@@ -5,7 +5,6 @@ use eframe::egui;
 use egui::{Align2, Color32, FontId, Pos2, Rect, RichText, Stroke, Vec2, vec2};
 
 const ROOT_NODE_SIZE: Vec2 = vec2(216.0, 420.0);
-
 pub(crate) fn render(
     ui: &mut egui::Ui,
     state: &mut StudioAppState,
@@ -13,7 +12,12 @@ pub(crate) fn render(
 ) {
     let snapshot = state.snapshot();
     let rect = ui.max_rect();
-    handle_viewport_input(ui, rect, graph_canvas);
+    let background_response = ui.interact(
+        rect,
+        egui::Id::new("graph_view_background"),
+        egui::Sense::click_and_drag(),
+    );
+    handle_viewport_input(ui, rect, &background_response, graph_canvas);
     let painter = ui.painter_at(rect);
 
     painter.rect_filled(rect, 0.0, theme::BACKGROUND);
@@ -26,7 +30,12 @@ pub(crate) fn render(
     render_view_controls(ui, rect, graph_canvas, root_world_rect, &snapshot);
 }
 
-fn handle_viewport_input(ui: &mut egui::Ui, rect: Rect, graph_canvas: &mut GraphCanvasState) {
+fn handle_viewport_input(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    background_response: &egui::Response,
+    graph_canvas: &mut GraphCanvasState,
+) {
     let Some(pointer_pos) = ui.input(|input| input.pointer.hover_pos()) else {
         return;
     };
@@ -38,12 +47,13 @@ fn handle_viewport_input(ui: &mut egui::Ui, rect: Rect, graph_canvas: &mut Graph
         let pointer_delta = input.pointer.delta();
         let pan_drag = input.pointer.middle_down()
             || input.pointer.secondary_down()
-            || (input.key_down(egui::Key::Space) && input.pointer.primary_down());
+            || (input.key_down(egui::Key::Space) && input.pointer.primary_down())
+            || background_response.dragged_by(egui::PointerButton::Primary);
         if pan_drag && pointer_delta != Vec2::ZERO {
             graph_canvas.pan(pointer_delta);
         }
 
-        let scroll = input.smooth_scroll_delta;
+        let scroll = input.translation_delta();
         if scroll != Vec2::ZERO {
             if input.modifiers.ctrl {
                 let factor = (scroll.y * 0.0015).exp();
@@ -51,11 +61,11 @@ fn handle_viewport_input(ui: &mut egui::Ui, rect: Rect, graph_canvas: &mut Graph
             } else {
                 graph_canvas.pan(scroll);
             }
-        }
-
-        let pinch_zoom = input.zoom_delta();
-        if (pinch_zoom - 1.0).abs() > 0.001 {
-            graph_canvas.zoom_by(pinch_zoom, pointer_pos, rect);
+        } else {
+            let pinch_zoom = input.zoom_delta();
+            if (pinch_zoom - 1.0).abs() > 0.001 {
+                graph_canvas.zoom_by(pinch_zoom, pointer_pos, rect);
+            }
         }
     });
 }
@@ -68,26 +78,36 @@ fn paint_grid(painter: &egui::Painter, rect: Rect, graph_canvas: &GraphCanvasSta
     let scaled_spacing = spacing * graph_canvas.zoom().max(0.35);
     let origin = graph_canvas.world_to_screen(Pos2::ZERO, rect);
 
-    let mut x = origin.x - ((origin.x - rect.left()) / scaled_spacing).ceil() * scaled_spacing;
-    let mut index = 0;
+    let first_x_index = ((rect.left() - origin.x) / scaled_spacing).floor() as i32;
+    let mut x_index = first_x_index;
+    let mut x = origin.x + x_index as f32 * scaled_spacing;
     while x <= rect.right() {
         painter.line_segment(
             [Pos2::new(x, rect.top()), Pos2::new(x, rect.bottom())],
-            if index % 4 == 0 { major } else { minor },
+            if x_index.rem_euclid(4) == 0 {
+                major
+            } else {
+                minor
+            },
         );
         x += scaled_spacing;
-        index += 1;
+        x_index += 1;
     }
 
-    let mut y = origin.y - ((origin.y - rect.top()) / scaled_spacing).ceil() * scaled_spacing;
-    index = 0;
+    let first_y_index = ((rect.top() - origin.y) / scaled_spacing).floor() as i32;
+    let mut y_index = first_y_index;
+    let mut y = origin.y + y_index as f32 * scaled_spacing;
     while y <= rect.bottom() {
         painter.line_segment(
             [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-            if index % 4 == 0 { major } else { minor },
+            if y_index.rem_euclid(4) == 0 {
+                major
+            } else {
+                minor
+            },
         );
         y += scaled_spacing;
-        index += 1;
+        y_index += 1;
     }
 }
 
