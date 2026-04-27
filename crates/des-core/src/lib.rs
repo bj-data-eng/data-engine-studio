@@ -1,8 +1,7 @@
+pub mod identity;
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
-pub const APP_NAME: &str = "Data Engine Studio";
-pub const APP_INTERNAL_ID: &str = "data-engine-studio";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AppInfo {
@@ -13,8 +12,8 @@ pub struct AppInfo {
 impl AppInfo {
     pub fn current() -> Self {
         Self {
-            name: APP_NAME.to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            name: identity::APP_DISPLAY_NAME.to_string(),
+            version: identity::APP_VERSION.to_string(),
         }
     }
 }
@@ -72,8 +71,8 @@ mod tests {
     fn current_app_info_uses_workspace_package_version() {
         let info = AppInfo::current();
 
-        assert_eq!(info.name, APP_NAME);
-        assert_eq!(info.version, "0.1.0");
+        assert_eq!(info.name, identity::APP_DISPLAY_NAME);
+        assert_eq!(info.version, identity::APP_VERSION);
     }
 
     #[test]

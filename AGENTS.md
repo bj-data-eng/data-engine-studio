@@ -17,6 +17,15 @@ Current workspace:
 
 Future crates should be introduced only when there is a real API boundary to preserve, not as empty architecture theater.
 
+## App Identity
+
+Keep app identity centralized.
+
+- Rust runtime identity lives in `crates/des-core/src/identity.rs`.
+- Python package identity helpers live in `python/data_engine_studio/identity.py`.
+- The Python launcher should let Rust provide the default window title instead of hardcoding it.
+- `pyproject.toml` and the Cargo workspace version must stay aligned until a single build-time source of truth is introduced.
+
 ## Core Architecture Rules
 
 - Treat each crate as a bounded subsystem with a small public API.
@@ -187,4 +196,3 @@ Add app command snapshot model
 Scaffold graph document crate
 Wire workspace catalog shell
 ```
-

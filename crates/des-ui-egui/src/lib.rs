@@ -1,5 +1,5 @@
 use des_app::StudioAppState;
-use des_core::{APP_INTERNAL_ID, APP_NAME, StudioResult};
+use des_core::{StudioResult, identity};
 use eframe::egui;
 use egui::{Align, Color32, Layout, RichText, Stroke};
 
@@ -14,7 +14,7 @@ pub struct NativeLaunchOptions {
 impl Default for NativeLaunchOptions {
     fn default() -> Self {
         Self {
-            title: APP_NAME.to_string(),
+            title: identity::window_title(),
         }
     }
 }
@@ -23,7 +23,7 @@ pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(options.title.clone())
-            .with_app_id(APP_INTERNAL_ID)
+            .with_app_id(identity::APP_INTERNAL_ID)
             .with_inner_size([1320.0, 780.0])
             .with_min_inner_size([MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT]),
         persist_window: false,
@@ -71,7 +71,7 @@ impl StudioEguiApp {
     fn render_top_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.add_space(8.0);
-            ui.heading(RichText::new(APP_NAME).strong());
+            ui.heading(RichText::new(identity::APP_DISPLAY_NAME).strong());
             ui.separator();
             let _ = ui.button("New Flow");
             let _ = ui.button("Open");

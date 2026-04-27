@@ -7,7 +7,7 @@ from data_engine_studio.native import launch_native
 
 def launch() -> None:
     """Launch the desktop Studio shell."""
-    launch_native(title="Data Engine Studio")
+    launch_native()
 
 
 def main() -> None:
@@ -16,4 +16,3 @@ def main() -> None:
 
 
 __all__ = ["launch", "main"]
-
