@@ -11,6 +11,7 @@ This roadmap is intentionally architecture-first. The core product requirement i
 - Keep graph, project, validation, query, and execution logic independent from `egui` and Python.
 - Keep Python as packaging and process entry only.
 - Keep `egui` as rendering and interaction only.
+- Keep Studio as the app; a selected workspace must not become the application identity.
 - Make runtime truth explicit through snapshots and events; logs are history, not the control plane.
 - Design for unit tests at crate boundaries before integration tests across the full app.
 - If a small behavior change requires touching many crates, revisit the boundary.
@@ -92,6 +93,10 @@ Implementation requirements:
 ## Workspaces, Ownership, And Export
 
 Studio must support more than one workspace root. A workspace root is a folder that can contain or discover one or more authored workspaces. A workspace is the concrete project area where flows, graph files, custom code, workspace config, and shared state live.
+
+Studio owns the workspace catalog. Opening a workspace changes the active context, not the identity or lifecycle of the whole app. The app must be able to start with no selected workspace, switch workspaces, show workspace status, and eventually support multiple workspace contexts without rewriting the shell.
+
+The primary UI should be a full-window graph workspace rather than a permanent sidebar beside a graph. Workspace roots, workspaces, and grouped flows can be represented as high-level nodes. Selecting a flow expands its flow graph from that card, with connectors from the selected flow into source nodes and then through transform/sink stages.
 
 Initial workspace model:
 
@@ -257,7 +262,7 @@ Lessons carried forward from `data-engine`:
 - Create the Python package skeleton.
 - Add `pyo3`/`maturin` native extension plumbing.
 - Launch a minimal egui window from `python -m data_engine_studio`.
-- Keep the shell shaped around a primary flow/workspace list with the node graph as an expanded flow editor.
+- Keep the shell shaped around a full-window graph workspace, with roots/workspaces/flows as high-level nodes and selected flows expanding into editable node graphs.
 - Add CI-ready commands for Rust tests, Python import smoke tests, and formatting.
 
 ### Milestone 2: Core Graph And Node Registry
@@ -295,6 +300,7 @@ Lessons carried forward from `data-engine`:
   - central graph canvas
   - right inspector
   - bottom status/runtime bar
+- Split `des-ui-egui` into internal modules for shell, workspace browser, flow list, flow editor, graph canvas, node palette, inspector, runtime panel, and theme as those surfaces become real.
 - Implement selection, panning, zooming, adding nodes, moving nodes, and connecting ports.
 - Keep UI state out of graph/project state.
 

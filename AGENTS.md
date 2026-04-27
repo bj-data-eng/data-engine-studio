@@ -70,9 +70,23 @@ domain crates
   gradually replace des-app stubs behind the same contracts
 ```
 
-The primary product surface starts as a workspace/flow list. The node graph is an expanded "view/edit this flow" surface, not necessarily the first screen forever.
+The primary product surface is a full-window graph workspace. Workspace roots, workspaces, and grouped flows can appear as high-level graph nodes. The node graph for a selected flow expands from the flow card into source/transform/sink nodes.
 
 When adding UI behavior, add the corresponding command/snapshot shape in `des-app` first or at the same time.
+
+Avoid a monolithic GUI crate. Split `des-ui-egui` internally by product surface and responsibility as it grows. Prefer small modules such as:
+
+- `shell`: top-level frame, menus, command routing, global layout.
+- `workspace_browser`: workspace roots, workspace list, ownership/status affordances.
+- `flow_list`: grouped built ETL flow cards embedded in the workspace/root graph node.
+- `flow_editor`: expanded flow editor container.
+- `graph_canvas`: node canvas drawing and interactions.
+- `node_palette`: source/transform/trigger/sink palette.
+- `inspector`: selected flow/node/property editing.
+- `runtime_panel`: run state, validation, logs, and status.
+- `theme`: visual constants and egui styling.
+
+UI modules may share small view models from `des-app`, but should not reach into graph/project/runtime internals directly.
 
 ## Workspace And Ownership Requirements
 
@@ -85,6 +99,8 @@ Keep these concepts distinct:
 - project document: saved graph/config/custom-code state
 - workspace state: shared coordination state such as ownership or published revisions
 - runtime state: runs, logs, scheduler state, caches, previews, and local process state
+
+The selected workspace must never "become" the app. The app owns a catalog of workspaces and can show zero, one, or many workspace contexts over time. A workspace is selected or opened within Studio; it is not the root application identity.
 
 Workspace ownership and runtime ownership may become separate concepts. Do not assume one global lock unless the roadmap explicitly changes.
 
