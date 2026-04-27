@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "crates/des-app",
+    "crates/des-core",
+    "crates/des-python",
+    "crates/des-ui-egui",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/bj-data-eng/data-engine-studio"
+
+[workspace.dependencies]
+des-app = { path = "crates/des-app" }
+des-core = { path = "crates/des-core" }
+des-ui-egui = { path = "crates/des-ui-egui" }
+eframe = { version = "0.34", default-features = true }
+egui = "0.34"
+pyo3 = { version = "0.27", features = ["extension-module", "abi3-py311"] }
+serde = { version = "1.0", features = ["derive"] }
+

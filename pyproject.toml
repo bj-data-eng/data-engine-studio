@@ -1,0 +1,33 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "data-engine-studio"
+version = "0.1.0"
+description = "Rust-first visual ETL and data exploration studio."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Data Engine Studio contributors" },
+]
+keywords = ["duckdb", "polars", "etl", "egui", "rust"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Rust",
+  "Topic :: Database",
+]
+
+[project.scripts]
+data-engine-studio = "data_engine_studio.launcher:main"
+
+[tool.maturin]
+manifest-path = "crates/des-python/Cargo.toml"
+python-source = "python"
+module-name = "data_engine_studio._native"
+features = ["pyo3/extension-module"]
+

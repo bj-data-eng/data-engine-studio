@@ -1,0 +1,20 @@
+[package]
+name = "des-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+des-core.workspace = true
+des-ui-egui.workspace = true
+pyo3.workspace = true
+
+[package.metadata.maturin]
+python-source = "../../python"
+module-name = "data_engine_studio._native"
+
