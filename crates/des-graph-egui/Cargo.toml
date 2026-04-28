@@ -1,0 +1,25 @@
+[package]
+name = "des-graph-egui"
+version.workspace = true
+edition = "2021"
+description = "A general-purpose node graph widget for egui."
+license = "MIT"
+repository.workspace = true
+
+[lib]
+name = "des_graph_egui"
+
+[dependencies]
+egui.workspace = true
+layout-rs = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+eframe.workspace = true
+env_logger = "0.11"
+petgraph = "0.8"
+
+[features]
+default = ["layout", "serde"]
+layout = ["layout-rs"]
+serde = ["egui/serde", "dep:serde"]
