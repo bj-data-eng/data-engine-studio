@@ -14,11 +14,6 @@ egui.workspace = true
 layout-rs = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
-[dev-dependencies]
-eframe.workspace = true
-env_logger = "0.11"
-petgraph = "0.8"
-
 [features]
 default = ["layout", "serde"]
 layout = ["layout-rs"]
