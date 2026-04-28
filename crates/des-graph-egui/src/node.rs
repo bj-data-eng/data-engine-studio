@@ -1,5 +1,5 @@
-use crate::socket::{SocketKind, SocketResponses};
 use crate::NodesCtx;
+use crate::socket::{SocketKind, SocketResponses};
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 
@@ -200,14 +200,14 @@ impl Node {
         ui: &mut egui::Ui,
         content: impl FnOnce(NodeCtx<'_>) -> FramedResponse<R>,
     ) -> NodeResponse<R> {
-        self.show_impl(ctx, ui, Box::new(content) as Box<_>)
+        self.show_impl(ctx, ui, content)
     }
 
-    fn show_impl<'a, R>(
+    fn show_impl<R>(
         self,
         ctx: &mut NodesCtx,
         ui: &mut egui::Ui,
-        content: Box<dyn FnOnce(NodeCtx<'_>) -> FramedResponse<R> + 'a>,
+        content: impl FnOnce(NodeCtx<'_>) -> FramedResponse<R>,
     ) -> NodeResponse<R> {
         let layout = &mut ctx.layout;
 
@@ -220,10 +220,10 @@ impl Node {
             // Otherwise, add the node to the top-left.
             let clip_rect = ui.clip_rect();
             let mut pos = clip_rect.center();
-            if ui.rect_contains_pointer(clip_rect) {
-                if let Some(ptr) = ui.response().hover_pos() {
-                    pos = ptr;
-                }
+            if ui.rect_contains_pointer(clip_rect)
+                && let Some(ptr) = ui.response().hover_pos()
+            {
+                pos = ptr;
             }
             egui::Pos2::new(pos.x, pos.y)
         });
@@ -290,7 +290,7 @@ impl Node {
         // the user's content is added... Is there a better way to handle this?
         let (mut selected, in_selection_rect) = {
             let gmem_arc = crate::memory(ui, ctx.graph_id);
-            let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+            let mut gmem = crate::lock_graph_memory(&gmem_arc);
             let in_selection_rect = match ctx.selection_rect {
                 Some(sel_rect) if ui.input(|i| !i.modifiers.shift) => {
                     let size = gmem
@@ -388,7 +388,7 @@ impl Node {
         let mut edge_event = None;
         {
             let gmem_arc = crate::memory(ui, ctx.graph_id);
-            let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+            let mut gmem = crate::lock_graph_memory(&gmem_arc);
             gmem.node_sizes.insert(self.id, response.rect.size());
 
             let ctrl_down = ui.input(|i| i.modifiers.ctrl);
@@ -432,14 +432,13 @@ impl Node {
                 && pointer.primary_pressed()
             {
                 // If this node's socket was pressed, create a start event.
-                if let Some(ref pressed) = gmem.pressed {
-                    if let crate::PressAction::Socket(socket) = pressed.action {
-                        if self.id == socket.node {
-                            let kind = socket.kind;
-                            let index = socket.index;
-                            edge_event = Some(EdgeEvent::Started { kind, index });
-                        }
-                    }
+                if let Some(ref pressed) = gmem.pressed
+                    && let crate::PressAction::Socket(socket) = pressed.action
+                    && self.id == socket.node
+                {
+                    let kind = socket.kind;
+                    let index = socket.index;
+                    edge_event = Some(EdgeEvent::Started { kind, index });
                 }
 
                 // Also check for deselection.
@@ -456,19 +455,17 @@ impl Node {
                 }
 
             // Check for edge creation / cancellation events (skip when immutable).
-            } else if !immutable {
-                if let Some(r) = ctx.socket_press_released {
-                    if let Some(c) = gmem.closest_socket {
-                        if r.kind == c.kind && self.id == r.node {
-                            edge_event = Some(EdgeEvent::Cancelled);
-                        } else if self.id == c.node && ui.input(|i| i.pointer.primary_released()) {
-                            let kind = c.kind;
-                            let index = c.index;
-                            edge_event = Some(EdgeEvent::Ended { kind, index });
-                        }
-                    } else if edge_event.is_none() && self.id == r.node {
+            } else if !immutable && let Some(r) = ctx.socket_press_released {
+                if let Some(c) = gmem.closest_socket {
+                    if r.kind == c.kind && self.id == r.node {
                         edge_event = Some(EdgeEvent::Cancelled);
+                    } else if self.id == c.node && ui.input(|i| i.pointer.primary_released()) {
+                        let kind = c.kind;
+                        let index = c.index;
+                        edge_event = Some(EdgeEvent::Ended { kind, index });
                     }
+                } else if edge_event.is_none() && self.id == r.node {
+                    edge_event = Some(EdgeEvent::Cancelled);
                 }
             }
         }
@@ -499,7 +496,7 @@ impl Node {
         {
             // Remove ourselves from the selection.
             let gmem_arc = crate::memory(ui, ctx.graph_id);
-            let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+            let mut gmem = crate::lock_graph_memory(&gmem_arc);
             selection_changed |= gmem.selection.nodes.remove(&self.id);
             selected = false;
             true
@@ -510,7 +507,7 @@ impl Node {
         // Propagate this node's selection change to the graph-level dirty flag.
         if selection_changed {
             let gmem_arc = crate::memory(ui, ctx.graph_id);
-            let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+            let mut gmem = crate::lock_graph_memory(&gmem_arc);
             gmem.selection.changed = true;
         }
 
@@ -531,6 +528,10 @@ impl Node {
 
 impl NodeId {
     /// Create a new NodeId by hashing any hashable value.
+    ///
+    /// This is a convenience for immediate-mode UI ids. Persisted graph models
+    /// should provide their own stable ids and use [`NodeId::from_u64`] at the
+    /// UI boundary.
     pub fn new(id_src: impl Hash) -> Self {
         use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::new();

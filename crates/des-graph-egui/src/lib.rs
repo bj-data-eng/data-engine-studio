@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(feature = "layout")]
 pub use layout::layout;
 pub use node::{FramedResponse, NodeCtx, NodeId, NodeInteraction};
-pub use socket::layout::{grid::SocketGrid, SocketLayout};
+pub use socket::layout::{SocketLayout, grid::SocketGrid};
 pub use socket::{SocketKind, SocketResponses};
 
 pub mod bezier;
@@ -337,7 +337,7 @@ impl Graph {
 
             // Check for selection rectangle and node dragging.
             let gmem_arc = memory(ui, self.id);
-            let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+            let mut gmem = crate::lock_graph_memory(&gmem_arc);
 
             // Apply externally-provided selection if set.
             if let Some(nodes) = self.selected_nodes.take() {
@@ -382,14 +382,14 @@ impl Graph {
                 );
 
                 // Apply drag delta to all selected nodes (skip when immutable).
-                if !self.immutable && interaction.drag_nodes_delta != egui::Vec2::ZERO {
-                    if let Some(pressed) = gmem.pressed.as_ref() {
-                        if let PressAction::DragNodes { .. } = pressed.action {
-                            for &n_id in &gmem.selection.nodes {
-                                if let Some(pos) = layout.get_mut(&n_id) {
-                                    *pos += interaction.drag_nodes_delta;
-                                }
-                            }
+                if !self.immutable
+                    && interaction.drag_nodes_delta != egui::Vec2::ZERO
+                    && let Some(pressed) = gmem.pressed.as_ref()
+                    && let PressAction::DragNodes { .. } = pressed.action
+                {
+                    for &n_id in &gmem.selection.nodes {
+                        if let Some(pos) = layout.get_mut(&n_id) {
+                            *pos += interaction.drag_nodes_delta;
                         }
                     }
                 }
@@ -442,7 +442,7 @@ impl Graph {
 
             // Snapshot selection only if it changed this frame.
             let gmem_arc = memory(ui, self.id);
-            let gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+            let gmem = crate::lock_graph_memory(&gmem_arc);
             let selection_changed = if gmem.selection.changed {
                 Some(gmem.selection.nodes.clone())
             } else {
@@ -452,10 +452,10 @@ impl Graph {
             (output, selection_changed)
         });
 
-        if self.center_view {
-            if let Some(rect) = bounding_rect {
-                view.scene_rect = rect.expand(rect.width() * 0.1);
-            }
+        if self.center_view
+            && let Some(rect) = bounding_rect
+        {
+            view.scene_rect = rect.expand(rect.width() * 0.1);
         }
 
         let (inner, selection_changed) = scene_response.inner;
@@ -590,13 +590,13 @@ impl<'a> Show<'a> {
 /// removed the node from their graph, so we should stop tracking it.
 fn prune_unused_nodes(graph_id: egui::Id, visited: &HashSet<NodeId>, ui: &mut egui::Ui) {
     let gmem_arc = memory(ui, graph_id);
-    let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+    let mut gmem = crate::lock_graph_memory(&gmem_arc);
     gmem.node_sizes.retain(|k, _| visited.contains(k));
     gmem.selection.nodes.retain(|k| visited.contains(k));
-    if let Some(socket) = gmem.closest_socket.as_ref() {
-        if !visited.contains(&socket.node) {
-            gmem.closest_socket = None;
-        }
+    if let Some(socket) = gmem.closest_socket.as_ref()
+        && !visited.contains(&socket.node)
+    {
+        gmem.closest_socket = None;
     }
     if let Some(pressed) = gmem.pressed.as_ref() {
         match pressed.action {
@@ -624,7 +624,7 @@ impl EdgesCtx {
         input: usize,
     ) -> Option<(egui::Pos2, egui::Vec2)> {
         let gmem_arc = crate::memory(ui, self.graph_id);
-        let gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+        let gmem = crate::lock_graph_memory(&gmem_arc);
         gmem.sockets
             .get(&node)
             .and_then(|sockets| sockets.input(input))
@@ -640,7 +640,7 @@ impl EdgesCtx {
         output: usize,
     ) -> Option<(egui::Pos2, egui::Vec2)> {
         let gmem_arc = memory(ui, self.graph_id);
-        let gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+        let gmem = crate::lock_graph_memory(&gmem_arc);
         gmem.sockets
             .get(&node)
             .and_then(|sockets| sockets.output(output))
@@ -649,7 +649,7 @@ impl EdgesCtx {
     /// If the user is in the progress of creating an edge, this returns the relevant info.
     pub fn in_progress(&self, ui: &egui::Ui) -> Option<EdgeInProgress> {
         let gmem_arc = memory(ui, self.graph_id);
-        let gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+        let gmem = crate::lock_graph_memory(&gmem_arc);
         let pressed = gmem.pressed.as_ref()?;
         let start = match pressed.action {
             PressAction::Socket(socket) => {
@@ -961,14 +961,14 @@ pub fn with_graph_memory<R>(
         d.get_temp_mut_or_default::<Arc<Mutex<GraphTempMemory>>>(graph_id)
             .clone()
     });
-    let gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+    let gmem = crate::lock_graph_memory(&gmem_arc);
     f(&gmem)
 }
 
 /// Checks if a node with the given ID is currently selected in the specified graph.
 pub fn is_node_selected(ui: &egui::Ui, graph_id: egui::Id, node_id: NodeId) -> bool {
     let gmem_arc = memory(ui, graph_id);
-    let gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+    let gmem = crate::lock_graph_memory(&gmem_arc);
     gmem.selection.nodes.contains(&node_id)
 }
 
@@ -978,4 +978,12 @@ fn memory(ui: &egui::Ui, graph_id: egui::Id) -> Arc<Mutex<GraphTempMemory>> {
         d.get_temp_mut_or_default::<Arc<Mutex<GraphTempMemory>>>(graph_id)
             .clone()
     })
+}
+
+pub(crate) fn lock_graph_memory(
+    memory: &Arc<Mutex<GraphTempMemory>>,
+) -> MutexGuard<'_, GraphTempMemory> {
+    memory
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }

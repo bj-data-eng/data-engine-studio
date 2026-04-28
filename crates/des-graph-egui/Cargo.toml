@@ -1,7 +1,7 @@
 [package]
 name = "des-graph-egui"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 description = "A general-purpose node graph widget for egui."
 license = "MIT"
 repository.workspace = true
@@ -15,6 +15,6 @@ layout-rs = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [features]
-default = ["layout", "serde"]
+default = []
 layout = ["layout-rs"]
 serde = ["egui/serde", "dep:serde"]

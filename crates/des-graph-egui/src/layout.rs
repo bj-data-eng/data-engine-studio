@@ -36,9 +36,10 @@ pub fn layout(
     }
 
     for (a, b) in edges {
+        let (Some(&na), Some(&nb)) = (handles.get(&a), handles.get(&b)) else {
+            continue;
+        };
         let edge = Arrow::default();
-        let na = handles[&a];
-        let nb = handles[&b];
         vg.add_edge(edge, na, nb);
     }
 

@@ -7,9 +7,7 @@ preserved in `LICENSE-MIT`.
 This crate is maintained as an owned Data Engine Studio graph UI subsystem.
 Changes made for Data Engine Studio are also licensed under MIT.
 
-## Upstream README
-
-# egui_graph
+# Upstream Lineage
 
 A general-purpose node graph widget for [egui](https://github.com/emilk/egui).
 
@@ -23,11 +21,11 @@ sophisticated example of what can be built with egui_graph, check out
 
 ## Key Design Philosophy
 
-One of the core design decisions of `egui_graph` is to avoid requiring that
+One of the core design decisions inherited from `egui_graph` is to avoid requiring that
 users model their graph with any particular data structure. The library provides
 immediate-mode widgets for rendering and interacting with graphs, but leaves
 the underlying data model up to you. Store your graph however makes sense for
-your application - whether that's an adjacency list, entity-component system,
+your application, whether that's an adjacency list, entity-component system,
 or any other representation.
 
 ## Features
@@ -43,7 +41,7 @@ or any other representation.
 ## Quick Start
 
 ```rust
-use egui_graph::{Graph, View, Node, NodeId, Edge};
+use des_graph_egui::{Edge, Graph, Node, NodeId, View};
 
 // Create a view to store node and "camera" positions.
 let mut view = View::default();
@@ -52,19 +50,19 @@ let mut view = View::default();
 Graph::new("my_graph")
     .show(&mut view, ui, |ui, mut show| {
         // Add nodes to the graph
-        show.nodes(|nctx, ui| {
+        show.nodes(ui, |nctx, ui| {
             Node::new("node_1")
                 .inputs(2)
                 .outputs(1)
                 .show(nctx, ui, |node_ctx| {
-                    node_ctx.framed(|ui| {
+                    node_ctx.framed(|ui, _sockets| {
                         ui.label("My Node");
                     })
                 })
         });
 
         // Add edges between nodes
-        show.edges(|ectx, ui| {
+        show.edges(ui, |ectx, ui| {
             let selected = false;
             Edge::new(
                 (NodeId::new("node_1"), 0),  // From output 0
@@ -75,7 +73,7 @@ Graph::new("my_graph")
     });
 ```
 
-Visit the demo.rs example for a more thorough, up-to-date example.
+The original upstream examples are available in the source fork history.
 
 ## Core Components
 
@@ -105,7 +103,7 @@ Node::new(id_source)
     .socket_radius(5.0)
     .show(ctx, ui, |node_ctx| {
         // Node content goes here
-        node_ctx.framed(|ui| {
+        node_ctx.framed(|ui, _sockets| {
             ui.label("Node Content");
         })
     })
@@ -130,7 +128,7 @@ Edge::new(
 With the `layout` feature enabled:
 
 ```rust
-use egui_graph::layout;
+use des_graph_egui::layout;
 
 let positions = layout(
     nodes.iter().map(|(id, size)| (*id, size)),
@@ -159,21 +157,6 @@ view.layout = positions;
 - **Drag to Input Socket**: Preview connection
 - **Release on Input**: Create edge
 - **ESC**: Cancel edge creation
-
-## Examples
-
-Run the included demo:
-
-```bash
-cargo run --release --example demo
-```
-
-The demo showcases:
-- Multiple node types (labels, buttons, sliders)
-- Dynamic node creation and deletion
-- Edge creation between nodes
-- Automatic layout
-- Configuration options
 
 ## Architecture
 

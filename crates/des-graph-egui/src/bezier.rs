@@ -67,7 +67,12 @@ impl Cubic {
         let distance = self.from.distance(self.ctrl1)
             + self.ctrl1.distance(self.ctrl2)
             + self.ctrl2.distance(self.to);
-        let samples = (distance / distance_per_point).round() as usize;
+        let samples =
+            if distance.is_finite() && distance_per_point.is_finite() && distance_per_point > 0.0 {
+                (distance / distance_per_point).ceil().max(1.0) as usize
+            } else {
+                1
+            };
         (0..=samples).map(move |ix| {
             let t = ix as f32 / samples as f32;
             self.sample(t)
@@ -112,10 +117,10 @@ impl Cubic {
         }
         let mut pts = self.flatten(distance_per_point).peekable();
         while let Some(b1) = pts.next() {
-            if let Some(&b2) = pts.peek() {
-                if lines_intersect(line, (b1, b2)) {
-                    return true;
-                }
+            if let Some(&b2) = pts.peek()
+                && lines_intersect(line, (b1, b2))
+            {
+                return true;
             }
         }
         false
@@ -136,7 +141,7 @@ impl Cubic {
         let lb = rect.left_bottom();
         let rt = rect.right_top();
         let rb = rect.right_bottom();
-        let lines = [(lt, rt), (rt, rb), (rb, lb)];
+        let lines = [(lt, rt), (rt, rb), (rb, lb), (lb, lt)];
         lines
             .iter()
             .any(|&l| self.intersects_line(distance_per_point, l))
@@ -157,6 +162,7 @@ fn rect_intersects_line(r: egui::Rect, (a, b): (egui::Pos2, egui::Pos2)) -> bool
     lines_intersect((lt, rt), (a, b))
         || lines_intersect((rt, rb), (a, b))
         || lines_intersect((rb, lb), (a, b))
+        || lines_intersect((lb, lt), (a, b))
 }
 
 // Whether or not the given lines intersect.
@@ -173,4 +179,37 @@ fn lines_intersect(a: (egui::Pos2, egui::Pos2), b: (egui::Pos2, egui::Pos2)) -> 
     let t2 = tri_area(b1, b2, a2);
     let res2 = (t1 > 0.0) != (t2 > 0.0) && !(t1 == 0.0 && t2 == 0.0);
     res1 && res2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flatten_degenerate_curve_keeps_finite_points() {
+        let point = egui::pos2(12.0, 34.0);
+        let curve = Cubic {
+            from: point,
+            ctrl1: point,
+            ctrl2: point,
+            to: point,
+        };
+
+        let points: Vec<_> = curve.flatten(0.0).collect();
+
+        assert_eq!(points, vec![point, point]);
+        assert!(
+            points
+                .iter()
+                .all(|point| point.x.is_finite() && point.y.is_finite())
+        );
+    }
+
+    #[test]
+    fn rectangle_intersection_checks_all_edges() {
+        let rect = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(10.0, 10.0));
+        let line_crossing_left_edge = (egui::pos2(-1.0, 5.0), egui::pos2(5.0, 5.0));
+
+        assert!(rect_intersects_line(rect, line_crossing_left_edge));
+    }
 }

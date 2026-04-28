@@ -1,4 +1,4 @@
-use crate::{bezier, EdgesCtx, NodeId};
+use crate::{EdgesCtx, NodeId, bezier};
 use std::ops;
 
 /// A simple bezier-curve Edge widget.

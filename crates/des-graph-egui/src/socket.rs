@@ -124,7 +124,7 @@ pub(crate) fn show(
         || !node_sockets.outputs.is_empty()
     {
         let gmem_arc = crate::memory(ui, graph_id);
-        let mut gmem = gmem_arc.lock().expect("failed to lock graph temp memory");
+        let mut gmem = crate::lock_graph_memory(&gmem_arc);
         gmem.sockets.insert(node_id, node_sockets.clone());
 
         let pressed_socket = gmem
@@ -161,15 +161,17 @@ pub(crate) fn show(
         .min(ui.spacing().interact_size.y);
 
     let paint_highlight = |kind, ix| {
-        if let Some((k, i)) = pressed_socket {
-            if k == kind && i == ix {
-                return true;
-            }
+        if let Some((k, i)) = pressed_socket
+            && k == kind
+            && i == ix
+        {
+            return true;
         }
-        if let Some((k, i)) = closest_socket {
-            if k == kind && i == ix {
-                return true;
-            }
+        if let Some((k, i)) = closest_socket
+            && k == kind
+            && i == ix
+        {
+            return true;
         }
         false
     };
