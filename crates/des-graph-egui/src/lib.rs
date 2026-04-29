@@ -452,6 +452,14 @@ impl Graph {
             (output, selection_changed)
         });
 
+        apply_scroll_navigation_over_children(
+            ui,
+            &scene_response.response,
+            scene_rect,
+            graph_rect,
+            self.zoom_range,
+        );
+
         if self.center_view
             && let Some(rect) = bounding_rect
         {
@@ -465,6 +473,79 @@ impl Graph {
             selection_changed,
         }
     }
+}
+
+fn apply_scroll_navigation_over_children(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    scene_rect: &mut egui::Rect,
+    graph_rect: egui::Rect,
+    zoom_range: egui::Rangef,
+) {
+    if response.changed() || response.contains_pointer() {
+        return;
+    }
+
+    let Some(pointer_pos) = ui.input(|input| input.pointer.latest_pos()) else {
+        return;
+    };
+    if !graph_rect.contains(pointer_pos) {
+        return;
+    }
+
+    let (zoom_delta, pan_delta) =
+        ui.input(|input| (input.zoom_delta(), input.smooth_scroll_delta()));
+    if zoom_delta == 1.0 && pan_delta == egui::Vec2::ZERO {
+        return;
+    }
+
+    let mut zoom = scene_zoom(graph_rect, *scene_rect, zoom_range);
+    if zoom_delta != 1.0 {
+        let next_zoom = (zoom * zoom_delta).clamp(zoom_range.min, zoom_range.max);
+        if (next_zoom - zoom).abs() > f32::EPSILON {
+            zoom_at_pointer(scene_rect, graph_rect, pointer_pos, zoom, next_zoom);
+            zoom = next_zoom;
+        }
+    }
+
+    if pan_delta != egui::Vec2::ZERO && zoom > 0.0 {
+        *scene_rect = scene_rect.translate(-pan_delta / zoom);
+    }
+
+    ui.ctx().request_repaint();
+}
+
+fn scene_zoom(graph_rect: egui::Rect, scene_rect: egui::Rect, zoom_range: egui::Rangef) -> f32 {
+    if scene_rect.width() <= 0.0 || scene_rect.height() <= 0.0 {
+        return 1.0;
+    }
+    (graph_rect.width() / scene_rect.width())
+        .min(graph_rect.height() / scene_rect.height())
+        .clamp(zoom_range.min, zoom_range.max)
+}
+
+fn zoom_at_pointer(
+    scene_rect: &mut egui::Rect,
+    graph_rect: egui::Rect,
+    pointer_pos: egui::Pos2,
+    old_zoom: f32,
+    next_zoom: f32,
+) {
+    let translation = graph_rect.center().to_vec2() - old_zoom * scene_rect.center().to_vec2();
+    let pointer_scene = egui::Pos2::new(
+        (pointer_pos.x - translation.x) / old_zoom,
+        (pointer_pos.y - translation.y) / old_zoom,
+    );
+    let next_translation = pointer_pos.to_vec2() - next_zoom * pointer_scene.to_vec2();
+    let next_min = egui::Pos2::new(
+        (graph_rect.min.x - next_translation.x) / next_zoom,
+        (graph_rect.min.y - next_translation.y) / next_zoom,
+    );
+    let next_max = egui::Pos2::new(
+        (graph_rect.max.x - next_translation.x) / next_zoom,
+        (graph_rect.max.y - next_translation.y) / next_zoom,
+    );
+    *scene_rect = egui::Rect::from_min_max(next_min, next_max);
 }
 
 impl GraphTempMemory {

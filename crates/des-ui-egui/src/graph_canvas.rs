@@ -1,85 +1,99 @@
 use crate::theme;
 use des_app::{
-    AppCommand, FlowGraphSummary, GraphEdgeSummary, GraphNodeSummary, GraphPortSide, StudioAppState,
+    AppCommand, AppSnapshot, CanvasPoint, FlowGraphSummary, GraphNodeSummary, StudioAppState,
 };
+use des_graph_egui::{Graph, NodeId, View, edge::Edge, node::Node};
 use eframe::egui;
-use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, Vec2, vec2};
+use egui::{Color32, Pos2, Rect, RichText, Stroke, Vec2, vec2};
+use std::collections::HashSet;
 
+const ROOT_NODE_ID: NodeId = NodeId::from_u64(1);
+const ROOT_NODE_SIZE: Vec2 = vec2(216.0, 420.0);
 const NODE_SIZE: Vec2 = vec2(230.0, 112.0);
-const PORT_RADIUS: f32 = 6.0;
-const PORT_TOP_OFFSET: f32 = 46.0;
-const PORT_SPACING: f32 = 24.0;
+const INITIAL_SCENE_SIZE: Vec2 = vec2(1320.0, 780.0);
 
 pub(crate) struct GraphCanvasState {
-    dragging_edge: Option<PortRef>,
-    pan: Vec2,
-    zoom: f32,
+    view: View,
+    selected_edges: HashSet<String>,
+}
+
+pub(crate) struct GraphCanvasDiagnostics {
+    pub(crate) zoom: f32,
+    pub(crate) scene_rect: Rect,
+    pub(crate) node_count: usize,
+    pub(crate) selected_edge_count: usize,
 }
 
 impl Default for GraphCanvasState {
     fn default() -> Self {
         Self {
-            dragging_edge: None,
-            pan: Vec2::ZERO,
-            zoom: 1.0,
+            view: View {
+                scene_rect: Rect::from_min_size(Pos2::ZERO, INITIAL_SCENE_SIZE),
+                layout: Default::default(),
+            },
+            selected_edges: HashSet::new(),
         }
     }
 }
 
 impl GraphCanvasState {
-    pub(crate) fn zoom(&self) -> f32 {
-        self.zoom
+    pub(crate) fn set_scene_rect(&mut self, rect: Rect) {
+        if rect.is_finite() && rect.width() > 0.0 && rect.height() > 0.0 {
+            self.view.scene_rect = rect;
+        }
     }
 
-    pub(crate) fn pan(&mut self, delta: Vec2) {
-        self.pan += delta;
+    pub(crate) fn view_zoom(&self, screen_rect: Rect) -> f32 {
+        if self.view.scene_rect.width() <= 0.0 || self.view.scene_rect.height() <= 0.0 {
+            return 1.0;
+        }
+        (screen_rect.width() / self.view.scene_rect.width())
+            .min(screen_rect.height() / self.view.scene_rect.height())
+            .clamp(0.35, 2.25)
     }
 
-    pub(crate) fn zoom_by(&mut self, factor: f32, anchor: Pos2, rect: Rect) {
-        let old_zoom = self.zoom;
-        let next_zoom = (self.zoom * factor).clamp(0.35, 2.25);
-        if (next_zoom - old_zoom).abs() < f32::EPSILON {
+    pub(crate) fn zoom_by(&mut self, factor: f32, anchor: Pos2, screen_rect: Rect) {
+        let old_zoom = self.view_zoom(screen_rect);
+        let next_zoom = (old_zoom * factor).clamp(0.35, 2.25);
+        if (next_zoom - old_zoom).abs() < f32::EPSILON || screen_rect.size() == Vec2::ZERO {
             return;
         }
-        let world_anchor = self.screen_to_world(anchor, rect);
-        self.zoom = next_zoom;
-        let next_anchor = self.world_to_screen(world_anchor, rect);
-        self.pan += anchor - next_anchor;
+        let anchor_offset = anchor - screen_rect.min;
+        let world_anchor = self.view.scene_rect.min + anchor_offset / old_zoom;
+        let next_size = screen_rect.size() / next_zoom;
+        let next_min = world_anchor - anchor_offset / next_zoom;
+        self.view.scene_rect = Rect::from_min_size(next_min, next_size);
     }
 
-    pub(crate) fn world_to_screen(&self, world: Pos2, rect: Rect) -> Pos2 {
-        rect.left_top() + self.pan + world.to_vec2() * self.zoom
-    }
-
-    pub(crate) fn screen_to_world(&self, screen: Pos2, rect: Rect) -> Pos2 {
-        let local = (screen - rect.left_top() - self.pan) / self.zoom;
-        Pos2::new(local.x, local.y)
-    }
-
-    pub(crate) fn world_rect(&self, min: Pos2, size: Vec2, rect: Rect) -> Rect {
-        Rect::from_min_size(self.world_to_screen(min, rect), size * self.zoom)
-    }
-
-    pub(crate) fn fit_world_rect(&mut self, world_rect: Rect, screen_rect: Rect, padding: f32) {
+    pub(crate) fn fit_world_rect(&mut self, world_rect: Rect, screen_rect: Rect, padding_px: f32) {
         if world_rect.width() <= 0.0 || world_rect.height() <= 0.0 {
             return;
         }
-        let available = (screen_rect.size() - Vec2::splat(padding * 2.0)).max(Vec2::splat(1.0));
+        let available = (screen_rect.size() - Vec2::splat(padding_px * 2.0)).max(Vec2::splat(1.0));
         let next_zoom = (available.x / world_rect.width())
             .min(available.y / world_rect.height())
             .clamp(0.35, 2.25);
-        self.zoom = next_zoom;
-        let content_size = world_rect.size() * self.zoom;
-        let target_min = screen_rect.min + (screen_rect.size() - content_size) * 0.5;
-        self.pan = target_min - screen_rect.min - world_rect.min.to_vec2() * self.zoom;
+        let next_size = screen_rect.size() / next_zoom;
+        self.view.scene_rect = Rect::from_center_size(world_rect.center(), next_size);
     }
-}
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct PortRef {
-    node_id: String,
-    port_id: String,
-    side: GraphPortSide,
+    pub(crate) fn diagnostics(
+        &self,
+        screen_rect: Rect,
+        snapshot: &AppSnapshot,
+    ) -> GraphCanvasDiagnostics {
+        let node_count = selected_flow(snapshot)
+            .map(|flow| flow.graph.nodes.len())
+            .unwrap_or_default()
+            + 1;
+
+        GraphCanvasDiagnostics {
+            zoom: self.view_zoom(screen_rect),
+            scene_rect: self.view.scene_rect,
+            node_count,
+            selected_edge_count: self.selected_edges.len(),
+        }
+    }
 }
 
 pub(crate) fn render(
@@ -87,72 +101,436 @@ pub(crate) fn render(
     state: &mut StudioAppState,
     canvas_state: &mut GraphCanvasState,
     rect: Rect,
-    graph: &FlowGraphSummary,
+    snapshot: &AppSnapshot,
 ) {
-    let painter = ui.painter_at(rect);
-    paint_edges(&painter, rect, graph, canvas_state);
+    ensure_layout_positions(canvas_state, snapshot);
+    let mut selected_edges = std::mem::take(&mut canvas_state.selected_edges);
+    let content_scale = 1.0;
 
-    if !ui.input(|input| input.pointer.primary_down()) {
-        canvas_state.dragging_edge = None;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+        ui.set_min_size(rect.size());
+        let response = Graph::new("studio-workspace-graph")
+            .zoom_range(egui::Rangef::new(0.35, 2.25))
+            .max_inner_size(vec2(5000.0, 3000.0))
+            .show(&mut canvas_state.view, ui, |ui, show| {
+                show.nodes(ui, |nodes, ui| {
+                    render_root_node(ui, state, snapshot, nodes, content_scale);
+                    if let Some(flow) = selected_flow(snapshot) {
+                        for node in &flow.graph.nodes {
+                            render_flow_node(ui, nodes, node, content_scale);
+                        }
+                    }
+                })
+                .edges(ui, |edges, ui| {
+                    if let Some(flow) = selected_flow(snapshot) {
+                        render_root_edges(ui, &mut selected_edges, edges, &flow.graph);
+                        render_flow_edges(ui, &mut selected_edges, edges, &flow.graph);
+                    }
+                });
+            });
+
+        if response.response.hovered() {
+            ui.ctx().request_repaint();
+        }
+    });
+
+    canvas_state.selected_edges = selected_edges;
+    sync_node_positions(state, canvas_state, snapshot);
+}
+
+pub(crate) fn graph_world_bounds(snapshot: &AppSnapshot) -> Option<Rect> {
+    let root = root_node_world_rect();
+    let mut bounds = root;
+    if let Some(flow) = selected_flow(snapshot)
+        && let Some(graph_bounds) = flow_graph_world_bounds(&flow.graph)
+    {
+        bounds = bounds.union(graph_bounds);
     }
+    Some(bounds)
+}
 
-    if let Some(from_port) = &canvas_state.dragging_edge {
-        if let Some(from_pos) = port_position(
-            rect,
-            graph,
-            &from_port.node_id,
-            &from_port.port_id,
-            from_port.side,
-            canvas_state,
-        ) {
-            let pointer_pos = ui
-                .input(|input| input.pointer.hover_pos())
-                .unwrap_or(from_pos);
-            paint_curve(
-                &painter,
-                from_pos,
-                pointer_pos,
-                Color32::from_rgb(235, 185, 82),
-                2.0,
-            );
+fn ensure_layout_positions(canvas_state: &mut GraphCanvasState, snapshot: &AppSnapshot) {
+    canvas_state
+        .view
+        .layout
+        .entry(ROOT_NODE_ID)
+        .or_insert(root_node_world_rect().min);
+
+    if let Some(flow) = selected_flow(snapshot) {
+        for node in &flow.graph.nodes {
+            canvas_state
+                .view
+                .layout
+                .entry(node_id(&node.id))
+                .or_insert(Pos2::new(node.position.x, node.position.y));
         }
     }
+}
 
-    for node in &graph.nodes {
-        render_node(ui, state, canvas_state, rect, node);
+fn sync_node_positions(
+    state: &mut StudioAppState,
+    canvas_state: &GraphCanvasState,
+    snapshot: &AppSnapshot,
+) {
+    let Some(flow) = selected_flow(snapshot) else {
+        return;
+    };
+
+    for node in &flow.graph.nodes {
+        let Some(position) = canvas_state.view.layout.get(&node_id(&node.id)) else {
+            continue;
+        };
+        if (position.x - node.position.x).abs() > 0.5 || (position.y - node.position.y).abs() > 0.5
+        {
+            state.dispatch(AppCommand::MoveGraphNode {
+                node_id: node.id.clone(),
+                position: CanvasPoint::new(position.x, position.y),
+            });
+        }
     }
 }
 
-fn render_node(
+fn render_root_node(
     ui: &mut egui::Ui,
     state: &mut StudioAppState,
-    canvas_state: &mut GraphCanvasState,
-    canvas_rect: Rect,
-    node: &GraphNodeSummary,
+    snapshot: &AppSnapshot,
+    nodes: &mut des_graph_egui::NodesCtx<'_>,
+    scale: f32,
 ) {
-    let rect = node_rect(canvas_rect, node, canvas_state);
-    let painter = ui.painter_at(canvas_rect);
-    paint_node_body(ui, &painter, state, canvas_state, rect, node);
-    paint_ports(ui, &painter, canvas_state, canvas_rect, node);
+    let has_flow = selected_flow(snapshot).is_some();
+    Node::from_id(ROOT_NODE_ID)
+        .outputs(usize::from(has_flow))
+        .max_width(ROOT_NODE_SIZE.x)
+        .socket_color(theme::SOURCE_CONNECTOR)
+        .socket_radius(6.0)
+        .animation_time(0.0)
+        .show(nodes, ui, |ctx| {
+            let interaction = ctx.interaction();
+            ctx.framed_with(root_frame(interaction), |ui, sockets| {
+                ui.set_min_size(ROOT_NODE_SIZE);
+                ui.set_width(ROOT_NODE_SIZE.x);
+                ui.label(theme::graph_heading_at("Workspace Roots", scale));
+                ui.label(theme::metadata_at("Catalog node", scale));
+                ui.add_space(8.0);
+                render_root_selector(ui, state, snapshot, scale);
+                ui.add_space(10.0);
+                render_workspace_cards(ui, state, snapshot, scale);
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(8.0);
+                render_flow_cards(ui, state, snapshot, sockets, scale);
+            })
+        });
 }
 
-pub(crate) fn source_entry_points_with_view(
-    canvas_rect: Rect,
+fn render_root_selector(
+    ui: &mut egui::Ui,
+    state: &mut StudioAppState,
+    snapshot: &AppSnapshot,
+    scale: f32,
+) {
+    let selected_root = snapshot
+        .home
+        .workspace_roots
+        .iter()
+        .find(|root| Some(root.id.as_str()) == snapshot.selected_root_id.as_deref());
+    let selected_label = selected_root
+        .map(|root| root.name.as_str())
+        .unwrap_or("No root selected");
+
+    egui::ComboBox::from_id_salt("workspace_root_selector")
+        .selected_text(selected_label)
+        .width(ROOT_NODE_SIZE.x - 24.0)
+        .show_ui(ui, |ui| {
+            for root in &snapshot.home.workspace_roots {
+                let selected = Some(root.id.as_str()) == snapshot.selected_root_id.as_deref();
+                if ui.selectable_label(selected, &root.name).clicked() {
+                    state.dispatch(AppCommand::SelectWorkspaceRoot {
+                        root_id: root.id.clone(),
+                    });
+                }
+            }
+        });
+
+    if let Some(root) = selected_root {
+        ui.label(theme::metadata_at(&root.path, scale));
+    }
+}
+
+fn render_workspace_cards(
+    ui: &mut egui::Ui,
+    state: &mut StudioAppState,
+    snapshot: &AppSnapshot,
+    scale: f32,
+) {
+    ui.label(RichText::new("Workspaces").size(14.0 * scale).strong());
+    let workspaces: Vec<_> = snapshot
+        .home
+        .workspaces
+        .iter()
+        .filter(|workspace| {
+            Some(workspace.root_id.as_str()) == snapshot.selected_root_id.as_deref()
+        })
+        .collect();
+
+    for workspace in workspaces {
+        let selected = Some(workspace.id.as_str()) == snapshot.selected_workspace_id.as_deref();
+        let response = card_frame(selected).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(
+                egui::Label::new(RichText::new(&workspace.name).size(14.0 * scale).strong())
+                    .wrap()
+                    .selectable(false),
+            );
+            ui.add(
+                egui::Label::new(theme::metadata_at(&workspace.status, scale))
+                    .wrap()
+                    .selectable(false),
+            );
+        });
+        if response.response.interact(egui::Sense::click()).clicked() {
+            state.dispatch(AppCommand::SelectWorkspace {
+                workspace_id: workspace.id.clone(),
+            });
+        }
+        ui.add_space(6.0);
+    }
+}
+
+fn render_flow_cards(
+    ui: &mut egui::Ui,
+    state: &mut StudioAppState,
+    snapshot: &AppSnapshot,
+    sockets: &mut des_graph_egui::SocketLayout,
+    scale: f32,
+) {
+    ui.label(RichText::new("Grouped Flows").size(14.0 * scale).strong());
+    let selected_id = snapshot.selected_flow_id.as_deref();
+    for flow in &snapshot.home.flows {
+        let selected = Some(flow.id.as_str()) == selected_id;
+        let response = card_frame(selected).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(
+                egui::Label::new(RichText::new(&flow.name).size(14.0 * scale).strong())
+                    .wrap()
+                    .selectable(false),
+            );
+            ui.add(
+                egui::Label::new(theme::metadata_at(&flow.group, scale))
+                    .wrap()
+                    .selectable(false),
+            );
+            ui.horizontal(|ui| {
+                ui.label(theme::metadata_at(
+                    format!("{} nodes", flow.node_count),
+                    scale,
+                ));
+                ui.separator();
+                ui.label(theme::metadata_at(&flow.trigger, scale));
+            });
+        });
+        if response.response.interact(egui::Sense::click()).clicked() {
+            state.dispatch(AppCommand::SelectFlow {
+                flow_id: flow.id.clone(),
+            });
+        }
+        if selected {
+            sockets.output(0, response.response.rect);
+        }
+        ui.add_space(6.0);
+    }
+}
+
+fn render_flow_node(
+    ui: &mut egui::Ui,
+    nodes: &mut des_graph_egui::NodesCtx<'_>,
+    node: &GraphNodeSummary,
+    scale: f32,
+) {
+    let source_input = is_source_node(node);
+    let input_count = node.inputs.len() + usize::from(source_input);
+    Node::from_id(node_id(&node.id))
+        .inputs(input_count)
+        .outputs(node.outputs.len())
+        .max_width(NODE_SIZE.x)
+        .socket_color(node_socket_color(node))
+        .socket_radius(6.0)
+        .animation_time(0.0)
+        .show(nodes, ui, |ctx| {
+            let interaction = ctx.interaction();
+            ctx.framed_with(flow_node_frame(interaction), |ui, sockets| {
+                ui.set_min_size(NODE_SIZE);
+                ui.set_width(NODE_SIZE.x);
+                ui.label(theme::metadata_at(&node.subtitle, scale));
+                ui.label(theme::node_title_at(&node.title, scale));
+                ui.add_space(12.0);
+
+                if source_input {
+                    sockets.row(ui, Some(0), None, |ui| {
+                        ui.label(theme::metadata_at("< flow", scale));
+                    });
+                }
+
+                for (index, port) in node.inputs.iter().enumerate() {
+                    let input_index = index + usize::from(source_input);
+                    sockets.row(ui, Some(input_index), None, |ui| {
+                        ui.label(theme::metadata_at(format!("< {}", port.label), scale));
+                    });
+                }
+                for (index, port) in node.outputs.iter().enumerate() {
+                    sockets.row(ui, None, Some(index), |ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(theme::metadata_at(format!("{} >", port.label), scale));
+                        });
+                    });
+                }
+            })
+        });
+}
+
+fn render_root_edges(
+    ui: &mut egui::Ui,
+    selected_edges: &mut HashSet<String>,
+    edges: &mut des_graph_egui::EdgesCtx,
     graph: &FlowGraphSummary,
-    canvas_state: &GraphCanvasState,
-) -> Vec<Pos2> {
-    graph
+) {
+    for node in graph
         .nodes
         .iter()
-        .filter(|node| node.inputs.is_empty() && !node.outputs.is_empty())
-        .map(|node| {
-            let rect = node_rect(canvas_rect, node, canvas_state);
-            Pos2::new(rect.left(), rect.center().y)
-        })
-        .collect()
+        .filter(|node| is_source_node(node) && !node.outputs.is_empty())
+    {
+        let edge_id = format!("root-to-{}", node.id);
+        let mut selected = selected_edges.contains(&edge_id);
+        let response = Edge::new((ROOT_NODE_ID, 0), (node_id(&node.id), 0), &mut selected)
+            .curvature_factor(0.75)
+            .show(edges, ui);
+        sync_edge_selection(selected_edges, edge_id, selected, response.changed());
+    }
 }
 
-pub(crate) fn graph_world_bounds(graph: &FlowGraphSummary) -> Option<Rect> {
+fn render_flow_edges(
+    ui: &mut egui::Ui,
+    selected_edges: &mut HashSet<String>,
+    edges: &mut des_graph_egui::EdgesCtx,
+    graph: &FlowGraphSummary,
+) {
+    for edge in &graph.edges {
+        let Some(from_node) = graph.nodes.iter().find(|node| node.id == edge.from_node_id) else {
+            continue;
+        };
+        let Some(to_node) = graph.nodes.iter().find(|node| node.id == edge.to_node_id) else {
+            continue;
+        };
+        let Some(from_index) = output_index(from_node, &edge.from_port_id) else {
+            continue;
+        };
+        let Some(to_index) = input_index(to_node, &edge.to_port_id) else {
+            continue;
+        };
+
+        let mut selected = selected_edges.contains(&edge.id);
+        let response = Edge::new(
+            (node_id(&edge.from_node_id), from_index),
+            (node_id(&edge.to_node_id), to_index),
+            &mut selected,
+        )
+        .curvature_factor(0.75)
+        .show(edges, ui);
+        sync_edge_selection(
+            selected_edges,
+            edge.id.clone(),
+            selected,
+            response.changed(),
+        );
+    }
+}
+
+fn sync_edge_selection(
+    selected_edges: &mut HashSet<String>,
+    edge_id: String,
+    selected: bool,
+    changed: bool,
+) {
+    if !changed {
+        return;
+    }
+    if selected {
+        selected_edges.insert(edge_id);
+    } else {
+        selected_edges.remove(&edge_id);
+    }
+}
+
+fn input_index(node: &GraphNodeSummary, port_id: &str) -> Option<usize> {
+    node.inputs.iter().position(|port| port.id == port_id)
+}
+
+fn output_index(node: &GraphNodeSummary, port_id: &str) -> Option<usize> {
+    node.outputs.iter().position(|port| port.id == port_id)
+}
+
+fn root_frame(interaction: des_graph_egui::NodeInteraction) -> egui::Frame {
+    node_frame(theme::PANEL, interaction)
+}
+
+fn flow_node_frame(interaction: des_graph_egui::NodeInteraction) -> egui::Frame {
+    let fill = if interaction.hovered || interaction.selected {
+        Color32::from_rgb(36, 44, 50)
+    } else {
+        Color32::from_rgb(29, 35, 39)
+    };
+    node_frame(fill, interaction)
+}
+
+fn node_frame(fill: Color32, interaction: des_graph_egui::NodeInteraction) -> egui::Frame {
+    egui::Frame::new()
+        .fill(fill)
+        .stroke(Stroke::new(
+            if interaction.selected { 1.5 } else { 1.0 },
+            if interaction.selected {
+                theme::STROKE_SELECTED
+            } else {
+                theme::STROKE
+            },
+        ))
+        .corner_radius(8.0)
+        .inner_margin(12.0)
+}
+
+fn card_frame(selected: bool) -> egui::Frame {
+    egui::Frame::new()
+        .fill(if selected {
+            theme::PANEL_SELECTED
+        } else {
+            Color32::from_rgb(32, 37, 42)
+        })
+        .stroke(Stroke::new(
+            1.0,
+            if selected {
+                theme::STROKE_SELECTED
+            } else {
+                theme::STROKE
+            },
+        ))
+        .corner_radius(6.0)
+        .inner_margin(8.0)
+}
+
+fn node_socket_color(node: &GraphNodeSummary) -> Color32 {
+    if is_source_node(node) {
+        theme::SOURCE_CONNECTOR
+    } else if node.outputs.is_empty() {
+        Color32::from_rgb(151, 93, 219)
+    } else {
+        theme::CONNECTOR
+    }
+}
+
+fn is_source_node(node: &GraphNodeSummary) -> bool {
+    node.inputs.is_empty() && !node.outputs.is_empty()
+}
+
+fn flow_graph_world_bounds(graph: &FlowGraphSummary) -> Option<Rect> {
     let mut bounds: Option<Rect> = None;
     for node in &graph.nodes {
         let rect = Rect::from_min_size(Pos2::new(node.position.x, node.position.y), NODE_SIZE);
@@ -164,232 +542,26 @@ pub(crate) fn graph_world_bounds(graph: &FlowGraphSummary) -> Option<Rect> {
     bounds
 }
 
-fn paint_node_body(
-    ui: &mut egui::Ui,
-    painter: &egui::Painter,
-    state: &mut StudioAppState,
-    canvas_state: &GraphCanvasState,
-    rect: Rect,
-    node: &GraphNodeSummary,
-) {
-    let response = ui.interact(
-        rect,
-        egui::Id::new(("graph-node", &node.id)),
-        Sense::click_and_drag(),
-    );
-    if response.dragged() {
-        let delta = ui.input(|input| input.pointer.delta());
-        if delta != Vec2::ZERO {
-            state.dispatch(AppCommand::MoveGraphNodeBy {
-                node_id: node.id.clone(),
-                dx: delta.x / canvas_state.zoom(),
-                dy: delta.y / canvas_state.zoom(),
-            });
-        }
+fn selected_flow(snapshot: &AppSnapshot) -> Option<&des_app::FlowSummary> {
+    snapshot
+        .home
+        .flows
+        .iter()
+        .find(|flow| Some(flow.id.as_str()) == snapshot.selected_flow_id.as_deref())
+}
+
+fn root_node_world_rect() -> Rect {
+    Rect::from_min_size(Pos2::new(28.0, 78.0), ROOT_NODE_SIZE)
+}
+
+fn node_id(id: &str) -> NodeId {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+    let mut hash = FNV_OFFSET;
+    for byte in id.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
     }
-
-    let scale = canvas_state.zoom().clamp(0.75, 1.35);
-    let fill = if response.hovered() || response.dragged() {
-        Color32::from_rgb(36, 44, 50)
-    } else {
-        Color32::from_rgb(29, 35, 39)
-    };
-    painter.rect_filled(rect, 8.0, fill);
-    painter.rect_stroke(
-        rect,
-        8.0,
-        Stroke::new(1.0, theme::STROKE),
-        egui::StrokeKind::Inside,
-    );
-
-    let text_left = rect.left() + 16.0 * scale;
-    painter.text(
-        Pos2::new(text_left, rect.top() + 14.0 * scale),
-        Align2::LEFT_TOP,
-        &node.subtitle,
-        FontId::proportional(12.0 * scale),
-        theme::TEXT_MUTED,
-    );
-    painter.text(
-        Pos2::new(text_left, rect.top() + 34.0 * scale),
-        Align2::LEFT_TOP,
-        &node.title,
-        FontId::proportional(18.0 * scale),
-        Color32::from_rgb(222, 228, 235),
-    );
-
-    for (index, port) in node.inputs.iter().enumerate() {
-        painter.text(
-            Pos2::new(
-                rect.left() + 16.0 * scale,
-                rect.top() + (PORT_TOP_OFFSET + index as f32 * PORT_SPACING - 8.0) * scale,
-            ),
-            Align2::LEFT_TOP,
-            format!("< {}", port.label),
-            FontId::proportional(11.0 * scale),
-            theme::TEXT_MUTED,
-        );
-    }
-    for (index, port) in node.outputs.iter().enumerate() {
-        painter.text(
-            Pos2::new(
-                rect.right() - 16.0 * scale,
-                rect.top() + (PORT_TOP_OFFSET + index as f32 * PORT_SPACING - 8.0) * scale,
-            ),
-            Align2::RIGHT_TOP,
-            format!("{} >", port.label),
-            FontId::proportional(11.0 * scale),
-            theme::TEXT_MUTED,
-        );
-    }
-}
-
-fn paint_ports(
-    ui: &mut egui::Ui,
-    painter: &egui::Painter,
-    canvas_state: &mut GraphCanvasState,
-    canvas_rect: Rect,
-    node: &GraphNodeSummary,
-) {
-    for port in node.inputs.iter().chain(node.outputs.iter()) {
-        let center = port_position(
-            canvas_rect,
-            &FlowGraphSummary {
-                nodes: vec![node.clone()],
-                edges: Vec::new(),
-            },
-            &node.id,
-            &port.id,
-            port.side,
-            canvas_state,
-        )
-        .unwrap_or_else(|| node_rect(canvas_rect, node, canvas_state).center());
-        let color = match port.side {
-            GraphPortSide::Input => Color32::from_rgb(95, 204, 140),
-            GraphPortSide::Output => Color32::from_rgb(94, 162, 230),
-        };
-        let radius = PORT_RADIUS * canvas_state.zoom().clamp(0.75, 1.35);
-        painter.circle_filled(center, radius, color);
-        painter.circle_stroke(
-            center,
-            radius,
-            Stroke::new(1.0, Color32::from_rgb(220, 230, 240)),
-        );
-
-        let hit_rect = Rect::from_center_size(center, vec2(22.0, 22.0));
-        let response = ui.interact(
-            hit_rect,
-            egui::Id::new(("graph-port", &node.id, &port.id, format!("{:?}", port.side))),
-            Sense::drag(),
-        );
-        if response.drag_started() {
-            canvas_state.dragging_edge = Some(PortRef {
-                node_id: node.id.clone(),
-                port_id: port.id.clone(),
-                side: port.side,
-            });
-        }
-    }
-}
-
-fn paint_edges(
-    painter: &egui::Painter,
-    canvas_rect: Rect,
-    graph: &FlowGraphSummary,
-    canvas_state: &GraphCanvasState,
-) {
-    for edge in &graph.edges {
-        paint_edge(painter, canvas_rect, graph, edge, canvas_state);
-    }
-}
-
-fn paint_edge(
-    painter: &egui::Painter,
-    canvas_rect: Rect,
-    graph: &FlowGraphSummary,
-    edge: &GraphEdgeSummary,
-    canvas_state: &GraphCanvasState,
-) {
-    let Some(from) = port_position(
-        canvas_rect,
-        graph,
-        &edge.from_node_id,
-        &edge.from_port_id,
-        GraphPortSide::Output,
-        canvas_state,
-    ) else {
-        return;
-    };
-    let Some(to) = port_position(
-        canvas_rect,
-        graph,
-        &edge.to_node_id,
-        &edge.to_port_id,
-        GraphPortSide::Input,
-        canvas_state,
-    ) else {
-        return;
-    };
-    paint_curve(painter, from, to, theme::CONNECTOR, 2.25);
-}
-
-fn paint_curve(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32, width: f32) {
-    let distance = (to.x - from.x).abs().max(80.0);
-    let control_offset = distance * 0.45;
-    let points = cubic_points(
-        from,
-        Pos2::new(from.x + control_offset, from.y),
-        Pos2::new(to.x - control_offset, to.y),
-        to,
-    );
-    painter.add(egui::Shape::line(points, Stroke::new(width, color)));
-}
-
-fn cubic_points(p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2) -> Vec<Pos2> {
-    let mut points = Vec::with_capacity(24);
-    for index in 0..24 {
-        let t = index as f32 / 23.0;
-        let nt = 1.0 - t;
-        let x = nt.powi(3) * p0.x
-            + 3.0 * nt.powi(2) * t * p1.x
-            + 3.0 * nt * t.powi(2) * p2.x
-            + t.powi(3) * p3.x;
-        let y = nt.powi(3) * p0.y
-            + 3.0 * nt.powi(2) * t * p1.y
-            + 3.0 * nt * t.powi(2) * p2.y
-            + t.powi(3) * p3.y;
-        points.push(Pos2::new(x, y));
-    }
-    points
-}
-
-fn port_position(
-    canvas_rect: Rect,
-    graph: &FlowGraphSummary,
-    node_id: &str,
-    port_id: &str,
-    side: GraphPortSide,
-    canvas_state: &GraphCanvasState,
-) -> Option<Pos2> {
-    let node = graph.nodes.iter().find(|node| node.id == node_id)?;
-    let rect = node_rect(canvas_rect, node, canvas_state);
-    let ports = match side {
-        GraphPortSide::Input => &node.inputs,
-        GraphPortSide::Output => &node.outputs,
-    };
-    let index = ports.iter().position(|port| port.id == port_id)?;
-    let y = rect.top() + (PORT_TOP_OFFSET + index as f32 * PORT_SPACING) * canvas_state.zoom();
-    let x = match side {
-        GraphPortSide::Input => rect.left(),
-        GraphPortSide::Output => rect.right(),
-    };
-    Some(Pos2::new(x, y))
-}
-
-fn node_rect(canvas_rect: Rect, node: &GraphNodeSummary, canvas_state: &GraphCanvasState) -> Rect {
-    canvas_state.world_rect(
-        Pos2::new(node.position.x, node.position.y),
-        NODE_SIZE,
-        canvas_rect,
-    )
+    NodeId::from_u64(hash)
 }

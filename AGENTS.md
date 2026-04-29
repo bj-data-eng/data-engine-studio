@@ -151,6 +151,12 @@ Rust tests:
 cargo test
 ```
 
+Faster Rust tests:
+
+```powershell
+cargo nextest run --workspace
+```
+
 Format Rust:
 
 ```powershell
@@ -167,6 +173,39 @@ Native editable install:
 
 ```powershell
 .\.venv\Scripts\python.exe -m maturin develop --manifest-path crates\des-python\Cargo.toml
+```
+
+UI screenshot harness:
+
+```powershell
+.\scripts\capture-ui.ps1 -Out target\ui-shots\studio.png -Width 1320 -Height 780
+```
+
+The screenshot harness builds `des-ui-egui` with the `ui-screenshot` feature, launches the dedicated `des-ui-shot` binary, writes the PNG named by `EFRAME_SCREENSHOT_TO`, and exits automatically. Use it for automated UI iteration. Do not launch the main Python app unless the user explicitly asks.
+
+Harness knobs:
+
+```powershell
+.\scripts\capture-ui.ps1 -DebugOverlay -SceneRect "0,0,1320,780" -FlowId customer-analytics
+```
+
+Use `-DebugOverlay` for zoom, scene rect, pointer, scroll, and selection diagnostics. Use `-SceneRect`, `-RootId`, `-WorkspaceId`, and `-FlowId` to seed the UI through launch-time options and app commands rather than test-only branches in the product UI.
+
+Command runner:
+
+```powershell
+just --list
+just ui-shot
+just ui-debug
+just verify
+just security
+```
+
+Dependency checks:
+
+```powershell
+cargo audit
+cargo deny check
 ```
 
 Run focused checks before committing. Run `cargo test` when Rust code changed. Run the Python import smoke when PyO3 or Python package code changed.
