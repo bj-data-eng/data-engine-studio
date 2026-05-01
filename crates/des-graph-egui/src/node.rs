@@ -21,6 +21,15 @@ pub struct NodeInteraction {
     pub hovered: bool,
 }
 
+/// Per-node interaction behavior.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct NodeBehavior {
+    /// When true, fallback graph wheel navigation will not pan or zoom while
+    /// the pointer is over this node. Use this for nodes that contain their
+    /// own scrollable or zoomable child UI.
+    pub blocks_graph_scroll: bool,
+}
+
 /// The default node widget.
 ///
 /// A `Node` is a thin wrapper around a `Window` and allows for instantiating arbitrary widgets
@@ -35,6 +44,7 @@ pub struct Node {
     socket_color: Option<egui::Color32>,
     max_width: Option<f32>,
     animation_time: f32,
+    behavior: NodeBehavior,
 }
 
 /// A unique identifier for a node within a graph.
@@ -114,6 +124,7 @@ impl Node {
             flow: egui::Direction::LeftToRight,
             socket_radius: 3.0,
             animation_time: 0.1,
+            behavior: NodeBehavior::default(),
         }
     }
 
@@ -178,6 +189,16 @@ impl Node {
     /// Default: `0.1`.
     pub fn animation_time(mut self, time: f32) -> Self {
         self.animation_time = time;
+        self
+    }
+
+    /// Configure whether graph-level wheel navigation should be blocked while
+    /// the pointer is over this node.
+    ///
+    /// Defaults to `false`, which lets compact graph nodes preserve normal
+    /// canvas navigation.
+    pub fn blocks_graph_scroll(mut self, blocks: bool) -> Self {
+        self.behavior.blocks_graph_scroll = blocks;
         self
     }
 
@@ -390,6 +411,7 @@ impl Node {
             let gmem_arc = crate::memory(ui, ctx.graph_id);
             let mut gmem = crate::lock_graph_memory(&gmem_arc);
             gmem.node_sizes.insert(self.id, response.rect.size());
+            gmem.node_behaviors.insert(self.id, self.behavior);
 
             let ctrl_down = ui.input(|i| i.modifiers.ctrl);
 

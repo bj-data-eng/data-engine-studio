@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(feature = "layout")]
 pub use layout::layout;
-pub use node::{FramedResponse, NodeCtx, NodeId, NodeInteraction};
+pub use node::{FramedResponse, NodeBehavior, NodeCtx, NodeId, NodeInteraction};
 pub use socket::layout::{SocketLayout, grid::SocketGrid};
 pub use socket::{SocketKind, SocketResponses};
 
@@ -33,6 +33,7 @@ pub struct Graph {
     /// structural changes - node positions, edges, and node content remain
     /// view-only while navigation and selection continue to work.
     immutable: bool,
+    interaction_exclusion_rects: Vec<egui::Rect>,
 }
 
 /// State related to the graph UI.
@@ -43,6 +44,7 @@ pub struct GraphTempMemory {
     /// Primarily used to check for node selection, as we don't know the size of the node until the
     /// contents have been instantiated.
     node_sizes: NodeSizes,
+    node_behaviors: HashMap<NodeId, NodeBehavior>,
     /// The currently selected nodes and edges.
     selection: Selection,
     /// Whether or not the primary button was pressed on the graph area and is still down.
@@ -164,6 +166,13 @@ pub struct NodeSockets {
     outputs: BTreeMap<usize, egui::Pos2>,
 }
 
+/// A screen-space point that should behave like an overlay node socket.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OverlaySocketKind {
+    Input,
+    Output,
+}
+
 /// A context to assist with the instantiation of node widgets.
 pub struct NodesCtx<'a> {
     pub graph_id: egui::Id,
@@ -234,6 +243,7 @@ impl Graph {
             id,
             selected_nodes: None,
             immutable: false,
+            interaction_exclusion_rects: Vec::new(),
         }
     }
 
@@ -295,6 +305,21 @@ impl Graph {
         self
     }
 
+    /// Ignore graph navigation and graph-level pointer gestures when the
+    /// pointer is inside this screen-space rectangle.
+    pub fn interaction_exclusion_rect(mut self, rect: egui::Rect) -> Self {
+        self.interaction_exclusion_rects.push(rect);
+        self
+    }
+
+    /// Ignore graph navigation and graph-level pointer gestures when the
+    /// pointer is inside any of these screen-space rectangles.
+    pub fn interaction_exclusion_rects(mut self, rects: &[egui::Rect]) -> Self {
+        self.interaction_exclusion_rects
+            .extend(rects.iter().copied());
+        self
+    }
+
     /// Begin showing the Graph.
     ///
     /// Returns a [`GraphResponse`] containing the user's return value,
@@ -323,6 +348,12 @@ impl Graph {
 
         // Track the bounding area of all widgets in the scene.
         let mut bounding_rect = None;
+        let input_scroll_delta = ui.input(|input| input.smooth_scroll_delta);
+        if input_scroll_delta != egui::Vec2::ZERO {
+            ui.ctx().input_mut(|input| {
+                input.smooth_scroll_delta = egui::Vec2::ZERO;
+            });
+        }
 
         let scene_response = scene.show(ui, scene_rect, |ui| {
             // Draw the selection rectangle if there is one.
@@ -333,7 +364,14 @@ impl Graph {
 
             // Check for interactions with the scene area.
             let scene_response = ui.response();
-            let ptr_on_graph = scene_response.hovered();
+            let pointer = ui.input(|i| i.pointer.clone());
+            let pointer_global = pointer.interact_pos().or(pointer.hover_pos());
+            let pointer_excluded = pointer_global.is_some_and(|pos| {
+                self.interaction_exclusion_rects
+                    .iter()
+                    .any(|rect| rect.contains(pos))
+            });
+            let ptr_on_graph = scene_response.hovered() && !pointer_excluded;
 
             // Check for selection rectangle and node dragging.
             let gmem_arc = memory(ui, self.id);
@@ -354,8 +392,7 @@ impl Graph {
             // widgets floating above (like a window floating above the graph).
             // We should change this to get the pointer only if it is hovered or
             // interacting with the scene or any of its child nodes somehow.
-            let pointer = ui.input(|i| i.pointer.clone());
-            if let Some(ptr_global) = pointer.interact_pos().or(pointer.hover_pos()) {
+            if let Some(ptr_global) = pointer_global {
                 let ptr_graph = ui
                     .ctx()
                     .layer_transform_from_global(ui.layer_id())
@@ -363,9 +400,12 @@ impl Graph {
                     .mul_pos(ptr_global);
 
                 // Check for the closest socket.
-                closest_socket = ui.response().hover_pos().and_then(|pos| {
-                    find_closest_socket(pos, layout, &gmem, ui).map(|(socket, _dist_sqrd)| socket)
-                });
+                if !pointer_excluded {
+                    closest_socket = ui.response().hover_pos().and_then(|pos| {
+                        find_closest_socket(pos, layout, &gmem, ui)
+                            .map(|(socket, _dist_sqrd)| socket)
+                    });
+                }
 
                 // When immutable, suppress socket presses (map to Select).
                 let closest_socket_for_interaction =
@@ -451,13 +491,21 @@ impl Graph {
 
             (output, selection_changed)
         });
+        if input_scroll_delta != egui::Vec2::ZERO {
+            ui.ctx().input_mut(|input| {
+                input.smooth_scroll_delta = input_scroll_delta;
+            });
+        }
 
         apply_scroll_navigation_over_children(
             ui,
             &scene_response.response,
+            self.id,
+            layout,
             scene_rect,
             graph_rect,
             self.zoom_range,
+            &self.interaction_exclusion_rects,
         );
 
         if self.center_view
@@ -478,11 +526,14 @@ impl Graph {
 fn apply_scroll_navigation_over_children(
     ui: &egui::Ui,
     response: &egui::Response,
+    graph_id: egui::Id,
+    layout: &Layout,
     scene_rect: &mut egui::Rect,
     graph_rect: egui::Rect,
     zoom_range: egui::Rangef,
+    interaction_exclusion_rects: &[egui::Rect],
 ) {
-    if response.changed() || response.contains_pointer() {
+    if response.changed() {
         return;
     }
 
@@ -490,6 +541,23 @@ fn apply_scroll_navigation_over_children(
         return;
     };
     if !graph_rect.contains(pointer_pos) {
+        return;
+    }
+    if pointer_over_scroll_blocking_node(
+        ui,
+        graph_id,
+        layout,
+        graph_rect,
+        *scene_rect,
+        zoom_range,
+        pointer_pos,
+    ) {
+        return;
+    }
+    if interaction_exclusion_rects
+        .iter()
+        .any(|rect| rect.contains(pointer_pos))
+    {
         return;
     }
 
@@ -513,6 +581,38 @@ fn apply_scroll_navigation_over_children(
     }
 
     ui.ctx().request_repaint();
+}
+
+fn pointer_over_scroll_blocking_node(
+    ui: &egui::Ui,
+    graph_id: egui::Id,
+    layout: &Layout,
+    graph_rect: egui::Rect,
+    scene_rect: egui::Rect,
+    zoom_range: egui::Rangef,
+    pointer_pos: egui::Pos2,
+) -> bool {
+    let zoom = scene_zoom(graph_rect, scene_rect, zoom_range);
+    if zoom <= 0.0 {
+        return false;
+    }
+
+    let translation = graph_rect.center().to_vec2() - zoom * scene_rect.center().to_vec2();
+    let pointer_scene = egui::Pos2::new(
+        (pointer_pos.x - translation.x) / zoom,
+        (pointer_pos.y - translation.y) / zoom,
+    );
+
+    let gmem_arc = memory(ui, graph_id);
+    let gmem = crate::lock_graph_memory(&gmem_arc);
+    layout.iter().any(|(node_id, position)| {
+        gmem.node_behaviors
+            .get(node_id)
+            .is_some_and(|behavior| behavior.blocks_graph_scroll)
+            && gmem.node_sizes.get(node_id).is_some_and(|size| {
+                egui::Rect::from_min_size(*position, *size).contains(pointer_scene)
+            })
+    })
 }
 
 fn scene_zoom(graph_rect: egui::Rect, scene_rect: egui::Rect, zoom_range: egui::Rangef) -> f32 {
@@ -553,9 +653,33 @@ impl GraphTempMemory {
     pub fn node_sizes(&self) -> &NodeSizes {
         &self.node_sizes
     }
+
+    /// Get the configured behavior for a node.
+    pub fn node_behavior(&self, node_id: NodeId) -> NodeBehavior {
+        self.node_behaviors
+            .get(&node_id)
+            .copied()
+            .unwrap_or_default()
+    }
 }
 
 impl NodeSockets {
+    pub fn single_overlay_output(pos: egui::Pos2) -> Self {
+        Self {
+            flow: egui::Direction::LeftToRight,
+            inputs: BTreeMap::new(),
+            outputs: BTreeMap::from([(0, pos)]),
+        }
+    }
+
+    pub fn single_overlay_input(pos: egui::Pos2) -> Self {
+        Self {
+            flow: egui::Direction::LeftToRight,
+            inputs: BTreeMap::from([(0, pos)]),
+            outputs: BTreeMap::new(),
+        }
+    }
+
     /// The screen position and normal of the input at the given index.
     ///
     /// Returns `None` if there is no input at the given index.
@@ -673,6 +797,7 @@ fn prune_unused_nodes(graph_id: egui::Id, visited: &HashSet<NodeId>, ui: &mut eg
     let gmem_arc = memory(ui, graph_id);
     let mut gmem = crate::lock_graph_memory(&gmem_arc);
     gmem.node_sizes.retain(|k, _| visited.contains(k));
+    gmem.node_behaviors.retain(|k, _| visited.contains(k));
     gmem.selection.nodes.retain(|k| visited.contains(k));
     if let Some(socket) = gmem.closest_socket.as_ref()
         && !visited.contains(&socket.node)
@@ -695,6 +820,41 @@ fn prune_unused_nodes(graph_id: egui::Id, visited: &HashSet<NodeId>, ui: &mut eg
 }
 
 impl EdgesCtx {
+    /// Register a screen-space overlay socket so normal graph edges can connect
+    /// to fixed panels or other UI that lives above the pannable scene.
+    pub fn register_overlay_socket(
+        &mut self,
+        ui: &egui::Ui,
+        node: NodeId,
+        kind: OverlaySocketKind,
+        index: usize,
+        screen_pos: egui::Pos2,
+    ) {
+        let Some(scene_pos) = ui
+            .ctx()
+            .layer_transform_from_global(ui.layer_id())
+            .map(|transform| transform.mul_pos(screen_pos))
+        else {
+            return;
+        };
+
+        let gmem_arc = memory(ui, self.graph_id);
+        let mut gmem = crate::lock_graph_memory(&gmem_arc);
+        let sockets = gmem.sockets.entry(node).or_insert_with(|| NodeSockets {
+            flow: egui::Direction::LeftToRight,
+            inputs: BTreeMap::new(),
+            outputs: BTreeMap::new(),
+        });
+        match kind {
+            OverlaySocketKind::Input => {
+                sockets.inputs.insert(index, scene_pos);
+            }
+            OverlaySocketKind::Output => {
+                sockets.outputs.insert(index, scene_pos);
+            }
+        }
+    }
+
     /// Retrieves the position and normal of the specified input for the given node.
     ///
     /// Returns `None` if either the `node` or `input` do not exist.

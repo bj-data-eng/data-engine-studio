@@ -4,6 +4,7 @@ members = [
     "crates/des-core",
     "crates/des-graph-egui",
     "crates/des-python",
+    "crates/des-ui-runtime",
     "crates/des-ui-egui",
 ]
 resolver = "3"
@@ -18,6 +19,7 @@ repository = "https://github.com/bj-data-eng/data-engine-studio"
 des-app = { path = "crates/des-app" }
 des-core = { path = "crates/des-core" }
 des-graph-egui = { path = "crates/des-graph-egui" }
+des-ui-runtime = { path = "crates/des-ui-runtime" }
 des-ui-egui = { path = "crates/des-ui-egui" }
 eframe = { version = "0.34", default-features = true }
 egui = "0.34"

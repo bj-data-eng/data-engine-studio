@@ -8,13 +8,23 @@ pub(crate) fn render(
     ui: &mut egui::Ui,
     state: &mut StudioAppState,
     graph_canvas: &mut GraphCanvasState,
+    rect: Rect,
+    interaction_exclusion_rects: &[Rect],
+    selected_flow_anchor: Option<Rect>,
 ) {
     let snapshot = state.snapshot();
-    let rect = ui.max_rect();
     let painter = ui.painter_at(rect);
 
     painter.rect_filled(rect, 0.0, theme::BACKGROUND);
-    graph_canvas::render(ui, state, graph_canvas, rect, &snapshot);
+    graph_canvas::render(
+        ui,
+        state,
+        graph_canvas,
+        rect,
+        &snapshot,
+        interaction_exclusion_rects,
+        selected_flow_anchor,
+    );
     paint_title(&painter, rect, &snapshot);
     render_view_controls(ui, rect, graph_canvas, &snapshot);
 }
@@ -43,9 +53,17 @@ fn render_view_controls(
     graph_canvas: &mut GraphCanvasState,
     snapshot: &AppSnapshot,
 ) {
-    egui::Area::new("graph_view_controls".into())
-        .fixed_pos(rect.right_top() + vec2(-168.0, 18.0))
-        .show(ui.ctx(), |ui| {
+    let controls_rect =
+        Rect::from_min_size(rect.right_top() + vec2(-168.0, 18.0), vec2(150.0, 42.0));
+    let layer_id = egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("graph_view_controls_layer"),
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(controls_rect)
+            .layer_id(layer_id),
+        |ui| {
             egui::Frame::new()
                 .fill(Color32::from_rgb(24, 28, 32))
                 .stroke(Stroke::new(1.0, theme::STROKE))
@@ -78,5 +96,6 @@ fn render_view_controls(
                         }
                     });
                 });
-        });
+        },
+    );
 }

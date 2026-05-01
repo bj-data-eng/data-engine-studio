@@ -750,10 +750,15 @@ dependencies = [
  "des-app",
  "des-core",
  "des-graph-egui",
+ "des-ui-runtime",
  "eframe",
  "egui",
  "iconflow",
 ]
+
+[[package]]
+name = "des-ui-runtime"
+version = "0.1.0"
 
 [[package]]
 name = "dispatch"

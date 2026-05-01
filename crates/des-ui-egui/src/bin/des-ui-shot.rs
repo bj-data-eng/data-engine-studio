@@ -52,6 +52,12 @@ fn startup_commands() -> Vec<AppCommand> {
     if let Ok(workspace_id) = std::env::var("DES_UI_SELECTED_WORKSPACE") {
         commands.push(AppCommand::SelectWorkspace { workspace_id });
     }
+    if let Ok(project_id) = std::env::var("DES_UI_SELECTED_PROJECT") {
+        commands.push(AppCommand::SelectProject { project_id });
+    }
+    if let Ok(group_id) = std::env::var("DES_UI_SELECTED_GROUP") {
+        commands.push(AppCommand::SelectFlowGroup { group_id });
+    }
     if let Ok(flow_id) = std::env::var("DES_UI_SELECTED_FLOW") {
         commands.push(AppCommand::SelectFlow { flow_id });
     }

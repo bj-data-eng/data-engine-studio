@@ -2,15 +2,14 @@ use crate::theme;
 use des_app::{
     AppCommand, AppSnapshot, CanvasPoint, FlowGraphSummary, GraphNodeSummary, StudioAppState,
 };
-use des_graph_egui::{Graph, NodeId, View, edge::Edge, node::Node};
+use des_graph_egui::{Graph, NodeId, OverlaySocketKind, View, edge::Edge, node::Node};
 use eframe::egui;
-use egui::{Color32, Pos2, Rect, RichText, Stroke, Vec2, vec2};
+use egui::{Color32, Pos2, Rect, Stroke, Vec2, vec2};
 use std::collections::HashSet;
 
-const ROOT_NODE_ID: NodeId = NodeId::from_u64(1);
-const ROOT_NODE_SIZE: Vec2 = vec2(216.0, 420.0);
 const NODE_SIZE: Vec2 = vec2(230.0, 112.0);
 const INITIAL_SCENE_SIZE: Vec2 = vec2(1320.0, 780.0);
+const FLOW_CATALOG_NODE_ID: NodeId = NodeId::from_u64(2);
 
 pub(crate) struct GraphCanvasState {
     view: View,
@@ -84,8 +83,7 @@ impl GraphCanvasState {
     ) -> GraphCanvasDiagnostics {
         let node_count = selected_flow(snapshot)
             .map(|flow| flow.graph.nodes.len())
-            .unwrap_or_default()
-            + 1;
+            .unwrap_or_default();
 
         GraphCanvasDiagnostics {
             zoom: self.view_zoom(screen_rect),
@@ -102,6 +100,8 @@ pub(crate) fn render(
     canvas_state: &mut GraphCanvasState,
     rect: Rect,
     snapshot: &AppSnapshot,
+    interaction_exclusion_rects: &[Rect],
+    selected_flow_anchor: Option<Rect>,
 ) {
     ensure_layout_positions(canvas_state, snapshot);
     let mut selected_edges = std::mem::take(&mut canvas_state.selected_edges);
@@ -112,9 +112,9 @@ pub(crate) fn render(
         let response = Graph::new("studio-workspace-graph")
             .zoom_range(egui::Rangef::new(0.35, 2.25))
             .max_inner_size(vec2(5000.0, 3000.0))
+            .interaction_exclusion_rects(interaction_exclusion_rects)
             .show(&mut canvas_state.view, ui, |ui, show| {
                 show.nodes(ui, |nodes, ui| {
-                    render_root_node(ui, state, snapshot, nodes, content_scale);
                     if let Some(flow) = selected_flow(snapshot) {
                         for node in &flow.graph.nodes {
                             render_flow_node(ui, nodes, node, content_scale);
@@ -123,7 +123,13 @@ pub(crate) fn render(
                 })
                 .edges(ui, |edges, ui| {
                     if let Some(flow) = selected_flow(snapshot) {
-                        render_root_edges(ui, &mut selected_edges, edges, &flow.graph);
+                        render_catalog_edges(
+                            ui,
+                            &mut selected_edges,
+                            edges,
+                            &flow.graph,
+                            selected_flow_anchor,
+                        );
                         render_flow_edges(ui, &mut selected_edges, edges, &flow.graph);
                     }
                 });
@@ -139,23 +145,10 @@ pub(crate) fn render(
 }
 
 pub(crate) fn graph_world_bounds(snapshot: &AppSnapshot) -> Option<Rect> {
-    let root = root_node_world_rect();
-    let mut bounds = root;
-    if let Some(flow) = selected_flow(snapshot)
-        && let Some(graph_bounds) = flow_graph_world_bounds(&flow.graph)
-    {
-        bounds = bounds.union(graph_bounds);
-    }
-    Some(bounds)
+    selected_flow(snapshot).and_then(|flow| flow_graph_world_bounds(&flow.graph))
 }
 
 fn ensure_layout_positions(canvas_state: &mut GraphCanvasState, snapshot: &AppSnapshot) {
-    canvas_state
-        .view
-        .layout
-        .entry(ROOT_NODE_ID)
-        .or_insert(root_node_world_rect().min);
-
     if let Some(flow) = selected_flow(snapshot) {
         for node in &flow.graph.nodes {
             canvas_state
@@ -187,157 +180,6 @@ fn sync_node_positions(
                 position: CanvasPoint::new(position.x, position.y),
             });
         }
-    }
-}
-
-fn render_root_node(
-    ui: &mut egui::Ui,
-    state: &mut StudioAppState,
-    snapshot: &AppSnapshot,
-    nodes: &mut des_graph_egui::NodesCtx<'_>,
-    scale: f32,
-) {
-    let has_flow = selected_flow(snapshot).is_some();
-    Node::from_id(ROOT_NODE_ID)
-        .outputs(usize::from(has_flow))
-        .max_width(ROOT_NODE_SIZE.x)
-        .socket_color(theme::SOURCE_CONNECTOR)
-        .socket_radius(6.0)
-        .animation_time(0.0)
-        .show(nodes, ui, |ctx| {
-            let interaction = ctx.interaction();
-            ctx.framed_with(root_frame(interaction), |ui, sockets| {
-                ui.set_min_size(ROOT_NODE_SIZE);
-                ui.set_width(ROOT_NODE_SIZE.x);
-                ui.label(theme::graph_heading_at("Workspace Roots", scale));
-                ui.label(theme::metadata_at("Catalog node", scale));
-                ui.add_space(8.0);
-                render_root_selector(ui, state, snapshot, scale);
-                ui.add_space(10.0);
-                render_workspace_cards(ui, state, snapshot, scale);
-                ui.add_space(8.0);
-                ui.separator();
-                ui.add_space(8.0);
-                render_flow_cards(ui, state, snapshot, sockets, scale);
-            })
-        });
-}
-
-fn render_root_selector(
-    ui: &mut egui::Ui,
-    state: &mut StudioAppState,
-    snapshot: &AppSnapshot,
-    scale: f32,
-) {
-    let selected_root = snapshot
-        .home
-        .workspace_roots
-        .iter()
-        .find(|root| Some(root.id.as_str()) == snapshot.selected_root_id.as_deref());
-    let selected_label = selected_root
-        .map(|root| root.name.as_str())
-        .unwrap_or("No root selected");
-
-    egui::ComboBox::from_id_salt("workspace_root_selector")
-        .selected_text(selected_label)
-        .width(ROOT_NODE_SIZE.x - 24.0)
-        .show_ui(ui, |ui| {
-            for root in &snapshot.home.workspace_roots {
-                let selected = Some(root.id.as_str()) == snapshot.selected_root_id.as_deref();
-                if ui.selectable_label(selected, &root.name).clicked() {
-                    state.dispatch(AppCommand::SelectWorkspaceRoot {
-                        root_id: root.id.clone(),
-                    });
-                }
-            }
-        });
-
-    if let Some(root) = selected_root {
-        ui.label(theme::metadata_at(&root.path, scale));
-    }
-}
-
-fn render_workspace_cards(
-    ui: &mut egui::Ui,
-    state: &mut StudioAppState,
-    snapshot: &AppSnapshot,
-    scale: f32,
-) {
-    ui.label(RichText::new("Workspaces").size(14.0 * scale).strong());
-    let workspaces: Vec<_> = snapshot
-        .home
-        .workspaces
-        .iter()
-        .filter(|workspace| {
-            Some(workspace.root_id.as_str()) == snapshot.selected_root_id.as_deref()
-        })
-        .collect();
-
-    for workspace in workspaces {
-        let selected = Some(workspace.id.as_str()) == snapshot.selected_workspace_id.as_deref();
-        let response = card_frame(selected).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.add(
-                egui::Label::new(RichText::new(&workspace.name).size(14.0 * scale).strong())
-                    .wrap()
-                    .selectable(false),
-            );
-            ui.add(
-                egui::Label::new(theme::metadata_at(&workspace.status, scale))
-                    .wrap()
-                    .selectable(false),
-            );
-        });
-        if response.response.interact(egui::Sense::click()).clicked() {
-            state.dispatch(AppCommand::SelectWorkspace {
-                workspace_id: workspace.id.clone(),
-            });
-        }
-        ui.add_space(6.0);
-    }
-}
-
-fn render_flow_cards(
-    ui: &mut egui::Ui,
-    state: &mut StudioAppState,
-    snapshot: &AppSnapshot,
-    sockets: &mut des_graph_egui::SocketLayout,
-    scale: f32,
-) {
-    ui.label(RichText::new("Grouped Flows").size(14.0 * scale).strong());
-    let selected_id = snapshot.selected_flow_id.as_deref();
-    for flow in &snapshot.home.flows {
-        let selected = Some(flow.id.as_str()) == selected_id;
-        let response = card_frame(selected).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.add(
-                egui::Label::new(RichText::new(&flow.name).size(14.0 * scale).strong())
-                    .wrap()
-                    .selectable(false),
-            );
-            ui.add(
-                egui::Label::new(theme::metadata_at(&flow.group, scale))
-                    .wrap()
-                    .selectable(false),
-            );
-            ui.horizontal(|ui| {
-                ui.label(theme::metadata_at(
-                    format!("{} nodes", flow.node_count),
-                    scale,
-                ));
-                ui.separator();
-                ui.label(theme::metadata_at(&flow.trigger, scale));
-            });
-        });
-        if response.response.interact(egui::Sense::click()).clicked() {
-            state.dispatch(AppCommand::SelectFlow {
-                flow_id: flow.id.clone(),
-            });
-        }
-        if selected {
-            sockets.output(0, response.response.rect);
-        }
-        ui.add_space(6.0);
     }
 }
 
@@ -388,22 +230,39 @@ fn render_flow_node(
         });
 }
 
-fn render_root_edges(
+fn render_catalog_edges(
     ui: &mut egui::Ui,
     selected_edges: &mut HashSet<String>,
     edges: &mut des_graph_egui::EdgesCtx,
     graph: &FlowGraphSummary,
+    selected_flow_anchor: Option<Rect>,
 ) {
+    let Some(anchor) = selected_flow_anchor else {
+        return;
+    };
+    let anchor_pos = Pos2::new(anchor.right(), anchor.center().y);
+    edges.register_overlay_socket(
+        ui,
+        FLOW_CATALOG_NODE_ID,
+        OverlaySocketKind::Output,
+        0,
+        anchor_pos,
+    );
+
     for node in graph
         .nodes
         .iter()
         .filter(|node| is_source_node(node) && !node.outputs.is_empty())
     {
-        let edge_id = format!("root-to-{}", node.id);
+        let edge_id = format!("catalog-to-{}", node.id);
         let mut selected = selected_edges.contains(&edge_id);
-        let response = Edge::new((ROOT_NODE_ID, 0), (node_id(&node.id), 0), &mut selected)
-            .curvature_factor(0.75)
-            .show(edges, ui);
+        let response = Edge::new(
+            (FLOW_CATALOG_NODE_ID, 0),
+            (node_id(&node.id), 0),
+            &mut selected,
+        )
+        .curvature_factor(0.75)
+        .show(edges, ui);
         sync_edge_selection(selected_edges, edge_id, selected, response.changed());
     }
 }
@@ -469,10 +328,6 @@ fn output_index(node: &GraphNodeSummary, port_id: &str) -> Option<usize> {
     node.outputs.iter().position(|port| port.id == port_id)
 }
 
-fn root_frame(interaction: des_graph_egui::NodeInteraction) -> egui::Frame {
-    node_frame(theme::PANEL, interaction)
-}
-
 fn flow_node_frame(interaction: des_graph_egui::NodeInteraction) -> egui::Frame {
     let fill = if interaction.hovered || interaction.selected {
         Color32::from_rgb(36, 44, 50)
@@ -495,25 +350,6 @@ fn node_frame(fill: Color32, interaction: des_graph_egui::NodeInteraction) -> eg
         ))
         .corner_radius(8.0)
         .inner_margin(12.0)
-}
-
-fn card_frame(selected: bool) -> egui::Frame {
-    egui::Frame::new()
-        .fill(if selected {
-            theme::PANEL_SELECTED
-        } else {
-            Color32::from_rgb(32, 37, 42)
-        })
-        .stroke(Stroke::new(
-            1.0,
-            if selected {
-                theme::STROKE_SELECTED
-            } else {
-                theme::STROKE
-            },
-        ))
-        .corner_radius(6.0)
-        .inner_margin(8.0)
 }
 
 fn node_socket_color(node: &GraphNodeSummary) -> Color32 {
@@ -548,10 +384,6 @@ fn selected_flow(snapshot: &AppSnapshot) -> Option<&des_app::FlowSummary> {
         .flows
         .iter()
         .find(|flow| Some(flow.id.as_str()) == snapshot.selected_flow_id.as_deref())
-}
-
-fn root_node_world_rect() -> Rect {
-    Rect::from_min_size(Pos2::new(28.0, 78.0), ROOT_NODE_SIZE)
 }
 
 fn node_id(id: &str) -> NodeId {

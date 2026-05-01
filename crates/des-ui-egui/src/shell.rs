@@ -1,4 +1,9 @@
-use crate::{debug_overlay, graph_canvas::GraphCanvasState, graph_view, theme};
+use crate::{
+    debug_overlay,
+    graph_canvas::GraphCanvasState,
+    graph_view, theme,
+    workspace_catalog::{self, WorkspaceCatalogState},
+};
 use des_app::StudioAppState;
 use eframe::egui;
 
@@ -6,6 +11,7 @@ pub(crate) fn render(
     ui: &mut egui::Ui,
     state: &mut StudioAppState,
     graph_canvas: &mut GraphCanvasState,
+    workspace_catalog: &mut WorkspaceCatalogState,
     debug_overlay: bool,
 ) {
     let full_rect = ui.max_rect();
@@ -32,11 +38,31 @@ pub(crate) fn render(
             });
     });
 
+    let catalog_rect = workspace_catalog::panel_rect(graph_rect);
+    let graph_exclusions = [catalog_rect];
+    let selected_flow_anchor = workspace_catalog.selected_flow_anchor();
+
     ui.scope_builder(egui::UiBuilder::new().max_rect(graph_rect), |ui| {
         ui.set_min_size(graph_rect.size());
         ui.set_max_size(graph_rect.size());
-        graph_view::render(ui, state, graph_canvas);
+        graph_view::render(
+            ui,
+            state,
+            graph_canvas,
+            graph_rect,
+            &graph_exclusions,
+            selected_flow_anchor,
+        );
     });
+
+    let catalog_snapshot = state.snapshot();
+    workspace_catalog::render(
+        ui,
+        catalog_rect,
+        state,
+        workspace_catalog,
+        &catalog_snapshot,
+    );
 
     if debug_overlay {
         debug_overlay::render(ui, graph_rect, graph_canvas, &state.snapshot());

@@ -4,12 +4,14 @@ Use this guide when making automated changes in Data Engine Studio.
 
 ## Project Shape
 
-Data Engine Studio is a Rust-first visual ETL and data exploration studio. It is distributed through PyPI under a thin Python process. Rust owns application behavior; Python owns packaging and process entry; `egui` owns rendering and interaction.
+Data Engine Studio is a Rust-first visual ETL and data exploration studio. It is distributed through PyPI under a thin Python process. Rust owns application behavior; Python owns packaging and process entry; `egui` is a native rendering/input host rather than the long-term owner of product layout semantics.
 
 Current workspace:
 
 - `crates/des-core`: shared primitives such as app info, diagnostics, errors, and small stable types.
 - `crates/des-app`: app state, command handling, snapshots, and orchestration. This is the composition layer.
+- `crates/des-ui-runtime`: DOM-like element tree, deterministic CSS-like style resolution, layout frames, retained UI state, and input routing. This crate must not depend on egui.
+- `crates/des-graph-egui`: vendored graph interaction crate kept while graph UX is still being explored.
 - `crates/des-ui-egui`: egui UI shell and widgets. UI renders snapshots and sends commands.
 - `crates/des-python`: PyO3 extension module exposed to Python as `data_engine_studio._native`.
 - `python/data_engine_studio`: Python launcher/wrapper package.
@@ -32,7 +34,9 @@ Keep app identity centralized.
 - Export intentional front-door types from `lib.rs`; keep implementation modules private unless there is a clear reason.
 - Prefer typed commands, events, snapshots, reports, and change sets over shared mutable state.
 - Keep graph, project, validation, query, and execution logic independent from `egui` and Python.
+- Keep `des-ui-runtime` independent from `egui` and Python. It should expose product-neutral UI runtime contracts: element trees, style sheets, layout frames, input events, and retained interaction state.
 - Keep `des-ui-egui` out of business logic. UI should render state and dispatch commands.
+- Treat `des-ui-egui` as an adapter/host for the runtime where possible: translate egui input into runtime input and paint runtime output through egui/epaint.
 - Keep `des-python` thin. It should expose native launch/runtime diagnostics, not own app behavior.
 - `des-app` may coordinate crates, but should coordinate through public APIs rather than reaching into internals.
 - If a small behavior change requires touching many crates, revisit the boundary before continuing.
@@ -44,6 +48,7 @@ python package
   -> des-python
     -> des-app
       -> des-ui-egui
+        -> des-ui-runtime
       -> domain/service crates
         -> des-core
 ```
@@ -57,9 +62,13 @@ The UI is allowed to drive architecture discovery, but it must not absorb the ar
 Preferred pattern:
 
 ```text
+des-ui-runtime
+  resolves element trees + style sheets
+  owns layout, z-order, hit testing, and retained UI state
+
 des-ui-egui
-  renders AppSnapshot
-  sends AppCommand
+  adapts egui input/output to the runtime
+  renders AppSnapshot and sends AppCommand
 
 des-app
   applies AppCommand
@@ -72,7 +81,19 @@ domain crates
 
 The primary product surface is a full-window graph workspace. Workspace roots, workspaces, and grouped flows can appear as high-level graph nodes. The node graph for a selected flow expands from the flow card into source/transform/sink nodes.
 
-When adding UI behavior, add the corresponding command/snapshot shape in `des-app` first or at the same time.
+When adding product behavior, add the corresponding command/snapshot shape in `des-app` first or at the same time. When adding low-level UI behavior such as layout, z-order, hover, press, focus, scroll ownership, clipping, or event routing, prefer adding it to `des-ui-runtime` rather than patching around it in product UI code.
+
+Do not recreate CSS specificity. Runtime style resolution should stay deterministic and boring:
+
+```text
+role defaults
+then classes in declaration/rule order
+then state variants
+then id overrides
+then explicit local overrides later if needed
+```
+
+The element tree defines identity, nesting, roles, classes, text, and event intent. The style sheet defines visual and layout properties such as size, margin, padding, z-index, color, borders, overflow, and layout direction.
 
 Avoid a monolithic GUI crate. Split `des-ui-egui` internally by product surface and responsibility as it grows. Prefer small modules such as:
 
@@ -87,6 +108,8 @@ Avoid a monolithic GUI crate. Split `des-ui-egui` internally by product surface 
 - `theme`: visual constants and egui styling.
 
 UI modules may share small view models from `des-app`, but should not reach into graph/project/runtime internals directly.
+
+Avoid new throwaway GUI framework spikes in the main tree. If a spike is needed, keep it short-lived and remove it once a direction is chosen.
 
 ## Workspace And Ownership Requirements
 
@@ -190,6 +213,15 @@ Harness knobs:
 ```
 
 Use `-DebugOverlay` for zoom, scene rect, pointer, scroll, and selection diagnostics. Use `-SceneRect`, `-RootId`, `-WorkspaceId`, and `-FlowId` to seed the UI through launch-time options and app commands rather than test-only branches in the product UI.
+
+Fast UI launch for local iteration:
+
+```powershell
+cargo build -p des-ui-egui --bin des-ui-dev
+.\target\debug\des-ui-dev.exe
+```
+
+During rapid UI iteration, prefer the Rust dev launcher and screenshot harness over rebuilding the Python extension. Run `maturin develop` when PyO3 or Python package code changes, and before commits that need the Python launcher validated.
 
 Command runner:
 

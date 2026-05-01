@@ -6,6 +6,8 @@ param(
     [string]$SceneRect = "",
     [string]$RootId = "",
     [string]$WorkspaceId = "",
+    [string]$ProjectId = "",
+    [string]$GroupId = "",
     [string]$FlowId = ""
 )
 
@@ -40,6 +42,12 @@ if ($RootId) {
 if ($WorkspaceId) {
     $env:DES_UI_SELECTED_WORKSPACE = $WorkspaceId
 }
+if ($ProjectId) {
+    $env:DES_UI_SELECTED_PROJECT = $ProjectId
+}
+if ($GroupId) {
+    $env:DES_UI_SELECTED_GROUP = $GroupId
+}
 if ($FlowId) {
     $env:DES_UI_SELECTED_FLOW = $FlowId
 }
@@ -56,6 +64,8 @@ finally {
     Remove-Item Env:\DES_UI_SCENE_RECT -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_ROOT -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_WORKSPACE -ErrorAction SilentlyContinue
+    Remove-Item Env:\DES_UI_SELECTED_PROJECT -ErrorAction SilentlyContinue
+    Remove-Item Env:\DES_UI_SELECTED_GROUP -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_FLOW -ErrorAction SilentlyContinue
 }
 

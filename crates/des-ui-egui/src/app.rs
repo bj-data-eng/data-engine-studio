@@ -1,10 +1,11 @@
-use crate::{graph_canvas::GraphCanvasState, shell};
+use crate::{graph_canvas::GraphCanvasState, shell, workspace_catalog::WorkspaceCatalogState};
 use des_app::{AppCommand, StudioAppState};
 use eframe::egui;
 
 pub(crate) struct StudioEguiApp {
     state: StudioAppState,
     graph_canvas: GraphCanvasState,
+    workspace_catalog: WorkspaceCatalogState,
     debug_overlay: bool,
 }
 
@@ -29,6 +30,7 @@ impl StudioEguiApp {
         Self {
             state,
             graph_canvas,
+            workspace_catalog: WorkspaceCatalogState::default(),
             debug_overlay: options.debug_overlay,
         }
     }
@@ -40,6 +42,7 @@ impl eframe::App for StudioEguiApp {
             ui,
             &mut self.state,
             &mut self.graph_canvas,
+            &mut self.workspace_catalog,
             self.debug_overlay,
         );
     }

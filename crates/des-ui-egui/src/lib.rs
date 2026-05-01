@@ -4,6 +4,7 @@ mod graph_canvas;
 mod graph_view;
 mod shell;
 mod theme;
+mod workspace_catalog;
 
 use des_app::AppCommand;
 use des_core::{StudioResult, identity};
@@ -52,6 +53,10 @@ pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
         }),
     )
     .map_err(|error| des_core::StudioError::new(error.to_string()))
+}
+
+pub fn apply_default_theme(context: &egui::Context) {
+    theme::apply_theme(context);
 }
 
 fn scene_rect_from_array(rect: [f32; 4]) -> egui::Rect {
