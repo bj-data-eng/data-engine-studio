@@ -1,10 +1,6 @@
 mod app;
-mod debug_overlay;
-mod graph_canvas;
-mod graph_view;
-mod shell;
 mod theme;
-mod workspace_catalog;
+mod ui_lab;
 
 use des_app::AppCommand;
 use des_core::{StudioResult, identity};
@@ -20,7 +16,6 @@ pub struct NativeLaunchOptions {
     pub title: String,
     pub inner_size: [f32; 2],
     pub debug_overlay: bool,
-    pub initial_scene_rect: Option<[f32; 4]>,
     pub startup_commands: Vec<AppCommand>,
 }
 
@@ -30,7 +25,6 @@ impl Default for NativeLaunchOptions {
             title: identity::window_title(),
             inner_size: [DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT],
             debug_overlay: false,
-            initial_scene_rect: None,
             startup_commands: Vec::new(),
         }
     }
@@ -39,7 +33,6 @@ impl Default for NativeLaunchOptions {
 pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
     let app_options = app::StudioEguiAppOptions {
         debug_overlay: options.debug_overlay,
-        initial_scene_rect: options.initial_scene_rect.map(scene_rect_from_array),
         startup_commands: options.startup_commands.clone(),
     };
     let native_options = native_options(options);
@@ -57,10 +50,6 @@ pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
 
 pub fn apply_default_theme(context: &egui::Context) {
     theme::apply_theme(context);
-}
-
-fn scene_rect_from_array(rect: [f32; 4]) -> egui::Rect {
-    egui::Rect::from_min_size(egui::pos2(rect[0], rect[1]), egui::vec2(rect[2], rect[3]))
 }
 
 struct BuiltNativeOptions {

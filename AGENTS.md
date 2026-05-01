@@ -12,7 +12,7 @@ Current workspace:
 - `crates/des-app`: app state, command handling, snapshots, and orchestration. This is the composition layer.
 - `crates/des-ui-runtime`: DOM-like element tree, deterministic CSS-like style resolution, layout frames, retained UI state, and input routing. This crate must not depend on egui.
 - `crates/des-graph-egui`: vendored graph interaction crate kept while graph UX is still being explored.
-- `crates/des-ui-egui`: egui UI shell and widgets. UI renders snapshots and sends commands.
+- `crates/des-ui-egui`: egui host adapter and current UI lab. UI renders snapshots/runtime output and sends commands.
 - `crates/des-python`: PyO3 extension module exposed to Python as `data_engine_studio._native`.
 - `python/data_engine_studio`: Python launcher/wrapper package.
 - `ROADMAP.md`: architecture-first plan and milestone map.
@@ -95,8 +95,10 @@ then explicit local overrides later if needed
 
 The element tree defines identity, nesting, roles, classes, text, and event intent. The style sheet defines visual and layout properties such as size, margin, padding, z-index, color, borders, overflow, and layout direction.
 
-Avoid a monolithic GUI crate. Split `des-ui-egui` internally by product surface and responsibility as it grows. Prefer small modules such as:
+Avoid a monolithic GUI crate. The current first screen is a runtime-backed UI lab, not the final product shell. Use it to exercise layout, styling, input, graph/canvas, table, editor, markdown, and other UI features before promoting them into app surfaces. Split `des-ui-egui` internally by product surface and responsibility as it grows. Prefer small modules such as:
 
+- `ui_lab`: runtime-backed testing UI for all emerging UI features.
+- `runtime_adapter`: egui input/output translation for `des-ui-runtime`.
 - `shell`: top-level frame, menus, command routing, global layout.
 - `workspace_browser`: workspace roots, workspace list, ownership/status affordances.
 - `flow_list`: grouped built ETL flow cards embedded in the workspace/root graph node.
@@ -209,10 +211,10 @@ The screenshot harness builds `des-ui-egui` with the `ui-screenshot` feature, la
 Harness knobs:
 
 ```powershell
-.\scripts\capture-ui.ps1 -DebugOverlay -SceneRect "0,0,1320,780" -FlowId customer-analytics
+.\scripts\capture-ui.ps1 -DebugOverlay
 ```
 
-Use `-DebugOverlay` for zoom, scene rect, pointer, scroll, and selection diagnostics. Use `-SceneRect`, `-RootId`, `-WorkspaceId`, and `-FlowId` to seed the UI through launch-time options and app commands rather than test-only branches in the product UI.
+Use `-DebugOverlay` for UI lab diagnostics. As the runtime lab grows, prefer seeding views through launch-time options and app commands rather than test-only branches in the product UI.
 
 Fast UI launch for local iteration:
 

@@ -3,7 +3,6 @@ param(
     [int]$Width = 1320,
     [int]$Height = 780,
     [switch]$DebugOverlay,
-    [string]$SceneRect = "",
     [string]$RootId = "",
     [string]$WorkspaceId = "",
     [string]$ProjectId = "",
@@ -33,9 +32,6 @@ $env:DES_UI_HARNESS_TITLE = "Data Engine Studio UI Harness"
 if ($DebugOverlay) {
     $env:DES_UI_DEBUG_OVERLAY = "1"
 }
-if ($SceneRect) {
-    $env:DES_UI_SCENE_RECT = $SceneRect
-}
 if ($RootId) {
     $env:DES_UI_SELECTED_ROOT = $RootId
 }
@@ -61,7 +57,6 @@ finally {
     Remove-Item Env:\DES_UI_HARNESS_HEIGHT -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_HARNESS_TITLE -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_DEBUG_OVERLAY -ErrorAction SilentlyContinue
-    Remove-Item Env:\DES_UI_SCENE_RECT -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_ROOT -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_WORKSPACE -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_PROJECT -ErrorAction SilentlyContinue

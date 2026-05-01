@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use eframe::egui;
 use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId, TextStyle, vec2};
 use iconflow::{Pack, Size, Style, try_icon};

@@ -1,17 +1,15 @@
-use crate::{graph_canvas::GraphCanvasState, shell, workspace_catalog::WorkspaceCatalogState};
+use crate::ui_lab::UiLabState;
 use des_app::{AppCommand, StudioAppState};
 use eframe::egui;
 
 pub(crate) struct StudioEguiApp {
-    state: StudioAppState,
-    graph_canvas: GraphCanvasState,
-    workspace_catalog: WorkspaceCatalogState,
+    _state: StudioAppState,
+    ui_lab: UiLabState,
     debug_overlay: bool,
 }
 
 pub(crate) struct StudioEguiAppOptions {
     pub(crate) debug_overlay: bool,
-    pub(crate) initial_scene_rect: Option<egui::Rect>,
     pub(crate) startup_commands: Vec<AppCommand>,
 }
 
@@ -22,15 +20,9 @@ impl StudioEguiApp {
             state.dispatch(command);
         }
 
-        let mut graph_canvas = GraphCanvasState::default();
-        if let Some(rect) = options.initial_scene_rect {
-            graph_canvas.set_scene_rect(rect);
-        }
-
         Self {
-            state,
-            graph_canvas,
-            workspace_catalog: WorkspaceCatalogState::default(),
+            _state: state,
+            ui_lab: UiLabState::default(),
             debug_overlay: options.debug_overlay,
         }
     }
@@ -38,12 +30,6 @@ impl StudioEguiApp {
 
 impl eframe::App for StudioEguiApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        shell::render(
-            ui,
-            &mut self.state,
-            &mut self.graph_canvas,
-            &mut self.workspace_catalog,
-            self.debug_overlay,
-        );
+        self.ui_lab.render(ui, self.debug_overlay);
     }
 }

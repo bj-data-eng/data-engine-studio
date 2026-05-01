@@ -179,6 +179,12 @@ impl From<&str> for ElementId {
     }
 }
 
+impl From<String> for ElementId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClassName(String);
 
@@ -194,6 +200,12 @@ impl ClassName {
 
 impl From<&str> for ClassName {
     fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<String> for ClassName {
+    fn from(value: String) -> Self {
         Self::new(value)
     }
 }
@@ -301,9 +313,18 @@ impl Ui {
     }
 
     pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<String>) {
+        self.text_element(id, ElementSpec::new(ElementRole::Text), text);
+    }
+
+    pub fn text_element(
+        &mut self,
+        id: impl Into<ElementId>,
+        spec: ElementSpec,
+        text: impl Into<String>,
+    ) {
         self.children.push(Element {
             id: id.into(),
-            spec: ElementSpec::new(ElementRole::Text),
+            spec,
             text: Some(text.into()),
             children: Vec::new(),
         });
@@ -316,6 +337,8 @@ pub enum StyleSelector {
     Class(&'static str),
     Id(&'static str),
     State(ElementStateSelector),
+    ClassState(&'static str, ElementStateSelector),
+    IdState(&'static str, ElementStateSelector),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -328,6 +351,8 @@ pub struct StylePatch {
     pub min_size: Option<Size>,
     pub background: Option<Color>,
     pub border: Option<Color>,
+    pub text_color: Option<Color>,
+    pub font_size: Option<f32>,
     pub radius: Option<f32>,
     pub overflow_y: Option<Overflow>,
     pub z_index: Option<i32>,
@@ -374,6 +399,16 @@ impl StylePatch {
         self
     }
 
+    pub fn text_color(mut self, color: Color) -> Self {
+        self.text_color = Some(color);
+        self
+    }
+
+    pub fn font_size(mut self, font_size: f32) -> Self {
+        self.font_size = Some(font_size);
+        self
+    }
+
     pub fn radius(mut self, radius: f32) -> Self {
         self.radius = Some(radius);
         self
@@ -400,6 +435,8 @@ pub struct ComputedStyle {
     pub min_size: Size,
     pub background: Option<Color>,
     pub border: Option<Color>,
+    pub text_color: Color,
+    pub font_size: f32,
     pub radius: f32,
     pub overflow_y: Overflow,
     pub z_index: i32,
@@ -416,6 +453,8 @@ impl Default for ComputedStyle {
             min_size: Size::new(0.0, 0.0),
             background: None,
             border: None,
+            text_color: Color::rgb(218, 226, 234),
+            font_size: 13.0,
             radius: 0.0,
             overflow_y: Overflow::Visible,
             z_index: 0,
@@ -448,6 +487,12 @@ impl ComputedStyle {
         }
         if let Some(value) = patch.border {
             self.border = Some(value);
+        }
+        if let Some(value) = patch.text_color {
+            self.text_color = value;
+        }
+        if let Some(value) = patch.font_size {
+            self.font_size = value;
         }
         if let Some(value) = patch.radius {
             self.radius = value;
@@ -710,6 +755,18 @@ fn selector_matches(
             ElementStateSelector::Selected => element.spec.selected,
             ElementStateSelector::Disabled => element.spec.disabled,
         },
+        StyleSelector::ClassState(class, selector) => {
+            element
+                .spec
+                .classes
+                .iter()
+                .any(|element_class| element_class.as_str() == class)
+                && selector_matches(StyleSelector::State(selector), element, state)
+        }
+        StyleSelector::IdState(id, selector) => {
+            element.id.as_str() == id
+                && selector_matches(StyleSelector::State(selector), element, state)
+        }
     }
 }
 

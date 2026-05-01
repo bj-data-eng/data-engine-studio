@@ -320,6 +320,7 @@ Lessons carried forward from `data-engine`:
 
 ### Milestone 5: egui Shell
 
+- Use the runtime-backed UI lab as the first screen while the UI platform is being built. The lab should expose each runtime feature in one or more views before that feature is used in the app proper.
 - Build the first usable app shell:
   - menu/toolbar
   - left node palette

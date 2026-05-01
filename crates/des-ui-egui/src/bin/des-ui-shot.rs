@@ -11,7 +11,6 @@ fn main() {
         title,
         inner_size: [width, height],
         debug_overlay: env_bool("DES_UI_DEBUG_OVERLAY"),
-        initial_scene_rect: env_scene_rect("DES_UI_SCENE_RECT"),
         startup_commands: startup_commands(),
     };
 
@@ -29,19 +28,6 @@ fn env_bool(name: &str) -> bool {
     std::env::var(name)
         .ok()
         .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
-}
-
-fn env_scene_rect(name: &str) -> Option<[f32; 4]> {
-    let value = std::env::var(name).ok()?;
-    let parts: Vec<_> = value
-        .split(',')
-        .map(str::trim)
-        .filter_map(|part| part.parse::<f32>().ok())
-        .collect();
-    match parts.as_slice() {
-        [x, y, width, height] => Some([*x, *y, *width, *height]),
-        _ => None,
-    }
 }
 
 fn startup_commands() -> Vec<AppCommand> {
