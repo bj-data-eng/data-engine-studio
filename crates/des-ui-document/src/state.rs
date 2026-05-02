@@ -8,8 +8,10 @@ pub struct ElementState {
     pub scroll_y: f32,
     pub hovered: bool,
     pub pressed: bool,
-    pub scrollbar_hovered: bool,
-    pub scrollbar_dragged: bool,
+    pub scrollbar_hovered_axis: Option<ScrollAxis>,
+    pub scrollbar_dragged_axis: Option<ScrollAxis>,
+    pub(crate) scrollbar_visual_width_x: Option<f32>,
+    pub(crate) scrollbar_visual_width_y: Option<f32>,
     pub focused: bool,
     pub click_count: u32,
     pub(crate) rendered_style: Option<ComputedStyle>,
@@ -50,6 +52,16 @@ pub struct DocumentOutput {
     pub hit_id: Option<ElementId>,
     pub scroll_chrome: Vec<ScrollChrome>,
     pub animating: bool,
+    pub metrics: DocumentMetrics,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DocumentMetrics {
+    pub element_count: usize,
+    pub scroll_chrome_count: usize,
+    pub reused_input_layout: bool,
+    pub input_changed_state: bool,
+    pub animation_changed_style: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

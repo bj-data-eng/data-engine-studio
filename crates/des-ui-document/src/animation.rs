@@ -4,35 +4,50 @@ use crate::state::ElementState;
 use crate::style::{ComputedStyle, StyleSheet, Transition, resolve_style};
 use std::collections::HashMap;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct AnimationUpdate {
+    pub changed: bool,
+    pub animating: bool,
+}
+
 pub(crate) fn update_element_style_animation(
     element: &Element,
     stylesheet: &StyleSheet,
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
-) -> bool {
+) -> AnimationUpdate {
     let target_style = resolve_style(element, stylesheet, states.get(&element.id));
-    let mut animating = false;
+    let mut update = AnimationUpdate::default();
 
     if let Some(state) = states.get_mut(&element.id) {
+        let previous = state.rendered_style.clone();
         let next_style = match (state.rendered_style.as_ref(), target_style.transition) {
             (Some(current_style), Some(_)) if current_style == &target_style => Some(target_style),
             (Some(current_style), Some(transition)) => {
                 let (style, still_animating) =
                     eased_style(current_style, &target_style, transition, snap_epsilon);
-                animating |= still_animating;
+                update.animating |= still_animating;
                 Some(style)
             }
             (None, Some(_)) => Some(target_style),
             (_, None) => None,
         };
         state.rendered_style = next_style;
+        update.changed |= state.rendered_style != previous;
     }
 
     for child in &element.children {
-        animating |= update_element_style_animation(child, stylesheet, states, snap_epsilon);
+        update += update_element_style_animation(child, stylesheet, states, snap_epsilon);
     }
 
-    animating
+    update
+}
+
+impl std::ops::AddAssign for AnimationUpdate {
+    fn add_assign(&mut self, rhs: Self) {
+        self.changed |= rhs.changed;
+        self.animating |= rhs.animating;
+    }
 }
 
 fn eased_style(
@@ -105,6 +120,15 @@ fn eased_style(
     );
     animating |= (next.scrollbar_width - target.scrollbar_width).abs() > snap_epsilon;
 
+    next.scrollbar_expanded_width = ease_f32(
+        current.scrollbar_expanded_width,
+        target.scrollbar_expanded_width,
+        amount,
+        snap_epsilon,
+    );
+    animating |=
+        (next.scrollbar_expanded_width - target.scrollbar_expanded_width).abs() > snap_epsilon;
+
     next.scrollbar_handle_color = current
         .scrollbar_handle_color
         .lerp(target.scrollbar_handle_color, amount);
@@ -137,6 +161,74 @@ fn eased_style(
     );
     animating |= (next.scrollbar_handle_border_width - target.scrollbar_handle_border_width).abs()
         > snap_epsilon;
+
+    next.scrollbar_hover_handle_color = ease_optional_color(
+        current.scrollbar_hover_handle_color,
+        target.scrollbar_hover_handle_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.scrollbar_hover_handle_color != target.scrollbar_hover_handle_color;
+
+    next.scrollbar_hover_track_color = ease_optional_color(
+        current.scrollbar_hover_track_color,
+        target.scrollbar_hover_track_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.scrollbar_hover_track_color != target.scrollbar_hover_track_color;
+
+    next.scrollbar_hover_handle_border_color = ease_optional_color(
+        current.scrollbar_hover_handle_border_color,
+        target.scrollbar_hover_handle_border_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |=
+        next.scrollbar_hover_handle_border_color != target.scrollbar_hover_handle_border_color;
+
+    next.scrollbar_hover_handle_border_width = ease_optional_f32(
+        current.scrollbar_hover_handle_border_width,
+        target.scrollbar_hover_handle_border_width,
+        amount,
+        snap_epsilon,
+    );
+    animating |=
+        next.scrollbar_hover_handle_border_width != target.scrollbar_hover_handle_border_width;
+
+    next.scrollbar_pressed_handle_color = ease_optional_color(
+        current.scrollbar_pressed_handle_color,
+        target.scrollbar_pressed_handle_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.scrollbar_pressed_handle_color != target.scrollbar_pressed_handle_color;
+
+    next.scrollbar_pressed_track_color = ease_optional_color(
+        current.scrollbar_pressed_track_color,
+        target.scrollbar_pressed_track_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.scrollbar_pressed_track_color != target.scrollbar_pressed_track_color;
+
+    next.scrollbar_pressed_handle_border_color = ease_optional_color(
+        current.scrollbar_pressed_handle_border_color,
+        target.scrollbar_pressed_handle_border_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |=
+        next.scrollbar_pressed_handle_border_color != target.scrollbar_pressed_handle_border_color;
+
+    next.scrollbar_pressed_handle_border_width = ease_optional_f32(
+        current.scrollbar_pressed_handle_border_width,
+        target.scrollbar_pressed_handle_border_width,
+        amount,
+        snap_epsilon,
+    );
+    animating |=
+        next.scrollbar_pressed_handle_border_width != target.scrollbar_pressed_handle_border_width;
 
     next.scrollbar_radius = ease_f32(
         current.scrollbar_radius,
@@ -205,6 +297,27 @@ fn ease_f32(current: f32, target: f32, amount: f32, snap_epsilon: f32) -> f32 {
         target
     } else {
         next
+    }
+}
+
+fn ease_optional_f32(
+    current: Option<f32>,
+    target: Option<f32>,
+    amount: f32,
+    snap_epsilon: f32,
+) -> Option<f32> {
+    match (current, target) {
+        (Some(current), Some(target)) => Some(ease_f32(current, target, amount, snap_epsilon)),
+        (None, Some(target)) => Some(ease_f32(0.0, target, amount, snap_epsilon)),
+        (Some(current), None) => {
+            let next = ease_f32(current, 0.0, amount, snap_epsilon);
+            if next <= snap_epsilon {
+                None
+            } else {
+                Some(next)
+            }
+        }
+        (None, None) => None,
     }
 }
 

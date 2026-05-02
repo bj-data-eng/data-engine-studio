@@ -879,7 +879,14 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::id("scroll-panel"),
-            Style::default().size(70.0, 70.0).overflow(Overflow::Scroll),
+            Style::default()
+                .size(70.0, 70.0)
+                .overflow(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
+                .scrollbar_pressed_handle_color(Color::rgba(190, 217, 255, 238))
+                .scrollbar_pressed_handle_border_color(Color::rgba(255, 255, 255, 120))
+                .scrollbar_pressed_handle_border_width(1.0),
         )
         .rule(
             StyleSelector::id("content"),
@@ -926,6 +933,78 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
         }),
         "two-axis overflow should emit vertical chrome"
     );
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(64.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let vertical = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .unwrap();
+    let horizontal = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Horizontal
+        })
+        .unwrap();
+    assert!(vertical.expanded);
+    assert_eq!(vertical.handle_rect.size.width, 10.0);
+    assert!(!horizontal.expanded);
+    assert_eq!(horizontal.handle_rect.size.height, 2.0);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(64.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let vertical = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .unwrap();
+    let horizontal = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Horizontal
+        })
+        .unwrap();
+    assert!(vertical.dragged);
+    assert_eq!(vertical.handle_rect.size.width, 10.0);
+    assert_eq!(vertical.handle_color.a, 238);
+    assert!(vertical.handle_border_color.is_some());
+    assert!(!horizontal.dragged);
+    assert_eq!(horizontal.handle_rect.size.height, 2.0);
+    assert_eq!(horizontal.handle_color.a, 118);
+    assert!(horizontal.handle_border_color.is_none());
 }
 
 #[test]
@@ -1085,7 +1164,8 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
         .find(|chrome| chrome.element_id == ElementId::new("scroll-panel"))
         .unwrap();
     assert!(chrome.dragged);
-    assert!(chrome.handle_rect.size.width > 6.0);
+    assert!(chrome.handle_rect.size.width > 2.0);
+    assert!(chrome.handle_rect.size.width < 10.0);
     assert_eq!(chrome.track_color, Some(Color::rgba(2, 8, 12, 84)));
     assert!(chrome.handle_color.a > 118);
     assert!(chrome.handle_border_color.is_some());
@@ -1137,25 +1217,16 @@ fn scroll_fixture_stylesheet(panel_height: f32) -> StyleSheet {
                 .gap(4.0)
                 .overflow_y(Overflow::Scroll)
                 .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
                 .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
                 .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_hover_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_pressed_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_pressed_handle_color(Color::rgba(190, 217, 255, 238))
+                .scrollbar_pressed_handle_border_color(Color::rgba(255, 255, 255, 120))
+                .scrollbar_pressed_handle_border_width(1.0)
                 .scrollbar_radius(6.0)
                 .transition(Transition::ease_out(0.2)),
-        )
-        .rule(
-            StyleSelector::id_state("scroll-panel", ElementStateSelector::ScrollbarHovered),
-            Style::default()
-                .scrollbar_width(10.0)
-                .scrollbar_track_color(Color::rgba(2, 8, 12, 84)),
-        )
-        .rule(
-            StyleSelector::id_state("scroll-panel", ElementStateSelector::Pressed),
-            Style::default()
-                .scrollbar_width(10.0)
-                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
-                .scrollbar_handle_color(Color::rgba(190, 217, 255, 238))
-                .scrollbar_handle_border_color(Color::rgba(255, 255, 255, 120))
-                .scrollbar_handle_border_width(1.0),
         )
         .rule(
             StyleSelector::Role(ElementRole::Card),

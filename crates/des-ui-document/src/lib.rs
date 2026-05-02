@@ -24,8 +24,8 @@ pub use geometry::{
     PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use state::{
-    ChangeSet, DocumentInput, DocumentOutput, ElementState, PointerInput, ResolvedElement,
-    ScrollChrome,
+    ChangeSet, DocumentInput, DocumentMetrics, DocumentOutput, ElementState, PointerInput,
+    ResolvedElement, ScrollChrome,
 };
 pub use style::{
     CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle, Style, StyleRule,

@@ -9,10 +9,12 @@ use styles::stylesheet;
 use views::{render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentOutput, ElementRole, ElementSpec, Size,
+    Color, Document, DocumentEngine, DocumentMetrics, DocumentOutput, ElementRole, ElementSpec,
+    Size, StyleSheet,
 };
 use eframe::egui;
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 const BACKGROUND: Color = Color::rgb(17, 20, 23);
 const PANEL: Color = Color::rgb(27, 31, 35);
@@ -81,20 +83,24 @@ impl LabView {
 
 pub(crate) struct UiLabState {
     document_engine: DocumentEngine,
+    stylesheet: StyleSheet,
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
     last_click_counts: BTreeMap<&'static str, u32>,
+    last_perf: UiLabPerf,
 }
 
 impl Default for UiLabState {
     fn default() -> Self {
         Self {
             document_engine: DocumentEngine::default(),
+            stylesheet: stylesheet(),
             view: LabView::Layout,
             show_optional_card: true,
             dense_mode: false,
             last_click_counts: BTreeMap::new(),
+            last_perf: UiLabPerf::default(),
         }
     }
 }
@@ -111,17 +117,31 @@ impl UiLabState {
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
-        let stylesheet = stylesheet();
+        let document_start = Instant::now();
         let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
+        let document_time = document_start.elapsed();
+        let engine_start = Instant::now();
         let output = self.document_engine.update_with_input(
             &document,
-            &stylesheet,
+            &self.stylesheet,
             document_input(ui, origin),
         );
+        let engine_time = engine_start.elapsed();
 
+        let paint_start = Instant::now();
         paint_frame(ui, origin, &output.layout);
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
+        let paint_time = paint_start.elapsed();
+        self.last_perf = UiLabPerf {
+            document_time,
+            engine_time,
+            paint_time,
+            metrics: output.metrics,
+        };
         self.apply_clicks(ui, &output);
+        if debug_overlay {
+            self.paint_debug_overlay(ui);
+        }
         if output.animating {
             ui.ctx().request_repaint();
         }
@@ -180,6 +200,52 @@ impl UiLabState {
             );
         })
     }
+
+    fn paint_debug_overlay(&self, ui: &egui::Ui) {
+        egui::Area::new("ui-lab-debug-overlay".into())
+            .order(egui::Order::Foreground)
+            .fixed_pos(ui.max_rect().right_top() + egui::vec2(-274.0, 12.0))
+            .show(ui.ctx(), |ui| {
+                egui::Frame::new()
+                    .fill(egui::Color32::from_rgba_unmultiplied(13, 16, 19, 230))
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(61, 68, 76)))
+                    .corner_radius(egui::CornerRadius::same(6))
+                    .inner_margin(egui::Margin::symmetric(10, 8))
+                    .show(ui, |ui| {
+                        ui.set_width(250.0);
+                        ui.label(
+                            egui::RichText::new("UI Lab Runtime")
+                                .color(egui::Color32::from_rgb(228, 234, 240))
+                                .strong(),
+                        );
+                        ui.separator();
+                        debug_row(ui, "document", self.last_perf.document_time);
+                        debug_row(ui, "engine", self.last_perf.engine_time);
+                        debug_row(ui, "paint", self.last_perf.paint_time);
+                        ui.separator();
+                        ui.label(format!(
+                            "elements: {}",
+                            self.last_perf.metrics.element_count
+                        ));
+                        ui.label(format!(
+                            "scrollbars: {}",
+                            self.last_perf.metrics.scroll_chrome_count
+                        ));
+                        ui.label(format!(
+                            "reused layout: {}",
+                            self.last_perf.metrics.reused_input_layout
+                        ));
+                        ui.label(format!(
+                            "input changed: {}",
+                            self.last_perf.metrics.input_changed_state
+                        ));
+                        ui.label(format!(
+                            "style changed: {}",
+                            self.last_perf.metrics.animation_changed_style
+                        ));
+                    });
+            });
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -187,4 +253,21 @@ enum LabAction {
     SelectView(LabView),
     ToggleOptionalCard,
     ToggleDensity,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct UiLabPerf {
+    document_time: Duration,
+    engine_time: Duration,
+    paint_time: Duration,
+    metrics: DocumentMetrics,
+}
+
+fn debug_row(ui: &mut egui::Ui, label: &str, duration: Duration) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(format!("{:.2} ms", duration.as_secs_f64() * 1000.0));
+        });
+    });
 }

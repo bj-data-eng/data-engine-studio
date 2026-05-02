@@ -54,11 +54,23 @@ fn scroll_chrome_for_frame(
 
     let state = states.get(&frame.id);
     let container_hovered = state.is_some_and(|state| state.hovered);
-    let scrollbar_hovered = state.is_some_and(|state| state.scrollbar_hovered);
-    let dragged = state.is_some_and(|state| state.scrollbar_dragged);
+    let scrollbar_hovered = state.is_some_and(|state| state.scrollbar_hovered_axis == Some(axis));
+    let dragged = state.is_some_and(|state| state.scrollbar_dragged_axis == Some(axis));
     let visible = container_hovered || scrollbar_hovered || dragged;
     let expanded = scrollbar_hovered || dragged;
-    let visual_width = frame.style.scrollbar_width.max(0.0);
+    let visual_width = state
+        .and_then(|state| match axis {
+            ScrollAxis::Horizontal => state.scrollbar_visual_width_x,
+            ScrollAxis::Vertical => state.scrollbar_visual_width_y,
+        })
+        .unwrap_or_else(|| {
+            if expanded {
+                frame.style.scrollbar_expanded_width
+            } else {
+                frame.style.scrollbar_width
+            }
+        })
+        .max(0.0);
     let viewport_rect = frame
         .rect
         .inset(frame.style.border_width)
@@ -136,6 +148,58 @@ fn scroll_chrome_for_frame(
             ),
         ),
     };
+    let handle_color = if dragged {
+        frame
+            .style
+            .scrollbar_pressed_handle_color
+            .unwrap_or(frame.style.scrollbar_handle_color)
+    } else if scrollbar_hovered {
+        frame
+            .style
+            .scrollbar_hover_handle_color
+            .unwrap_or(frame.style.scrollbar_handle_color)
+    } else {
+        frame.style.scrollbar_handle_color
+    };
+    let track_color = if dragged {
+        frame
+            .style
+            .scrollbar_pressed_track_color
+            .or(frame.style.scrollbar_track_color)
+    } else if scrollbar_hovered {
+        frame
+            .style
+            .scrollbar_hover_track_color
+            .or(frame.style.scrollbar_track_color)
+    } else {
+        frame.style.scrollbar_track_color
+    };
+    let handle_border_color = if dragged {
+        frame
+            .style
+            .scrollbar_pressed_handle_border_color
+            .or(frame.style.scrollbar_handle_border_color)
+    } else if scrollbar_hovered {
+        frame
+            .style
+            .scrollbar_hover_handle_border_color
+            .or(frame.style.scrollbar_handle_border_color)
+    } else {
+        frame.style.scrollbar_handle_border_color
+    };
+    let handle_border_width = if dragged {
+        frame
+            .style
+            .scrollbar_pressed_handle_border_width
+            .unwrap_or(frame.style.scrollbar_handle_border_width)
+    } else if scrollbar_hovered {
+        frame
+            .style
+            .scrollbar_hover_handle_border_width
+            .unwrap_or(frame.style.scrollbar_handle_border_width)
+    } else {
+        frame.style.scrollbar_handle_border_width
+    };
 
     ScrollChrome {
         element_id: frame.id.clone(),
@@ -143,10 +207,10 @@ fn scroll_chrome_for_frame(
         track_rect,
         hit_rect,
         handle_rect,
-        handle_color: frame.style.scrollbar_handle_color,
-        track_color: frame.style.scrollbar_track_color,
-        handle_border_color: frame.style.scrollbar_handle_border_color,
-        handle_border_width: frame.style.scrollbar_handle_border_width,
+        handle_color,
+        track_color,
+        handle_border_color,
+        handle_border_width,
         radius: frame.style.scrollbar_radius,
         max_scroll,
         visible,

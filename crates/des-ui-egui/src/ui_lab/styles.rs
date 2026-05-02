@@ -760,18 +760,6 @@ pub(super) fn stylesheet() -> StyleSheet {
             styled_scrollbar_style(),
         )
         .rule(
-            styled_scrollbar_selector()
-                .state(ElementStateSelector::ScrollbarHovered)
-                .selector(),
-            styled_scrollbar_hover_style(),
-        )
-        .rule(
-            styled_scrollbar_selector()
-                .state(ElementStateSelector::Pressed)
-                .selector(),
-            styled_scrollbar_pressed_style(),
-        )
-        .rule(
             StyleSelector::class("scroll-row-card"),
             Style::default()
                 .width_fill()
@@ -940,21 +928,13 @@ fn styled_scrollbar_style() -> Style {
     Style::default()
         .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
         .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+        .scrollbar_width(2.0)
+        .scrollbar_expanded_width(10.0)
+        .scrollbar_hover_track_color(Color::rgba(2, 8, 12, 84))
+        .scrollbar_pressed_track_color(Color::rgba(2, 8, 12, 84))
+        .scrollbar_pressed_handle_color(Color::rgba(190, 217, 255, 238))
+        .scrollbar_pressed_handle_border_color(Color::rgba(255, 255, 255, 120))
+        .scrollbar_pressed_handle_border_width(1.0)
         .scrollbar_radius(6.0)
         .transition(Transition::ease_out(0.14))
-}
-
-fn styled_scrollbar_hover_style() -> Style {
-    Style::default()
-        .scrollbar_width(10.0)
-        .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
-}
-
-fn styled_scrollbar_pressed_style() -> Style {
-    Style::default()
-        .scrollbar_width(10.0)
-        .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
-        .scrollbar_handle_color(Color::rgba(190, 217, 255, 238))
-        .scrollbar_handle_border_color(Color::rgba(255, 255, 255, 120))
-        .scrollbar_handle_border_width(1.0)
 }

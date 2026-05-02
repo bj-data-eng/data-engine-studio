@@ -132,10 +132,19 @@ pub struct Style {
     pub overflow_x: Option<Overflow>,
     pub overflow_y: Option<Overflow>,
     pub scrollbar_width: Option<f32>,
+    pub scrollbar_expanded_width: Option<f32>,
     pub scrollbar_handle_color: Option<Color>,
     pub scrollbar_track_color: Option<Color>,
     pub scrollbar_handle_border_color: Option<Color>,
     pub scrollbar_handle_border_width: Option<f32>,
+    pub scrollbar_hover_handle_color: Option<Color>,
+    pub scrollbar_hover_track_color: Option<Color>,
+    pub scrollbar_hover_handle_border_color: Option<Color>,
+    pub scrollbar_hover_handle_border_width: Option<f32>,
+    pub scrollbar_pressed_handle_color: Option<Color>,
+    pub scrollbar_pressed_track_color: Option<Color>,
+    pub scrollbar_pressed_handle_border_color: Option<Color>,
+    pub scrollbar_pressed_handle_border_width: Option<f32>,
     pub scrollbar_radius: Option<f32>,
     pub position: Option<Position>,
     pub inset: PositionInsets,
@@ -389,6 +398,11 @@ impl Style {
         self
     }
 
+    pub fn scrollbar_expanded_width(mut self, width: f32) -> Self {
+        self.scrollbar_expanded_width = Some(width.max(0.0));
+        self
+    }
+
     pub fn scrollbar_handle_color(mut self, color: Color) -> Self {
         self.scrollbar_handle_color = Some(color);
         self
@@ -406,6 +420,46 @@ impl Style {
 
     pub fn scrollbar_handle_border_width(mut self, width: f32) -> Self {
         self.scrollbar_handle_border_width = Some(width.max(0.0));
+        self
+    }
+
+    pub fn scrollbar_hover_handle_color(mut self, color: Color) -> Self {
+        self.scrollbar_hover_handle_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_hover_track_color(mut self, color: Color) -> Self {
+        self.scrollbar_hover_track_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_hover_handle_border_color(mut self, color: Color) -> Self {
+        self.scrollbar_hover_handle_border_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_hover_handle_border_width(mut self, width: f32) -> Self {
+        self.scrollbar_hover_handle_border_width = Some(width.max(0.0));
+        self
+    }
+
+    pub fn scrollbar_pressed_handle_color(mut self, color: Color) -> Self {
+        self.scrollbar_pressed_handle_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_pressed_track_color(mut self, color: Color) -> Self {
+        self.scrollbar_pressed_track_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_pressed_handle_border_color(mut self, color: Color) -> Self {
+        self.scrollbar_pressed_handle_border_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_pressed_handle_border_width(mut self, width: f32) -> Self {
+        self.scrollbar_pressed_handle_border_width = Some(width.max(0.0));
         self
     }
 
@@ -497,10 +551,19 @@ pub struct ComputedStyle {
     pub overflow_x: Overflow,
     pub overflow_y: Overflow,
     pub scrollbar_width: f32,
+    pub scrollbar_expanded_width: f32,
     pub scrollbar_handle_color: Color,
     pub scrollbar_track_color: Option<Color>,
     pub scrollbar_handle_border_color: Option<Color>,
     pub scrollbar_handle_border_width: f32,
+    pub scrollbar_hover_handle_color: Option<Color>,
+    pub scrollbar_hover_track_color: Option<Color>,
+    pub scrollbar_hover_handle_border_color: Option<Color>,
+    pub scrollbar_hover_handle_border_width: Option<f32>,
+    pub scrollbar_pressed_handle_color: Option<Color>,
+    pub scrollbar_pressed_track_color: Option<Color>,
+    pub scrollbar_pressed_handle_border_color: Option<Color>,
+    pub scrollbar_pressed_handle_border_width: Option<f32>,
     pub scrollbar_radius: f32,
     pub position: Position,
     pub inset: PositionInsets,
@@ -531,10 +594,19 @@ impl Default for ComputedStyle {
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
             scrollbar_width: 2.0,
+            scrollbar_expanded_width: 10.0,
             scrollbar_handle_color: Color::rgba(232, 236, 240, 118),
             scrollbar_track_color: None,
             scrollbar_handle_border_color: None,
             scrollbar_handle_border_width: 0.0,
+            scrollbar_hover_handle_color: None,
+            scrollbar_hover_track_color: None,
+            scrollbar_hover_handle_border_color: None,
+            scrollbar_hover_handle_border_width: None,
+            scrollbar_pressed_handle_color: None,
+            scrollbar_pressed_track_color: None,
+            scrollbar_pressed_handle_border_color: None,
+            scrollbar_pressed_handle_border_width: None,
             scrollbar_radius: 6.0,
             position: Position::Flow,
             inset: PositionInsets::ZERO,
@@ -624,6 +696,9 @@ impl ComputedStyle {
         if let Some(value) = style.scrollbar_width {
             self.scrollbar_width = value.max(0.0);
         }
+        if let Some(value) = style.scrollbar_expanded_width {
+            self.scrollbar_expanded_width = value.max(0.0);
+        }
         if let Some(value) = style.scrollbar_handle_color {
             self.scrollbar_handle_color = value;
         }
@@ -635,6 +710,30 @@ impl ComputedStyle {
         }
         if let Some(value) = style.scrollbar_handle_border_width {
             self.scrollbar_handle_border_width = value.max(0.0);
+        }
+        if let Some(value) = style.scrollbar_hover_handle_color {
+            self.scrollbar_hover_handle_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_hover_track_color {
+            self.scrollbar_hover_track_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_hover_handle_border_color {
+            self.scrollbar_hover_handle_border_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_hover_handle_border_width {
+            self.scrollbar_hover_handle_border_width = Some(value.max(0.0));
+        }
+        if let Some(value) = style.scrollbar_pressed_handle_color {
+            self.scrollbar_pressed_handle_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_pressed_track_color {
+            self.scrollbar_pressed_track_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_pressed_handle_border_color {
+            self.scrollbar_pressed_handle_border_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_pressed_handle_border_width {
+            self.scrollbar_pressed_handle_border_width = Some(value.max(0.0));
         }
         if let Some(value) = style.scrollbar_radius {
             self.scrollbar_radius = value.max(0.0);
@@ -776,10 +875,10 @@ fn state_selector_matches(
         ElementStateSelector::Hovered => state.is_some_and(|state| state.hovered),
         ElementStateSelector::Pressed => state.is_some_and(|state| state.pressed),
         ElementStateSelector::ScrollbarHovered => {
-            state.is_some_and(|state| state.scrollbar_hovered)
+            state.is_some_and(|state| state.scrollbar_hovered_axis.is_some())
         }
         ElementStateSelector::ScrollbarDragged => {
-            state.is_some_and(|state| state.scrollbar_dragged)
+            state.is_some_and(|state| state.scrollbar_dragged_axis.is_some())
         }
         ElementStateSelector::Focused => {
             element.spec.focused || state.is_some_and(|state| state.focused)
