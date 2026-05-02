@@ -10,6 +10,7 @@ mod element;
 mod engine;
 mod geometry;
 mod layout;
+mod query;
 mod scroll;
 mod state;
 mod style;
@@ -24,6 +25,7 @@ pub use geometry::{
     AlignItems, CornerRadii, Direction, Insets, JustifyContent, Length, Overflow, Point, Position,
     PositionInsets, Rect, ScrollAxis, Size,
 };
+pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics, DocumentOutput,
     ElementState, PointerInput, ResolvedElement, ScrollChrome,

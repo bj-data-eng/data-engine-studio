@@ -1,5 +1,6 @@
 use crate::element::{ClassName, Color, ElementId, ElementRole, Glyph};
 use crate::geometry::{Point, Rect, ScrollAxis};
+use crate::query::DocumentSnapshot;
 use crate::style::{ComputedStyle, Transition};
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -56,6 +57,12 @@ pub struct DocumentOutput {
     pub scroll_chrome: Vec<ScrollChrome>,
     pub animating: bool,
     pub metrics: DocumentMetrics,
+}
+
+impl DocumentOutput {
+    pub fn snapshot(&self) -> DocumentSnapshot<'_> {
+        DocumentSnapshot::new(&self.layout)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -200,6 +200,91 @@ fn document_update_can_set_text_value_and_authored_states() {
 }
 
 #[test]
+fn document_snapshot_queries_resolved_elements_without_mutation_access() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default().size(80.0, 30.0),
+        )
+        .rule(
+            StyleSelector::class("drop-zone"),
+            Style::default().background(Color::rgb(35, 56, 78)),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "drop-target",
+            ElementSpec::new(ElementRole::Card)
+                .class("drop-zone")
+                .value("target-a")
+                .interactive(),
+            |ui| {
+                ui.text("drop-label", "Drop here");
+            },
+        );
+        ui.element("plain-card", ElementSpec::new(ElementRole::Card), |_| {});
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let snapshot = output.snapshot();
+    let drop_target = snapshot.find("drop-target").unwrap();
+
+    assert_eq!(snapshot.root().id().as_str(), "root");
+    assert_eq!(drop_target.role(), ElementRole::Card);
+    assert!(drop_target.has_class("drop-zone"));
+    assert_eq!(drop_target.value(), Some("target-a"));
+    assert!(drop_target.interactive());
+    assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
+    assert_eq!(
+        snapshot.find("drop-label").unwrap().text(),
+        Some("Drop here")
+    );
+    assert_eq!(snapshot.elements_with_class("drop-zone").len(), 1);
+    assert_eq!(snapshot.elements_by_role(ElementRole::Card).len(), 2);
+}
+
+#[test]
+fn document_snapshot_hit_test_returns_target_and_path() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default().size(120.0, 80.0),
+        )
+        .rule(StyleSelector::id("base"), Style::default().size(80.0, 40.0))
+        .rule(
+            StyleSelector::id("overlay"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(20.0))
+                .top(Length::Px(10.0))
+                .z_index(5)
+                .size(80.0, 40.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("base", ElementSpec::new(ElementRole::Card), |_| {});
+            ui.element("overlay", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let hit = output
+        .snapshot()
+        .hit_test(Point::new(30.0, 20.0))
+        .expect("expected hit result");
+    let path: Vec<_> = hit
+        .path
+        .iter()
+        .map(|element| element.id().as_str())
+        .collect();
+
+    assert_eq!(hit.target.id().as_str(), "overlay");
+    assert_eq!(hit.point, Point::new(30.0, 20.0));
+    assert_eq!(path, vec!["root", "panel", "overlay"]);
+}
+
+#[test]
 fn compound_selectors_require_all_parts_without_specificity_weighting() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
