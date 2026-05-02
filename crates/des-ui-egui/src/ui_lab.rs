@@ -30,6 +30,7 @@ const TEXT_MUTED: Color = Color::rgb(156, 166, 176);
 const TEXT_ACCENT: Color = Color::rgb(113, 196, 255);
 const GREEN: Color = Color::rgb(95, 204, 140);
 const PURPLE: Color = Color::rgb(151, 93, 219);
+const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LabView {
@@ -143,7 +144,7 @@ impl UiLabState {
             self.paint_debug_overlay(ui);
         }
         if output.animating {
-            ui.ctx().request_repaint();
+            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
         }
     }
 
@@ -230,6 +231,10 @@ impl UiLabState {
                         ui.label(format!(
                             "scrollbars: {}",
                             self.last_perf.metrics.scroll_chrome_count
+                        ));
+                        ui.label(format!(
+                            "cached layout: {}",
+                            self.last_perf.metrics.reused_cached_layout
                         ));
                         ui.label(format!(
                             "reused layout: {}",

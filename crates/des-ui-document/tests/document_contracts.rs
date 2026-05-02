@@ -1158,6 +1158,77 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
 }
 
 #[test]
+fn scrollbar_hover_transition_reuses_layout() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .size(70.0, 70.0)
+                .overflow(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
+                .transition(Transition::ease_out(0.25)),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(70.0, 140.0),
+        );
+    let document = Document::build(Size::new(180.0, 140.0), |ui| {
+        ui.element("scroll-panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("content", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    engine.update(&document, &stylesheet);
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(64.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let vertical = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .unwrap();
+
+    assert!(vertical.expanded);
+    assert!(vertical.handle_rect.size.width > 2.0);
+    assert!(vertical.handle_rect.size.width < 10.0);
+    assert!(output.animating);
+    assert!(output.metrics.reused_input_layout);
+    assert!(!output.metrics.animation_changed_layout);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(64.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(output.metrics.reused_input_layout);
+    assert!(!output.metrics.animation_changed_layout);
+}
+
+#[test]
 fn nested_scroll_chrome_is_clipped_by_ancestor_scroll_viewport() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

@@ -59,6 +59,7 @@ pub struct DocumentOutput {
 pub struct DocumentMetrics {
     pub element_count: usize,
     pub scroll_chrome_count: usize,
+    pub reused_cached_layout: bool,
     pub reused_input_layout: bool,
     pub input_changed_state: bool,
     pub animation_changed_style: bool,

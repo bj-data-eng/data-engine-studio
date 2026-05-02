@@ -839,11 +839,15 @@ pub(crate) fn classify_computed_style_change(
             paint_changed: true,
             layout_changed: layout_relevant_style_changed(previous, next),
         },
-        (None, None) => StyleInvalidation::default(),
-        _ => StyleInvalidation {
+        (None, Some(_)) => StyleInvalidation {
+            paint_changed: true,
+            layout_changed: false,
+        },
+        (Some(_), None) => StyleInvalidation {
             paint_changed: true,
             layout_changed: true,
         },
+        (None, None) => StyleInvalidation::default(),
     }
 }
 

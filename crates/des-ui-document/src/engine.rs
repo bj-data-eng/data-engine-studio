@@ -43,6 +43,7 @@ pub struct DocumentEngine {
     states: HashMap<ElementId, ElementState>,
     scroll_limits: HashMap<ElementId, Size>,
     active_scroll_drag: Option<ScrollDrag>,
+    cached_layout: Option<ResolvedElement>,
 }
 
 impl DocumentEngine {
@@ -57,15 +58,26 @@ impl DocumentEngine {
         input: DocumentInput,
     ) -> DocumentOutput {
         let changes = self.sync_element_states(document);
-        let mut scroll_limits = HashMap::new();
-        let input_layout = layout_element(
-            &document.root,
-            Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height),
-            stylesheet,
-            &self.states,
-            &mut scroll_limits,
-        );
-        self.scroll_limits = scroll_limits;
+        let viewport_rect = Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height);
+        let reused_cached_layout = changes.created.is_empty()
+            && changes.removed.is_empty()
+            && self.cached_layout_matches(viewport_rect);
+        let input_layout = if reused_cached_layout {
+            self.cached_layout
+                .clone()
+                .expect("cached layout exists when it matches the viewport")
+        } else {
+            let mut scroll_limits = HashMap::new();
+            let layout = layout_element(
+                &document.root,
+                viewport_rect,
+                stylesheet,
+                &self.states,
+                &mut scroll_limits,
+            );
+            self.scroll_limits = scroll_limits;
+            layout
+        };
         let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
         let input_update = self.apply_input(&input_layout, &input_scroll_chrome, input);
         let input_style_invalidation = classify_resolved_style_invalidation(
@@ -86,7 +98,7 @@ impl DocumentEngine {
             let mut scroll_limits = HashMap::new();
             let layout = layout_element(
                 &document.root,
-                Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height),
+                viewport_rect,
                 stylesheet,
                 &self.states,
                 &mut scroll_limits,
@@ -111,6 +123,7 @@ impl DocumentEngine {
             };
             (layout, scroll_chrome, true)
         };
+        self.cached_layout = Some(layout.clone());
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
 
@@ -123,6 +136,7 @@ impl DocumentEngine {
             metrics: DocumentMetrics {
                 element_count,
                 scroll_chrome_count,
+                reused_cached_layout,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
                 animation_changed_style: input_style_invalidation.changed()
@@ -142,7 +156,14 @@ impl DocumentEngine {
     }
 
     pub fn element_state_mut(&mut self, id: &str) -> Option<&mut ElementState> {
+        self.cached_layout = None;
         self.states.get_mut(&ElementId::new(id))
+    }
+
+    fn cached_layout_matches(&self, viewport_rect: Rect) -> bool {
+        self.cached_layout
+            .as_ref()
+            .is_some_and(|layout| layout.rect == viewport_rect)
     }
 
     fn sync_element_states(&mut self, document: &Document) -> ChangeSet {
