@@ -1,4 +1,7 @@
-use super::*;
+use des_ui_runtime::{
+    Color, LayoutFrame, Overflow, Point, PointerInput, Rect, RuntimeInput, ScrollChrome,
+};
+use eframe::egui;
 
 pub(super) fn runtime_input(ui: &egui::Ui, origin: egui::Pos2) -> RuntimeInput {
     ui.input(|input| RuntimeInput {
@@ -85,11 +88,7 @@ fn paint_frame_clipped(
     }
 }
 
-pub(super) fn paint_scroll_chrome(
-    ui: &mut egui::Ui,
-    origin: egui::Pos2,
-    chromes: &[des_ui_runtime::ScrollChrome],
-) {
+pub(super) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {
     let painter = ui.painter();
     for chrome in chromes {
         if !chrome.visible {
@@ -125,7 +124,7 @@ pub(super) fn paint_scroll_chrome(
     }
 }
 
-fn runtime_rect_to_egui(origin: egui::Pos2, rect: des_ui_runtime::Rect) -> egui::Rect {
+fn runtime_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
     egui::Rect::from_min_size(
         egui::pos2(origin.x + rect.origin.x, origin.y + rect.origin.y),
         egui::vec2(rect.size.width, rect.size.height),
