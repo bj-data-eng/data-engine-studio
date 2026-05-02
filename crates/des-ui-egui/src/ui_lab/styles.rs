@@ -44,14 +44,14 @@ pub(super) fn stylesheet() -> StyleSheet {
             StylePatch::default().font_size(13.0).text_color(TEXT),
         )
         .rule(
-            StyleSelector::Class("lab-root"),
+            StyleSelector::class("lab-root"),
             StylePatch::default()
                 .size(1320.0, 780.0)
                 .background(BACKGROUND)
                 .gap(0.0),
         )
         .rule(
-            StyleSelector::Class("topbar"),
+            StyleSelector::class("topbar"),
             StylePatch::default()
                 .size(1320.0, 58.0)
                 .padding(Insets::symmetric(18.0, 10.0))
@@ -59,7 +59,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(22, 26, 30)),
         )
         .rule(
-            StyleSelector::Class("lab-body"),
+            StyleSelector::class("lab-body"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .size(1320.0, 722.0)
@@ -68,7 +68,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(BACKGROUND),
         )
         .rule(
-            StyleSelector::Class("nav"),
+            StyleSelector::class("nav"),
             StylePatch::default()
                 .size(242.0, 690.0)
                 .padding(Insets::all(12.0))
@@ -80,7 +80,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .z_index(10),
         )
         .rule(
-            StyleSelector::Class("stage"),
+            StyleSelector::class("stage"),
             StylePatch::default()
                 .size(1036.0, 690.0)
                 .padding(Insets::all(18.0))
@@ -91,14 +91,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .overflow_y(Overflow::Scroll),
         )
         .rule(
-            StyleSelector::Class("box-model-grid"),
+            StyleSelector::class("box-model-grid"),
             StylePatch::default()
                 .width_fill()
                 .gap(10.0)
                 .background(PANEL_ALT),
         )
         .rule(
-            StyleSelector::Class("box-model-row"),
+            StyleSelector::class("box-model-row"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .width_fill()
@@ -107,7 +107,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(PANEL_ALT),
         )
         .rule(
-            StyleSelector::Class("box-model-case"),
+            StyleSelector::class("box-model-case"),
             StylePatch::default()
                 .size(318.0, 172.0)
                 .padding(Insets::all(8.0))
@@ -117,35 +117,35 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Class("box-section-label"),
+            StyleSelector::class("box-section-label"),
             StylePatch::default()
                 .font_size(14.0)
                 .text_color(TEXT_ACCENT)
                 .height(Length::Px(18.0)),
         )
         .rule(
-            StyleSelector::Class("box-label"),
+            StyleSelector::class("box-label"),
             StylePatch::default()
                 .font_size(13.0)
                 .text_color(TEXT)
                 .height(Length::Px(16.0)),
         )
         .rule(
-            StyleSelector::Class("box-note"),
+            StyleSelector::class("box-note"),
             StylePatch::default()
                 .font_size(11.0)
                 .text_color(TEXT_MUTED)
                 .height(Length::Px(14.0)),
         )
         .rule(
-            StyleSelector::Class("box-rule"),
+            StyleSelector::class("box-rule"),
             StylePatch::default()
                 .font_size(10.0)
                 .text_color(TEXT_ACCENT)
                 .height(Length::Px(24.0)),
         )
         .rule(
-            StyleSelector::Class("box-subject-frame"),
+            StyleSelector::class("box-subject-frame"),
             StylePatch::default()
                 .size(294.0, 86.0)
                 .background(Color::rgb(13, 16, 19))
@@ -153,7 +153,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .overflow_y(Overflow::Visible),
         )
         .rule(
-            StyleSelector::Class("box-subject"),
+            StyleSelector::class("box-subject"),
             StylePatch::default()
                 .size(32.0, 32.0)
                 .gap(0.0)
@@ -161,70 +161,70 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(65, 121, 164)),
         )
         .rule(
-            StyleSelector::Class("box-chip"),
+            StyleSelector::class("box-chip"),
             StylePatch::default()
                 .size(12.0, 12.0)
                 .background(Color::rgb(141, 207, 164)),
         )
         .rule(
-            StyleSelector::Class("box-overflow-child"),
+            StyleSelector::class("box-overflow-child"),
             StylePatch::default()
                 .size(112.0, 112.0)
                 .background(Color::rgb(218, 151, 77)),
         )
         .rule(
-            StyleSelector::Class("box-subject-auto"),
+            StyleSelector::class("box-subject-auto"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto),
         )
         .rule(
-            StyleSelector::Class("box-subject-px"),
+            StyleSelector::class("box-subject-px"),
             StylePatch::default().size(96.0, 44.0),
         )
         .rule(
-            StyleSelector::Class("box-subject-min"),
+            StyleSelector::class("box-subject-min"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .min_size(40.0, 40.0),
         )
         .rule(
-            StyleSelector::Class("box-subject-fill"),
+            StyleSelector::class("box-subject-fill"),
             StylePatch::default().width_fill().height(Length::Px(28.0)),
         )
         .rule(
-            StyleSelector::Class("box-subject-percent"),
+            StyleSelector::class("box-subject-percent"),
             StylePatch::default()
                 .width_percent(0.5)
                 .height(Length::Px(28.0)),
         )
         .rule(
-            StyleSelector::Class("box-subject-height-fill"),
+            StyleSelector::class("box-subject-height-fill"),
             StylePatch::default().width(Length::Px(64.0)).height_fill(),
         )
         .rule(
-            StyleSelector::Class("box-subject-margin"),
+            StyleSelector::class("box-subject-margin"),
             StylePatch::default()
                 .size(32.0, 32.0)
                 .margin(Insets::all(12.0)),
         )
         .rule(
-            StyleSelector::Class("box-subject-padding"),
+            StyleSelector::class("box-subject-padding"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .padding(Insets::all(12.0)),
         )
         .rule(
-            StyleSelector::Class("box-subject-border"),
+            StyleSelector::class("box-subject-border"),
             StylePatch::default()
                 .size(44.0, 44.0)
                 .border(PURPLE)
                 .border_width(5.0),
         )
         .rule(
-            StyleSelector::Class("box-subject-row-gap"),
+            StyleSelector::class("box-subject-row-gap"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .width(Length::Auto)
@@ -232,7 +232,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(10.0),
         )
         .rule(
-            StyleSelector::Class("box-subject-column-gap"),
+            StyleSelector::class("box-subject-column-gap"),
             StylePatch::default()
                 .direction(Direction::Column)
                 .width(Length::Auto)
@@ -240,25 +240,25 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(6.0),
         )
         .rule(
-            StyleSelector::Class("box-subject-visible-overflow"),
+            StyleSelector::class("box-subject-visible-overflow"),
             StylePatch::default()
                 .size(44.0, 44.0)
                 .overflow_y(Overflow::Visible),
         )
         .rule(
-            StyleSelector::Class("box-subject-scroll-overflow"),
+            StyleSelector::class("box-subject-scroll-overflow"),
             StylePatch::default()
                 .size(44.0, 44.0)
                 .overflow_y(Overflow::Scroll),
         )
         .rule(
-            StyleSelector::Class("box-subject-nested-nine"),
+            StyleSelector::class("box-subject-nested-nine"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto),
         )
         .rule(
-            StyleSelector::Class("box-nested-outer"),
+            StyleSelector::class("box-nested-outer"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
@@ -268,7 +268,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(41, 58, 73)),
         )
         .rule(
-            StyleSelector::Class("box-nested-inner"),
+            StyleSelector::class("box-nested-inner"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
@@ -279,7 +279,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(52, 72, 88)),
         )
         .rule(
-            StyleSelector::Class("box-nested-row"),
+            StyleSelector::class("box-nested-row"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .width(Length::Auto)
@@ -288,19 +288,19 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(65, 121, 164)),
         )
         .rule(
-            StyleSelector::Class("box-nested-cell"),
+            StyleSelector::class("box-nested-cell"),
             StylePatch::default()
                 .size(10.0, 10.0)
                 .background(Color::rgb(141, 207, 164)),
         )
         .rule(
-            StyleSelector::Class("box-subject-inset-percent"),
+            StyleSelector::class("box-subject-inset-percent"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto),
         )
         .rule(
-            StyleSelector::Class("box-inset-percent-parent"),
+            StyleSelector::class("box-inset-percent-parent"),
             StylePatch::default()
                 .size(88.0, 88.0)
                 .padding(Insets::all(8.0))
@@ -309,14 +309,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(65, 121, 164)),
         )
         .rule(
-            StyleSelector::Class("box-inset-percent-child"),
+            StyleSelector::class("box-inset-percent-child"),
             StylePatch::default()
                 .width_percent(0.5)
                 .height_percent(0.5)
                 .background(Color::rgb(141, 207, 164)),
         )
         .rule(
-            StyleSelector::Class("nav-item"),
+            StyleSelector::class("nav-item"),
             StylePatch::default()
                 .width_fill()
                 .height(des_ui_document::Length::Px(64.0))
@@ -324,84 +324,84 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border(STROKE),
         )
         .rule(
-            StyleSelector::ClassState("nav-item", ElementStateSelector::Selected),
+            StyleSelector::class_state("nav-item", ElementStateSelector::Selected),
             StylePatch::default()
                 .background(CARD_SELECTED)
                 .border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::ClassState("nav-item", ElementStateSelector::Hovered),
+            StyleSelector::class_state("nav-item", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::Class("toolbar-row"),
+            StyleSelector::class("toolbar-row"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .gap(8.0)
                 .background(PANEL_ALT),
         )
         .rule(
-            StyleSelector::Class("button"),
+            StyleSelector::class("button"),
             StylePatch::default()
                 .size(156.0, 36.0)
                 .background(Color::rgb(38, 43, 48))
                 .border(STROKE),
         )
         .rule(
-            StyleSelector::ClassState("button", ElementStateSelector::Selected),
+            StyleSelector::class_state("button", ElementStateSelector::Selected),
             StylePatch::default()
                 .background(CARD_SELECTED)
                 .border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::ClassState("button", ElementStateSelector::Hovered),
+            StyleSelector::class_state("button", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::ClassState("button", ElementStateSelector::Pressed),
+            StyleSelector::class_state("button", ElementStateSelector::Pressed),
             StylePatch::default().background(CARD_PRESSED),
         )
         .rule(
-            StyleSelector::Class("button-label"),
+            StyleSelector::class("button-label"),
             StylePatch::default().font_size(13.0).text_color(TEXT),
         )
         .rule(
-            StyleSelector::Class("card-row"),
+            StyleSelector::class("card-row"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .gap(12.0)
                 .background(PANEL_ALT),
         )
         .rule(
-            StyleSelector::Class("card-row-dense"),
+            StyleSelector::class("card-row-dense"),
             StylePatch::default()
                 .direction(Direction::Row)
                 .gap(6.0)
                 .background(PANEL_ALT),
         )
         .rule(
-            StyleSelector::Class("feature-card"),
+            StyleSelector::class("feature-card"),
             StylePatch::default()
                 .size(250.0, 98.0)
                 .background(CARD)
                 .border(STROKE),
         )
         .rule(
-            StyleSelector::ClassState("feature-card", ElementStateSelector::Hovered),
+            StyleSelector::class_state("feature-card", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::ClassState("feature-card", ElementStateSelector::Pressed),
+            StyleSelector::class_state("feature-card", ElementStateSelector::Pressed),
             StylePatch::default().background(CARD_PRESSED),
         )
         .rule(
-            StyleSelector::Class("stack"),
+            StyleSelector::class("stack"),
             StylePatch::default()
                 .size(620.0, 320.0)
                 .padding(Insets::all(10.0))
@@ -411,7 +411,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(7.0),
         )
         .rule(
-            StyleSelector::Class("list-row"),
+            StyleSelector::class("list-row"),
             StylePatch::default()
                 .size(600.0, 58.0)
                 .background(Color::rgb(25, 30, 34))
@@ -419,29 +419,29 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Class("specificity-proof"),
+            StyleSelector::class("specificity-proof"),
             StylePatch::default()
                 .background(Color::rgb(30, 37, 43))
                 .border(Color::rgb(80, 91, 103)),
         )
         .rule(
-            StyleSelector::ClassState("specificity-proof", ElementStateSelector::Hovered),
+            StyleSelector::class_state("specificity-proof", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(Color::rgb(38, 55, 64))
                 .border(GREEN),
         )
         .rule(
-            StyleSelector::Id("style-row-state"),
+            StyleSelector::id("style-row-state"),
             StylePatch::default().border(PURPLE),
         )
         .rule(
-            StyleSelector::IdState("style-row-state", ElementStateSelector::Hovered),
+            StyleSelector::id_state("style-row-state", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(Color::rgb(50, 41, 68))
                 .border(TEXT_ACCENT),
         )
         .rule(
-            StyleSelector::Class("scroll-panel"),
+            StyleSelector::class("scroll-panel"),
             StylePatch::default()
                 .size(318.0, 420.0)
                 .padding(Insets::all(10.0))
@@ -451,7 +451,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(7.0),
         )
         .rule(
-            StyleSelector::Class("scroll-list"),
+            StyleSelector::class("scroll-list"),
             StylePatch::default()
                 .width_fill()
                 .height(des_ui_document::Length::Px(370.0))
@@ -460,11 +460,11 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .overflow_y(Overflow::Scroll),
         )
         .rule(
-            StyleSelector::ClassState("scroll-panel", ElementStateSelector::Hovered),
+            StyleSelector::class_state("scroll-panel", ElementStateSelector::Hovered),
             StylePatch::default().border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::Class("scroll-row-card"),
+            StyleSelector::class("scroll-row-card"),
             StylePatch::default()
                 .width_fill()
                 .height(des_ui_document::Length::Px(34.0))
@@ -474,13 +474,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(4.0),
         )
         .rule(
-            StyleSelector::ClassState("scroll-row-card", ElementStateSelector::Hovered),
+            StyleSelector::class_state("scroll-row-card", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(Color::rgb(38, 47, 54))
                 .border(STROKE_SELECTED),
         )
         .rule(
-            StyleSelector::Class("nest-outer"),
+            StyleSelector::class("nest-outer"),
             StylePatch::default()
                 .size(650.0, 430.0)
                 .padding(Insets::all(28.0))
@@ -490,7 +490,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(8.0),
         )
         .rule(
-            StyleSelector::Class("nest-middle"),
+            StyleSelector::class("nest-middle"),
             StylePatch::default()
                 .size(500.0, 270.0)
                 .padding(Insets::all(24.0))
@@ -500,7 +500,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(7.0),
         )
         .rule(
-            StyleSelector::Class("nest-inner"),
+            StyleSelector::class("nest-inner"),
             StylePatch::default()
                 .size(360.0, 130.0)
                 .padding(Insets::all(18.0))
@@ -510,13 +510,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(7.0),
         )
         .rule(
-            StyleSelector::ClassState("nest-inner", ElementStateSelector::Hovered),
+            StyleSelector::class_state("nest-inner", ElementStateSelector::Hovered),
             StylePatch::default()
                 .background(Color::rgb(55, 50, 78))
                 .border(TEXT_ACCENT),
         )
         .rule(
-            StyleSelector::Class("canvas-placeholder"),
+            StyleSelector::class("canvas-placeholder"),
             StylePatch::default()
                 .size(720.0, 360.0)
                 .padding(Insets::all(18.0))
@@ -526,39 +526,39 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(7.0),
         )
         .rule(
-            StyleSelector::Class("title"),
+            StyleSelector::class("title"),
             StylePatch::default().font_size(21.0).text_color(TEXT),
         )
         .rule(
-            StyleSelector::Class("heading"),
+            StyleSelector::class("heading"),
             StylePatch::default().font_size(24.0).text_color(TEXT),
         )
         .rule(
-            StyleSelector::Class("section-title"),
+            StyleSelector::class("section-title"),
             StylePatch::default()
                 .font_size(13.0)
                 .text_color(TEXT_ACCENT),
         )
         .rule(
-            StyleSelector::Class("card-title"),
+            StyleSelector::class("card-title"),
             StylePatch::default().font_size(16.0).text_color(TEXT),
         )
         .rule(
-            StyleSelector::Class("muted"),
+            StyleSelector::class("muted"),
             StylePatch::default().font_size(12.5).text_color(TEXT_MUTED),
         )
         .rule(
-            StyleSelector::IdState("interaction-card-two", ElementStateSelector::Hovered),
+            StyleSelector::id_state("interaction-card-two", ElementStateSelector::Hovered),
             StylePatch::default()
                 .border(GREEN)
                 .transition(Transition::ease_out(0.24)),
         )
         .rule(
-            StyleSelector::Id("interaction-card-three"),
+            StyleSelector::id("interaction-card-three"),
             StylePatch::default().transition(Transition::ease_out(0.06)),
         )
         .rule(
-            StyleSelector::IdState("interaction-card-three", ElementStateSelector::Pressed),
+            StyleSelector::id_state("interaction-card-three", ElementStateSelector::Pressed),
             StylePatch::default()
                 .background(Color::rgb(53, 38, 70))
                 .border(PURPLE),

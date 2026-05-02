@@ -50,14 +50,14 @@ fn style_rules_resolve_role_class_state_and_id_in_order() {
                 .background(Color::rgb(20, 20, 20)),
         )
         .rule(
-            StyleSelector::Class("selected"),
+            StyleSelector::class("selected"),
             StylePatch::default().background(Color::rgb(35, 56, 78)),
         )
         .rule(
             StyleSelector::State(ElementStateSelector::Hovered),
             StylePatch::default().background(Color::rgb(40, 70, 95)),
         )
-        .rule(StyleSelector::Id("card"), StylePatch::default().radius(7.0));
+        .rule(StyleSelector::id("card"), StylePatch::default().radius(7.0));
     let document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.element(
             "card",
@@ -157,11 +157,11 @@ fn column_layout_applies_padding_gap_and_margin() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Id("catalog"),
+            StyleSelector::id("catalog"),
             StylePatch::default().padding(Insets::all(10.0)).gap(4.0),
         )
         .rule(
-            StyleSelector::Class("indented"),
+            StyleSelector::class("indented"),
             StylePatch::default().margin(Insets::symmetric(3.0, 2.0)),
         );
     let document = Document::build(Size::new(320.0, 200.0), |ui| {
@@ -188,14 +188,14 @@ fn fill_width_uses_parent_content_width_after_box_model() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Id("panel"),
+            StyleSelector::id("panel"),
             StylePatch::default()
                 .size(200.0, 120.0)
                 .border_width(2.0)
                 .padding(Insets::symmetric(12.0, 8.0)),
         )
         .rule(
-            StyleSelector::Id("row"),
+            StyleSelector::id("row"),
             StylePatch::default()
                 .width_fill()
                 .height(Length::Px(24.0))
@@ -262,7 +262,7 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Id("scroll-panel"),
+            StyleSelector::id("scroll-panel"),
             StylePatch::default()
                 .size(180.0, 80.0)
                 .padding(Insets::all(8.0))
@@ -451,7 +451,7 @@ fn catalog_document(title_id: &str) -> Document {
 fn probe_stylesheet() -> StyleSheet {
     StyleSheet::new()
         .rule(
-            StyleSelector::Class("catalog"),
+            StyleSelector::class("catalog"),
             StylePatch::default()
                 .size(180.0, 40.0)
                 .padding(Insets::all(12.0))
@@ -467,7 +467,7 @@ fn probe_stylesheet() -> StyleSheet {
 fn scroll_fixture_stylesheet(panel_height: f32) -> StyleSheet {
     StyleSheet::new()
         .rule(
-            StyleSelector::Id("scroll-panel"),
+            StyleSelector::id("scroll-panel"),
             StylePatch::default()
                 .size(180.0, panel_height)
                 .padding(Insets::all(8.0))

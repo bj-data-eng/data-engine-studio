@@ -22,10 +22,10 @@ ui-shot out='target/ui-shots/studio.png':
     ./scripts/capture-ui.ps1 -Out "{{out}}" -Width 1320 -Height 780
 
 ui-debug out='target/ui-shots/studio-debug.png':
-    ./scripts/capture-ui.ps1 -Out "{{out}}" -Width 1320 -Height 780 -DebugOverlay -SceneRect "140,0,1320,780" -FlowId customer-analytics
+    ./scripts/capture-ui.ps1 -Out "{{out}}" -Width 1320 -Height 780 -DebugOverlay -LabView graph
 
 ui-test:
-    cargo test -p des-ui-egui ui_lab::graphical_tests
+    cargo test -p des-ui-egui ui_lab::tests
 
 audit:
     cargo audit

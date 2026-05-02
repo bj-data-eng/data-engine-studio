@@ -255,7 +255,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Id("outer"),
+            StyleSelector::id("outer"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
@@ -263,7 +263,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
                 .border_width(3.0),
         )
         .rule(
-            StyleSelector::Id("inner"),
+            StyleSelector::id("inner"),
             StylePatch::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
@@ -272,7 +272,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
                 .border_width(2.0),
         )
         .rule(
-            StyleSelector::Class("row"),
+            StyleSelector::class("row"),
             StylePatch::default()
                 .direction(des_ui_document::Direction::Row)
                 .width(Length::Auto)
@@ -280,7 +280,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
                 .gap(4.0),
         )
         .rule(
-            StyleSelector::Class("cell"),
+            StyleSelector::class("cell"),
             StylePatch::default().size(10.0, 10.0),
         );
     let document = Document::build(Size::new(240.0, 160.0), |ui| {

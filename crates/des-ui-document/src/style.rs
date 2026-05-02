@@ -1,15 +1,33 @@
-use crate::element::{Color, Element, ElementRole, ElementStateSelector};
+use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
 use crate::geometry::{Direction, Insets, Length, Overflow, Size};
 use crate::state::ElementState;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StyleSelector {
     Role(ElementRole),
-    Class(&'static str),
-    Id(&'static str),
+    Class(ClassName),
+    Id(ElementId),
     State(ElementStateSelector),
-    ClassState(&'static str, ElementStateSelector),
-    IdState(&'static str, ElementStateSelector),
+    ClassState(ClassName, ElementStateSelector),
+    IdState(ElementId, ElementStateSelector),
+}
+
+impl StyleSelector {
+    pub fn class(class: impl Into<ClassName>) -> Self {
+        Self::Class(class.into())
+    }
+
+    pub fn id(id: impl Into<ElementId>) -> Self {
+        Self::Id(id.into())
+    }
+
+    pub fn class_state(class: impl Into<ClassName>, state: ElementStateSelector) -> Self {
+        Self::ClassState(class.into(), state)
+    }
+
+    pub fn id_state(id: impl Into<ElementId>, state: ElementStateSelector) -> Self {
+        Self::IdState(id.into(), state)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -317,7 +335,7 @@ pub(crate) fn resolve_style(
     let mut style = ComputedStyle::default();
 
     for rule in &stylesheet.rules {
-        if selector_matches(rule.selector, element, state) {
+        if selector_matches(&rule.selector, element, state) {
             style.apply(&rule.patch);
         }
     }
@@ -326,29 +344,29 @@ pub(crate) fn resolve_style(
 }
 
 fn selector_matches(
-    selector: StyleSelector,
+    selector: &StyleSelector,
     element: &Element,
     state: Option<&ElementState>,
 ) -> bool {
     match selector {
-        StyleSelector::Role(role) => element.spec.role == role,
+        StyleSelector::Role(role) => element.spec.role == *role,
         StyleSelector::Class(class) => element
             .spec
             .classes
             .iter()
-            .any(|element_class| element_class.as_str() == class),
-        StyleSelector::Id(id) => element.id.as_str() == id,
-        StyleSelector::State(selector) => state_selector_matches(selector, element, state),
+            .any(|element_class| element_class == class),
+        StyleSelector::Id(id) => &element.id == id,
+        StyleSelector::State(selector) => state_selector_matches(*selector, element, state),
         StyleSelector::ClassState(class, selector) => {
             element
                 .spec
                 .classes
                 .iter()
-                .any(|element_class| element_class.as_str() == class)
-                && state_selector_matches(selector, element, state)
+                .any(|element_class| element_class == class)
+                && state_selector_matches(*selector, element, state)
         }
         StyleSelector::IdState(id, selector) => {
-            element.id.as_str() == id && state_selector_matches(selector, element, state)
+            &element.id == id && state_selector_matches(*selector, element, state)
         }
     }
 }
