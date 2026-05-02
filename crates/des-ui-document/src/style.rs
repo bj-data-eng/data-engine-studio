@@ -1,5 +1,6 @@
-use crate::element::{Color, ElementRole, ElementStateSelector};
+use crate::element::{Color, Element, ElementRole, ElementStateSelector};
 use crate::geometry::{Direction, Insets, Length, Overflow, Size};
+use crate::state::ElementState;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StyleSelector {
@@ -305,5 +306,63 @@ impl StyleSheet {
 
     pub fn push_rule(&mut self, selector: StyleSelector, patch: StylePatch) {
         self.rules.push(StyleRule::new(selector, patch));
+    }
+}
+
+pub(crate) fn resolve_style(
+    element: &Element,
+    stylesheet: &StyleSheet,
+    state: Option<&ElementState>,
+) -> ComputedStyle {
+    let mut style = ComputedStyle::default();
+
+    for rule in &stylesheet.rules {
+        if selector_matches(rule.selector, element, state) {
+            style.apply(&rule.patch);
+        }
+    }
+
+    style
+}
+
+fn selector_matches(
+    selector: StyleSelector,
+    element: &Element,
+    state: Option<&ElementState>,
+) -> bool {
+    match selector {
+        StyleSelector::Role(role) => element.spec.role == role,
+        StyleSelector::Class(class) => element
+            .spec
+            .classes
+            .iter()
+            .any(|element_class| element_class.as_str() == class),
+        StyleSelector::Id(id) => element.id.as_str() == id,
+        StyleSelector::State(selector) => state_selector_matches(selector, element, state),
+        StyleSelector::ClassState(class, selector) => {
+            element
+                .spec
+                .classes
+                .iter()
+                .any(|element_class| element_class.as_str() == class)
+                && state_selector_matches(selector, element, state)
+        }
+        StyleSelector::IdState(id, selector) => {
+            element.id.as_str() == id && state_selector_matches(selector, element, state)
+        }
+    }
+}
+
+fn state_selector_matches(
+    selector: ElementStateSelector,
+    element: &Element,
+    state: Option<&ElementState>,
+) -> bool {
+    match selector {
+        ElementStateSelector::Hovered => state.is_some_and(|state| state.hovered),
+        ElementStateSelector::Pressed => state.is_some_and(|state| state.pressed),
+        ElementStateSelector::Focused => state.is_some_and(|state| state.focused),
+        ElementStateSelector::Selected => element.spec.selected,
+        ElementStateSelector::Disabled => element.spec.disabled,
     }
 }

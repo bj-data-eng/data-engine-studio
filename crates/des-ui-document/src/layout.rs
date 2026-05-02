@@ -1,7 +1,7 @@
-use crate::element::{Element, ElementId, ElementRole, ElementStateSelector};
+use crate::element::{Element, ElementId, ElementRole};
 use crate::geometry::{Direction, Insets, Overflow, Point, Rect, Size};
 use crate::state::{ElementState, ResolvedElement};
-use crate::style::{ComputedStyle, StyleSelector, StyleSheet};
+use crate::style::{ComputedStyle, StyleSheet, resolve_style};
 use std::collections::HashMap;
 
 pub(crate) fn layout_element(
@@ -49,57 +49,6 @@ pub(crate) fn layout_element(
         text: element.text.clone(),
         interactive: element.spec.interactive && !element.spec.disabled,
         children,
-    }
-}
-
-pub(crate) fn resolve_style(
-    element: &Element,
-    stylesheet: &StyleSheet,
-    state: Option<&ElementState>,
-) -> ComputedStyle {
-    let mut style = ComputedStyle::default();
-
-    for rule in &stylesheet.rules {
-        if selector_matches(rule.selector, element, state) {
-            style.apply(&rule.patch);
-        }
-    }
-
-    style
-}
-
-fn selector_matches(
-    selector: StyleSelector,
-    element: &Element,
-    state: Option<&ElementState>,
-) -> bool {
-    match selector {
-        StyleSelector::Role(role) => element.spec.role == role,
-        StyleSelector::Class(class) => element
-            .spec
-            .classes
-            .iter()
-            .any(|element_class| element_class.as_str() == class),
-        StyleSelector::Id(id) => element.id.as_str() == id,
-        StyleSelector::State(selector) => match selector {
-            ElementStateSelector::Hovered => state.is_some_and(|state| state.hovered),
-            ElementStateSelector::Pressed => state.is_some_and(|state| state.pressed),
-            ElementStateSelector::Focused => state.is_some_and(|state| state.focused),
-            ElementStateSelector::Selected => element.spec.selected,
-            ElementStateSelector::Disabled => element.spec.disabled,
-        },
-        StyleSelector::ClassState(class, selector) => {
-            element
-                .spec
-                .classes
-                .iter()
-                .any(|element_class| element_class.as_str() == class)
-                && selector_matches(StyleSelector::State(selector), element, state)
-        }
-        StyleSelector::IdState(id, selector) => {
-            element.id.as_str() == id
-                && selector_matches(StyleSelector::State(selector), element, state)
-        }
     }
 }
 

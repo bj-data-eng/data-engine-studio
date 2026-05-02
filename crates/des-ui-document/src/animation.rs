@@ -1,7 +1,6 @@
 use crate::element::{Color, Element, ElementId};
-use crate::layout::resolve_style;
 use crate::state::ElementState;
-use crate::style::{ComputedStyle, StyleSheet, Transition};
+use crate::style::{ComputedStyle, StyleSheet, Transition, resolve_style};
 use std::collections::HashMap;
 
 pub(crate) fn update_element_style_animation(
