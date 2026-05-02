@@ -71,10 +71,7 @@ fn eased_style(
     next.border = ease_optional_color(current.border, target.border, amount, snap_epsilon);
     animating |= next.border != target.border;
 
-    next.text_color = current.text_color.lerp(target.text_color, amount);
-    if color_distance(next.text_color, target.text_color) <= snap_epsilon {
-        next.text_color = target.text_color;
-    }
+    next.text_color = ease_color(current.text_color, target.text_color, amount, snap_epsilon);
     animating |= next.text_color != target.text_color;
 
     next.gap = ease_f32(current.gap, target.gap, amount, snap_epsilon);
@@ -129,12 +126,12 @@ fn eased_style(
     animating |=
         (next.scrollbar_expanded_width - target.scrollbar_expanded_width).abs() > snap_epsilon;
 
-    next.scrollbar_handle_color = current
-        .scrollbar_handle_color
-        .lerp(target.scrollbar_handle_color, amount);
-    if color_distance(next.scrollbar_handle_color, target.scrollbar_handle_color) <= snap_epsilon {
-        next.scrollbar_handle_color = target.scrollbar_handle_color;
-    }
+    next.scrollbar_handle_color = ease_color(
+        current.scrollbar_handle_color,
+        target.scrollbar_handle_color,
+        amount,
+        snap_epsilon,
+    );
     animating |= next.scrollbar_handle_color != target.scrollbar_handle_color;
 
     next.scrollbar_track_color = ease_optional_color(
@@ -249,16 +246,16 @@ fn ease_optional_color(
 ) -> Option<Color> {
     match (current, target) {
         (Some(current), Some(target)) => {
-            let next = current.lerp(target, amount);
-            if color_distance(next, target) <= snap_epsilon {
+            let next = ease_color(current, target, amount, snap_epsilon);
+            if next == target {
                 Some(target)
             } else {
                 Some(next)
             }
         }
         (None, Some(target)) => {
-            let next = Color { a: 0, ..target }.lerp(target, amount);
-            if color_distance(next, target) <= snap_epsilon {
+            let next = ease_color(Color { a: 0, ..target }, target, amount, snap_epsilon);
+            if next == target {
                 Some(target)
             } else {
                 Some(next)
@@ -266,8 +263,8 @@ fn ease_optional_color(
         }
         (Some(current), None) => {
             let transparent = Color { a: 0, ..current };
-            let next = current.lerp(transparent, amount);
-            if color_distance(next, transparent) <= snap_epsilon {
+            let next = ease_color(current, transparent, amount, snap_epsilon);
+            if next == transparent {
                 None
             } else {
                 Some(next)
@@ -275,6 +272,18 @@ fn ease_optional_color(
         }
         (None, None) => None,
     }
+}
+
+fn ease_color(current: Color, target: Color, amount: f32, snap_epsilon: f32) -> Color {
+    if current == target {
+        return target;
+    }
+    if color_distance(current, target) <= snap_epsilon.max(1.0) {
+        return target;
+    }
+
+    let next = current.lerp(target, amount);
+    if next == current { target } else { next }
 }
 
 fn color_distance(left: Color, right: Color) -> f32 {

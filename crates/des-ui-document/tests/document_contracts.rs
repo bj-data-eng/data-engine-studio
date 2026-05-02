@@ -254,6 +254,25 @@ fn transitioned_state_rules_ease_visual_style_properties() {
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
+    assert!(!output.animating);
+    assert!(!output.metrics.animation_changed_style);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(2.0, 2.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(!output.animating);
+    assert!(!output.metrics.animation_changed_style);
 }
 
 #[test]

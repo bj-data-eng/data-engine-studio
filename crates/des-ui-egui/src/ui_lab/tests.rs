@@ -491,6 +491,95 @@ fn animation_margin_specimen_expands_layout_on_hover() {
 }
 
 #[test]
+fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
+    let mut engine = DocumentEngine::default();
+    let document =
+        UiLabState::new(Some("animation")).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let stylesheet = stylesheet();
+    let base = engine.update(&document, &stylesheet);
+    let target = frame(&base, "animation-hover-margin-target");
+    let hover_pointer = Point::new(
+        target.rect.origin.x + target.rect.size.width / 2.0,
+        target.rect.origin.y + target.rect.size.height / 2.0,
+    );
+
+    let mut output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: hover_pointer,
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    for _ in 0..32 {
+        if !output.animating && !output.metrics.animation_changed_style {
+            break;
+        }
+        output = engine.update_with_input(
+            &document,
+            &stylesheet,
+            DocumentInput {
+                pointer: Some(PointerInput {
+                    position: hover_pointer,
+                    primary_delta: Point::ZERO,
+                    primary_down: false,
+                    primary_clicked: false,
+                }),
+                scroll_delta: Point::ZERO,
+            },
+        );
+    }
+    assert!(!output.animating);
+    assert!(!output.metrics.animation_changed_style);
+
+    let exit_pointer = Point::new(4.0, 4.0);
+    output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: exit_pointer,
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    for _ in 0..32 {
+        if !output.animating
+            && !output.metrics.animation_changed_style
+            && !output.metrics.input_changed_state
+        {
+            break;
+        }
+        output = engine.update_with_input(
+            &document,
+            &stylesheet,
+            DocumentInput {
+                pointer: Some(PointerInput {
+                    position: exit_pointer,
+                    primary_delta: Point::ZERO,
+                    primary_down: false,
+                    primary_clicked: false,
+                }),
+                scroll_delta: Point::ZERO,
+            },
+        );
+    }
+
+    assert!(!output.animating);
+    assert!(!output.metrics.animation_changed_style);
+    assert!(!output.metrics.input_changed_state);
+    assert!(output.metrics.reused_input_layout);
+}
+
+#[test]
 fn external_style_contract_can_drive_document_without_ui_lab_internals() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
