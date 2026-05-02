@@ -253,15 +253,18 @@ fn measure_element(
         }
     };
 
-    Size::new(
-        style
-            .width
-            .resolve(parent_size.width, auto_size.width)
-            .max(style.min_size.width),
-        style
-            .height
-            .resolve(parent_size.height, auto_size.height)
-            .max(style.min_size.height),
+    clamp_size(
+        Size::new(
+            style
+                .width
+                .resolve(parent_size.width, auto_size.width)
+                .max(style.min_size.width),
+            style
+                .height
+                .resolve(parent_size.height, auto_size.height)
+                .max(style.min_size.height),
+        ),
+        style,
     )
 }
 
@@ -291,15 +294,29 @@ fn measure_intrinsic_element(
         }
     };
 
+    clamp_size(
+        Size::new(
+            style
+                .width
+                .resolve_intrinsic(parent_size.width, auto_size.width)
+                .max(style.min_size.width),
+            style
+                .height
+                .resolve_intrinsic(parent_size.height, auto_size.height)
+                .max(style.min_size.height),
+        ),
+        style,
+    )
+}
+
+fn clamp_size(size: Size, style: &ComputedStyle) -> Size {
     Size::new(
-        style
-            .width
-            .resolve_intrinsic(parent_size.width, auto_size.width)
-            .max(style.min_size.width),
-        style
-            .height
-            .resolve_intrinsic(parent_size.height, auto_size.height)
-            .max(style.min_size.height),
+        size.width
+            .max(style.min_size.width)
+            .min(style.max_size.width.max(style.min_size.width)),
+        size.height
+            .max(style.min_size.height)
+            .min(style.max_size.height.max(style.min_size.height)),
     )
 }
 

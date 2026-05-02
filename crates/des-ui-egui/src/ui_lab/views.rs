@@ -145,6 +145,14 @@ fn render_layout_view(
                     "width: Auto; height: Auto; minimum size: 40 by 40",
                     "box-subject-min",
                 );
+                box_model_case(
+                    ui,
+                    "box-max",
+                    "Max size",
+                    "auto content is clamped by maximum size",
+                    "width: Auto; height: Auto; child size 88 by 48; maximum size 52 by 34",
+                    "box-subject-max",
+                );
             });
             box_model_row(ui, "box-row-parent-relative", |ui| {
                 box_model_case(
@@ -368,6 +376,13 @@ fn box_model_subject(
             }
             "box-subject-padding" => {
                 box_chip(ui, case_id, 0);
+            }
+            "box-subject-max" => {
+                ui.element(
+                    format!("{case_id}-wide-child"),
+                    ElementSpec::new(ElementRole::Panel).class("box-max-wide-child"),
+                    |_| {},
+                );
             }
             "box-subject-row-gap" | "box-subject-column-gap" => {
                 box_chip(ui, case_id, 0);

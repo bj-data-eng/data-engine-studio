@@ -159,6 +159,13 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     assert_close(frame(&output, "box-px-subject").rect.size.height, 44.0);
     assert_close(frame(&output, "box-min-subject").rect.size.width, 40.0);
     assert_close(frame(&output, "box-min-subject").rect.size.height, 40.0);
+    assert_close(frame(&output, "box-max-subject").rect.size.width, 52.0);
+    assert_close(frame(&output, "box-max-subject").rect.size.height, 34.0);
+    assert!(
+        frame(&output, "box-max-wide-child").rect.right()
+            > frame(&output, "box-max-subject").rect.right(),
+        "max-size specimen child should reveal the parent clamp"
+    );
 
     assert_close(frame(&output, "box-fill-subject").rect.size.width, 298.0);
     assert_close(frame(&output, "box-percent-subject").rect.size.width, 149.0);

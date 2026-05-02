@@ -78,6 +78,9 @@ fn eased_style(
     next.min_size = ease_size(current.min_size, target.min_size, amount, snap_epsilon);
     animating |= next.min_size != target.min_size;
 
+    next.max_size = ease_size(current.max_size, target.max_size, amount, snap_epsilon);
+    animating |= next.max_size != target.max_size;
+
     next.border_width = ease_insets(
         current.border_width,
         target.border_width,
@@ -188,6 +191,13 @@ fn color_distance(left: Color, right: Color) -> f32 {
 }
 
 fn ease_f32(current: f32, target: f32, amount: f32, snap_epsilon: f32) -> f32 {
+    if current == target {
+        return target;
+    }
+    if !current.is_finite() || !target.is_finite() {
+        return target;
+    }
+
     let next = current + (target - current) * amount;
     if (next - target).abs() <= snap_epsilon {
         target

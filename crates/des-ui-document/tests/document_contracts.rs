@@ -265,6 +265,7 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
             Style::default()
                 .size(100.0, 40.0)
                 .min_size(20.0, 20.0)
+                .max_size(180.0, 120.0)
                 .padding(Insets::all(4.0))
                 .margin(Insets::all(2.0))
                 .gap(4.0)
@@ -278,6 +279,7 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
             Style::default()
                 .size(140.0, 80.0)
                 .min_size(40.0, 60.0)
+                .max_size(220.0, 160.0)
                 .padding(Insets::all(12.0))
                 .margin(Insets::all(10.0))
                 .gap(20.0)
@@ -312,6 +314,7 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
 
     assert_eq!(card.rect.size, Size::new(110.0, 50.0));
     assert_eq!(card.style.min_size, Size::new(25.0, 30.0));
+    assert_eq!(card.style.max_size, Size::new(190.0, 130.0));
     assert_eq!(card.style.padding, Insets::all(6.0));
     assert_eq!(card.style.margin, Insets::all(4.0));
     assert_eq!(card.style.gap, 8.0);
@@ -456,6 +459,68 @@ fn fill_size_does_not_inflate_auto_sized_parent_during_intrinsic_measurement() {
     let panel = output.layout.find("panel").unwrap();
 
     assert_eq!(panel.rect.size, Size::new(24.0, 24.0));
+}
+
+#[test]
+fn max_size_clamps_auto_explicit_and_fill_sizes() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .size(200.0, 120.0)
+                .padding(Insets::all(10.0)),
+        )
+        .rule(
+            StyleSelector::id("auto-child"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .max_size(40.0, 30.0),
+        )
+        .rule(
+            StyleSelector::id("fixed-child"),
+            Style::default().size(96.0, 70.0).max_size(42.0, 28.0),
+        )
+        .rule(
+            StyleSelector::id("fill-child"),
+            Style::default()
+                .width_fill()
+                .height_fill()
+                .max_size(50.0, 34.0),
+        )
+        .rule(
+            StyleSelector::class("wide"),
+            Style::default().size(80.0, 20.0),
+        );
+    let document = Document::build(Size::new(260.0, 180.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("auto-child", ElementSpec::new(ElementRole::Panel), |ui| {
+                ui.element(
+                    "wide-child",
+                    ElementSpec::new(ElementRole::Card).class("wide"),
+                    |_| {},
+                );
+            });
+            ui.element("fixed-child", ElementSpec::new(ElementRole::Card), |_| {});
+            ui.element("fill-child", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+
+    assert_eq!(
+        output.layout.find("auto-child").unwrap().rect.size,
+        Size::new(40.0, 20.0)
+    );
+    assert_eq!(
+        output.layout.find("fixed-child").unwrap().rect.size,
+        Size::new(42.0, 28.0)
+    );
+    assert_eq!(
+        output.layout.find("fill-child").unwrap().rect.size,
+        Size::new(50.0, 34.0)
+    );
 }
 
 #[test]

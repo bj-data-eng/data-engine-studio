@@ -119,6 +119,7 @@ pub struct Style {
     pub width: Option<Length>,
     pub height: Option<Length>,
     pub min_size: Option<Size>,
+    pub max_size: Option<Size>,
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: EdgeStyle,
@@ -262,6 +263,11 @@ impl Style {
 
     pub fn min_size(mut self, width: f32, height: f32) -> Self {
         self.min_size = Some(Size::new(width, height));
+        self
+    }
+
+    pub fn max_size(mut self, width: f32, height: f32) -> Self {
+        self.max_size = Some(Size::new(width, height));
         self
     }
 
@@ -454,6 +460,7 @@ pub struct ComputedStyle {
     pub width: Length,
     pub height: Length,
     pub min_size: Size,
+    pub max_size: Size,
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: Insets,
@@ -484,6 +491,7 @@ impl Default for ComputedStyle {
             width: Length::Auto,
             height: Length::Auto,
             min_size: Size::new(0.0, 0.0),
+            max_size: Size::new(f32::INFINITY, f32::INFINITY),
             background: None,
             border: None,
             border_width: Insets::ZERO,
@@ -530,6 +538,9 @@ impl ComputedStyle {
         }
         if let Some(value) = style.min_size {
             self.min_size = value;
+        }
+        if let Some(value) = style.max_size {
+            self.max_size = value;
         }
         if let Some(value) = style.background {
             self.background = Some(value);

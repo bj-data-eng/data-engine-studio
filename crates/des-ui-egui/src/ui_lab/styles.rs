@@ -193,6 +193,19 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .min_size(40.0, 40.0),
         )
         .rule(
+            StyleSelector::class("box-subject-max"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .max_size(52.0, 34.0),
+        )
+        .rule(
+            StyleSelector::class("box-max-wide-child"),
+            Style::default()
+                .size(88.0, 48.0)
+                .background(Color::rgb(141, 207, 164)),
+        )
+        .rule(
             StyleSelector::class("box-subject-fill"),
             Style::default().width_fill().height(Length::Px(28.0)),
         )
