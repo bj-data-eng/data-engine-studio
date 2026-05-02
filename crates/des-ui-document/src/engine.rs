@@ -67,7 +67,7 @@ impl DocumentEngine {
         let input_update = self.apply_input(&input_layout, &input_scroll_chrome, input);
         let clamp_changed = self.clamp_scroll_states();
         let animation_update = self.update_style_animation(document, stylesheet);
-        let scrollbar_animation_update = self.update_scrollbar_animation(&input_layout);
+        let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
 
         let needs_final_layout = input_update.changed
             || clamp_changed
@@ -345,66 +345,42 @@ impl DocumentEngine {
         update_element_style_animation(&document.root, stylesheet, &mut self.states, SNAP_EPSILON)
     }
 
-    fn update_scrollbar_animation(&mut self, layout: &ResolvedElement) -> AnimationUpdate {
+    fn update_scrollbar_animation(&mut self, scroll_chrome: &[ScrollChrome]) -> AnimationUpdate {
         const SNAP_EPSILON: f32 = 0.001;
         let mut update = AnimationUpdate::default();
-        update +=
-            self.update_scrollbar_animation_for_frame(layout, ScrollAxis::Vertical, SNAP_EPSILON);
-        update +=
-            self.update_scrollbar_animation_for_frame(layout, ScrollAxis::Horizontal, SNAP_EPSILON);
-        for child in &layout.children {
-            update += self.update_scrollbar_animation(child);
+        for chrome in scroll_chrome {
+            update += self.update_scrollbar_animation_for_chrome(chrome, SNAP_EPSILON);
         }
         update
     }
 
-    fn update_scrollbar_animation_for_frame(
+    fn update_scrollbar_animation_for_chrome(
         &mut self,
-        frame: &ResolvedElement,
-        axis: ScrollAxis,
+        chrome: &ScrollChrome,
         snap_epsilon: f32,
     ) -> AnimationUpdate {
-        let max_scroll = self
-            .scroll_limits
-            .get(&frame.id)
-            .copied()
-            .unwrap_or_default();
-        let can_scroll = match axis {
-            ScrollAxis::Horizontal => {
-                frame.style.overflow_x == Overflow::Scroll && max_scroll.width > 0.0
-            }
-            ScrollAxis::Vertical => {
-                frame.style.overflow_y == Overflow::Scroll && max_scroll.height > 0.0
-            }
-        };
-        if !can_scroll {
-            return AnimationUpdate::default();
-        }
-
-        let Some(state) = self.states.get_mut(&frame.id) else {
+        let Some(state) = self.states.get_mut(&chrome.element_id) else {
             return AnimationUpdate::default();
         };
-        let expanded = state.scrollbar_hovered_axis == Some(axis)
-            || state.scrollbar_dragged_axis == Some(axis);
+        let expanded = state.scrollbar_hovered_axis == Some(chrome.axis)
+            || state.scrollbar_dragged_axis == Some(chrome.axis);
         let target = if expanded {
-            frame.style.scrollbar_expanded_width
+            chrome.expanded_visual_width
         } else {
-            frame.style.scrollbar_width
-        }
-        .max(0.0);
-        let current_slot = match axis {
+            chrome.compact_visual_width
+        };
+        let current_slot = match chrome.axis {
             ScrollAxis::Horizontal => &mut state.scrollbar_visual_width_x,
             ScrollAxis::Vertical => &mut state.scrollbar_visual_width_y,
         };
         let current = current_slot.unwrap_or_else(|| {
             if expanded {
-                frame.style.scrollbar_width.max(0.0)
+                chrome.compact_visual_width
             } else {
                 target
             }
         });
-        let amount = frame
-            .style
+        let amount = chrome
             .transition
             .map(|transition| transition.easing.sample(transition.step))
             .unwrap_or(1.0);

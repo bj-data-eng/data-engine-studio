@@ -67,18 +67,19 @@ fn scroll_chrome_for_frame(
     let dragged = state.is_some_and(|state| state.scrollbar_dragged_axis == Some(axis));
     let visible = container_hovered || scrollbar_hovered || dragged;
     let expanded = scrollbar_hovered || dragged;
+    let compact_visual_width = frame.style.scrollbar_width.max(0.0);
+    let expanded_visual_width = frame.style.scrollbar_expanded_width.max(0.0);
+    let target_visual_width = if expanded {
+        expanded_visual_width
+    } else {
+        compact_visual_width
+    };
     let visual_width = state
         .and_then(|state| match axis {
             ScrollAxis::Horizontal => state.scrollbar_visual_width_x,
             ScrollAxis::Vertical => state.scrollbar_visual_width_y,
         })
-        .unwrap_or_else(|| {
-            if expanded {
-                frame.style.scrollbar_expanded_width
-            } else {
-                frame.style.scrollbar_width
-            }
-        })
+        .unwrap_or(target_visual_width)
         .max(0.0);
     let viewport_rect = frame
         .rect
@@ -235,6 +236,9 @@ fn scroll_chrome_for_frame(
         expanded,
         hovered: scrollbar_hovered,
         dragged,
+        compact_visual_width,
+        expanded_visual_width,
+        transition: frame.style.transition,
     })
 }
 

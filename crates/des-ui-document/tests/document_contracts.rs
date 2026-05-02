@@ -1086,6 +1086,99 @@ fn nested_scroll_chrome_is_clipped_by_ancestor_scroll_viewport() {
 }
 
 #[test]
+fn clipped_scroll_chrome_does_not_drive_animation_work() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("horizontal-parent"),
+            Style::default()
+                .direction(des_ui_document::Direction::Row)
+                .size(120.0, 96.0)
+                .gap(10.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
+                .transition(Transition::ease_out(0.2)),
+        )
+        .rule(
+            StyleSelector::class("nested-list"),
+            Style::default()
+                .size(70.0, 74.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
+                .transition(Transition::ease_out(0.2)),
+        )
+        .rule(
+            StyleSelector::class("nested-row"),
+            Style::default().size(54.0, 28.0),
+        );
+    let document = Document::build(Size::new(180.0, 140.0), |ui| {
+        ui.element(
+            "horizontal-parent",
+            ElementSpec::new(ElementRole::Panel),
+            |ui| {
+                for list_index in 0..3 {
+                    ui.element(
+                        format!("nested-list-{list_index}"),
+                        ElementSpec::new(ElementRole::Panel).class("nested-list"),
+                        |ui| {
+                            for row_index in 0..5 {
+                                ui.element(
+                                    format!("nested-list-{list_index}-row-{row_index}"),
+                                    ElementSpec::new(ElementRole::Card).class("nested-row"),
+                                    |_| {},
+                                );
+                            }
+                        },
+                    );
+                }
+            },
+        );
+    });
+
+    engine.update(&document, &stylesheet);
+    engine
+        .element_state_mut("horizontal-parent")
+        .unwrap()
+        .scroll_x = 110.0;
+    let output = engine.update(&document, &stylesheet);
+    let nested_scrollbar = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| chrome.element_id == ElementId::new("nested-list-2"))
+        .expect("nested list should be visible after horizontal scroll");
+    let pointer = Point::new(
+        nested_scrollbar.hit_rect.origin.x + nested_scrollbar.hit_rect.size.width / 2.0,
+        nested_scrollbar.hit_rect.origin.y + nested_scrollbar.hit_rect.size.height / 2.0,
+    );
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: pointer,
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    engine
+        .element_state_mut("horizontal-parent")
+        .unwrap()
+        .scroll_x = 0.0;
+    let output = engine.update(&document, &stylesheet);
+
+    assert!(
+        !output.animating,
+        "offscreen nested scrollbars should not keep the document animating"
+    );
+}
+
+#[test]
 fn scroll_delta_is_clamped_when_content_does_not_overflow() {
     let mut engine = DocumentEngine::default();
     let stylesheet = scroll_fixture_stylesheet(120.0);

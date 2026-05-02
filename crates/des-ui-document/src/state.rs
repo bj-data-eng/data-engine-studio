@@ -1,6 +1,6 @@
 use crate::element::{ClassName, Color, ElementId, ElementRole};
 use crate::geometry::{Point, Rect, ScrollAxis};
-use crate::style::ComputedStyle;
+use crate::style::{ComputedStyle, Transition};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ElementState {
@@ -95,4 +95,7 @@ pub struct ScrollChrome {
     pub expanded: bool,
     pub hovered: bool,
     pub dragged: bool,
+    pub(crate) compact_visual_width: f32,
+    pub(crate) expanded_visual_width: f32,
+    pub(crate) transition: Option<Transition>,
 }
