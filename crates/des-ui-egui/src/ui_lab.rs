@@ -233,11 +233,11 @@ impl UiLabState {
                             self.last_perf.metrics.scroll_chrome_count
                         ));
                         ui.label(format!(
-                            "cached layout: {}",
+                            "input cache hit: {}",
                             self.last_perf.metrics.reused_cached_layout
                         ));
                         ui.label(format!(
-                            "reused layout: {}",
+                            "final relayout skipped: {}",
                             self.last_perf.metrics.reused_input_layout
                         ));
                         ui.label(format!(
