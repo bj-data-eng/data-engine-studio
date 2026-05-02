@@ -58,6 +58,23 @@ cargo test -p des-ui-egui
 - Store generated artifacts under `target/`; do not commit local render output
   unless it is an intentional baseline.
 
+## Box Model Decision
+
+The runtime uses a CSS-inspired box model, but it does not aim for one-to-one
+CSS compatibility. `width` and `height` mean the final painted frame size:
+padding and border are inside that frame. This is equivalent to a border-box
+mental model and should remain the default because Studio is a dense product UI
+where "a 320px card" should visually occupy 320px.
+
+Margin remains outside the painted box. It affects layout footprint and sibling
+placement, but it is not included in `LayoutFrame::rect.size` and is not
+painted as part of the element.
+
+Auto sizing measures children plus padding and border. Fill and percent sizing
+resolve against the parent content rect after parent padding and border are
+removed. These contracts should be represented in both runtime assertions and
+the UI lab specimen view.
+
 ## Browser-Inspired Test Types
 
 - `testharness` equivalent: Rust assertion tests over runtime state.

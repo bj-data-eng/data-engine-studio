@@ -1,5 +1,5 @@
 use des_ui_runtime::{
-    Color, Direction, ElementRole, ElementSpec, ElementStateSelector, Insets, LayoutFrame,
+    Color, Direction, ElementRole, ElementSpec, ElementStateSelector, Insets, LayoutFrame, Length,
     Overflow, Point, PointerInput, Runtime, RuntimeInput, RuntimeOutput, Scene, Size, StylePatch,
     StyleSelector, StyleSheet, Transition,
 };
@@ -270,83 +270,299 @@ fn render_stage(
     );
 }
 
-fn render_layout_view(ui: &mut des_ui_runtime::Ui, show_optional_card: bool, dense_mode: bool) {
+fn render_layout_view(ui: &mut des_ui_runtime::Ui, _show_optional_card: bool, _dense_mode: bool) {
     ui.text_element(
         "layout-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
-        "Layout Runtime",
+        "Box Model Specimens",
     );
     ui.text_element(
         "layout-copy",
         ElementSpec::new(ElementRole::Text).class("muted"),
-        "This view is built from element nesting plus style rules. The egui layer only paints frames.",
+        "Each subject isolates one layout contract. Selector rules are printed above the specimen.",
     );
     ui.element(
-        "layout-toolbar",
-        ElementSpec::new(ElementRole::Panel).class("toolbar-row"),
+        "box-model-grid",
+        ElementSpec::new(ElementRole::Panel).class("box-model-grid"),
         |ui| {
-            ui.element(
-                "toggle-optional-card",
-                ElementSpec::new(ElementRole::Control)
-                    .class("button")
-                    .interactive(),
-                |ui| {
-                    ui.text_element(
-                        "toggle-optional-card-label",
-                        ElementSpec::new(ElementRole::Text).class("button-label"),
-                        if show_optional_card {
-                            "Remove Optional Card"
-                        } else {
-                            "Add Optional Card"
-                        },
-                    );
-                },
+            box_model_row(ui, "box-row-size", |ui| {
+                box_model_case(
+                    ui,
+                    "box-auto",
+                    "Auto",
+                    "content-sized",
+                    ".box-subject-auto { width:auto; height:auto }",
+                    "box-subject-auto",
+                );
+                box_model_case(
+                    ui,
+                    "box-px",
+                    "Px size",
+                    "96 x 44",
+                    ".box-subject-px { width:96px; height:44px }",
+                    "box-subject-px",
+                );
+                box_model_case(
+                    ui,
+                    "box-min",
+                    "Min size",
+                    "empty -> min",
+                    ".box-subject-min { auto; min-size:40px }",
+                    "box-subject-min",
+                );
+            });
+            box_model_row(ui, "box-row-parent-relative", |ui| {
+                box_model_case(
+                    ui,
+                    "box-fill",
+                    "Width fill",
+                    "parent content",
+                    ".box-subject-fill { width:fill; height:28px }",
+                    "box-subject-fill",
+                );
+                box_model_case(
+                    ui,
+                    "box-percent",
+                    "Width 50%",
+                    "parent content",
+                    ".box-subject-percent { width:50%; height:28px }",
+                    "box-subject-percent",
+                );
+                box_model_case(
+                    ui,
+                    "box-height-fill",
+                    "Height fill",
+                    "parent content",
+                    ".box-subject-height-fill { width:64px; height:fill }",
+                    "box-subject-height-fill",
+                );
+            });
+            box_model_row(ui, "box-row-insets", |ui| {
+                box_model_case(
+                    ui,
+                    "box-margin",
+                    "Margin",
+                    "12px outside",
+                    ".box-subject-margin { size:32px; margin:12px }",
+                    "box-subject-margin",
+                );
+                box_model_case(
+                    ui,
+                    "box-padding",
+                    "Padding",
+                    "12px inside",
+                    ".box-subject-padding { auto; padding:12px }",
+                    "box-subject-padding",
+                );
+                box_model_case(
+                    ui,
+                    "box-border",
+                    "Border",
+                    "5px inside",
+                    ".box-subject-border { size:44px; border:5px }",
+                    "box-subject-border",
+                );
+            });
+            box_model_row(ui, "box-row-flow", |ui| {
+                box_model_case(
+                    ui,
+                    "box-row-gap",
+                    "Row gap",
+                    "3 children",
+                    ".box-subject-row-gap { row; auto; gap:10px }",
+                    "box-subject-row-gap",
+                );
+                box_model_case(
+                    ui,
+                    "box-column-gap",
+                    "Column gap",
+                    "3 children",
+                    ".box-subject-column-gap { column; auto; gap:6px }",
+                    "box-subject-column-gap",
+                );
+                box_model_case(
+                    ui,
+                    "box-visible-overflow",
+                    "Overflow visible",
+                    "unclipped child",
+                    ".box-subject-visible-overflow { size:44px; overflow:visible }",
+                    "box-subject-visible-overflow",
+                );
+            });
+            box_model_row(ui, "box-row-overflow", |ui| {
+                box_model_case(
+                    ui,
+                    "box-scroll-overflow",
+                    "Overflow scroll",
+                    "clipped content",
+                    ".box-subject-scroll-overflow { size:44px; overflow:scroll }",
+                    "box-subject-scroll-overflow",
+                );
+            });
+            box_model_section_label(ui, "box-combo-title", "Nested Awareness");
+            box_model_row(ui, "box-row-combinations-one", |ui| {
+                box_model_case(
+                    ui,
+                    "box-nested-nine",
+                    "Nested auto grid",
+                    "outer margin + inner border",
+                    ".outer:auto margin8 border3; .inner:auto padding5 border2",
+                    "box-subject-nested-nine",
+                );
+                box_model_case(
+                    ui,
+                    "box-inset-percent",
+                    "Percent insets",
+                    "child resolves from content rect",
+                    ".parent:88px padding8 border2; .child:50%",
+                    "box-subject-inset-percent",
+                );
+            });
+        },
+    );
+}
+
+fn box_model_section_label(ui: &mut des_ui_runtime::Ui, id: &'static str, label: &'static str) {
+    ui.text_element(
+        id,
+        ElementSpec::new(ElementRole::Text).class("box-section-label"),
+        label,
+    );
+}
+
+fn box_model_row(
+    ui: &mut des_ui_runtime::Ui,
+    id: &'static str,
+    add_contents: impl FnOnce(&mut des_ui_runtime::Ui),
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Panel).class("box-model-row"),
+        add_contents,
+    );
+}
+
+fn box_model_case(
+    ui: &mut des_ui_runtime::Ui,
+    id: &'static str,
+    title: &'static str,
+    note: &'static str,
+    rule_text: &'static str,
+    subject_class: &'static str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Panel).class("box-model-case"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-title"),
+                ElementSpec::new(ElementRole::Text).class("box-label"),
+                title,
+            );
+            ui.text_element(
+                format!("{id}-note"),
+                ElementSpec::new(ElementRole::Text).class("box-note"),
+                note,
+            );
+            ui.text_element(
+                format!("{id}-rule"),
+                ElementSpec::new(ElementRole::Text).class("box-rule"),
+                rule_text,
             );
             ui.element(
-                "toggle-density",
-                ElementSpec::new(ElementRole::Control)
-                    .class("button")
-                    .interactive()
-                    .selected(dense_mode),
+                format!("{id}-frame"),
+                ElementSpec::new(ElementRole::Panel).class("box-subject-frame"),
                 |ui| {
-                    ui.text_element(
-                        "toggle-density-label",
-                        ElementSpec::new(ElementRole::Text).class("button-label"),
-                        if dense_mode { "Dense On" } else { "Dense Off" },
-                    );
+                    box_model_subject(ui, id, subject_class);
                 },
             );
         },
     );
+}
+
+fn box_model_subject(
+    ui: &mut des_ui_runtime::Ui,
+    case_id: &'static str,
+    subject_class: &'static str,
+) {
     ui.element(
-        "layout-card-row",
-        ElementSpec::new(ElementRole::Panel).class(if dense_mode {
-            "card-row-dense"
-        } else {
-            "card-row"
-        }),
-        |ui| {
-            metric_card(
-                ui,
-                "layout-card-a",
-                "Role Defaults",
-                "panel/card/text role rules",
-            );
-            metric_card(
-                ui,
-                "layout-card-b",
-                "Class Rules",
-                "shared card and button classes",
-            );
-            if show_optional_card {
-                metric_card(
-                    ui,
-                    "layout-card-c",
-                    "Stable Identity",
-                    "created/removed/retained ids",
+        format!("{case_id}-subject"),
+        ElementSpec::new(ElementRole::Panel)
+            .class("box-subject")
+            .class(subject_class),
+        |ui| match subject_class {
+            "box-subject-auto" => {
+                box_chip(ui, case_id, 0);
+            }
+            "box-subject-padding" => {
+                box_chip(ui, case_id, 0);
+            }
+            "box-subject-row-gap" | "box-subject-column-gap" => {
+                box_chip(ui, case_id, 0);
+                box_chip(ui, case_id, 1);
+                box_chip(ui, case_id, 2);
+            }
+            "box-subject-visible-overflow" | "box-subject-scroll-overflow" => {
+                ui.element(
+                    format!("{case_id}-overflow-child"),
+                    ElementSpec::new(ElementRole::Panel).class("box-overflow-child"),
+                    |_| {},
                 );
             }
+            "box-subject-nested-nine" => {
+                ui.element(
+                    format!("{case_id}-outer"),
+                    ElementSpec::new(ElementRole::Panel).class("box-nested-outer"),
+                    |ui| {
+                        ui.element(
+                            format!("{case_id}-inner"),
+                            ElementSpec::new(ElementRole::Panel).class("box-nested-inner"),
+                            |ui| {
+                                for row in 0..3 {
+                                    ui.element(
+                                        format!("{case_id}-row-{row}"),
+                                        ElementSpec::new(ElementRole::Panel)
+                                            .class("box-nested-row"),
+                                        |ui| {
+                                            for column in 0..3 {
+                                                ui.element(
+                                                    format!("{case_id}-cell-{row}-{column}"),
+                                                    ElementSpec::new(ElementRole::Panel)
+                                                        .class("box-nested-cell"),
+                                                    |_| {},
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
+                            },
+                        );
+                    },
+                );
+            }
+            "box-subject-inset-percent" => {
+                ui.element(
+                    format!("{case_id}-parent"),
+                    ElementSpec::new(ElementRole::Panel).class("box-inset-percent-parent"),
+                    |ui| {
+                        ui.element(
+                            format!("{case_id}-child"),
+                            ElementSpec::new(ElementRole::Panel).class("box-inset-percent-child"),
+                            |_| {},
+                        );
+                    },
+                );
+            }
+            _ => {}
         },
+    );
+}
+
+fn box_chip(ui: &mut des_ui_runtime::Ui, case_id: &'static str, index: usize) {
+    ui.element(
+        format!("{case_id}-chip-{index}"),
+        ElementSpec::new(ElementRole::Panel).class("box-chip"),
+        |_| {},
     );
 }
 
@@ -555,32 +771,6 @@ fn render_graph_view(ui: &mut des_ui_runtime::Ui) {
     );
 }
 
-fn metric_card(
-    ui: &mut des_ui_runtime::Ui,
-    id: &'static str,
-    title: &'static str,
-    body: &'static str,
-) {
-    ui.element(
-        id,
-        ElementSpec::new(ElementRole::Card)
-            .class("feature-card")
-            .interactive(),
-        |ui| {
-            ui.text_element(
-                format!("{id}-title"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
-                title,
-            );
-            ui.text_element(
-                format!("{id}-body"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
-                body,
-            );
-        },
-    );
-}
-
 fn interactive_labeled_row(
     ui: &mut des_ui_runtime::Ui,
     id: &'static str,
@@ -728,7 +918,233 @@ fn stylesheet() -> StyleSheet {
                 .gap(12.0)
                 .background(PANEL_ALT)
                 .border(STROKE)
-                .radius(8.0),
+                .radius(8.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::Class("box-model-grid"),
+            StylePatch::default()
+                .width_fill()
+                .gap(10.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::Class("box-model-row"),
+            StylePatch::default()
+                .direction(Direction::Row)
+                .width_fill()
+                .height(Length::Px(172.0))
+                .gap(10.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::Class("box-model-case"),
+            StylePatch::default()
+                .size(318.0, 172.0)
+                .padding(Insets::all(8.0))
+                .gap(3.0)
+                .background(Color::rgb(20, 24, 28))
+                .border(Color::rgb(45, 54, 62))
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::Class("box-section-label"),
+            StylePatch::default()
+                .font_size(14.0)
+                .text_color(TEXT_ACCENT)
+                .height(Length::Px(18.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-label"),
+            StylePatch::default()
+                .font_size(13.0)
+                .text_color(TEXT)
+                .height(Length::Px(16.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-note"),
+            StylePatch::default()
+                .font_size(11.0)
+                .text_color(TEXT_MUTED)
+                .height(Length::Px(14.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-rule"),
+            StylePatch::default()
+                .font_size(10.0)
+                .text_color(TEXT_ACCENT)
+                .height(Length::Px(24.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-frame"),
+            StylePatch::default()
+                .size(294.0, 86.0)
+                .background(Color::rgb(13, 16, 19))
+                .border(Color::rgb(39, 48, 56))
+                .overflow_y(Overflow::Visible),
+        )
+        .rule(
+            StyleSelector::Class("box-subject"),
+            StylePatch::default()
+                .size(32.0, 32.0)
+                .gap(0.0)
+                .padding(Insets::ZERO)
+                .background(Color::rgb(65, 121, 164)),
+        )
+        .rule(
+            StyleSelector::Class("box-chip"),
+            StylePatch::default()
+                .size(12.0, 12.0)
+                .background(Color::rgb(141, 207, 164)),
+        )
+        .rule(
+            StyleSelector::Class("box-overflow-child"),
+            StylePatch::default()
+                .size(112.0, 112.0)
+                .background(Color::rgb(218, 151, 77)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-auto"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-px"),
+            StylePatch::default().size(96.0, 44.0),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-min"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .min_size(40.0, 40.0),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-fill"),
+            StylePatch::default().width_fill().height(Length::Px(28.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-percent"),
+            StylePatch::default()
+                .width_percent(0.5)
+                .height(Length::Px(28.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-height-fill"),
+            StylePatch::default().width(Length::Px(64.0)).height_fill(),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-margin"),
+            StylePatch::default()
+                .size(32.0, 32.0)
+                .margin(Insets::all(12.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-padding"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .padding(Insets::all(12.0)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-border"),
+            StylePatch::default()
+                .size(44.0, 44.0)
+                .border(PURPLE)
+                .border_width(5.0),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-row-gap"),
+            StylePatch::default()
+                .direction(Direction::Row)
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .gap(10.0),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-column-gap"),
+            StylePatch::default()
+                .direction(Direction::Column)
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .gap(6.0),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-visible-overflow"),
+            StylePatch::default()
+                .size(44.0, 44.0)
+                .overflow_y(Overflow::Visible),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-scroll-overflow"),
+            StylePatch::default()
+                .size(44.0, 44.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-nested-nine"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::Class("box-nested-outer"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .margin(Insets::all(8.0))
+                .border(PURPLE)
+                .border_width(3.0)
+                .background(Color::rgb(41, 58, 73)),
+        )
+        .rule(
+            StyleSelector::Class("box-nested-inner"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .padding(Insets::all(5.0))
+                .gap(4.0)
+                .border(GREEN)
+                .border_width(2.0)
+                .background(Color::rgb(52, 72, 88)),
+        )
+        .rule(
+            StyleSelector::Class("box-nested-row"),
+            StylePatch::default()
+                .direction(Direction::Row)
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .gap(4.0)
+                .background(Color::rgb(65, 121, 164)),
+        )
+        .rule(
+            StyleSelector::Class("box-nested-cell"),
+            StylePatch::default()
+                .size(10.0, 10.0)
+                .background(Color::rgb(141, 207, 164)),
+        )
+        .rule(
+            StyleSelector::Class("box-subject-inset-percent"),
+            StylePatch::default()
+                .width(Length::Auto)
+                .height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::Class("box-inset-percent-parent"),
+            StylePatch::default()
+                .size(88.0, 88.0)
+                .padding(Insets::all(8.0))
+                .border(PURPLE)
+                .border_width(2.0)
+                .background(Color::rgb(65, 121, 164)),
+        )
+        .rule(
+            StyleSelector::Class("box-inset-percent-child"),
+            StylePatch::default()
+                .width_percent(0.5)
+                .height_percent(0.5)
+                .background(Color::rgb(141, 207, 164)),
         )
         .rule(
             StyleSelector::Class("nav-item"),
@@ -1145,6 +1561,13 @@ mod graphical_tests {
             .rect
     }
 
+    fn lab_output(initial_view: &str) -> RuntimeOutput {
+        let mut runtime = Runtime::default();
+        let scene =
+            UiLabState::new(Some(initial_view)).scene(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+        runtime.update(&scene, &stylesheet())
+    }
+
     fn find_frame<'a>(frame: &'a LayoutFrame, id: &str) -> Option<&'a LayoutFrame> {
         if frame.id.as_str() == id {
             return Some(frame);
@@ -1153,6 +1576,17 @@ mod graphical_tests {
             .children
             .iter()
             .find_map(|child| find_frame(child, id))
+    }
+
+    fn frame<'a>(output: &'a RuntimeOutput, id: &str) -> &'a LayoutFrame {
+        find_frame(&output.layout, id).unwrap_or_else(|| panic!("expected layout frame for {id}"))
+    }
+
+    fn assert_close(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() < 0.01,
+            "expected {actual} to be close to {expected}"
+        );
     }
 
     #[test]
@@ -1235,5 +1669,116 @@ mod graphical_tests {
         let direct_image = lab_image("interaction");
 
         assert_exact_image_match(&clicked_image, &direct_image);
+    }
+
+    #[test]
+    fn box_model_specimens_cover_size_inset_and_flow_contracts() {
+        let output = lab_output("layout");
+
+        assert_close(frame(&output, "box-auto-subject").rect.size.width, 12.0);
+        assert_close(frame(&output, "box-auto-subject").rect.size.height, 12.0);
+        assert_close(frame(&output, "box-px-subject").rect.size.width, 96.0);
+        assert_close(frame(&output, "box-px-subject").rect.size.height, 44.0);
+        assert_close(frame(&output, "box-min-subject").rect.size.width, 40.0);
+        assert_close(frame(&output, "box-min-subject").rect.size.height, 40.0);
+
+        assert_close(frame(&output, "box-fill-subject").rect.size.width, 292.0);
+        assert_close(frame(&output, "box-percent-subject").rect.size.width, 146.0);
+        assert_close(
+            frame(&output, "box-height-fill-subject").rect.size.height,
+            84.0,
+        );
+
+        let margin_subject = frame(&output, "box-margin-subject");
+        let margin_frame = frame(&output, "box-margin-frame");
+        assert_close(
+            margin_subject.rect.origin.x - margin_frame.rect.origin.x,
+            13.0,
+        );
+        assert_close(
+            margin_subject.rect.origin.y - margin_frame.rect.origin.y,
+            13.0,
+        );
+
+        assert_close(frame(&output, "box-padding-subject").rect.size.width, 36.0);
+        assert_close(frame(&output, "box-padding-subject").rect.size.height, 36.0);
+        assert_close(frame(&output, "box-border-subject").style.border_width, 5.0);
+        assert_close(frame(&output, "box-border-subject").rect.size.width, 44.0);
+        assert_close(frame(&output, "box-border-subject").rect.size.height, 44.0);
+
+        assert_close(frame(&output, "box-row-gap-subject").rect.size.width, 56.0);
+        assert_close(frame(&output, "box-row-gap-subject").rect.size.height, 12.0);
+        let first_row_chip = frame(&output, "box-row-gap-chip-0");
+        let second_row_chip = frame(&output, "box-row-gap-chip-1");
+        assert_close(
+            second_row_chip.rect.origin.x - first_row_chip.rect.origin.x,
+            22.0,
+        );
+
+        assert_close(
+            frame(&output, "box-column-gap-subject").rect.size.width,
+            12.0,
+        );
+        assert_close(
+            frame(&output, "box-column-gap-subject").rect.size.height,
+            48.0,
+        );
+        let first_column_chip = frame(&output, "box-column-gap-chip-0");
+        let second_column_chip = frame(&output, "box-column-gap-chip-1");
+        assert_close(
+            second_column_chip.rect.origin.y - first_column_chip.rect.origin.y,
+            18.0,
+        );
+
+        let visible_overflow_child = frame(&output, "box-visible-overflow-overflow-child");
+        let visible_overflow_subject = frame(&output, "box-visible-overflow-subject");
+        assert!(
+            visible_overflow_child.rect.bottom() > visible_overflow_subject.rect.bottom(),
+            "visible overflow child should extend beyond its square subject"
+        );
+
+        assert_close(
+            frame(&output, "box-nested-nine-subject").rect.size.width,
+            74.0,
+        );
+        assert_close(
+            frame(&output, "box-nested-nine-subject").rect.size.height,
+            74.0,
+        );
+        assert_close(
+            frame(&output, "box-nested-nine-inner").rect.size.width,
+            52.0,
+        );
+        assert_close(
+            frame(&output, "box-nested-nine-inner").rect.size.height,
+            52.0,
+        );
+        assert_close(
+            frame(&output, "box-nested-nine-cell-0-1").rect.origin.x
+                - frame(&output, "box-nested-nine-cell-0-0").rect.origin.x,
+            14.0,
+        );
+        assert_close(
+            frame(&output, "box-nested-nine-cell-1-0").rect.origin.y
+                - frame(&output, "box-nested-nine-cell-0-0").rect.origin.y,
+            14.0,
+        );
+
+        assert_close(
+            frame(&output, "box-inset-percent-child").rect.size.width,
+            34.0,
+        );
+        assert_close(
+            frame(&output, "box-inset-percent-child").rect.size.height,
+            34.0,
+        );
+
+        assert!(
+            output
+                .scroll_chrome
+                .iter()
+                .any(|chrome| chrome.element_id.as_str() == "box-scroll-overflow-subject"),
+            "scroll overflow specimen should emit scroll chrome"
+        );
     }
 }

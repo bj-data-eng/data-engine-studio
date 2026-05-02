@@ -1242,7 +1242,12 @@ fn layout_children(
             (content_rect.size.height - child_style.margin.vertical()).max(0.0),
         );
         let measured = measure_element(child, &child_style, child_available, stylesheet, states);
-        let child_rect = Rect::new(cursor.x, cursor.y, measured.width, measured.height);
+        let child_rect = Rect::new(
+            cursor.x,
+            cursor.y,
+            child_available.width,
+            child_available.height,
+        );
         frames.push(layout_element(
             child,
             child_rect,
