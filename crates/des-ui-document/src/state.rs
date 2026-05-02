@@ -1,4 +1,4 @@
-use crate::element::{ClassName, Color, ElementId, ElementRole};
+use crate::element::{ClassName, Color, ElementId, ElementRole, Glyph};
 use crate::geometry::{Point, Rect, ScrollAxis};
 use crate::style::{ComputedStyle, Transition};
 
@@ -32,6 +32,7 @@ pub struct ResolvedElement {
     pub rect: Rect,
     pub style: ComputedStyle,
     pub text: Option<String>,
+    pub glyph: Option<Glyph>,
     pub interactive: bool,
     pub children: Vec<ResolvedElement>,
 }

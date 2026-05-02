@@ -13,6 +13,14 @@ pub enum ElementRole {
     Radio,
     Dropdown,
     TextInput,
+    Icon,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Glyph {
+    Check,
+    ChevronDown,
+    ChevronUp,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -117,6 +125,7 @@ pub struct ElementSpec {
     pub selected: bool,
     pub disabled: bool,
     pub focused: bool,
+    pub glyph: Option<Glyph>,
 }
 
 impl ElementSpec {
@@ -128,6 +137,7 @@ impl ElementSpec {
             selected: false,
             disabled: false,
             focused: false,
+            glyph: None,
         }
     }
 
@@ -153,6 +163,11 @@ impl ElementSpec {
 
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+
+    pub fn glyph(mut self, glyph: Glyph) -> Self {
+        self.glyph = Some(glyph);
         self
     }
 }

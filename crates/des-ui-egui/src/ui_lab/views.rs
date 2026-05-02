@@ -1,4 +1,5 @@
 use super::*;
+use des_ui_document::Glyph;
 
 pub(super) fn render_topbar(ui: &mut des_ui_document::DocumentBuilder, debug_overlay: bool) {
     ui.element(
@@ -647,10 +648,12 @@ fn control_checkbox(ui: &mut des_ui_document::DocumentBuilder, checked: bool) {
                             .selected(checked),
                         |ui| {
                             if checked {
-                                ui.text_element(
+                                ui.element(
                                     "control-checkbox-glyph",
-                                    ElementSpec::new(ElementRole::Text).class("check-glyph"),
-                                    "x",
+                                    ElementSpec::new(ElementRole::Icon)
+                                        .class("check-glyph")
+                                        .glyph(Glyph::Check),
+                                    |_| {},
                                 );
                             }
                         },
@@ -730,10 +733,16 @@ fn control_dropdown(ui: &mut des_ui_document::DocumentBuilder, open: bool, choic
                         ElementSpec::new(ElementRole::Text).class("control-label"),
                         selected,
                     );
-                    ui.text_element(
+                    ui.element(
                         "control-dropdown-chevron",
-                        ElementSpec::new(ElementRole::Text).class("muted"),
-                        if open { "^" } else { "v" },
+                        ElementSpec::new(ElementRole::Icon)
+                            .class("dropdown-chevron")
+                            .glyph(if open {
+                                Glyph::ChevronUp
+                            } else {
+                                Glyph::ChevronDown
+                            }),
+                        |_| {},
                     );
                 },
             );

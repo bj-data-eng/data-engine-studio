@@ -77,6 +77,7 @@ fn layout_element_in_viewport(
         rect,
         style,
         text: element.text.clone(),
+        glyph: element.spec.glyph,
         interactive: element.spec.interactive && !element.spec.disabled,
         children,
     }
@@ -437,6 +438,10 @@ fn measure_element(
                 .unwrap_or_default();
             Size::new(width.max(style.min_size.width), 18.0)
         }
+        ElementRole::Icon => Size::new(
+            style.font_size.max(style.min_size.width),
+            style.font_size.max(style.min_size.height),
+        ),
         _ => {
             let content_parent_size = measurement_content_size(style, parent_size);
             let content = measure_children(element, style, content_parent_size, stylesheet, states);
@@ -478,6 +483,10 @@ fn measure_intrinsic_element(
                 .unwrap_or_default();
             Size::new(width.max(style.min_size.width), 18.0)
         }
+        ElementRole::Icon => Size::new(
+            style.font_size.max(style.min_size.width),
+            style.font_size.max(style.min_size.height),
+        ),
         _ => {
             let content_parent_size = measurement_content_size(style, parent_size);
             let content = measure_children(element, style, content_parent_size, stylesheet, states);

@@ -82,6 +82,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
+            StyleSelector::Role(ElementRole::Icon),
+            Style::default()
+                .size(14.0, 14.0)
+                .font_size(14.0)
+                .text_color(TEXT_MUTED),
+        )
+        .rule(
             StyleSelector::Role(ElementRole::Text),
             Style::default().font_size(13.0).text_color(TEXT),
         )
@@ -595,7 +602,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("check-glyph"),
             Style::default()
-                .font_size(12.0)
+                .size(13.0, 13.0)
+                .font_size(13.0)
                 .text_color(Color::rgb(244, 248, 252)),
         )
         .rule(
@@ -638,18 +646,28 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("dropdown-control", ElementStateSelector::Selected),
-            Style::default().border(STROKE_SELECTED),
+            Style::default()
+                .border(STROKE_SELECTED)
+                .bottom_left_radius(0.0)
+                .bottom_right_radius(0.0),
         )
         .rule(
             StyleSelector::class("dropdown-menu"),
             Style::default()
+                .absolute_parent()
+                .top(Length::Px(63.0))
+                .left(Length::Px(0.0))
+                .z_index(20)
                 .width_fill()
                 .height(Length::Auto)
                 .padding(Insets::all(4.0))
-                .gap(3.0)
+                .gap(4.0)
                 .background(Color::rgb(18, 22, 26))
                 .border(STROKE_SELECTED)
-                .radius(5.0),
+                .top_left_radius(0.0)
+                .top_right_radius(0.0)
+                .bottom_left_radius(5.0)
+                .bottom_right_radius(5.0),
         )
         .rule(
             StyleSelector::class("dropdown-option"),

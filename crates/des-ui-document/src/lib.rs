@@ -16,7 +16,7 @@ mod style;
 
 pub use element::{
     ClassName, Color, Document, DocumentBuilder, Element, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector,
+    ElementStateSelector, Glyph,
 };
 pub use engine::DocumentEngine;
 pub use geometry::{

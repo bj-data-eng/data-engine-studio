@@ -1,5 +1,5 @@
 use des_ui_document::{
-    Color, CornerRadii, DocumentInput, Insets, Overflow, Point, PointerInput, Rect,
+    Color, CornerRadii, DocumentInput, Glyph, Insets, Overflow, Point, PointerInput, Rect,
     ResolvedElement, ScrollChrome,
 };
 use eframe::egui;
@@ -63,6 +63,16 @@ fn paint_frame_clipped(
                 to_egui_color(frame.style.text_color),
             );
         }
+
+        if let Some(glyph) = frame.glyph {
+            paint_glyph(
+                &painter,
+                rect,
+                glyph,
+                frame.style.text_color,
+                frame.style.font_size,
+            );
+        }
     }
 
     let mut children: Vec<_> = frame.children.iter().collect();
@@ -117,6 +127,36 @@ fn paint_frame_clipped(
     };
     for child in children {
         paint_frame_clipped(ui, origin, child, next_clip);
+    }
+}
+
+fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, glyph: Glyph, color: Color, size: f32) {
+    let color = to_egui_color(color);
+    let stroke = egui::Stroke::new((size / 8.0).clamp(1.25, 2.5), color);
+    let center = rect.center();
+    let half = (size.min(rect.width()).min(rect.height()) / 2.0).max(1.0);
+    match glyph {
+        Glyph::Check => {
+            let a = egui::pos2(center.x - half * 0.55, center.y - half * 0.05);
+            let b = egui::pos2(center.x - half * 0.15, center.y + half * 0.38);
+            let c = egui::pos2(center.x + half * 0.58, center.y - half * 0.42);
+            painter.line_segment([a, b], stroke);
+            painter.line_segment([b, c], stroke);
+        }
+        Glyph::ChevronDown => {
+            let a = egui::pos2(center.x - half * 0.5, center.y - half * 0.2);
+            let b = egui::pos2(center.x, center.y + half * 0.32);
+            let c = egui::pos2(center.x + half * 0.5, center.y - half * 0.2);
+            painter.line_segment([a, b], stroke);
+            painter.line_segment([b, c], stroke);
+        }
+        Glyph::ChevronUp => {
+            let a = egui::pos2(center.x - half * 0.5, center.y + half * 0.2);
+            let b = egui::pos2(center.x, center.y - half * 0.32);
+            let c = egui::pos2(center.x + half * 0.5, center.y + half * 0.2);
+            painter.line_segment([a, b], stroke);
+            painter.line_segment([b, c], stroke);
+        }
     }
 }
 
