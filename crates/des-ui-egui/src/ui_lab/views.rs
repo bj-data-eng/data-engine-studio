@@ -83,6 +83,10 @@ pub(super) fn render_stage(
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
+    checkbox_enabled: bool,
+    radio_choice: usize,
+    dropdown_open: bool,
+    dropdown_choice: usize,
 ) {
     ui.element(
         "stage",
@@ -91,7 +95,13 @@ pub(super) fn render_stage(
             .class("styled-scrollbar"),
         |ui| match view {
             LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
-            LabView::Interaction => render_interaction_view(ui),
+            LabView::Interaction => render_interaction_view(
+                ui,
+                checkbox_enabled,
+                radio_choice,
+                dropdown_open,
+                dropdown_choice,
+            ),
             LabView::Styling => render_styling_view(ui, dense_mode),
             LabView::Animation => render_animation_view(ui),
             LabView::Scrolling => render_scrolling_view(ui),
@@ -537,7 +547,13 @@ fn box_chip(ui: &mut des_ui_document::DocumentBuilder, case_id: &'static str, in
     );
 }
 
-fn render_interaction_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_interaction_view(
+    ui: &mut des_ui_document::DocumentBuilder,
+    checkbox_enabled: bool,
+    radio_choice: usize,
+    dropdown_open: bool,
+    dropdown_choice: usize,
+) {
     ui.text_element(
         "interaction-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -584,6 +600,206 @@ fn render_interaction_view(ui: &mut des_ui_document::DocumentBuilder) {
                             format!("{id}-body"),
                             ElementSpec::new(ElementRole::Text).class("muted"),
                             body,
+                        );
+                    },
+                );
+            }
+        },
+    );
+    ui.text_element(
+        "controls-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Control roles",
+    );
+    ui.element(
+        "controls-grid",
+        ElementSpec::new(ElementRole::Panel).class("controls-grid"),
+        |ui| {
+            control_checkbox(ui, checkbox_enabled);
+            control_radio_group(ui, radio_choice);
+            control_dropdown(ui, dropdown_open, dropdown_choice);
+            control_text_inputs(ui);
+        },
+    );
+}
+
+fn control_checkbox(ui: &mut des_ui_document::DocumentBuilder, checked: bool) {
+    ui.element(
+        "control-checkbox-card",
+        ElementSpec::new(ElementRole::Card).class("control-card"),
+        |ui| {
+            ui.text_element(
+                "control-checkbox-title",
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                "Checkbox",
+            );
+            ui.element(
+                "control-checkbox",
+                ElementSpec::new(ElementRole::Checkbox)
+                    .class("control-row")
+                    .interactive()
+                    .selected(checked),
+                |ui| {
+                    ui.element(
+                        "control-checkbox-mark",
+                        ElementSpec::new(ElementRole::Panel)
+                            .class("checkbox-mark")
+                            .selected(checked),
+                        |ui| {
+                            if checked {
+                                ui.text_element(
+                                    "control-checkbox-glyph",
+                                    ElementSpec::new(ElementRole::Text).class("check-glyph"),
+                                    "x",
+                                );
+                            }
+                        },
+                    );
+                    ui.text_element(
+                        "control-checkbox-label",
+                        ElementSpec::new(ElementRole::Text).class("control-label"),
+                        "Profile this transform",
+                    );
+                },
+            );
+        },
+    );
+}
+
+fn control_radio_group(ui: &mut des_ui_document::DocumentBuilder, choice: usize) {
+    ui.element(
+        "control-radio-card",
+        ElementSpec::new(ElementRole::Card).class("control-card"),
+        |ui| {
+            ui.text_element(
+                "control-radio-title",
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                "Radio group",
+            );
+            for (index, id, label) in [
+                (0, "control-radio-local", "Local runtime"),
+                (1, "control-radio-remote", "Remote worker"),
+                (2, "control-radio-hybrid", "Hybrid"),
+            ] {
+                ui.element(
+                    id,
+                    ElementSpec::new(ElementRole::Radio)
+                        .class("control-row")
+                        .interactive()
+                        .selected(choice == index),
+                    |ui| {
+                        ui.element(
+                            format!("{id}-dot"),
+                            ElementSpec::new(ElementRole::Panel)
+                                .class("radio-dot")
+                                .selected(choice == index),
+                            |_| {},
+                        );
+                        ui.text_element(
+                            format!("{id}-label"),
+                            ElementSpec::new(ElementRole::Text).class("control-label"),
+                            label,
+                        );
+                    },
+                );
+            }
+        },
+    );
+}
+
+fn control_dropdown(ui: &mut des_ui_document::DocumentBuilder, open: bool, choice: usize) {
+    let selected = ["CSV source", "DuckDB table", "Python node"][choice];
+    ui.element(
+        "control-dropdown-card",
+        ElementSpec::new(ElementRole::Card).class("control-card"),
+        |ui| {
+            ui.text_element(
+                "control-dropdown-title",
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                "Dropdown",
+            );
+            ui.element(
+                "control-dropdown",
+                ElementSpec::new(ElementRole::Dropdown)
+                    .class("dropdown-control")
+                    .interactive()
+                    .selected(open),
+                |ui| {
+                    ui.text_element(
+                        "control-dropdown-label",
+                        ElementSpec::new(ElementRole::Text).class("control-label"),
+                        selected,
+                    );
+                    ui.text_element(
+                        "control-dropdown-chevron",
+                        ElementSpec::new(ElementRole::Text).class("muted"),
+                        if open { "^" } else { "v" },
+                    );
+                },
+            );
+            if open {
+                ui.element(
+                    "control-dropdown-menu",
+                    ElementSpec::new(ElementRole::Panel).class("dropdown-menu"),
+                    |ui| {
+                        for (index, id, label) in [
+                            (0, "control-dropdown-option-csv", "CSV source"),
+                            (1, "control-dropdown-option-duckdb", "DuckDB table"),
+                            (2, "control-dropdown-option-python", "Python node"),
+                        ] {
+                            ui.element(
+                                id,
+                                ElementSpec::new(ElementRole::Control)
+                                    .class("dropdown-option")
+                                    .interactive()
+                                    .selected(choice == index),
+                                |ui| {
+                                    ui.text_element(
+                                        format!("{id}-label"),
+                                        ElementSpec::new(ElementRole::Text)
+                                            .class("control-label")
+                                            .selected(choice == index),
+                                        label,
+                                    );
+                                },
+                            );
+                        }
+                    },
+                );
+            }
+        },
+    );
+}
+
+fn control_text_inputs(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "control-input-card",
+        ElementSpec::new(ElementRole::Card).class("control-card"),
+        |ui| {
+            ui.text_element(
+                "control-input-title",
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                "Input fields",
+            );
+            for (id, label, focused, disabled) in [
+                ("control-input-name", "pipeline_name", true, false),
+                ("control-input-disabled", "read_only_id", false, true),
+            ] {
+                ui.element(
+                    id,
+                    ElementSpec::new(ElementRole::TextInput)
+                        .class("input-field")
+                        .interactive()
+                        .focused(focused)
+                        .disabled(disabled),
+                    |ui| {
+                        ui.text_element(
+                            format!("{id}-label"),
+                            ElementSpec::new(ElementRole::Text)
+                                .class("control-label")
+                                .focused(focused)
+                                .disabled(disabled),
+                            label,
                         );
                     },
                 );

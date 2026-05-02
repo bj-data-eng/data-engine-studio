@@ -88,6 +88,10 @@ pub(crate) struct UiLabState {
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
+    checkbox_enabled: bool,
+    radio_choice: usize,
+    dropdown_open: bool,
+    dropdown_choice: usize,
     last_click_counts: BTreeMap<&'static str, u32>,
     last_perf: UiLabPerf,
 }
@@ -100,6 +104,10 @@ impl Default for UiLabState {
             view: LabView::Layout,
             show_optional_card: true,
             dense_mode: false,
+            checkbox_enabled: true,
+            radio_choice: 0,
+            dropdown_open: false,
+            dropdown_choice: 1,
             last_click_counts: BTreeMap::new(),
             last_perf: UiLabPerf::default(),
         }
@@ -162,6 +170,20 @@ impl UiLabState {
             ("view-graph", LabAction::SelectView(LabView::Graph)),
             ("toggle-optional-card", LabAction::ToggleOptionalCard),
             ("toggle-density", LabAction::ToggleDensity),
+            ("control-checkbox", LabAction::ToggleCheckbox),
+            ("control-radio-local", LabAction::SelectRadio(0)),
+            ("control-radio-remote", LabAction::SelectRadio(1)),
+            ("control-radio-hybrid", LabAction::SelectRadio(2)),
+            ("control-dropdown", LabAction::ToggleDropdown),
+            ("control-dropdown-option-csv", LabAction::SelectDropdown(0)),
+            (
+                "control-dropdown-option-duckdb",
+                LabAction::SelectDropdown(1),
+            ),
+            (
+                "control-dropdown-option-python",
+                LabAction::SelectDropdown(2),
+            ),
         ] {
             let count = self
                 .document_engine
@@ -176,6 +198,13 @@ impl UiLabState {
                         self.show_optional_card = !self.show_optional_card
                     }
                     LabAction::ToggleDensity => self.dense_mode = !self.dense_mode,
+                    LabAction::ToggleCheckbox => self.checkbox_enabled = !self.checkbox_enabled,
+                    LabAction::SelectRadio(choice) => self.radio_choice = choice,
+                    LabAction::ToggleDropdown => self.dropdown_open = !self.dropdown_open,
+                    LabAction::SelectDropdown(choice) => {
+                        self.dropdown_choice = choice;
+                        self.dropdown_open = false;
+                    }
                 }
                 ui.ctx().request_repaint();
             }
@@ -194,7 +223,16 @@ impl UiLabState {
                         ElementSpec::new(ElementRole::Panel).class("lab-body"),
                         |ui| {
                             render_nav(ui, self.view);
-                            render_stage(ui, self.view, self.show_optional_card, self.dense_mode);
+                            render_stage(
+                                ui,
+                                self.view,
+                                self.show_optional_card,
+                                self.dense_mode,
+                                self.checkbox_enabled,
+                                self.radio_choice,
+                                self.dropdown_open,
+                                self.dropdown_choice,
+                            );
                         },
                     );
                 },
@@ -266,6 +304,10 @@ enum LabAction {
     SelectView(LabView),
     ToggleOptionalCard,
     ToggleDensity,
+    ToggleCheckbox,
+    SelectRadio(usize),
+    ToggleDropdown,
+    SelectDropdown(usize),
 }
 
 #[derive(Clone, Copy, Debug, Default)]

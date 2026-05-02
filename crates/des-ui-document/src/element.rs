@@ -9,6 +9,10 @@ pub enum ElementRole {
     Text,
     Canvas,
     Control,
+    Checkbox,
+    Radio,
+    Dropdown,
+    TextInput,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

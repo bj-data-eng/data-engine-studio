@@ -21,9 +21,17 @@ fn lab_image(initial_view: &str) -> image::RgbaImage {
 }
 
 fn lab_rect(id: &str) -> des_ui_document::Rect {
+    lab_rect_in("layout", id)
+}
+
+fn lab_rect_in(initial_view: &str, id: &str) -> des_ui_document::Rect {
+    let state = UiLabState::new(Some(initial_view));
+    state_rect(&state, id)
+}
+
+fn state_rect(state: &UiLabState, id: &str) -> des_ui_document::Rect {
     let mut engine = DocumentEngine::default();
-    let document =
-        UiLabState::new(Some("layout")).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
     let output = engine.update(&document, &stylesheet());
     find_frame(&output.layout, id)
         .unwrap_or_else(|| panic!("expected layout frame for {id}"))
@@ -160,6 +168,70 @@ fn clicked_nav_view_matches_directly_seeded_view() {
     let direct_image = lab_image("interaction");
 
     assert_exact_image_match(&clicked_image, &direct_image);
+}
+
+#[test]
+fn interaction_view_renders_common_control_roles() {
+    let output = lab_output("interaction");
+
+    assert_eq!(
+        frame(&output, "control-checkbox").role,
+        ElementRole::Checkbox
+    );
+    assert_eq!(
+        frame(&output, "control-radio-local").role,
+        ElementRole::Radio
+    );
+    assert_eq!(
+        frame(&output, "control-dropdown").role,
+        ElementRole::Dropdown
+    );
+    assert_eq!(
+        frame(&output, "control-input-name").role,
+        ElementRole::TextInput
+    );
+    assert!(frame(&output, "control-checkbox").interactive);
+    assert!(frame(&output, "control-input-name").interactive);
+    assert!(!frame(&output, "control-input-disabled").interactive);
+}
+
+#[test]
+fn common_control_clicks_update_lab_state() {
+    let mut harness = lab_harness("interaction");
+
+    for (id, assert_state) in [
+        (
+            "control-checkbox",
+            Box::new(|state: &UiLabState| assert!(!state.checkbox_enabled))
+                as Box<dyn Fn(&UiLabState)>,
+        ),
+        (
+            "control-radio-remote",
+            Box::new(|state: &UiLabState| assert_eq!(state.radio_choice, 1)),
+        ),
+        (
+            "control-dropdown",
+            Box::new(|state: &UiLabState| assert!(state.dropdown_open)),
+        ),
+        (
+            "control-dropdown-option-python",
+            Box::new(|state: &UiLabState| {
+                assert_eq!(state.dropdown_choice, 2);
+                assert!(!state.dropdown_open);
+            }),
+        ),
+    ] {
+        let rect = state_rect(harness.state(), id);
+        let target = egui::pos2(
+            rect.origin.x + rect.size.width / 2.0,
+            rect.origin.y + rect.size.height / 2.0,
+        );
+        harness.hover_at(target);
+        harness.drag_at(target);
+        harness.drop_at(target);
+        harness.run();
+        assert_state(harness.state());
+    }
 }
 
 #[test]

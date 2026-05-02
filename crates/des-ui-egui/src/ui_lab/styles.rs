@@ -40,6 +40,48 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
+            StyleSelector::Role(ElementRole::Checkbox),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .padding(Insets::symmetric(9.0, 7.0))
+                .gap(8.0)
+                .background(CARD)
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::Role(ElementRole::Radio),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .padding(Insets::symmetric(9.0, 7.0))
+                .gap(8.0)
+                .background(CARD)
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::Role(ElementRole::Dropdown),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::SpaceBetween)
+                .padding(Insets::symmetric(10.0, 7.0))
+                .gap(8.0)
+                .background(CARD)
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::Role(ElementRole::TextInput),
+            Style::default()
+                .padding(Insets::symmetric(10.0, 7.0))
+                .background(Color::rgb(13, 16, 19))
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
             StyleSelector::Role(ElementRole::Text),
             Style::default().font_size(13.0).text_color(TEXT),
         )
@@ -493,6 +535,150 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .direction(Direction::Row)
                 .gap(6.0)
                 .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("controls-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width_fill()
+                .height(Length::Auto)
+                .gap(12.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("control-card"),
+            Style::default()
+                .width(Length::Px(235.0))
+                .height(Length::Auto)
+                .min_size(0.0, 132.0)
+                .padding(Insets::all(10.0))
+                .gap(8.0),
+        )
+        .rule(
+            StyleSelector::class("control-row"),
+            Style::default().width_fill().height(Length::Px(36.0)),
+        )
+        .rule(
+            StyleSelector::class_state("control-row", ElementStateSelector::Hovered),
+            Style::default()
+                .background(CARD_HOVER)
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("control-row", ElementStateSelector::Pressed),
+            Style::default().background(CARD_PRESSED),
+        )
+        .rule(
+            StyleSelector::class_state("control-row", ElementStateSelector::Selected),
+            Style::default()
+                .background(CARD_SELECTED)
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class("checkbox-mark"),
+            Style::default()
+                .size(18.0, 18.0)
+                .padding(Insets::ZERO)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(Color::rgb(16, 20, 24))
+                .border(STROKE)
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::class_state("checkbox-mark", ElementStateSelector::Selected),
+            Style::default()
+                .background(STROKE_SELECTED)
+                .border(Color::rgb(126, 190, 255)),
+        )
+        .rule(
+            StyleSelector::class("check-glyph"),
+            Style::default()
+                .font_size(12.0)
+                .text_color(Color::rgb(244, 248, 252)),
+        )
+        .rule(
+            StyleSelector::class("radio-dot"),
+            Style::default()
+                .size(18.0, 18.0)
+                .background(Color::rgb(16, 20, 24))
+                .border(STROKE)
+                .border_width(2.0)
+                .radius(9.0),
+        )
+        .rule(
+            StyleSelector::class_state("radio-dot", ElementStateSelector::Selected),
+            Style::default()
+                .background(STROKE_SELECTED)
+                .border(Color::rgb(160, 212, 255))
+                .border_width(5.0),
+        )
+        .rule(
+            StyleSelector::class("control-label"),
+            Style::default().font_size(12.5).text_color(TEXT),
+        )
+        .rule(
+            StyleSelector::class_state("control-label", ElementStateSelector::Selected),
+            Style::default().text_color(TEXT_ACCENT),
+        )
+        .rule(
+            StyleSelector::class_state("control-label", ElementStateSelector::Disabled),
+            Style::default().text_color(Color::rgb(96, 104, 112)),
+        )
+        .rule(
+            StyleSelector::class("dropdown-control"),
+            Style::default().width_fill().height(Length::Px(38.0)),
+        )
+        .rule(
+            StyleSelector::class_state("dropdown-control", ElementStateSelector::Hovered),
+            Style::default()
+                .background(CARD_HOVER)
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("dropdown-control", ElementStateSelector::Selected),
+            Style::default().border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class("dropdown-menu"),
+            Style::default()
+                .width_fill()
+                .height(Length::Auto)
+                .padding(Insets::all(4.0))
+                .gap(3.0)
+                .background(Color::rgb(18, 22, 26))
+                .border(STROKE_SELECTED)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class("dropdown-option"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(30.0))
+                .padding(Insets::symmetric(8.0, 6.0)),
+        )
+        .rule(
+            StyleSelector::class_state("dropdown-option", ElementStateSelector::Hovered),
+            Style::default().background(CARD_HOVER),
+        )
+        .rule(
+            StyleSelector::class_state("dropdown-option", ElementStateSelector::Selected),
+            Style::default().background(CARD_SELECTED),
+        )
+        .rule(
+            StyleSelector::class("input-field"),
+            Style::default().width_fill().height(Length::Px(38.0)),
+        )
+        .rule(
+            StyleSelector::class_state("input-field", ElementStateSelector::Focused),
+            Style::default().border(STROKE_SELECTED).border_width(2.0),
+        )
+        .rule(
+            StyleSelector::class_state("input-field", ElementStateSelector::Disabled),
+            Style::default()
+                .background(Color::rgb(21, 24, 27))
+                .border(Color::rgb(40, 46, 52)),
         )
         .rule(
             StyleSelector::class("feature-card"),
