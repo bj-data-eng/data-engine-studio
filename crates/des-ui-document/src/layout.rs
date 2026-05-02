@@ -1,5 +1,5 @@
 use crate::element::{Element, ElementId, ElementRole};
-use crate::geometry::{Direction, Insets, Overflow, Point, Rect, Size};
+use crate::geometry::{Direction, Length, Overflow, Point, Rect, Size};
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ComputedStyle, StyleSheet, resolve_style};
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ pub(crate) fn layout_element(
         .and_then(|state| state.rendered_style.clone())
         .unwrap_or(style);
     let rect = element_rect(element, &style, parent_rect, stylesheet, states);
-    let inner_rect = rect.inset(Insets::all(style.border_width));
+    let inner_rect = rect.inset(style.border_width);
     let mut content_rect = inner_rect.inset(style.padding);
     let content_size = measure_children(element, &style, content_rect.size, stylesheet, states);
     if style.overflow_y == Overflow::Scroll {
@@ -81,6 +81,7 @@ fn layout_children(
     scroll_limits: &mut HashMap<ElementId, f32>,
 ) -> Vec<ResolvedElement> {
     let mut cursor = content_rect.origin;
+    let mut line_height: f32 = 0.0;
     let mut frames = Vec::with_capacity(element.children.len());
 
     for child in &element.children {
@@ -89,7 +90,21 @@ fn layout_children(
             (content_rect.size.width - child_style.margin.horizontal()).max(0.0),
             (content_rect.size.height - child_style.margin.vertical()).max(0.0),
         );
-        let measured = measure_element(child, &child_style, child_available, stylesheet, states);
+        let measured =
+            measure_intrinsic_element(child, &child_style, child_available, stylesheet, states);
+        let outer_width = measured.width + child_style.margin.horizontal();
+        let outer_height = measured.height + child_style.margin.vertical();
+
+        if style.direction == Direction::Row
+            && style.wrap
+            && cursor.x > content_rect.origin.x
+            && cursor.x + outer_width > content_rect.right()
+        {
+            cursor.x = content_rect.origin.x;
+            cursor.y += line_height + style.gap;
+            line_height = 0.0;
+        }
+
         let child_rect = Rect::new(
             cursor.x,
             cursor.y,
@@ -105,11 +120,10 @@ fn layout_children(
         ));
 
         match style.direction {
-            Direction::Column => {
-                cursor.y += measured.height + child_style.margin.vertical() + style.gap
-            }
+            Direction::Column => cursor.y += outer_height + style.gap,
             Direction::Row => {
-                cursor.x += measured.width + child_style.margin.horizontal() + style.gap
+                cursor.x += outer_width + style.gap;
+                line_height = line_height.max(outer_height);
             }
         }
     }
@@ -134,10 +148,11 @@ fn measure_element(
             Size::new(width.max(style.min_size.width), 18.0)
         }
         _ => {
-            let content = measure_children(element, style, parent_size, stylesheet, states);
+            let content_parent_size = measurement_content_size(style, parent_size);
+            let content = measure_children(element, style, content_parent_size, stylesheet, states);
             Size::new(
-                content.width + style.padding.horizontal() + style.border_width * 2.0,
-                content.height + style.padding.vertical() + style.border_width * 2.0,
+                content.width + style.padding.horizontal() + style.border_width.horizontal(),
+                content.height + style.padding.vertical() + style.border_width.vertical(),
             )
         }
     };
@@ -154,6 +169,64 @@ fn measure_element(
     )
 }
 
+fn measure_intrinsic_element(
+    element: &Element,
+    style: &ComputedStyle,
+    parent_size: Size,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+) -> Size {
+    let auto_size = match element.spec.role {
+        ElementRole::Text => {
+            let width = element
+                .text
+                .as_ref()
+                .map(|text| text.chars().count() as f32 * 7.5)
+                .unwrap_or_default();
+            Size::new(width.max(style.min_size.width), 18.0)
+        }
+        _ => {
+            let content_parent_size = measurement_content_size(style, parent_size);
+            let content = measure_children(element, style, content_parent_size, stylesheet, states);
+            Size::new(
+                content.width + style.padding.horizontal() + style.border_width.horizontal(),
+                content.height + style.padding.vertical() + style.border_width.vertical(),
+            )
+        }
+    };
+
+    Size::new(
+        style
+            .width
+            .resolve_intrinsic(parent_size.width, auto_size.width)
+            .max(style.min_size.width),
+        style
+            .height
+            .resolve_intrinsic(parent_size.height, auto_size.height)
+            .max(style.min_size.height),
+    )
+}
+
+fn measurement_content_size(style: &ComputedStyle, parent_size: Size) -> Size {
+    let width = match style.width {
+        Length::Auto => parent_size.width,
+        width => width
+            .resolve_intrinsic(parent_size.width, parent_size.width)
+            .max(style.min_size.width),
+    };
+    let height = match style.height {
+        Length::Auto => parent_size.height,
+        height => height
+            .resolve_intrinsic(parent_size.height, parent_size.height)
+            .max(style.min_size.height),
+    };
+
+    Size::new(
+        (width - style.padding.horizontal() - style.border_width.horizontal()).max(0.0),
+        (height - style.padding.vertical() - style.border_width.vertical()).max(0.0),
+    )
+}
+
 fn measure_children(
     element: &Element,
     style: &ComputedStyle,
@@ -161,6 +234,10 @@ fn measure_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
 ) -> Size {
+    if style.direction == Direction::Row && style.wrap {
+        return measure_wrapped_children(element, style, parent_size, stylesheet, states);
+    }
+
     let mut width: f32 = 0.0;
     let mut height: f32 = 0.0;
     let child_count = element.children.len();
@@ -171,7 +248,8 @@ fn measure_children(
             (parent_size.width - child_style.margin.horizontal()).max(0.0),
             (parent_size.height - child_style.margin.vertical()).max(0.0),
         );
-        let child_size = measure_element(child, &child_style, child_available, stylesheet, states);
+        let child_size =
+            measure_intrinsic_element(child, &child_style, child_available, stylesheet, states);
         let outer_width = child_size.width + child_style.margin.horizontal();
         let outer_height = child_size.height + child_style.margin.vertical();
         match style.direction {
@@ -194,7 +272,56 @@ fn measure_children(
         }
     }
 
-    Size::new(width.min(parent_size.width), height)
+    Size::new(width, height)
+}
+
+fn measure_wrapped_children(
+    element: &Element,
+    style: &ComputedStyle,
+    parent_size: Size,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+) -> Size {
+    let mut width: f32 = 0.0;
+    let mut height: f32 = 0.0;
+    let mut line_width: f32 = 0.0;
+    let mut line_height: f32 = 0.0;
+    let mut line_has_child = false;
+
+    for child in &element.children {
+        let child_style = resolve_style(child, stylesheet, states.get(&child.id));
+        let child_available = Size::new(
+            (parent_size.width - child_style.margin.horizontal()).max(0.0),
+            (parent_size.height - child_style.margin.vertical()).max(0.0),
+        );
+        let child_size =
+            measure_intrinsic_element(child, &child_style, child_available, stylesheet, states);
+        let outer_width = child_size.width + child_style.margin.horizontal();
+        let outer_height = child_size.height + child_style.margin.vertical();
+        let next_width = if line_has_child {
+            line_width + style.gap + outer_width
+        } else {
+            outer_width
+        };
+
+        if line_has_child && next_width > parent_size.width {
+            width = width.max(line_width);
+            height += line_height + style.gap;
+            line_width = outer_width;
+            line_height = outer_height;
+        } else {
+            line_width = next_width;
+            line_height = line_height.max(outer_height);
+            line_has_child = true;
+        }
+    }
+
+    if line_has_child {
+        width = width.max(line_width);
+        height += line_height;
+    }
+
+    Size::new(width, height)
 }
 
 pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {

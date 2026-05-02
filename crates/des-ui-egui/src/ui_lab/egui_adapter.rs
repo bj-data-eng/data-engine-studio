@@ -1,5 +1,6 @@
 use des_ui_document::{
-    Color, DocumentInput, Overflow, Point, PointerInput, Rect, ResolvedElement, ScrollChrome,
+    Color, CornerRadii, DocumentInput, Insets, Overflow, Point, PointerInput, Rect,
+    ResolvedElement, ScrollChrome,
 };
 use eframe::egui;
 
@@ -36,15 +37,20 @@ fn paint_frame_clipped(
         );
 
         if let Some(color) = frame.style.background {
-            painter.rect_filled(rect, frame.style.radius, to_egui_color(color));
+            painter.rect_filled(
+                rect,
+                to_egui_radius(frame.style.radius),
+                to_egui_color(color),
+            );
         }
 
         if let Some(color) = frame.style.border {
-            painter.rect_stroke(
+            paint_border(
+                &painter,
                 rect,
                 frame.style.radius,
-                egui::Stroke::new(frame.style.border_width, to_egui_color(color)),
-                egui::StrokeKind::Inside,
+                frame.style.border_width,
+                color,
             );
         }
 
@@ -71,12 +77,12 @@ fn paint_frame_clipped(
         );
         let content_rect = egui::Rect::from_min_max(
             egui::pos2(
-                rect.left() + frame.style.border_width + frame.style.padding.left,
-                rect.top() + frame.style.border_width + frame.style.padding.top,
+                rect.left() + frame.style.border_width.left + frame.style.padding.left,
+                rect.top() + frame.style.border_width.top + frame.style.padding.top,
             ),
             egui::pos2(
-                rect.right() - frame.style.border_width - frame.style.padding.right,
-                rect.bottom() - frame.style.border_width - frame.style.padding.bottom,
+                rect.right() - frame.style.border_width.right - frame.style.padding.right,
+                rect.bottom() - frame.style.border_width.bottom - frame.style.padding.bottom,
             ),
         );
         clip_rect.intersect(content_rect)
@@ -85,6 +91,68 @@ fn paint_frame_clipped(
     };
     for child in children {
         paint_frame_clipped(ui, origin, child, next_clip);
+    }
+}
+
+fn paint_border(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    radius: CornerRadii,
+    widths: Insets,
+    color: Color,
+) {
+    let color = to_egui_color(color);
+    if widths.is_uniform() {
+        if widths.top > 0.0 {
+            painter.rect_stroke(
+                rect,
+                to_egui_radius(radius),
+                egui::Stroke::new(widths.top, color),
+                egui::StrokeKind::Inside,
+            );
+        }
+        return;
+    }
+
+    if widths.top > 0.0 {
+        painter.rect_filled(
+            egui::Rect::from_min_max(
+                rect.left_top(),
+                egui::pos2(rect.right(), rect.top() + widths.top),
+            ),
+            0.0,
+            color,
+        );
+    }
+    if widths.right > 0.0 {
+        painter.rect_filled(
+            egui::Rect::from_min_max(
+                egui::pos2(rect.right() - widths.right, rect.top()),
+                rect.right_bottom(),
+            ),
+            0.0,
+            color,
+        );
+    }
+    if widths.bottom > 0.0 {
+        painter.rect_filled(
+            egui::Rect::from_min_max(
+                egui::pos2(rect.left(), rect.bottom() - widths.bottom),
+                rect.right_bottom(),
+            ),
+            0.0,
+            color,
+        );
+    }
+    if widths.left > 0.0 {
+        painter.rect_filled(
+            egui::Rect::from_min_max(
+                rect.left_top(),
+                egui::pos2(rect.left() + widths.left, rect.bottom()),
+            ),
+            0.0,
+            color,
+        );
     }
 }
 
@@ -133,4 +201,13 @@ fn document_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
 
 fn to_egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
+}
+
+fn to_egui_radius(radius: CornerRadii) -> egui::CornerRadius {
+    egui::CornerRadius {
+        nw: radius.top_left.round().clamp(0.0, 255.0) as u8,
+        ne: radius.top_right.round().clamp(0.0, 255.0) as u8,
+        se: radius.bottom_right.round().clamp(0.0, 255.0) as u8,
+        sw: radius.bottom_left.round().clamp(0.0, 255.0) as u8,
+    }
 }

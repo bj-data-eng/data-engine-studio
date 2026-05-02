@@ -19,11 +19,12 @@ pub use element::{
     ElementStateSelector,
 };
 pub use engine::DocumentEngine;
-pub use geometry::{Direction, Insets, Length, Overflow, Point, Rect, Size};
+pub use geometry::{CornerRadii, Direction, Insets, Length, Overflow, Point, Rect, Size};
 pub use state::{
     ChangeSet, DocumentInput, DocumentOutput, ElementState, PointerInput, ResolvedElement,
     ScrollChrome,
 };
 pub use style::{
-    ComputedStyle, Easing, StylePatch, StyleRule, StyleSelector, StyleSheet, Transition,
+    ComputedStyle, CornerStyle, Easing, EdgeStyle, Style, StyleRule, StyleSelector, StyleSheet,
+    Transition,
 };

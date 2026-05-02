@@ -5,7 +5,7 @@ use crate::graphics_testing::{
 };
 use des_ui_document::{
     Document, DocumentEngine, DocumentOutput, ElementRole, ElementSpec, Insets, Length,
-    ResolvedElement, Size, StylePatch, StyleSelector, StyleSheet,
+    ResolvedElement, Size, Style, StyleSelector, StyleSheet,
 };
 use egui_kittest::Harness;
 
@@ -150,8 +150,8 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     assert_close(frame(&output, "box-min-subject").rect.size.width, 40.0);
     assert_close(frame(&output, "box-min-subject").rect.size.height, 40.0);
 
-    assert_close(frame(&output, "box-fill-subject").rect.size.width, 292.0);
-    assert_close(frame(&output, "box-percent-subject").rect.size.width, 146.0);
+    assert_close(frame(&output, "box-fill-subject").rect.size.width, 298.0);
+    assert_close(frame(&output, "box-percent-subject").rect.size.width, 149.0);
     assert_close(
         frame(&output, "box-height-fill-subject").rect.size.height,
         84.0,
@@ -170,7 +170,10 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
 
     assert_close(frame(&output, "box-padding-subject").rect.size.width, 36.0);
     assert_close(frame(&output, "box-padding-subject").rect.size.height, 36.0);
-    assert_close(frame(&output, "box-border-subject").style.border_width, 5.0);
+    assert_close(
+        frame(&output, "box-border-subject").style.border_width.top,
+        5.0,
+    );
     assert_close(frame(&output, "box-border-subject").rect.size.width, 44.0);
     assert_close(frame(&output, "box-border-subject").rect.size.height, 44.0);
 
@@ -256,7 +259,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::id("outer"),
-            StylePatch::default()
+            Style::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .margin(Insets::all(8.0))
@@ -264,7 +267,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         )
         .rule(
             StyleSelector::id("inner"),
-            StylePatch::default()
+            Style::default()
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .padding(Insets::all(5.0))
@@ -273,7 +276,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         )
         .rule(
             StyleSelector::class("row"),
-            StylePatch::default()
+            Style::default()
                 .direction(des_ui_document::Direction::Row)
                 .width(Length::Auto)
                 .height(Length::Auto)
@@ -281,7 +284,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         )
         .rule(
             StyleSelector::class("cell"),
-            StylePatch::default().size(10.0, 10.0),
+            Style::default().size(10.0, 10.0),
         );
     let document = Document::build(Size::new(240.0, 160.0), |ui| {
         ui.element("outer", ElementSpec::new(ElementRole::Panel), |ui| {

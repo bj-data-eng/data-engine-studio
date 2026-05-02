@@ -104,6 +104,45 @@ impl Insets {
     pub fn vertical(self) -> f32 {
         self.top + self.bottom
     }
+
+    pub fn is_uniform(self) -> bool {
+        self.top == self.right && self.top == self.bottom && self.top == self.left
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CornerRadii {
+    pub top_left: f32,
+    pub top_right: f32,
+    pub bottom_right: f32,
+    pub bottom_left: f32,
+}
+
+impl CornerRadii {
+    pub const ZERO: Self = Self {
+        top_left: 0.0,
+        top_right: 0.0,
+        bottom_right: 0.0,
+        bottom_left: 0.0,
+    };
+
+    pub fn all(value: f32) -> Self {
+        Self {
+            top_left: value,
+            top_right: value,
+            bottom_right: value,
+            bottom_left: value,
+        }
+    }
+
+    pub fn corners(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self {
+        Self {
+            top_left,
+            top_right,
+            bottom_right,
+            bottom_left,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -133,6 +172,16 @@ impl Length {
             Self::Px(value) => value,
             Self::Fill => available,
             Self::Percent(factor) => available * factor,
+        }
+        .max(0.0)
+    }
+
+    pub(crate) fn resolve_intrinsic(self, available: f32, auto: f32) -> f32 {
+        match self {
+            Self::Fill => auto,
+            Self::Percent(factor) => available * factor,
+            Self::Auto => auto,
+            Self::Px(value) => value,
         }
         .max(0.0)
     }

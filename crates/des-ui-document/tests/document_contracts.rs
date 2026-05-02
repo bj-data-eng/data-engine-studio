@@ -1,6 +1,6 @@
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentInput, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector, Insets, Length, Overflow, Point, PointerInput, Size, StylePatch,
+    Color, CornerRadii, Document, DocumentEngine, DocumentInput, ElementId, ElementRole,
+    ElementSpec, ElementStateSelector, Insets, Length, Overflow, Point, PointerInput, Size, Style,
     StyleSelector, StyleSheet, Transition,
 };
 
@@ -45,19 +45,19 @@ fn style_rules_resolve_role_class_state_and_id_in_order() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::Role(ElementRole::Card),
-            StylePatch::default()
+            Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20)),
         )
         .rule(
             StyleSelector::class("selected"),
-            StylePatch::default().background(Color::rgb(35, 56, 78)),
+            Style::default().background(Color::rgb(35, 56, 78)),
         )
         .rule(
             StyleSelector::State(ElementStateSelector::Hovered),
-            StylePatch::default().background(Color::rgb(40, 70, 95)),
+            Style::default().background(Color::rgb(40, 70, 95)),
         )
-        .rule(StyleSelector::id("card"), StylePatch::default().radius(7.0));
+        .rule(StyleSelector::id("card"), Style::default().radius(7.0));
     let document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.element(
             "card",
@@ -84,7 +84,53 @@ fn style_rules_resolve_role_class_state_and_id_in_order() {
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
-    assert_eq!(card.style.radius, 7.0);
+    assert_eq!(card.style.radius, CornerRadii::all(7.0));
+}
+
+#[test]
+fn border_and_radius_rules_can_target_individual_sides_and_corners() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("card"),
+            Style::default()
+                .size(120.0, 80.0)
+                .border_width(2.0)
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::id("card"),
+            Style::default()
+                .border_left_width(8.0)
+                .border_bottom_width(5.0)
+                .top_right_radius(14.0)
+                .bottom_left_radius(0.0),
+        );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.element("card", ElementSpec::new(ElementRole::Card), |_| {});
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(
+        card.style.border_width,
+        Insets {
+            top: 2.0,
+            right: 2.0,
+            bottom: 5.0,
+            left: 8.0,
+        }
+    );
+    assert_eq!(
+        card.style.radius,
+        CornerRadii {
+            top_left: 4.0,
+            top_right: 14.0,
+            bottom_right: 4.0,
+            bottom_left: 0.0,
+        }
+    );
 }
 
 #[test]
@@ -93,14 +139,14 @@ fn transitioned_state_rules_ease_visual_style_properties() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::Role(ElementRole::Card),
-            StylePatch::default()
+            Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20))
                 .transition(Transition::ease_out(0.24)),
         )
         .rule(
             StyleSelector::State(ElementStateSelector::Hovered),
-            StylePatch::default().background(Color::rgb(40, 70, 95)),
+            Style::default().background(Color::rgb(40, 70, 95)),
         );
     let document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.element(
@@ -158,11 +204,11 @@ fn column_layout_applies_padding_gap_and_margin() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::id("catalog"),
-            StylePatch::default().padding(Insets::all(10.0)).gap(4.0),
+            Style::default().padding(Insets::all(10.0)).gap(4.0),
         )
         .rule(
             StyleSelector::class("indented"),
-            StylePatch::default().margin(Insets::symmetric(3.0, 2.0)),
+            Style::default().margin(Insets::symmetric(3.0, 2.0)),
         );
     let document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.element("catalog", ElementSpec::new(ElementRole::Panel), |ui| {
@@ -189,14 +235,14 @@ fn fill_width_uses_parent_content_width_after_box_model() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::id("panel"),
-            StylePatch::default()
+            Style::default()
                 .size(200.0, 120.0)
                 .border_width(2.0)
                 .padding(Insets::symmetric(12.0, 8.0)),
         )
         .rule(
             StyleSelector::id("row"),
-            StylePatch::default()
+            Style::default()
                 .width_fill()
                 .height(Length::Px(24.0))
                 .margin(Insets::symmetric(3.0, 0.0)),
@@ -215,11 +261,87 @@ fn fill_width_uses_parent_content_width_after_box_model() {
 }
 
 #[test]
+fn wrapped_row_layout_rearranges_children_and_expands_container_height() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .direction(des_ui_document::Direction::Row)
+                .wrap(true)
+                .width(Length::Px(120.0))
+                .height(Length::Auto)
+                .gap(10.0),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default().size(50.0, 20.0),
+        );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.element("row", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element(
+                "item-0",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+            ui.element(
+                "item-1",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+            ui.element(
+                "item-2",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let row = output.layout.find("row").unwrap();
+    let item_0 = output.layout.find("item-0").unwrap();
+    let item_1 = output.layout.find("item-1").unwrap();
+    let item_2 = output.layout.find("item-2").unwrap();
+
+    assert_eq!(row.rect.size, Size::new(120.0, 50.0));
+    assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
+    assert_eq!(item_1.rect.origin, Point::new(60.0, 0.0));
+    assert_eq!(item_2.rect.origin, Point::new(0.0, 30.0));
+}
+
+#[test]
+fn fill_size_does_not_inflate_auto_sized_parent_during_intrinsic_measurement() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default().width(Length::Auto).height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::id("child"),
+            Style::default()
+                .width_fill()
+                .height_fill()
+                .min_size(24.0, 24.0),
+        );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("child", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let panel = output.layout.find("panel").unwrap();
+
+    assert_eq!(panel.rect.size, Size::new(24.0, 24.0));
+}
+
+#[test]
 fn pointer_input_targets_interactive_owner_instead_of_inner_text() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::Role(ElementRole::Card),
-        StylePatch::default().size(100.0, 40.0),
+        Style::default().size(100.0, 40.0),
     );
     let document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.element(
@@ -263,7 +385,7 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::id("scroll-panel"),
-            StylePatch::default()
+            Style::default()
                 .size(180.0, 80.0)
                 .padding(Insets::all(8.0))
                 .gap(4.0)
@@ -272,7 +394,7 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
         )
         .rule(
             StyleSelector::Role(ElementRole::Card),
-            StylePatch::default().size(120.0, 36.0),
+            Style::default().size(120.0, 36.0),
         );
     let document = overflowing_scroll_document();
 
@@ -452,7 +574,7 @@ fn probe_stylesheet() -> StyleSheet {
     StyleSheet::new()
         .rule(
             StyleSelector::class("catalog"),
-            StylePatch::default()
+            Style::default()
                 .size(180.0, 40.0)
                 .padding(Insets::all(12.0))
                 .gap(8.0)
@@ -460,7 +582,7 @@ fn probe_stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::Role(ElementRole::Card),
-            StylePatch::default().size(180.0, 48.0),
+            Style::default().size(180.0, 48.0),
         )
 }
 
@@ -468,7 +590,7 @@ fn scroll_fixture_stylesheet(panel_height: f32) -> StyleSheet {
     StyleSheet::new()
         .rule(
             StyleSelector::id("scroll-panel"),
-            StylePatch::default()
+            Style::default()
                 .size(180.0, panel_height)
                 .padding(Insets::all(8.0))
                 .gap(4.0)
@@ -476,7 +598,7 @@ fn scroll_fixture_stylesheet(panel_height: f32) -> StyleSheet {
         )
         .rule(
             StyleSelector::Role(ElementRole::Card),
-            StylePatch::default().size(140.0, 32.0),
+            Style::default().size(140.0, 32.0),
         )
 }
 

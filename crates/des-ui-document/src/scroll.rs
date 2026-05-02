@@ -1,5 +1,5 @@
 use crate::element::ElementId;
-use crate::geometry::{Insets, Overflow, Rect};
+use crate::geometry::{Overflow, Rect};
 use crate::state::{ElementState, ResolvedElement, ScrollChrome};
 use std::collections::HashMap;
 
@@ -50,7 +50,7 @@ fn scroll_chrome_for_frame(
     let visual_width = if expanded { BAR_WIDTH } else { IDLE_WIDTH };
     let viewport_rect = frame
         .rect
-        .inset(Insets::all(frame.style.border_width))
+        .inset(frame.style.border_width)
         .inset(frame.style.padding);
     let content_height = viewport_rect.size.height + max_scroll;
     let handle_height = if content_height <= f32::EPSILON {

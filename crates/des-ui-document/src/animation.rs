@@ -1,4 +1,5 @@
 use crate::element::{Color, Element, ElementId};
+use crate::geometry::{CornerRadii, Insets};
 use crate::state::ElementState;
 use crate::style::{ComputedStyle, StyleSheet, Transition, resolve_style};
 use std::collections::HashMap;
@@ -59,13 +60,16 @@ fn eased_style(
     }
     animating |= next.text_color != target.text_color;
 
-    next.border_width = ease_f32(
+    next.border_width = ease_insets(
         current.border_width,
         target.border_width,
         amount,
         snap_epsilon,
     );
-    animating |= (next.border_width - target.border_width).abs() > snap_epsilon;
+    animating |= next.border_width != target.border_width;
+
+    next.radius = ease_corner_radii(current.radius, target.radius, amount, snap_epsilon);
+    animating |= next.radius != target.radius;
 
     (next, animating)
 }
@@ -119,5 +123,38 @@ fn ease_f32(current: f32, target: f32, amount: f32, snap_epsilon: f32) -> f32 {
         target
     } else {
         next
+    }
+}
+
+fn ease_insets(current: Insets, target: Insets, amount: f32, snap_epsilon: f32) -> Insets {
+    Insets {
+        top: ease_f32(current.top, target.top, amount, snap_epsilon),
+        right: ease_f32(current.right, target.right, amount, snap_epsilon),
+        bottom: ease_f32(current.bottom, target.bottom, amount, snap_epsilon),
+        left: ease_f32(current.left, target.left, amount, snap_epsilon),
+    }
+}
+
+fn ease_corner_radii(
+    current: CornerRadii,
+    target: CornerRadii,
+    amount: f32,
+    snap_epsilon: f32,
+) -> CornerRadii {
+    CornerRadii {
+        top_left: ease_f32(current.top_left, target.top_left, amount, snap_epsilon),
+        top_right: ease_f32(current.top_right, target.top_right, amount, snap_epsilon),
+        bottom_right: ease_f32(
+            current.bottom_right,
+            target.bottom_right,
+            amount,
+            snap_epsilon,
+        ),
+        bottom_left: ease_f32(
+            current.bottom_left,
+            target.bottom_left,
+            amount,
+            snap_epsilon,
+        ),
     }
 }

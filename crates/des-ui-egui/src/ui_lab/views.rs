@@ -120,24 +120,24 @@ fn render_layout_view(
                     ui,
                     "box-auto",
                     "Auto",
-                    "content-sized",
-                    ".box-subject-auto { width:auto; height:auto }",
+                    "content-sized container",
+                    "width: Auto; height: Auto",
                     "box-subject-auto",
                 );
                 box_model_case(
                     ui,
                     "box-px",
-                    "Px size",
-                    "96 x 44",
-                    ".box-subject-px { width:96px; height:44px }",
+                    "Fixed size",
+                    "width 96 pixels, height 44 pixels",
+                    "width: Px(96); height: Px(44)",
                     "box-subject-px",
                 );
                 box_model_case(
                     ui,
                     "box-min",
                     "Min size",
-                    "empty -> min",
-                    ".box-subject-min { auto; min-size:40px }",
+                    "empty element expands to minimum size",
+                    "width: Auto; height: Auto; minimum size: 40 by 40",
                     "box-subject-min",
                 );
             });
@@ -146,24 +146,24 @@ fn render_layout_view(
                     ui,
                     "box-fill",
                     "Width fill",
-                    "parent content",
-                    ".box-subject-fill { width:fill; height:28px }",
+                    "fills parent content width",
+                    "width: Fill; height: Px(28)",
                     "box-subject-fill",
                 );
                 box_model_case(
                     ui,
                     "box-percent",
                     "Width 50%",
-                    "parent content",
-                    ".box-subject-percent { width:50%; height:28px }",
+                    "resolves from parent content width",
+                    "width: Percent(0.5); height: Px(28)",
                     "box-subject-percent",
                 );
                 box_model_case(
                     ui,
                     "box-height-fill",
                     "Height fill",
-                    "parent content",
-                    ".box-subject-height-fill { width:64px; height:fill }",
+                    "fills parent content height",
+                    "width: Px(64); height: Fill",
                     "box-subject-height-fill",
                 );
             });
@@ -172,24 +172,24 @@ fn render_layout_view(
                     ui,
                     "box-margin",
                     "Margin",
-                    "12px outside",
-                    ".box-subject-margin { size:32px; margin:12px }",
+                    "12 pixels outside the border box",
+                    "size: 32 by 32; margin: all sides 12",
                     "box-subject-margin",
                 );
                 box_model_case(
                     ui,
                     "box-padding",
                     "Padding",
-                    "12px inside",
-                    ".box-subject-padding { auto; padding:12px }",
+                    "12 pixels inside the border box",
+                    "width: Auto; height: Auto; padding: all sides 12",
                     "box-subject-padding",
                 );
                 box_model_case(
                     ui,
                     "box-border",
                     "Border",
-                    "5px inside",
-                    ".box-subject-border { size:44px; border:5px }",
+                    "5 pixels on every side",
+                    "size: 44 by 44; border width: all sides 5",
                     "box-subject-border",
                 );
             });
@@ -199,7 +199,7 @@ fn render_layout_view(
                     "box-row-gap",
                     "Row gap",
                     "3 children",
-                    ".box-subject-row-gap { row; auto; gap:10px }",
+                    "direction: Row; width: Auto; height: Auto; gap: 10",
                     "box-subject-row-gap",
                 );
                 box_model_case(
@@ -207,7 +207,7 @@ fn render_layout_view(
                     "box-column-gap",
                     "Column gap",
                     "3 children",
-                    ".box-subject-column-gap { column; auto; gap:6px }",
+                    "direction: Column; width: Auto; height: Auto; gap: 6",
                     "box-subject-column-gap",
                 );
                 box_model_case(
@@ -215,7 +215,7 @@ fn render_layout_view(
                     "box-visible-overflow",
                     "Overflow visible",
                     "unclipped child",
-                    ".box-subject-visible-overflow { size:44px; overflow:visible }",
+                    "size: 44 by 44; vertical overflow: Visible",
                     "box-subject-visible-overflow",
                 );
             });
@@ -225,8 +225,16 @@ fn render_layout_view(
                     "box-scroll-overflow",
                     "Overflow scroll",
                     "clipped content",
-                    ".box-subject-scroll-overflow { size:44px; overflow:scroll }",
+                    "size: 44 by 44; vertical overflow: Scroll",
                     "box-subject-scroll-overflow",
+                );
+                box_model_case(
+                    ui,
+                    "box-side-radius",
+                    "Side + corner overrides",
+                    "CSS-like layered edges",
+                    "base: border width all sides 2; radius all corners 4 | override: left border width 8; bottom border width 5 | override: top-right radius 14; bottom-left radius 0",
+                    "box-subject-side-radius",
                 );
             });
             box_model_section_label(ui, "box-combo-title", "Nested Awareness");
@@ -236,7 +244,7 @@ fn render_layout_view(
                     "box-nested-nine",
                     "Nested auto grid",
                     "outer margin + inner border",
-                    ".outer:auto margin8 border3; .inner:auto padding5 border2",
+                    "outer: Auto size; margin all sides 8; border width all sides 3 | inner: Auto size; padding all sides 5; border width all sides 2",
                     "box-subject-nested-nine",
                 );
                 box_model_case(
@@ -244,7 +252,7 @@ fn render_layout_view(
                     "box-inset-percent",
                     "Percent insets",
                     "child resolves from content rect",
-                    ".parent:88px padding8 border2; .child:50%",
+                    "parent: size 88 by 88; padding all sides 8; border width all sides 2 | child: width Percent(0.5); height Percent(0.5)",
                     "box-subject-inset-percent",
                 );
             });
@@ -298,11 +306,13 @@ fn box_model_case(
                 ElementSpec::new(ElementRole::Text).class("box-note"),
                 note,
             );
-            ui.text_element(
-                format!("{id}-rule"),
-                ElementSpec::new(ElementRole::Text).class("box-rule"),
-                rule_text,
-            );
+            for (line_index, line) in rule_text.split(" | ").enumerate() {
+                ui.text_element(
+                    format!("{id}-rule-{line_index}"),
+                    ElementSpec::new(ElementRole::Text).class("box-rule"),
+                    line,
+                );
+            }
             ui.element(
                 format!("{id}-frame"),
                 ElementSpec::new(ElementRole::Panel).class("box-subject-frame"),
