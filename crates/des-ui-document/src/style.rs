@@ -1,6 +1,6 @@
 use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
 use crate::geometry::{
-    AlignItems, CornerRadii, Direction, Insets, JustifyContent, Length, Overflow, Position,
+    AlignItems, CornerRadii, Direction, Insets, JustifyContent, Length, Overflow, Point, Position,
     PositionInsets, Size,
 };
 use crate::state::ElementState;
@@ -110,6 +110,35 @@ impl Transition {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AnchorPlacement {
+    TopStart,
+    TopEnd,
+    BottomStart,
+    BottomEnd,
+    LeftStart,
+    LeftEnd,
+    RightStart,
+    RightEnd,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Anchor {
+    pub target: ElementId,
+    pub placement: AnchorPlacement,
+    pub offset: Point,
+}
+
+impl Anchor {
+    pub fn new(target: impl Into<ElementId>, placement: AnchorPlacement, offset: Point) -> Self {
+        Self {
+            target: target.into(),
+            placement,
+            offset,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Style {
     pub direction: Option<Direction>,
@@ -148,6 +177,7 @@ pub struct Style {
     pub scrollbar_radius: Option<f32>,
     pub position: Option<Position>,
     pub inset: PositionInsets,
+    pub anchor: Option<Anchor>,
     pub z_index: Option<i32>,
     pub transition: Option<Transition>,
 }
@@ -518,6 +548,25 @@ impl Style {
         self
     }
 
+    pub fn anchor(mut self, anchor: Anchor) -> Self {
+        self.anchor = Some(anchor);
+        self
+    }
+
+    pub fn anchor_bottom_start(
+        mut self,
+        target: impl Into<ElementId>,
+        offset_x: f32,
+        offset_y: f32,
+    ) -> Self {
+        self.anchor = Some(Anchor::new(
+            target,
+            AnchorPlacement::BottomStart,
+            Point::new(offset_x, offset_y),
+        ));
+        self
+    }
+
     pub fn z_index(mut self, z_index: i32) -> Self {
         self.z_index = Some(z_index);
         self
@@ -567,6 +616,7 @@ pub struct ComputedStyle {
     pub scrollbar_radius: f32,
     pub position: Position,
     pub inset: PositionInsets,
+    pub anchor: Option<Anchor>,
     pub z_index: i32,
     pub transition: Option<Transition>,
 }
@@ -610,6 +660,7 @@ impl Default for ComputedStyle {
             scrollbar_radius: 6.0,
             position: Position::Flow,
             inset: PositionInsets::ZERO,
+            anchor: None,
             z_index: 0,
             transition: None,
         }
@@ -753,6 +804,9 @@ impl ComputedStyle {
         if let Some(value) = style.inset.left {
             self.inset.left = Some(value);
         }
+        if let Some(value) = &style.anchor {
+            self.anchor = Some(value.clone());
+        }
         if let Some(value) = style.z_index {
             self.z_index = value;
         }
@@ -869,6 +923,7 @@ fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle)
         || previous.overflow_y != next.overflow_y
         || previous.position != next.position
         || previous.inset != next.inset
+        || previous.anchor != next.anchor
 }
 
 fn selector_matches(

@@ -3,7 +3,7 @@ use crate::geometry::{
     AlignItems, Direction, JustifyContent, Length, Overflow, Point, Position, Rect, Size,
 };
 use crate::state::{ElementState, ResolvedElement};
-use crate::style::{ComputedStyle, StyleSheet, resolve_style};
+use crate::style::{AnchorPlacement, ComputedStyle, StyleSheet, resolve_style};
 use std::collections::HashMap;
 
 pub(crate) fn layout_element(
@@ -13,6 +13,7 @@ pub(crate) fn layout_element(
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
 ) -> ResolvedElement {
+    let anchors = HashMap::new();
     layout_element_in_viewport(
         element,
         parent_rect,
@@ -20,6 +21,7 @@ pub(crate) fn layout_element(
         stylesheet,
         states,
         scroll_limits,
+        &anchors,
     )
 }
 
@@ -30,6 +32,7 @@ fn layout_element_in_viewport(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    anchors: &HashMap<ElementId, Rect>,
 ) -> ResolvedElement {
     let style = computed_style_for(element, stylesheet, states);
     let rect = element_rect(
@@ -39,6 +42,7 @@ fn layout_element_in_viewport(
         viewport_rect,
         stylesheet,
         states,
+        anchors,
     );
     let inner_rect = rect.inset(style.border_width);
     let mut content_rect = inner_rect.inset(style.padding);
@@ -68,6 +72,7 @@ fn layout_element_in_viewport(
         stylesheet,
         states,
         scroll_limits,
+        anchors,
     );
 
     ResolvedElement {
@@ -102,6 +107,7 @@ fn element_rect(
     viewport_rect: Rect,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    anchors: &HashMap<ElementId, Rect>,
 ) -> Rect {
     if element.spec.role == ElementRole::Root {
         return parent_rect;
@@ -109,6 +115,11 @@ fn element_rect(
 
     let measured = measure_element(element, style, parent_rect.size, stylesheet, states);
     if style.position != Position::Flow {
+        if let Some(anchor) = &style.anchor {
+            if let Some(anchor_rect) = anchors.get(&anchor.target) {
+                return anchored_rect(style, *anchor_rect, measured);
+            }
+        }
         let containing_rect = match style.position {
             Position::Flow => parent_rect,
             Position::AbsoluteParent => parent_rect,
@@ -133,6 +144,7 @@ fn layout_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
     if style.direction == Direction::Row && style.wrap {
         return layout_wrapped_children(
@@ -143,6 +155,7 @@ fn layout_children(
             stylesheet,
             states,
             scroll_limits,
+            anchors,
         );
     }
 
@@ -176,19 +189,12 @@ fn layout_children(
         free_main,
         flow_child_count,
     );
-    let mut frames = Vec::with_capacity(element.children.len());
+    let mut frames = vec![None; element.children.len()];
+    let mut child_anchors = anchors.clone();
 
-    for (child, metrics) in element.children.iter().zip(flow_metrics) {
+    for (index, (child, metrics)) in element.children.iter().zip(flow_metrics.iter()).enumerate() {
         let child_style = computed_style_for(child, stylesheet, states);
         if child_style.position != Position::Flow {
-            frames.push(layout_element_in_viewport(
-                child,
-                content_rect,
-                viewport_rect,
-                stylesheet,
-                states,
-                scroll_limits,
-            ));
             continue;
         }
 
@@ -204,19 +210,39 @@ fn layout_children(
             cursor_cross,
             metrics.available,
         );
-        frames.push(layout_element_in_viewport(
+        let frame = layout_element_in_viewport(
             child,
             child_rect,
             viewport_rect,
             stylesheet,
             states,
             scroll_limits,
-        ));
+            &child_anchors,
+        );
+        collect_frame_rects(&frame, &mut child_anchors);
+        frames[index] = Some(frame);
 
         cursor_main += outer_main + gap;
     }
 
-    frames
+    for (index, child) in element.children.iter().enumerate() {
+        if frames[index].is_some() {
+            continue;
+        }
+        let frame = layout_element_in_viewport(
+            child,
+            content_rect,
+            viewport_rect,
+            stylesheet,
+            states,
+            scroll_limits,
+            &child_anchors,
+        );
+        collect_frame_rects(&frame, &mut child_anchors);
+        frames[index] = Some(frame);
+    }
+
+    frames.into_iter().flatten().collect()
 }
 
 fn layout_wrapped_children(
@@ -227,22 +253,16 @@ fn layout_wrapped_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
     let mut cursor = content_rect.origin;
     let mut line_height: f32 = 0.0;
-    let mut frames = Vec::with_capacity(element.children.len());
+    let mut frames = vec![None; element.children.len()];
+    let mut child_anchors = anchors.clone();
 
-    for child in &element.children {
+    for (index, child) in element.children.iter().enumerate() {
         let child_style = computed_style_for(child, stylesheet, states);
         if child_style.position != Position::Flow {
-            frames.push(layout_element_in_viewport(
-                child,
-                content_rect,
-                viewport_rect,
-                stylesheet,
-                states,
-                scroll_limits,
-            ));
             continue;
         }
 
@@ -261,20 +281,47 @@ fn layout_wrapped_children(
             metrics.available.width,
             metrics.available.height,
         );
-        frames.push(layout_element_in_viewport(
+        let frame = layout_element_in_viewport(
             child,
             child_rect,
             viewport_rect,
             stylesheet,
             states,
             scroll_limits,
-        ));
+            &child_anchors,
+        );
+        collect_frame_rects(&frame, &mut child_anchors);
+        frames[index] = Some(frame);
 
         cursor.x += metrics.outer.width + style.gap;
         line_height = line_height.max(metrics.outer.height);
     }
 
-    frames
+    for (index, child) in element.children.iter().enumerate() {
+        if frames[index].is_some() {
+            continue;
+        }
+        let frame = layout_element_in_viewport(
+            child,
+            content_rect,
+            viewport_rect,
+            stylesheet,
+            states,
+            scroll_limits,
+            &child_anchors,
+        );
+        collect_frame_rects(&frame, &mut child_anchors);
+        frames[index] = Some(frame);
+    }
+
+    frames.into_iter().flatten().collect()
+}
+
+fn collect_frame_rects(frame: &ResolvedElement, anchors: &mut HashMap<ElementId, Rect>) {
+    anchors.insert(frame.id.clone(), frame.rect);
+    for child in &frame.children {
+        collect_frame_rects(child, anchors);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -420,6 +467,36 @@ fn positioned_rect(style: &ComputedStyle, containing_rect: Rect, measured: Size)
     };
 
     Rect::new(x, y, measured.width, measured.height)
+}
+
+fn anchored_rect(style: &ComputedStyle, anchor_rect: Rect, measured: Size) -> Rect {
+    let anchor = style
+        .anchor
+        .as_ref()
+        .expect("anchored rect requires an anchor style");
+    let (x, y) = match anchor.placement {
+        AnchorPlacement::TopStart => (anchor_rect.origin.x, anchor_rect.origin.y - measured.height),
+        AnchorPlacement::TopEnd => (
+            anchor_rect.right() - measured.width,
+            anchor_rect.origin.y - measured.height,
+        ),
+        AnchorPlacement::BottomStart => (anchor_rect.origin.x, anchor_rect.bottom()),
+        AnchorPlacement::BottomEnd => (anchor_rect.right() - measured.width, anchor_rect.bottom()),
+        AnchorPlacement::LeftStart => (anchor_rect.origin.x - measured.width, anchor_rect.origin.y),
+        AnchorPlacement::LeftEnd => (
+            anchor_rect.origin.x - measured.width,
+            anchor_rect.bottom() - measured.height,
+        ),
+        AnchorPlacement::RightStart => (anchor_rect.right(), anchor_rect.origin.y),
+        AnchorPlacement::RightEnd => (anchor_rect.right(), anchor_rect.bottom() - measured.height),
+    };
+
+    Rect::new(
+        x + anchor.offset.x + style.margin.left,
+        y + anchor.offset.y + style.margin.top,
+        measured.width,
+        measured.height,
+    )
 }
 
 fn measure_element(

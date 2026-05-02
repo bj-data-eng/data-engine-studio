@@ -808,6 +808,47 @@ fn absolute_parent_position_uses_parent_content_rect_and_leaves_flow_measurement
 }
 
 #[test]
+fn absolute_anchor_positions_against_resolved_element_rect() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .padding(Insets::all(10.0))
+                .border_width(2.0),
+        )
+        .rule(
+            StyleSelector::id("anchor"),
+            Style::default().size(80.0, 30.0),
+        )
+        .rule(
+            StyleSelector::id("popover"),
+            Style::default()
+                .absolute_parent()
+                .anchor_bottom_start("anchor", 0.0, -1.0)
+                .size(60.0, 20.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("popover", ElementSpec::new(ElementRole::Card), |_| {});
+            ui.element("anchor", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let panel = output.layout.find("panel").unwrap();
+    let anchor = output.layout.find("anchor").unwrap();
+    let popover = output.layout.find("popover").unwrap();
+
+    assert_eq!(panel.rect.size, Size::new(104.0, 54.0));
+    assert_eq!(anchor.rect.origin, Point::new(12.0, 12.0));
+    assert_eq!(popover.rect.origin, Point::new(12.0, 41.0));
+    assert_eq!(popover.rect.size, Size::new(60.0, 20.0));
+}
+
+#[test]
 fn absolute_viewport_position_uses_window_rect() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

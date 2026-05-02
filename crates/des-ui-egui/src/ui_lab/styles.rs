@@ -655,8 +655,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("dropdown-menu"),
             Style::default()
                 .absolute_parent()
-                .top(Length::Px(63.0))
-                .left(Length::Px(0.0))
+                .anchor_bottom_start("control-dropdown", 0.0, -1.0)
                 .z_index(20)
                 .width_fill()
                 .height(Length::Auto)

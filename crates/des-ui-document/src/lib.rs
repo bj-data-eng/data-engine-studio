@@ -28,6 +28,6 @@ pub use state::{
     ResolvedElement, ScrollChrome,
 };
 pub use style::{
-    CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle, Style, StyleRule,
-    StyleSelector, StyleSheet, Transition,
+    Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,
+    Style, StyleRule, StyleSelector, StyleSheet, Transition,
 };
