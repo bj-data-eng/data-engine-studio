@@ -235,6 +235,34 @@ fn common_control_clicks_update_lab_state() {
 }
 
 #[test]
+fn dropdown_click_away_closes_open_menu() {
+    let mut harness = lab_harness("interaction");
+
+    let dropdown = state_rect(harness.state(), "control-dropdown");
+    let dropdown_target = egui::pos2(
+        dropdown.origin.x + dropdown.size.width / 2.0,
+        dropdown.origin.y + dropdown.size.height / 2.0,
+    );
+    harness.hover_at(dropdown_target);
+    harness.drag_at(dropdown_target);
+    harness.drop_at(dropdown_target);
+    harness.run();
+    assert!(harness.state().dropdown_open);
+
+    let input = state_rect(harness.state(), "control-input-name");
+    let input_target = egui::pos2(
+        input.origin.x + input.size.width / 2.0,
+        input.origin.y + input.size.height / 2.0,
+    );
+    harness.hover_at(input_target);
+    harness.drag_at(input_target);
+    harness.drop_at(input_target);
+    harness.run();
+
+    assert!(!harness.state().dropdown_open);
+}
+
+#[test]
 fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     let output = lab_output_with_size("layout", Size::new(TEST_WIDTH, 1600.0));
 

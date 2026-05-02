@@ -9,8 +9,8 @@ use styles::stylesheet;
 use views::{render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentMetrics, DocumentOutput, ElementRole, ElementSpec,
-    Size, StyleSheet,
+    Color, Document, DocumentEngine, DocumentMetrics, DocumentOutput, ElementId, ElementRole,
+    ElementSpec, Size, StyleSheet,
 };
 use eframe::egui;
 use std::collections::BTreeMap;
@@ -129,12 +129,15 @@ impl UiLabState {
         let document_start = Instant::now();
         let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
         let document_time = document_start.elapsed();
+        let input = document_input(ui, origin);
+        let primary_clicked = input
+            .pointer
+            .map(|pointer| pointer.primary_clicked)
+            .unwrap_or(false);
         let engine_start = Instant::now();
-        let output = self.document_engine.update_with_input(
-            &document,
-            &self.stylesheet,
-            document_input(ui, origin),
-        );
+        let output = self
+            .document_engine
+            .update_with_input(&document, &self.stylesheet, input);
         let engine_time = engine_start.elapsed();
 
         let paint_start = Instant::now();
@@ -147,7 +150,7 @@ impl UiLabState {
             paint_time,
             metrics: output.metrics,
         };
-        self.apply_clicks(ui, &output);
+        self.apply_clicks(ui, &output, primary_clicked);
         if debug_overlay {
             self.paint_debug_overlay(ui);
         }
@@ -156,7 +159,8 @@ impl UiLabState {
         }
     }
 
-    fn apply_clicks(&mut self, ui: &egui::Ui, _output: &DocumentOutput) {
+    fn apply_clicks(&mut self, ui: &egui::Ui, output: &DocumentOutput, primary_clicked: bool) {
+        let was_dropdown_open = self.dropdown_open;
         for (id, action) in [
             ("view-layout", LabAction::SelectView(LabView::Layout)),
             (
@@ -208,6 +212,15 @@ impl UiLabState {
                 }
                 ui.ctx().request_repaint();
             }
+        }
+
+        if was_dropdown_open
+            && self.dropdown_open
+            && primary_clicked
+            && !is_dropdown_hit(&output.hit_id)
+        {
+            self.dropdown_open = false;
+            ui.ctx().request_repaint();
         }
     }
 
@@ -297,6 +310,16 @@ impl UiLabState {
                     });
             });
     }
+}
+
+fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {
+    hit_id.as_ref().is_some_and(|id| {
+        id.as_str() == "control-dropdown"
+            || id.as_str() == "control-dropdown-label"
+            || id.as_str() == "control-dropdown-chevron"
+            || id.as_str() == "control-dropdown-menu"
+            || id.as_str().starts_with("control-dropdown-option-")
+    })
 }
 
 #[derive(Clone, Copy)]
