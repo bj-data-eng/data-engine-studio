@@ -9,11 +9,10 @@ use styles::stylesheet;
 use views::{render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentMetrics, DocumentOutput, ElementId, ElementRole,
-    ElementSpec, Size, StyleSheet,
+    Color, Document, DocumentEngine, DocumentEventKind, DocumentMetrics, DocumentOutput, ElementId,
+    ElementRole, ElementSpec, Size, StyleSheet,
 };
 use eframe::egui;
-use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 const BACKGROUND: Color = Color::rgb(17, 20, 23);
@@ -92,7 +91,6 @@ pub(crate) struct UiLabState {
     radio_choice: usize,
     dropdown_open: bool,
     dropdown_choice: usize,
-    last_click_counts: BTreeMap<&'static str, u32>,
     last_perf: UiLabPerf,
 }
 
@@ -108,7 +106,6 @@ impl Default for UiLabState {
             radio_choice: 0,
             dropdown_open: false,
             dropdown_choice: 1,
-            last_click_counts: BTreeMap::new(),
             last_perf: UiLabPerf::default(),
         }
     }
@@ -161,55 +158,12 @@ impl UiLabState {
 
     fn apply_clicks(&mut self, ui: &egui::Ui, output: &DocumentOutput, primary_clicked: bool) {
         let was_dropdown_open = self.dropdown_open;
-        for (id, action) in [
-            ("view-layout", LabAction::SelectView(LabView::Layout)),
-            (
-                "view-interaction",
-                LabAction::SelectView(LabView::Interaction),
-            ),
-            ("view-styling", LabAction::SelectView(LabView::Styling)),
-            ("view-animation", LabAction::SelectView(LabView::Animation)),
-            ("view-scrolling", LabAction::SelectView(LabView::Scrolling)),
-            ("view-nesting", LabAction::SelectView(LabView::Nesting)),
-            ("view-graph", LabAction::SelectView(LabView::Graph)),
-            ("toggle-optional-card", LabAction::ToggleOptionalCard),
-            ("toggle-density", LabAction::ToggleDensity),
-            ("control-checkbox", LabAction::ToggleCheckbox),
-            ("control-radio-local", LabAction::SelectRadio(0)),
-            ("control-radio-remote", LabAction::SelectRadio(1)),
-            ("control-radio-hybrid", LabAction::SelectRadio(2)),
-            ("control-dropdown", LabAction::ToggleDropdown),
-            ("control-dropdown-option-csv", LabAction::SelectDropdown(0)),
-            (
-                "control-dropdown-option-duckdb",
-                LabAction::SelectDropdown(1),
-            ),
-            (
-                "control-dropdown-option-python",
-                LabAction::SelectDropdown(2),
-            ),
-        ] {
-            let count = self
-                .document_engine
-                .element_state(id)
-                .map(|state| state.click_count)
-                .unwrap_or_default();
-            let previous = self.last_click_counts.insert(id, count).unwrap_or_default();
-            if count > previous {
-                match action {
-                    LabAction::SelectView(view) => self.view = view,
-                    LabAction::ToggleOptionalCard => {
-                        self.show_optional_card = !self.show_optional_card
-                    }
-                    LabAction::ToggleDensity => self.dense_mode = !self.dense_mode,
-                    LabAction::ToggleCheckbox => self.checkbox_enabled = !self.checkbox_enabled,
-                    LabAction::SelectRadio(choice) => self.radio_choice = choice,
-                    LabAction::ToggleDropdown => self.dropdown_open = !self.dropdown_open,
-                    LabAction::SelectDropdown(choice) => {
-                        self.dropdown_choice = choice;
-                        self.dropdown_open = false;
-                    }
-                }
+        for event in &output.events {
+            if event.kind != DocumentEventKind::Clicked {
+                continue;
+            }
+            if let Some(action) = lab_action_for_id(event.target.as_str()) {
+                self.apply_lab_action(action);
                 ui.ctx().request_repaint();
             }
         }
@@ -221,6 +175,21 @@ impl UiLabState {
         {
             self.dropdown_open = false;
             ui.ctx().request_repaint();
+        }
+    }
+
+    fn apply_lab_action(&mut self, action: LabAction) {
+        match action {
+            LabAction::SelectView(view) => self.view = view,
+            LabAction::ToggleOptionalCard => self.show_optional_card = !self.show_optional_card,
+            LabAction::ToggleDensity => self.dense_mode = !self.dense_mode,
+            LabAction::ToggleCheckbox => self.checkbox_enabled = !self.checkbox_enabled,
+            LabAction::SelectRadio(choice) => self.radio_choice = choice,
+            LabAction::ToggleDropdown => self.dropdown_open = !self.dropdown_open,
+            LabAction::SelectDropdown(choice) => {
+                self.dropdown_choice = choice;
+                self.dropdown_open = false;
+            }
         }
     }
 
@@ -309,6 +278,29 @@ impl UiLabState {
                         ));
                     });
             });
+    }
+}
+
+fn lab_action_for_id(id: &str) -> Option<LabAction> {
+    match id {
+        "view-layout" => Some(LabAction::SelectView(LabView::Layout)),
+        "view-interaction" => Some(LabAction::SelectView(LabView::Interaction)),
+        "view-styling" => Some(LabAction::SelectView(LabView::Styling)),
+        "view-animation" => Some(LabAction::SelectView(LabView::Animation)),
+        "view-scrolling" => Some(LabAction::SelectView(LabView::Scrolling)),
+        "view-nesting" => Some(LabAction::SelectView(LabView::Nesting)),
+        "view-graph" => Some(LabAction::SelectView(LabView::Graph)),
+        "toggle-optional-card" => Some(LabAction::ToggleOptionalCard),
+        "toggle-density" => Some(LabAction::ToggleDensity),
+        "control-checkbox" => Some(LabAction::ToggleCheckbox),
+        "control-radio-local" => Some(LabAction::SelectRadio(0)),
+        "control-radio-remote" => Some(LabAction::SelectRadio(1)),
+        "control-radio-hybrid" => Some(LabAction::SelectRadio(2)),
+        "control-dropdown" => Some(LabAction::ToggleDropdown),
+        "control-dropdown-option-csv" => Some(LabAction::SelectDropdown(0)),
+        "control-dropdown-option-duckdb" => Some(LabAction::SelectDropdown(1)),
+        "control-dropdown-option-python" => Some(LabAction::SelectDropdown(2)),
+        _ => None,
     }
 }
 

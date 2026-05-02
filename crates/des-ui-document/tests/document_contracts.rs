@@ -1,7 +1,8 @@
 use des_ui_document::{
-    AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentInput, ElementId,
-    ElementRole, ElementSpec, ElementStateSelector, Insets, JustifyContent, Length, Overflow,
-    Point, PointerInput, ScrollAxis, Size, Style, StyleSelector, StyleSheet, Transition,
+    AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentInput,
+    DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
+    JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style, StyleSelector,
+    StyleSheet, Transition,
 };
 
 #[test]
@@ -85,6 +86,57 @@ fn style_rules_resolve_role_class_state_and_id_in_order() {
 
     assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
     assert_eq!(card.style.radius, CornerRadii::all(7.0));
+}
+
+#[test]
+fn document_update_can_add_remove_and_toggle_classes_before_layout() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20)),
+        )
+        .rule(
+            StyleSelector::class("expanded"),
+            Style::default().size(140.0, 60.0),
+        )
+        .rule(
+            StyleSelector::class("accent"),
+            Style::default().background(Color::rgb(35, 56, 78)),
+        );
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("card", ElementSpec::new(ElementRole::Card), |_| {});
+    });
+
+    let report = document.apply_update(
+        &DocumentUpdate::new()
+            .add_class("card", "expanded")
+            .toggle_class("card", "accent")
+            .add_class("missing", "accent"),
+    );
+    assert_eq!(report.matched, 2);
+    assert_eq!(report.changed, 2);
+    assert_eq!(report.missing_targets, vec![ElementId::new("missing")]);
+
+    let output = engine.update(&document, &stylesheet);
+    let card = output.layout.find("card").unwrap();
+    assert_eq!(card.rect.size, Size::new(140.0, 60.0));
+    assert_eq!(card.style.background, Some(Color::rgb(35, 56, 78)));
+
+    let report = document.apply_update(
+        &DocumentUpdate::new()
+            .remove_class("card", "expanded")
+            .toggle_class("card", "accent"),
+    );
+    assert_eq!(report.matched, 2);
+    assert_eq!(report.changed, 2);
+
+    let output = engine.update(&document, &stylesheet);
+    let card = output.layout.find("card").unwrap();
+    assert_eq!(card.rect.size, Size::new(100.0, 40.0));
+    assert_eq!(card.style.background, Some(Color::rgb(20, 20, 20)));
 }
 
 #[test]
@@ -970,6 +1022,81 @@ fn pointer_input_targets_interactive_owner_instead_of_inner_text() {
 }
 
 #[test]
+fn pointer_input_emits_document_interaction_events() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::Role(ElementRole::Card),
+        Style::default().size(100.0, 40.0),
+    );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+            |_| {},
+        );
+    });
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(20.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: true,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.hit_id, Some(ElementId::new("card")));
+    assert!(
+        output
+            .events
+            .contains(&DocumentEvent::pointer_entered("card"))
+    );
+    assert!(output.events.contains(&DocumentEvent::pressed("card")));
+    assert!(output.events.contains(&DocumentEvent::clicked("card")));
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(20.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(output.events.contains(&DocumentEvent::released("card")));
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(180.0, 120.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(
+        output
+            .events
+            .contains(&DocumentEvent::pointer_exited("card"))
+    );
+}
+
+#[test]
 fn scroll_delta_updates_hovered_scroll_container_state() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
@@ -1003,6 +1130,10 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
     );
 
     assert_eq!(output.hit_id, Some(ElementId::new("row-0")));
+    assert!(output.events.contains(&DocumentEvent::scrolled(
+        "scroll-panel",
+        ScrollAxis::Vertical
+    )));
     assert_eq!(engine.element_state("scroll-panel").unwrap().scroll_y, 24.0);
 
     let output = engine.update(&document, &stylesheet);

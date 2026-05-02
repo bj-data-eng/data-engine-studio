@@ -13,6 +13,7 @@ mod layout;
 mod scroll;
 mod state;
 mod style;
+mod update;
 
 pub use element::{
     ClassName, Color, Document, DocumentBuilder, Element, ElementId, ElementRole, ElementSpec,
@@ -24,10 +25,11 @@ pub use geometry::{
     PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use state::{
-    ChangeSet, DocumentInput, DocumentMetrics, DocumentOutput, ElementState, PointerInput,
-    ResolvedElement, ScrollChrome,
+    ChangeSet, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics, DocumentOutput,
+    ElementState, PointerInput, ResolvedElement, ScrollChrome,
 };
 pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,
     Style, StyleRule, StyleSelector, StyleSheet, Transition,
 };
+pub use update::{DocumentUpdate, DocumentUpdateReport};

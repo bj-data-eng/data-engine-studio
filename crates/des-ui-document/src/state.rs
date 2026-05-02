@@ -51,9 +51,59 @@ pub struct DocumentOutput {
     pub changes: ChangeSet,
     pub layout: ResolvedElement,
     pub hit_id: Option<ElementId>,
+    pub events: Vec<DocumentEvent>,
     pub scroll_chrome: Vec<ScrollChrome>,
     pub animating: bool,
     pub metrics: DocumentMetrics,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentEvent {
+    pub target: ElementId,
+    pub kind: DocumentEventKind,
+}
+
+impl DocumentEvent {
+    pub fn new(target: impl Into<ElementId>, kind: DocumentEventKind) -> Self {
+        Self {
+            target: target.into(),
+            kind,
+        }
+    }
+
+    pub fn pointer_entered(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::PointerEntered)
+    }
+
+    pub fn pointer_exited(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::PointerExited)
+    }
+
+    pub fn pressed(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::Pressed)
+    }
+
+    pub fn released(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::Released)
+    }
+
+    pub fn clicked(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::Clicked)
+    }
+
+    pub fn scrolled(target: impl Into<ElementId>, axis: ScrollAxis) -> Self {
+        Self::new(target, DocumentEventKind::Scrolled(axis))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DocumentEventKind {
+    PointerEntered,
+    PointerExited,
+    Pressed,
+    Released,
+    Clicked,
+    Scrolled(ScrollAxis),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
