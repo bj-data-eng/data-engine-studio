@@ -1,5 +1,5 @@
 use crate::animation::{AnimationUpdate, update_element_style_animation};
-use crate::element::{Document, ElementId};
+use crate::element::{Document, Element, ElementId};
 use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, layout_element};
 use crate::scroll::scroll_chrome;
@@ -7,7 +7,9 @@ use crate::state::{
     ChangeSet, DocumentInput, DocumentMetrics, DocumentOutput, ElementState, PointerInput,
     ResolvedElement, ScrollChrome,
 };
-use crate::style::StyleSheet;
+use crate::style::{
+    ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change, resolve_style,
+};
 use std::collections::{BTreeSet, HashMap};
 
 struct ScrollDrag {
@@ -20,6 +22,7 @@ struct ScrollDrag {
 struct InputUpdate {
     hit_id: Option<ElementId>,
     changed: bool,
+    layout_changed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -65,12 +68,20 @@ impl DocumentEngine {
         self.scroll_limits = scroll_limits;
         let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
         let input_update = self.apply_input(&input_layout, &input_scroll_chrome, input);
+        let input_style_invalidation = classify_resolved_style_invalidation(
+            &input_layout,
+            &document.root,
+            stylesheet,
+            &self.states,
+        );
         let clamp_changed = self.clamp_scroll_states();
         let animation_update = self.update_style_animation(document, stylesheet);
         let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
 
-        let needs_final_layout =
-            input_update.changed || clamp_changed || animation_update.layout_changed;
+        let needs_final_layout = input_update.layout_changed
+            || clamp_changed
+            || input_style_invalidation.layout_changed
+            || animation_update.layout_changed;
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
             let mut scroll_limits = HashMap::new();
             let layout = layout_element(
@@ -86,15 +97,18 @@ impl DocumentEngine {
             (layout, scroll_chrome, false)
         } else {
             let mut layout = input_layout;
-            if animation_update.paint_changed {
-                apply_rendered_styles(&mut layout, &self.states);
+            if input_style_invalidation.paint_changed || animation_update.paint_changed {
+                apply_resolved_styles(&mut layout, &document.root, stylesheet, &self.states);
             }
-            let scroll_chrome =
-                if animation_update.paint_changed || scrollbar_animation_update.paint_changed {
-                    scroll_chrome(&layout, &self.states, &self.scroll_limits)
-                } else {
-                    input_scroll_chrome
-                };
+            let scroll_chrome = if input_update.changed
+                || input_style_invalidation.paint_changed
+                || animation_update.paint_changed
+                || scrollbar_animation_update.paint_changed
+            {
+                scroll_chrome(&layout, &self.states, &self.scroll_limits)
+            } else {
+                input_scroll_chrome
+            };
             (layout, scroll_chrome, true)
         };
         let element_count = count_resolved_elements(&layout);
@@ -111,10 +125,13 @@ impl DocumentEngine {
                 scroll_chrome_count,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
-                animation_changed_style: animation_update.changed()
+                animation_changed_style: input_style_invalidation.changed()
+                    || animation_update.changed()
                     || scrollbar_animation_update.changed(),
-                animation_changed_layout: animation_update.layout_changed,
-                animation_changed_paint: animation_update.paint_changed
+                animation_changed_layout: input_style_invalidation.layout_changed
+                    || animation_update.layout_changed,
+                animation_changed_paint: input_style_invalidation.paint_changed
+                    || animation_update.paint_changed
                     || scrollbar_animation_update.paint_changed,
             },
         }
@@ -169,6 +186,7 @@ impl DocumentEngine {
 
         let Some(pointer) = input.pointer else {
             update.changed = interaction_changed(&self.states, &previous);
+            update.layout_changed = scroll_position_changed(&self.states, &previous);
             return update;
         };
         let scrollbar_hit = scroll_chrome
@@ -185,6 +203,7 @@ impl DocumentEngine {
             }
             update.hit_id = Some(chrome.element_id.clone());
             update.changed |= interaction_changed(&self.states, &previous);
+            update.layout_changed |= scroll_position_changed(&self.states, &previous);
             return update;
         }
         if let Some(active_drag) = &self.active_scroll_drag {
@@ -195,11 +214,13 @@ impl DocumentEngine {
             }
             update.hit_id = Some(active_drag.element_id.clone());
             update.changed |= interaction_changed(&self.states, &previous);
+            update.layout_changed |= scroll_position_changed(&self.states, &previous);
             return update;
         }
 
         let Some(path) = hit_path(layout, pointer.position) else {
             update.changed |= interaction_changed(&self.states, &previous);
+            update.layout_changed |= scroll_position_changed(&self.states, &previous);
             return update;
         };
         if (input.scroll_delta.x.abs() > f32::EPSILON || input.scroll_delta.y.abs() > f32::EPSILON)
@@ -249,6 +270,7 @@ impl DocumentEngine {
         }
 
         update.changed |= interaction_changed(&self.states, &previous);
+        update.layout_changed |= scroll_position_changed(&self.states, &previous);
         update
     }
 
@@ -406,16 +428,44 @@ impl DocumentEngine {
     }
 }
 
-fn apply_rendered_styles(frame: &mut ResolvedElement, states: &HashMap<ElementId, ElementState>) {
-    if let Some(style) = states
-        .get(&frame.id)
+fn classify_resolved_style_invalidation(
+    frame: &ResolvedElement,
+    element: &Element,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+) -> StyleInvalidation {
+    let next_style = resolved_style_for(element, states, stylesheet);
+    let mut invalidation = classify_computed_style_change(Some(&frame.style), Some(&next_style));
+
+    for (child_frame, child_element) in frame.children.iter().zip(&element.children) {
+        invalidation +=
+            classify_resolved_style_invalidation(child_frame, child_element, stylesheet, states);
+    }
+
+    invalidation
+}
+
+fn apply_resolved_styles(
+    frame: &mut ResolvedElement,
+    element: &Element,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+) {
+    frame.style = resolved_style_for(element, states, stylesheet);
+    for (child_frame, child_element) in frame.children.iter_mut().zip(&element.children) {
+        apply_resolved_styles(child_frame, child_element, stylesheet, states);
+    }
+}
+
+fn resolved_style_for(
+    element: &Element,
+    states: &HashMap<ElementId, ElementState>,
+    stylesheet: &StyleSheet,
+) -> ComputedStyle {
+    states
+        .get(&element.id)
         .and_then(|state| state.rendered_style.clone())
-    {
-        frame.style = style;
-    }
-    for child in &mut frame.children {
-        apply_rendered_styles(child, states);
-    }
+        .unwrap_or_else(|| resolve_style(element, stylesheet, states.get(&element.id)))
 }
 
 fn count_resolved_elements(frame: &ResolvedElement) -> usize {
@@ -473,6 +523,18 @@ fn interaction_changed(
                 scrollbar_visual_width_y: state.scrollbar_visual_width_y,
                 click_count: state.click_count,
             }
+    })
+}
+
+fn scroll_position_changed(
+    states: &HashMap<ElementId, ElementState>,
+    previous: &HashMap<ElementId, InteractionSnapshot>,
+) -> bool {
+    states.iter().any(|(id, state)| {
+        previous.get(id).is_some_and(|previous| {
+            (state.scroll_x - previous.scroll_x).abs() > f32::EPSILON
+                || (state.scroll_y - previous.scroll_y).abs() > f32::EPSILON
+        })
     })
 }
 

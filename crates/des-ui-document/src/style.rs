@@ -810,6 +810,63 @@ pub(crate) fn resolve_style(
     style
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct StyleInvalidation {
+    pub paint_changed: bool,
+    pub layout_changed: bool,
+}
+
+impl StyleInvalidation {
+    pub(crate) fn changed(self) -> bool {
+        self.paint_changed || self.layout_changed
+    }
+}
+
+impl std::ops::AddAssign for StyleInvalidation {
+    fn add_assign(&mut self, rhs: Self) {
+        self.paint_changed |= rhs.paint_changed;
+        self.layout_changed |= rhs.layout_changed;
+    }
+}
+
+pub(crate) fn classify_computed_style_change(
+    previous: Option<&ComputedStyle>,
+    next: Option<&ComputedStyle>,
+) -> StyleInvalidation {
+    match (previous, next) {
+        (Some(previous), Some(next)) if previous == next => StyleInvalidation::default(),
+        (Some(previous), Some(next)) => StyleInvalidation {
+            paint_changed: true,
+            layout_changed: layout_relevant_style_changed(previous, next),
+        },
+        (None, None) => StyleInvalidation::default(),
+        _ => StyleInvalidation {
+            paint_changed: true,
+            layout_changed: true,
+        },
+    }
+}
+
+fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle) -> bool {
+    previous.direction != next.direction
+        || previous.wrap != next.wrap
+        || previous.align_items != next.align_items
+        || previous.justify_content != next.justify_content
+        || previous.gap != next.gap
+        || previous.margin != next.margin
+        || previous.padding != next.padding
+        || previous.width != next.width
+        || previous.height != next.height
+        || previous.min_size != next.min_size
+        || previous.max_size != next.max_size
+        || previous.border_width != next.border_width
+        || previous.font_size != next.font_size
+        || previous.overflow_x != next.overflow_x
+        || previous.overflow_y != next.overflow_y
+        || previous.position != next.position
+        || previous.inset != next.inset
+}
+
 fn selector_matches(
     selector: &StyleSelector,
     element: &Element,

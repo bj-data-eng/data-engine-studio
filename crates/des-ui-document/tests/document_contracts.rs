@@ -232,7 +232,7 @@ fn transitioned_state_rules_ease_visual_style_properties() {
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.style.background, Some(Color::rgb(31, 48, 62)));
-    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.reused_input_layout);
 
     let output = engine.update_with_input(
         &document,
@@ -295,6 +295,94 @@ fn transitioned_state_rules_ease_visual_style_properties() {
 
     assert!(!output.animating);
     assert!(!output.metrics.animation_changed_style);
+}
+
+#[test]
+fn untransitioned_hover_color_reuses_layout_and_updates_paint() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(40, 70, 95)),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+            |_| {},
+        );
+    });
+
+    engine.update(&document, &stylesheet);
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(2.0, 2.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
+    assert!(output.metrics.reused_input_layout);
+    assert!(output.metrics.input_changed_state);
+    assert!(output.metrics.animation_changed_style);
+    assert!(!output.metrics.animation_changed_layout);
+    assert!(output.metrics.animation_changed_paint);
+}
+
+#[test]
+fn untransitioned_hover_layout_change_rebuilds_layout() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default().size(100.0, 40.0),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().size(140.0, 40.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+            |_| {},
+        );
+    });
+
+    engine.update(&document, &stylesheet);
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(2.0, 2.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.rect.size, Size::new(140.0, 40.0));
+    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_style);
+    assert!(output.metrics.animation_changed_layout);
 }
 
 #[test]
