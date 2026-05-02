@@ -3,8 +3,8 @@ use super::{
     STROKE, STROKE_SELECTED, TEXT, TEXT_ACCENT, TEXT_MUTED,
 };
 use des_ui_document::{
-    Color, Direction, ElementRole, ElementStateSelector, Insets, Length, Overflow, Style,
-    StyleSelector, StyleSheet, Transition,
+    AlignItems, Color, Direction, ElementRole, ElementStateSelector, Insets, JustifyContent,
+    Length, Overflow, Style, StyleSelector, StyleSheet, Transition,
 };
 
 pub(super) fn stylesheet() -> StyleSheet {
@@ -252,6 +252,24 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(6.0),
         )
         .rule(
+            StyleSelector::class("box-subject-row-align"),
+            Style::default()
+                .direction(Direction::Row)
+                .size(96.0, 54.0)
+                .gap(8.0)
+                .justify_content(JustifyContent::Center)
+                .align_items(AlignItems::End),
+        )
+        .rule(
+            StyleSelector::class("box-subject-column-align"),
+            Style::default()
+                .direction(Direction::Column)
+                .size(80.0, 92.0)
+                .gap(4.0)
+                .justify_content(JustifyContent::SpaceBetween)
+                .align_items(AlignItems::Center),
+        )
+        .rule(
             StyleSelector::class("box-subject-visible-overflow"),
             Style::default()
                 .size(44.0, 44.0)
@@ -262,6 +280,21 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .size(44.0, 44.0)
                 .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("box-subject-scroll-x-overflow"),
+            Style::default()
+                .size(44.0, 44.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("box-subject-scroll-xy-overflow"),
+            Style::default()
+                .size(44.0, 44.0)
+                .overflow(Overflow::Scroll)
                 .scrollbar_width(2.0),
         )
         .rule(
@@ -665,7 +698,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("scroll-panel"),
             Style::default()
-                .size(318.0, 420.0)
+                .size(318.0, 300.0)
                 .padding(Insets::all(10.0))
                 .gap(7.0)
                 .background(Color::rgb(20, 24, 28))
@@ -676,11 +709,47 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("scroll-list"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(370.0))
+                .height(des_ui_document::Length::Px(250.0))
                 .padding(Insets::symmetric(4.0, 4.0))
                 .gap(7.0)
                 .overflow_y(Overflow::Scroll)
                 .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("scroll-list-horizontal"),
+            Style::default()
+                .direction(Direction::Row)
+                .width_fill()
+                .height(des_ui_document::Length::Px(250.0))
+                .padding(Insets::symmetric(4.0, 4.0))
+                .gap(7.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("scroll-list-two-axis"),
+            Style::default()
+                .width_fill()
+                .height(des_ui_document::Length::Px(250.0))
+                .padding(Insets::symmetric(4.0, 4.0))
+                .gap(7.0)
+                .overflow(Overflow::Scroll)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("scroll-list-nested"),
+            Style::default().height(des_ui_document::Length::Px(222.0)),
+        )
+        .rule(
+            StyleSelector::class("scroll-nested-shell"),
+            Style::default()
+                .width_fill()
+                .height(des_ui_document::Length::Px(250.0))
+                .padding(Insets::all(12.0))
+                .background(Color::rgb(13, 16, 19))
+                .border(Color::rgb(39, 48, 56))
+                .radius(5.0),
         )
         .rule(
             StyleSelector::class_state("scroll-panel", ElementStateSelector::Hovered),
@@ -713,7 +782,68 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(4.0),
         )
         .rule(
+            StyleSelector::class("scroll-wide-row-card"),
+            Style::default()
+                .size(156.0, 214.0)
+                .padding(Insets::symmetric(9.0, 7.0))
+                .gap(7.0)
+                .background(Color::rgb(29, 34, 39))
+                .border(Color::rgb(48, 57, 65))
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::class("scroll-mini-list"),
+            Style::default()
+                .width_fill()
+                .height(des_ui_document::Length::Px(158.0))
+                .padding(Insets::symmetric(3.0, 3.0))
+                .gap(4.0)
+                .background(Color::rgb(20, 24, 28))
+                .border(Color::rgb(43, 52, 60))
+                .radius(4.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("scroll-mini-row"),
+            Style::default()
+                .width_fill()
+                .height(des_ui_document::Length::Px(24.0))
+                .padding(Insets::symmetric(6.0, 4.0))
+                .background(Color::rgb(24, 30, 35))
+                .border(Color::rgb(45, 54, 62))
+                .radius(3.0),
+        )
+        .rule(
+            StyleSelector::class("scroll-xy-row-card"),
+            Style::default()
+                .width(des_ui_document::Length::Px(430.0))
+                .height(des_ui_document::Length::Px(34.0))
+                .padding(Insets::symmetric(9.0, 7.0))
+                .background(Color::rgb(29, 34, 39))
+                .border(Color::rgb(48, 57, 65))
+                .radius(4.0),
+        )
+        .rule(
             StyleSelector::class_state("scroll-row-card", ElementStateSelector::Hovered),
+            Style::default()
+                .background(Color::rgb(38, 47, 54))
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("scroll-wide-row-card", ElementStateSelector::Hovered),
+            Style::default()
+                .background(Color::rgb(38, 47, 54))
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("scroll-mini-row", ElementStateSelector::Hovered),
+            Style::default()
+                .background(Color::rgb(36, 44, 51))
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("scroll-xy-row-card", ElementStateSelector::Hovered),
             Style::default()
                 .background(Color::rgb(38, 47, 54))
                 .border(STROKE_SELECTED),
@@ -811,7 +941,7 @@ fn styled_scrollbar_style() -> Style {
         .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
         .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
         .scrollbar_radius(6.0)
-        .transition(Transition::ease_out(0.2))
+        .transition(Transition::ease_out(0.14))
 }
 
 fn styled_scrollbar_hover_style() -> Style {

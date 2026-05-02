@@ -67,7 +67,9 @@ fn paint_frame_clipped(
 
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
-    let next_clip = if frame.style.overflow_y == Overflow::Scroll {
+    let next_clip = if frame.style.overflow_x == Overflow::Scroll
+        || frame.style.overflow_y == Overflow::Scroll
+    {
         let rect = egui::Rect::from_min_size(
             egui::pos2(
                 origin.x + frame.rect.origin.x,
@@ -85,7 +87,31 @@ fn paint_frame_clipped(
                 rect.bottom() - frame.style.border_width.bottom - frame.style.padding.bottom,
             ),
         );
-        clip_rect.intersect(content_rect)
+        let min = egui::pos2(
+            if frame.style.overflow_x == Overflow::Scroll {
+                content_rect.left()
+            } else {
+                clip_rect.left()
+            },
+            if frame.style.overflow_y == Overflow::Scroll {
+                content_rect.top()
+            } else {
+                clip_rect.top()
+            },
+        );
+        let max = egui::pos2(
+            if frame.style.overflow_x == Overflow::Scroll {
+                content_rect.right()
+            } else {
+                clip_rect.right()
+            },
+            if frame.style.overflow_y == Overflow::Scroll {
+                content_rect.bottom()
+            } else {
+                clip_rect.bottom()
+            },
+        );
+        clip_rect.intersect(egui::Rect::from_min_max(min, max))
     } else {
         clip_rect
     };

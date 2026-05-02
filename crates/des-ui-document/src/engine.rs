@@ -1,6 +1,6 @@
 use crate::animation::update_element_style_animation;
 use crate::element::{Document, ElementId};
-use crate::geometry::{Overflow, Rect};
+use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, layout_element};
 use crate::scroll::scroll_chrome;
 use crate::state::{
@@ -12,13 +12,14 @@ use std::collections::{BTreeSet, HashMap};
 
 struct ScrollDrag {
     element_id: ElementId,
-    pointer_offset_from_handle_top: f32,
+    axis: ScrollAxis,
+    pointer_offset_from_handle_start: f32,
 }
 
 #[derive(Default)]
 pub struct DocumentEngine {
     states: HashMap<ElementId, ElementState>,
-    scroll_limits: HashMap<ElementId, f32>,
+    scroll_limits: HashMap<ElementId, Size>,
     active_scroll_drag: Option<ScrollDrag>,
 }
 
@@ -139,11 +140,11 @@ impl DocumentEngine {
         }
 
         let path = hit_path(layout, pointer.position)?;
-        if input.scroll_delta.y.abs() > f32::EPSILON
-            && let Some(scroll_frame) = path
-                .iter()
-                .rev()
-                .find(|frame| frame.style.overflow_y == Overflow::Scroll)
+        if (input.scroll_delta.x.abs() > f32::EPSILON || input.scroll_delta.y.abs() > f32::EPSILON)
+            && let Some(scroll_frame) = path.iter().rev().find(|frame| {
+                frame.style.overflow_x == Overflow::Scroll
+                    || frame.style.overflow_y == Overflow::Scroll
+            })
             && let Some(state) = self.states.get_mut(&scroll_frame.id)
         {
             let max_scroll = self
@@ -151,7 +152,14 @@ impl DocumentEngine {
                 .get(&scroll_frame.id)
                 .copied()
                 .unwrap_or_default();
-            state.scroll_y = (state.scroll_y - input.scroll_delta.y).clamp(0.0, max_scroll);
+            if scroll_frame.style.overflow_x == Overflow::Scroll {
+                state.scroll_x =
+                    (state.scroll_x - input.scroll_delta.x).clamp(0.0, max_scroll.width);
+            }
+            if scroll_frame.style.overflow_y == Overflow::Scroll {
+                state.scroll_y =
+                    (state.scroll_y - input.scroll_delta.y).clamp(0.0, max_scroll.height);
+            }
         }
 
         for frame in &path {
@@ -192,9 +200,15 @@ impl DocumentEngine {
             .active_scroll_drag
             .as_ref()
             .map(|drag| drag.element_id.clone());
-        let active_chrome = active_id
-            .as_ref()
-            .and_then(|id| scroll_chrome.iter().find(|chrome| &chrome.element_id == id));
+        let active_chrome = active_id.as_ref().and_then(|id| {
+            scroll_chrome.iter().find(|chrome| {
+                &chrome.element_id == id
+                    && self
+                        .active_scroll_drag
+                        .as_ref()
+                        .is_some_and(|drag| drag.axis == chrome.axis)
+            })
+        });
         let chrome = active_chrome.or(hit);
         let Some(chrome) = chrome else {
             return;
@@ -203,32 +217,42 @@ impl DocumentEngine {
         if self
             .active_scroll_drag
             .as_ref()
-            .is_none_or(|drag| drag.element_id != chrome.element_id)
+            .is_none_or(|drag| drag.element_id != chrome.element_id || drag.axis != chrome.axis)
         {
+            let pointer_main = pointer_axis_position(pointer.position, chrome.axis);
+            let handle_start = rect_axis_origin(chrome.handle_rect, chrome.axis);
+            let handle_length = rect_axis_length(chrome.handle_rect, chrome.axis);
             let offset = if chrome.handle_rect.contains(pointer.position) {
-                pointer.position.y - chrome.handle_rect.origin.y
+                pointer_main - handle_start
             } else {
-                chrome.handle_rect.size.height / 2.0
+                handle_length / 2.0
             };
             self.active_scroll_drag = Some(ScrollDrag {
                 element_id: chrome.element_id.clone(),
-                pointer_offset_from_handle_top: offset,
+                axis: chrome.axis,
+                pointer_offset_from_handle_start: offset,
             });
         }
 
         let Some(drag) = &self.active_scroll_drag else {
             return;
         };
-        let track_travel =
-            (chrome.track_rect.size.height - chrome.handle_rect.size.height).max(0.0);
-        let handle_top = pointer.position.y - drag.pointer_offset_from_handle_top;
+        let track_travel = (rect_axis_length(chrome.track_rect, chrome.axis)
+            - rect_axis_length(chrome.handle_rect, chrome.axis))
+        .max(0.0);
+        let handle_start = pointer_axis_position(pointer.position, chrome.axis)
+            - drag.pointer_offset_from_handle_start;
         let handle_progress = if track_travel <= f32::EPSILON {
             0.0
         } else {
-            ((handle_top - chrome.track_rect.origin.y) / track_travel).clamp(0.0, 1.0)
+            ((handle_start - rect_axis_origin(chrome.track_rect, chrome.axis)) / track_travel)
+                .clamp(0.0, 1.0)
         };
         if let Some(state) = self.states.get_mut(&chrome.element_id) {
-            state.scroll_y = handle_progress * chrome.max_scroll;
+            match chrome.axis {
+                ScrollAxis::Horizontal => state.scroll_x = handle_progress * chrome.max_scroll,
+                ScrollAxis::Vertical => state.scroll_y = handle_progress * chrome.max_scroll,
+            }
             state.scrollbar_dragged = true;
         }
     }
@@ -236,12 +260,34 @@ impl DocumentEngine {
     fn clamp_scroll_states(&mut self) {
         for (id, state) in &mut self.states {
             let max_scroll = self.scroll_limits.get(id).copied().unwrap_or_default();
-            state.scroll_y = state.scroll_y.clamp(0.0, max_scroll);
+            state.scroll_x = state.scroll_x.clamp(0.0, max_scroll.width);
+            state.scroll_y = state.scroll_y.clamp(0.0, max_scroll.height);
         }
     }
 
     fn update_style_animation(&mut self, document: &Document, stylesheet: &StyleSheet) -> bool {
         const SNAP_EPSILON: f32 = 0.001;
         update_element_style_animation(&document.root, stylesheet, &mut self.states, SNAP_EPSILON)
+    }
+}
+
+fn pointer_axis_position(point: crate::geometry::Point, axis: ScrollAxis) -> f32 {
+    match axis {
+        ScrollAxis::Horizontal => point.x,
+        ScrollAxis::Vertical => point.y,
+    }
+}
+
+fn rect_axis_origin(rect: Rect, axis: ScrollAxis) -> f32 {
+    match axis {
+        ScrollAxis::Horizontal => rect.origin.x,
+        ScrollAxis::Vertical => rect.origin.y,
+    }
+}
+
+fn rect_axis_length(rect: Rect, axis: ScrollAxis) -> f32 {
+    match axis {
+        ScrollAxis::Horizontal => rect.size.width,
+        ScrollAxis::Vertical => rect.size.height,
     }
 }

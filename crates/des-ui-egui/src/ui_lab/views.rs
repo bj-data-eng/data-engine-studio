@@ -232,6 +232,24 @@ fn render_layout_view(
                     "box-subject-visible-overflow",
                 );
             });
+            box_model_row(ui, "box-row-alignment", |ui| {
+                box_model_case(
+                    ui,
+                    "box-row-align",
+                    "Row alignment",
+                    "children centered on main axis and end-aligned on cross axis",
+                    "direction: Row; size: 96 by 54; gap: 8; justify content: Center; align items: End",
+                    "box-subject-row-align",
+                );
+                box_model_case(
+                    ui,
+                    "box-column-align",
+                    "Column alignment",
+                    "children spaced on main axis and centered on cross axis",
+                    "direction: Column; size: 80 by 92; gap: 4; justify content: SpaceBetween; align items: Center",
+                    "box-subject-column-align",
+                );
+            });
             box_model_row(ui, "box-row-overflow", |ui| {
                 box_model_case(
                     ui,
@@ -241,6 +259,24 @@ fn render_layout_view(
                     "size: 44 by 44; vertical overflow: Scroll",
                     "box-subject-scroll-overflow",
                 );
+                box_model_case(
+                    ui,
+                    "box-scroll-x-overflow",
+                    "Overflow x scroll",
+                    "horizontal clipped content",
+                    "size: 44 by 44; horizontal overflow: Scroll; vertical overflow: Visible",
+                    "box-subject-scroll-x-overflow",
+                );
+                box_model_case(
+                    ui,
+                    "box-scroll-xy-overflow",
+                    "Overflow two-axis",
+                    "horizontal and vertical clipped content",
+                    "size: 44 by 44; horizontal overflow: Scroll; vertical overflow: Scroll",
+                    "box-subject-scroll-xy-overflow",
+                );
+            });
+            box_model_row(ui, "box-row-edges", |ui| {
                 box_model_case(
                     ui,
                     "box-side-radius",
@@ -363,7 +399,12 @@ fn box_model_subject(
     let mut spec = ElementSpec::new(ElementRole::Panel)
         .class("box-subject")
         .class(subject_class);
-    if subject_class == "box-subject-scroll-overflow" {
+    if matches!(
+        subject_class,
+        "box-subject-scroll-overflow"
+            | "box-subject-scroll-x-overflow"
+            | "box-subject-scroll-xy-overflow"
+    ) {
         spec = spec.class("styled-scrollbar");
     }
 
@@ -389,7 +430,19 @@ fn box_model_subject(
                 box_chip(ui, case_id, 1);
                 box_chip(ui, case_id, 2);
             }
-            "box-subject-visible-overflow" | "box-subject-scroll-overflow" => {
+            "box-subject-row-align" => {
+                box_chip(ui, case_id, 0);
+                box_chip(ui, case_id, 1);
+            }
+            "box-subject-column-align" => {
+                box_chip(ui, case_id, 0);
+                box_chip(ui, case_id, 1);
+                box_chip(ui, case_id, 2);
+            }
+            "box-subject-visible-overflow"
+            | "box-subject-scroll-overflow"
+            | "box-subject-scroll-x-overflow"
+            | "box-subject-scroll-xy-overflow" => {
                 ui.element(
                     format!("{case_id}-overflow-child"),
                     ElementSpec::new(ElementRole::Panel).class("box-overflow-child"),
@@ -805,14 +858,76 @@ fn render_scrolling_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "scroll-copy",
         ElementSpec::new(ElementRole::Text).class("muted"),
-        "Use the wheel or touchpad over either panel. The scroll offset lives in des-ui-document.",
+        "Use the wheel or touchpad over each panel. Scroll offsets live in des-ui-document.",
+    );
+    ui.text_element(
+        "scroll-direct-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Direct containers",
     );
     ui.element(
         "scroll-row",
         ElementSpec::new(ElementRole::Panel).class("card-row"),
         |ui| {
-            scroll_panel(ui, "scroll-panel-a", "Project List", 12);
-            scroll_panel(ui, "scroll-panel-b", "Preview Rows", 18);
+            scroll_panel(
+                ui,
+                "scroll-panel-a",
+                "Vertical",
+                12,
+                "scroll-list",
+                "scroll-row-card",
+            );
+            scroll_panel(
+                ui,
+                "scroll-panel-b",
+                "Horizontal",
+                8,
+                "scroll-list-horizontal",
+                "scroll-wide-row-card",
+            );
+            scroll_panel(
+                ui,
+                "scroll-panel-c",
+                "Two-axis",
+                12,
+                "scroll-list-two-axis",
+                "scroll-xy-row-card",
+            );
+        },
+    );
+    ui.text_element(
+        "scroll-nested-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Nested containers",
+    );
+    ui.element(
+        "scroll-nested-row",
+        ElementSpec::new(ElementRole::Panel).class("card-row"),
+        |ui| {
+            nested_scroll_panel(
+                ui,
+                "scroll-nested-vertical",
+                "Nested vertical",
+                12,
+                "scroll-list",
+                "scroll-row-card",
+            );
+            nested_scroll_panel(
+                ui,
+                "scroll-nested-horizontal",
+                "Nested horizontal",
+                8,
+                "scroll-list-horizontal",
+                "scroll-wide-row-card",
+            );
+            nested_scroll_panel(
+                ui,
+                "scroll-nested-two-axis",
+                "Nested two-axis",
+                12,
+                "scroll-list-two-axis",
+                "scroll-xy-row-card",
+            );
         },
     );
 }
@@ -931,6 +1046,8 @@ fn scroll_panel(
     id: &'static str,
     title: &'static str,
     row_count: usize,
+    list_class: &'static str,
+    row_class: &'static str,
 ) {
     ui.element(
         id,
@@ -944,20 +1061,110 @@ fn scroll_panel(
             ui.element(
                 format!("{id}-list"),
                 ElementSpec::new(ElementRole::Panel)
-                    .class("scroll-list")
+                    .class(list_class)
                     .class("styled-scrollbar"),
                 |ui| {
-                    for index in 0..row_count {
+                    scroll_rows(ui, id, row_count, row_class);
+                },
+            );
+        },
+    );
+}
+
+fn nested_scroll_panel(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    title: &'static str,
+    row_count: usize,
+    list_class: &'static str,
+    row_class: &'static str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Panel).class("scroll-panel"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-title"),
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                title,
+            );
+            ui.element(
+                format!("{id}-shell"),
+                ElementSpec::new(ElementRole::Panel).class("scroll-nested-shell"),
+                |ui| {
+                    ui.element(
+                        format!("{id}-list"),
+                        ElementSpec::new(ElementRole::Panel)
+                            .class(list_class)
+                            .class("scroll-list-nested")
+                            .class("styled-scrollbar"),
+                        |ui| {
+                            scroll_rows(ui, id, row_count, row_class);
+                        },
+                    );
+                },
+            );
+        },
+    );
+}
+
+fn scroll_rows(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    row_count: usize,
+    row_class: &'static str,
+) {
+    for index in 0..row_count {
+        if row_class == "scroll-wide-row-card" {
+            scroll_wide_card(ui, id, index);
+            continue;
+        }
+
+        ui.element(
+            format!("{id}-row-{index}"),
+            ElementSpec::new(ElementRole::Card)
+                .class(row_class)
+                .interactive(),
+            |ui| {
+                ui.text_element(
+                    format!("{id}-row-{index}-label"),
+                    ElementSpec::new(ElementRole::Text).class("muted"),
+                    format!("document-owned scroll row {:02}", index + 1),
+                );
+            },
+        );
+    }
+}
+
+fn scroll_wide_card(ui: &mut des_ui_document::DocumentBuilder, id: &'static str, index: usize) {
+    ui.element(
+        format!("{id}-row-{index}"),
+        ElementSpec::new(ElementRole::Card)
+            .class("scroll-wide-row-card")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-row-{index}-label"),
+                ElementSpec::new(ElementRole::Text).class("muted"),
+                format!("horizontal card {:02}", index + 1),
+            );
+            ui.element(
+                format!("{id}-row-{index}-mini-list"),
+                ElementSpec::new(ElementRole::Panel)
+                    .class("scroll-mini-list")
+                    .class("styled-scrollbar"),
+                |ui| {
+                    for item_index in 0..8 {
                         ui.element(
-                            format!("{id}-row-{index}"),
+                            format!("{id}-row-{index}-mini-row-{item_index}"),
                             ElementSpec::new(ElementRole::Card)
-                                .class("scroll-row-card")
+                                .class("scroll-mini-row")
                                 .interactive(),
                             |ui| {
                                 ui.text_element(
-                                    format!("{id}-row-{index}-label"),
+                                    format!("{id}-row-{index}-mini-row-{item_index}-label"),
                                     ElementSpec::new(ElementRole::Text).class("muted"),
-                                    format!("document-owned scroll row {:02}", index + 1),
+                                    format!("nested item {:02}", item_index + 1),
                                 );
                             },
                         );

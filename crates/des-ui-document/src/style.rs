@@ -1,6 +1,7 @@
 use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
 use crate::geometry::{
-    CornerRadii, Direction, Insets, Length, Overflow, Position, PositionInsets, Size,
+    AlignItems, CornerRadii, Direction, Insets, JustifyContent, Length, Overflow, Position,
+    PositionInsets, Size,
 };
 use crate::state::ElementState;
 
@@ -113,6 +114,8 @@ impl Transition {
 pub struct Style {
     pub direction: Option<Direction>,
     pub wrap: Option<bool>,
+    pub align_items: Option<AlignItems>,
+    pub justify_content: Option<JustifyContent>,
     pub gap: Option<f32>,
     pub margin: Option<Insets>,
     pub padding: Option<Insets>,
@@ -126,6 +129,7 @@ pub struct Style {
     pub text_color: Option<Color>,
     pub font_size: Option<f32>,
     pub radius: CornerStyle,
+    pub overflow_x: Option<Overflow>,
     pub overflow_y: Option<Overflow>,
     pub scrollbar_width: Option<f32>,
     pub scrollbar_handle_color: Option<Color>,
@@ -207,6 +211,16 @@ impl Style {
 
     pub fn wrap(mut self, wrap: bool) -> Self {
         self.wrap = Some(wrap);
+        self
+    }
+
+    pub fn align_items(mut self, align_items: AlignItems) -> Self {
+        self.align_items = Some(align_items);
+        self
+    }
+
+    pub fn justify_content(mut self, justify_content: JustifyContent) -> Self {
+        self.justify_content = Some(justify_content);
         self
     }
 
@@ -359,6 +373,17 @@ impl Style {
         self
     }
 
+    pub fn overflow_x(mut self, overflow: Overflow) -> Self {
+        self.overflow_x = Some(overflow);
+        self
+    }
+
+    pub fn overflow(mut self, overflow: Overflow) -> Self {
+        self.overflow_x = Some(overflow);
+        self.overflow_y = Some(overflow);
+        self
+    }
+
     pub fn scrollbar_width(mut self, width: f32) -> Self {
         self.scrollbar_width = Some(width.max(0.0));
         self
@@ -454,6 +479,8 @@ impl Style {
 pub struct ComputedStyle {
     pub direction: Direction,
     pub wrap: bool,
+    pub align_items: AlignItems,
+    pub justify_content: JustifyContent,
     pub gap: f32,
     pub margin: Insets,
     pub padding: Insets,
@@ -467,6 +494,7 @@ pub struct ComputedStyle {
     pub text_color: Color,
     pub font_size: f32,
     pub radius: CornerRadii,
+    pub overflow_x: Overflow,
     pub overflow_y: Overflow,
     pub scrollbar_width: f32,
     pub scrollbar_handle_color: Color,
@@ -485,6 +513,8 @@ impl Default for ComputedStyle {
         Self {
             direction: Direction::Column,
             wrap: false,
+            align_items: AlignItems::Start,
+            justify_content: JustifyContent::Start,
             gap: 0.0,
             margin: Insets::ZERO,
             padding: Insets::ZERO,
@@ -498,6 +528,7 @@ impl Default for ComputedStyle {
             text_color: Color::rgb(218, 226, 234),
             font_size: 13.0,
             radius: CornerRadii::ZERO,
+            overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
             scrollbar_width: 2.0,
             scrollbar_handle_color: Color::rgba(232, 236, 240, 118),
@@ -520,6 +551,12 @@ impl ComputedStyle {
         }
         if let Some(value) = style.wrap {
             self.wrap = value;
+        }
+        if let Some(value) = style.align_items {
+            self.align_items = value;
+        }
+        if let Some(value) = style.justify_content {
+            self.justify_content = value;
         }
         if let Some(value) = style.gap {
             self.gap = value;
@@ -580,6 +617,9 @@ impl ComputedStyle {
         }
         if let Some(value) = style.overflow_y {
             self.overflow_y = value;
+        }
+        if let Some(value) = style.overflow_x {
+            self.overflow_x = value;
         }
         if let Some(value) = style.scrollbar_width {
             self.scrollbar_width = value.max(0.0);

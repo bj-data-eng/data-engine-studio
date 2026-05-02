@@ -14,20 +14,18 @@ pub(crate) fn update_element_style_animation(
     let mut animating = false;
 
     if let Some(state) = states.get_mut(&element.id) {
-        let next_style = match &state.rendered_style {
-            Some(current_style) => {
-                if let Some(transition) = target_style.transition {
-                    let (style, still_animating) =
-                        eased_style(current_style, &target_style, transition, snap_epsilon);
-                    animating |= still_animating;
-                    style
-                } else {
-                    target_style
-                }
+        let next_style = match (state.rendered_style.as_ref(), target_style.transition) {
+            (Some(current_style), Some(_)) if current_style == &target_style => Some(target_style),
+            (Some(current_style), Some(transition)) => {
+                let (style, still_animating) =
+                    eased_style(current_style, &target_style, transition, snap_epsilon);
+                animating |= still_animating;
+                Some(style)
             }
-            None => target_style,
+            (None, Some(_)) => Some(target_style),
+            (_, None) => None,
         };
-        state.rendered_style = Some(next_style);
+        state.rendered_style = next_style;
     }
 
     for child in &element.children {
@@ -43,6 +41,10 @@ fn eased_style(
     transition: Transition,
     snap_epsilon: f32,
 ) -> (ComputedStyle, bool) {
+    if current == target {
+        return (target.clone(), false);
+    }
+
     let amount = transition.easing.sample(transition.step.clamp(0.0, 1.0));
     let mut next = target.clone();
     let mut animating = false;

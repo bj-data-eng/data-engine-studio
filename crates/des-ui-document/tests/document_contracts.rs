@@ -1,7 +1,7 @@
 use des_ui_document::{
-    Color, CornerRadii, Document, DocumentEngine, DocumentInput, ElementId, ElementRole,
-    ElementSpec, ElementStateSelector, Insets, Length, Overflow, Point, PointerInput, Size, Style,
-    StyleSelector, StyleSheet, Transition,
+    AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentInput, ElementId,
+    ElementRole, ElementSpec, ElementStateSelector, Insets, JustifyContent, Length, Overflow,
+    Point, PointerInput, ScrollAxis, Size, Style, StyleSelector, StyleSheet, Transition,
 };
 
 #[test]
@@ -435,6 +435,95 @@ fn wrapped_row_layout_rearranges_children_and_expands_container_height() {
 }
 
 #[test]
+fn row_layout_applies_main_and_cross_axis_alignment() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .direction(des_ui_document::Direction::Row)
+                .size(160.0, 80.0)
+                .gap(10.0)
+                .justify_content(JustifyContent::Center)
+                .align_items(AlignItems::End),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default().size(40.0, 20.0),
+        );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.element("row", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element(
+                "item-0",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+            ui.element(
+                "item-1",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+
+    assert_eq!(
+        output.layout.find("item-0").unwrap().rect.origin,
+        Point::new(35.0, 60.0)
+    );
+    assert_eq!(
+        output.layout.find("item-1").unwrap().rect.origin,
+        Point::new(85.0, 60.0)
+    );
+}
+
+#[test]
+fn column_layout_applies_main_and_cross_axis_alignment() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("column"),
+            Style::default()
+                .direction(des_ui_document::Direction::Column)
+                .size(120.0, 120.0)
+                .gap(5.0)
+                .justify_content(JustifyContent::SpaceBetween)
+                .align_items(AlignItems::Center),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default().size(30.0, 20.0),
+        );
+    let document = Document::build(Size::new(180.0, 160.0), |ui| {
+        ui.element("column", ElementSpec::new(ElementRole::Panel), |ui| {
+            for index in 0..3 {
+                ui.element(
+                    format!("item-{index}"),
+                    ElementSpec::new(ElementRole::Card).class("item"),
+                    |_| {},
+                );
+            }
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+
+    assert_eq!(
+        output.layout.find("item-0").unwrap().rect.origin,
+        Point::new(45.0, 0.0)
+    );
+    assert_eq!(
+        output.layout.find("item-1").unwrap().rect.origin,
+        Point::new(45.0, 50.0)
+    );
+    assert_eq!(
+        output.layout.find("item-2").unwrap().rect.origin,
+        Point::new(45.0, 100.0)
+    );
+}
+
+#[test]
 fn fill_size_does_not_inflate_auto_sized_parent_during_intrinsic_measurement() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
@@ -731,6 +820,115 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
 }
 
 #[test]
+fn horizontal_overflow_scrolls_child_content_on_x_axis() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .direction(des_ui_document::Direction::Row)
+                .size(80.0, 70.0)
+                .gap(4.0)
+                .overflow_x(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default().size(50.0, 32.0),
+        );
+    let document = Document::build(Size::new(180.0, 120.0), |ui| {
+        ui.element("scroll-panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("item-0", ElementSpec::new(ElementRole::Card), |_| {});
+            ui.element("item-1", ElementSpec::new(ElementRole::Card), |_| {});
+            ui.element("item-2", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(20.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::new(-30.0, 0.0),
+        },
+    );
+
+    assert_eq!(engine.element_state("scroll-panel").unwrap().scroll_x, 30.0);
+    let output = engine.update(&document, &stylesheet);
+    assert_eq!(
+        output.layout.find("item-0").unwrap().rect.origin,
+        Point::new(-30.0, 0.0)
+    );
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Horizontal
+                && chrome.max_scroll > 0.0
+        }),
+        "horizontal overflow should emit horizontal scroll chrome"
+    );
+}
+
+#[test]
+fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default().size(70.0, 70.0).overflow(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(140.0, 140.0),
+        );
+    let document = Document::build(Size::new(180.0, 140.0), |ui| {
+        ui.element("scroll-panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element("content", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(20.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::new(-16.0, -24.0),
+        },
+    );
+
+    let state = engine.element_state("scroll-panel").unwrap();
+    assert_eq!(state.scroll_x, 16.0);
+    assert_eq!(state.scroll_y, 24.0);
+
+    let output = engine.update(&document, &stylesheet);
+    let content = output.layout.find("content").unwrap();
+    assert_eq!(content.rect.origin, Point::new(-16.0, -24.0));
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Horizontal
+        }),
+        "two-axis overflow should emit horizontal chrome"
+    );
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        }),
+        "two-axis overflow should emit vertical chrome"
+    );
+}
+
+#[test]
 fn scroll_delta_is_clamped_when_content_does_not_overflow() {
     let mut engine = DocumentEngine::default();
     let stylesheet = scroll_fixture_stylesheet(120.0);
@@ -768,7 +966,10 @@ fn overflow_scroll_container_emits_draggable_scroll_chrome() {
     let chrome = output
         .scroll_chrome
         .iter()
-        .find(|chrome| chrome.element_id == ElementId::new("scroll-panel"))
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
         .expect("overflowing panel should emit scroll chrome");
     assert!(chrome.max_scroll > 0.0);
     assert!(chrome.handle_rect.size.height < chrome.track_rect.size.height);

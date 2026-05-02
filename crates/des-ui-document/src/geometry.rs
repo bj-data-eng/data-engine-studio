@@ -152,9 +152,31 @@ pub enum Direction {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AlignItems {
+    Start,
+    Center,
+    End,
+    Stretch,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JustifyContent {
+    Start,
+    Center,
+    End,
+    SpaceBetween,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Overflow {
     Visible,
     Scroll,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScrollAxis {
+    Horizontal,
+    Vertical,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

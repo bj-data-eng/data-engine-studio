@@ -20,7 +20,8 @@ pub use element::{
 };
 pub use engine::DocumentEngine;
 pub use geometry::{
-    CornerRadii, Direction, Insets, Length, Overflow, Point, Position, PositionInsets, Rect, Size,
+    AlignItems, CornerRadii, Direction, Insets, JustifyContent, Length, Overflow, Point, Position,
+    PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use state::{
     ChangeSet, DocumentInput, DocumentOutput, ElementState, PointerInput, ResolvedElement,

@@ -1,9 +1,10 @@
 use crate::element::{ClassName, Color, ElementId, ElementRole};
-use crate::geometry::{Point, Rect};
+use crate::geometry::{Point, Rect, ScrollAxis};
 use crate::style::ComputedStyle;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ElementState {
+    pub scroll_x: f32,
     pub scroll_y: f32,
     pub hovered: bool,
     pub pressed: bool,
@@ -68,6 +69,7 @@ pub struct PointerInput {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollChrome {
     pub element_id: ElementId,
+    pub axis: ScrollAxis,
     pub track_rect: Rect,
     pub hit_rect: Rect,
     pub handle_rect: Rect,

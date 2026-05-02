@@ -5,7 +5,8 @@ use crate::graphics_testing::{
 };
 use des_ui_document::{
     Color, Document, DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec,
-    Insets, Length, Point, PointerInput, ResolvedElement, Size, Style, StyleSelector, StyleSheet,
+    Insets, Length, Point, PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
+    StyleSheet,
 };
 use egui_kittest::Harness;
 
@@ -54,6 +55,15 @@ fn assert_close(actual: f32, expected: f32) {
     assert!(
         (actual - expected).abs() < 0.01,
         "expected {actual} to be close to {expected}"
+    );
+}
+
+fn assert_scroll_chrome(output: &DocumentOutput, id: &str, axis: ScrollAxis) {
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id.as_str() == id && chrome.axis == axis && chrome.max_scroll > 0.0
+        }),
+        "expected {axis:?} scroll chrome for {id}"
     );
 }
 
@@ -218,6 +228,39 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
         18.0,
     );
 
+    let row_align_subject = frame(&output, "box-row-align-subject");
+    let row_align_chip_0 = frame(&output, "box-row-align-chip-0");
+    let row_align_chip_1 = frame(&output, "box-row-align-chip-1");
+    assert_close(
+        row_align_chip_0.rect.origin.x - row_align_subject.rect.origin.x,
+        32.0,
+    );
+    assert_close(
+        row_align_chip_1.rect.origin.x - row_align_chip_0.rect.origin.x,
+        20.0,
+    );
+    assert_close(
+        row_align_chip_0.rect.origin.y - row_align_subject.rect.origin.y,
+        42.0,
+    );
+
+    let column_align_subject = frame(&output, "box-column-align-subject");
+    let column_align_chip_0 = frame(&output, "box-column-align-chip-0");
+    let column_align_chip_1 = frame(&output, "box-column-align-chip-1");
+    let column_align_chip_2 = frame(&output, "box-column-align-chip-2");
+    assert_close(
+        column_align_chip_0.rect.origin.x - column_align_subject.rect.origin.x,
+        34.0,
+    );
+    assert_close(
+        column_align_chip_1.rect.origin.y - column_align_chip_0.rect.origin.y,
+        40.0,
+    );
+    assert_close(
+        column_align_chip_2.rect.origin.y - column_align_chip_1.rect.origin.y,
+        40.0,
+    );
+
     let visible_overflow_child = frame(&output, "box-visible-overflow-overflow-child");
     let visible_overflow_subject = frame(&output, "box-visible-overflow-subject");
     assert!(
@@ -285,11 +328,62 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     assert!(
         output.scroll_chrome.iter().any(|chrome| {
             chrome.element_id.as_str() == "box-scroll-overflow-subject"
+                && chrome.axis == ScrollAxis::Vertical
                 && chrome.handle_rect.size.width == 2.0
                 && chrome.handle_color.a == 118
         }),
         "scroll overflow specimen should emit scroll chrome"
     );
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id.as_str() == "box-scroll-x-overflow-subject"
+                && chrome.axis == ScrollAxis::Horizontal
+                && chrome.handle_rect.size.height == 2.0
+                && chrome.handle_color.a == 118
+        }),
+        "horizontal scroll specimen should emit horizontal scroll chrome"
+    );
+    let two_axis_count = output
+        .scroll_chrome
+        .iter()
+        .filter(|chrome| chrome.element_id.as_str() == "box-scroll-xy-overflow-subject")
+        .count();
+    assert_eq!(
+        two_axis_count, 2,
+        "two-axis scroll specimen should emit one chrome per axis"
+    );
+}
+
+#[test]
+fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
+    let output = lab_output("scrolling");
+
+    assert_scroll_chrome(&output, "scroll-panel-a-list", ScrollAxis::Vertical);
+    assert_scroll_chrome(&output, "scroll-panel-b-list", ScrollAxis::Horizontal);
+    assert_scroll_chrome(
+        &output,
+        "scroll-panel-b-row-0-mini-list",
+        ScrollAxis::Vertical,
+    );
+    assert_scroll_chrome(&output, "scroll-panel-c-list", ScrollAxis::Horizontal);
+    assert_scroll_chrome(&output, "scroll-panel-c-list", ScrollAxis::Vertical);
+    assert_scroll_chrome(&output, "scroll-nested-vertical-list", ScrollAxis::Vertical);
+    assert_scroll_chrome(
+        &output,
+        "scroll-nested-horizontal-list",
+        ScrollAxis::Horizontal,
+    );
+    assert_scroll_chrome(
+        &output,
+        "scroll-nested-horizontal-row-0-mini-list",
+        ScrollAxis::Vertical,
+    );
+    assert_scroll_chrome(
+        &output,
+        "scroll-nested-two-axis-list",
+        ScrollAxis::Horizontal,
+    );
+    assert_scroll_chrome(&output, "scroll-nested-two-axis-list", ScrollAxis::Vertical);
 }
 
 #[test]

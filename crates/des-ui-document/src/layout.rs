@@ -1,5 +1,7 @@
 use crate::element::{Element, ElementId, ElementRole};
-use crate::geometry::{Direction, Length, Overflow, Point, Position, Rect, Size};
+use crate::geometry::{
+    AlignItems, Direction, JustifyContent, Length, Overflow, Point, Position, Rect, Size,
+};
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ComputedStyle, StyleSheet, resolve_style};
 use std::collections::HashMap;
@@ -9,7 +11,7 @@ pub(crate) fn layout_element(
     parent_rect: Rect,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
-    scroll_limits: &mut HashMap<ElementId, f32>,
+    scroll_limits: &mut HashMap<ElementId, Size>,
 ) -> ResolvedElement {
     layout_element_in_viewport(
         element,
@@ -27,7 +29,7 @@ fn layout_element_in_viewport(
     viewport_rect: Rect,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
-    scroll_limits: &mut HashMap<ElementId, f32>,
+    scroll_limits: &mut HashMap<ElementId, Size>,
 ) -> ResolvedElement {
     let style = computed_style_for(element, stylesheet, states);
     let rect = element_rect(
@@ -41,16 +43,22 @@ fn layout_element_in_viewport(
     let inner_rect = rect.inset(style.border_width);
     let mut content_rect = inner_rect.inset(style.padding);
     let content_size = measure_children(element, &style, content_rect.size, stylesheet, states);
-    if style.overflow_y == Overflow::Scroll {
+    if style.overflow_x == Overflow::Scroll || style.overflow_y == Overflow::Scroll {
         scroll_limits.insert(
             element.id.clone(),
-            (content_size.height - content_rect.size.height).max(0.0),
+            Size::new(
+                (content_size.width - content_rect.size.width).max(0.0),
+                (content_size.height - content_rect.size.height).max(0.0),
+            ),
         );
     }
-    if style.overflow_y == Overflow::Scroll
-        && let Some(state) = states.get(&element.id)
-    {
-        content_rect.origin.y -= state.scroll_y;
+    if let Some(state) = states.get(&element.id) {
+        if style.overflow_x == Overflow::Scroll {
+            content_rect.origin.x -= state.scroll_x;
+        }
+        if style.overflow_y == Overflow::Scroll {
+            content_rect.origin.y -= state.scroll_y;
+        }
     }
     let children = layout_children(
         element,
@@ -123,7 +131,101 @@ fn layout_children(
     viewport_rect: Rect,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
-    scroll_limits: &mut HashMap<ElementId, f32>,
+    scroll_limits: &mut HashMap<ElementId, Size>,
+) -> Vec<ResolvedElement> {
+    if style.direction == Direction::Row && style.wrap {
+        return layout_wrapped_children(
+            element,
+            style,
+            content_rect,
+            viewport_rect,
+            stylesheet,
+            states,
+            scroll_limits,
+        );
+    }
+
+    let flow_metrics: Vec<_> = element
+        .children
+        .iter()
+        .map(|child| {
+            let child_style = computed_style_for(child, stylesheet, states);
+            if child_style.position != Position::Flow {
+                return None;
+            }
+            Some(measure_flow_child(
+                child,
+                child_style,
+                content_rect.size,
+                stylesheet,
+                states,
+            ))
+        })
+        .collect();
+    let flow_child_count = flow_metrics
+        .iter()
+        .filter(|metrics| metrics.is_some())
+        .count();
+    let total_main = total_main_size(&flow_metrics, style);
+    let available_main = main_axis_size(content_rect.size, style.direction);
+    let free_main = (available_main - total_main).max(0.0);
+    let (mut cursor_main, gap) = aligned_main_axis(
+        style.justify_content,
+        style.gap,
+        free_main,
+        flow_child_count,
+    );
+    let mut frames = Vec::with_capacity(element.children.len());
+
+    for (child, metrics) in element.children.iter().zip(flow_metrics) {
+        let child_style = computed_style_for(child, stylesheet, states);
+        if child_style.position != Position::Flow {
+            frames.push(layout_element_in_viewport(
+                child,
+                content_rect,
+                viewport_rect,
+                stylesheet,
+                states,
+                scroll_limits,
+            ));
+            continue;
+        }
+
+        let metrics = metrics.expect("flow child should have measured metrics");
+        let outer_main = main_axis_size(metrics.outer, style.direction);
+        let outer_cross = cross_axis_size(metrics.outer, style.direction);
+        let available_cross = cross_axis_size(content_rect.size, style.direction);
+        let cursor_cross = aligned_cross_axis(style.align_items, available_cross, outer_cross);
+        let child_rect = flow_child_parent_rect(
+            content_rect,
+            style.direction,
+            cursor_main,
+            cursor_cross,
+            metrics.available,
+        );
+        frames.push(layout_element_in_viewport(
+            child,
+            child_rect,
+            viewport_rect,
+            stylesheet,
+            states,
+            scroll_limits,
+        ));
+
+        cursor_main += outer_main + gap;
+    }
+
+    frames
+}
+
+fn layout_wrapped_children(
+    element: &Element,
+    style: &ComputedStyle,
+    content_rect: Rect,
+    viewport_rect: Rect,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+    scroll_limits: &mut HashMap<ElementId, Size>,
 ) -> Vec<ResolvedElement> {
     let mut cursor = content_rect.origin;
     let mut line_height: f32 = 0.0;
@@ -143,19 +245,9 @@ fn layout_children(
             continue;
         }
 
-        let child_available = Size::new(
-            (content_rect.size.width - child_style.margin.horizontal()).max(0.0),
-            (content_rect.size.height - child_style.margin.vertical()).max(0.0),
-        );
-        let measured =
-            measure_intrinsic_element(child, &child_style, child_available, stylesheet, states);
-        let outer_width = measured.width + child_style.margin.horizontal();
-        let outer_height = measured.height + child_style.margin.vertical();
+        let metrics = measure_flow_child(child, child_style, content_rect.size, stylesheet, states);
 
-        if style.direction == Direction::Row
-            && style.wrap
-            && cursor.x > content_rect.origin.x
-            && cursor.x + outer_width > content_rect.right()
+        if cursor.x > content_rect.origin.x && cursor.x + metrics.outer.width > content_rect.right()
         {
             cursor.x = content_rect.origin.x;
             cursor.y += line_height + style.gap;
@@ -165,8 +257,8 @@ fn layout_children(
         let child_rect = Rect::new(
             cursor.x,
             cursor.y,
-            child_available.width,
-            child_available.height,
+            metrics.available.width,
+            metrics.available.height,
         );
         frames.push(layout_element_in_viewport(
             child,
@@ -177,16 +269,118 @@ fn layout_children(
             scroll_limits,
         ));
 
-        match style.direction {
-            Direction::Column => cursor.y += outer_height + style.gap,
-            Direction::Row => {
-                cursor.x += outer_width + style.gap;
-                line_height = line_height.max(outer_height);
-            }
-        }
+        cursor.x += metrics.outer.width + style.gap;
+        line_height = line_height.max(metrics.outer.height);
     }
 
     frames
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FlowChildMetrics {
+    available: Size,
+    outer: Size,
+}
+
+fn measure_flow_child(
+    child: &Element,
+    child_style: ComputedStyle,
+    parent_size: Size,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+) -> FlowChildMetrics {
+    let available = child_available_size(parent_size, &child_style);
+    let measured = measure_intrinsic_element(child, &child_style, available, stylesheet, states);
+    FlowChildMetrics {
+        available,
+        outer: Size::new(
+            measured.width + child_style.margin.horizontal(),
+            measured.height + child_style.margin.vertical(),
+        ),
+    }
+}
+
+fn child_available_size(parent_size: Size, child_style: &ComputedStyle) -> Size {
+    Size::new(
+        (parent_size.width - child_style.margin.horizontal()).max(0.0),
+        (parent_size.height - child_style.margin.vertical()).max(0.0),
+    )
+}
+
+fn total_main_size(children: &[Option<FlowChildMetrics>], style: &ComputedStyle) -> f32 {
+    let mut total = 0.0;
+    let mut count = 0;
+    for metrics in children.iter().flatten() {
+        total += main_axis_size(metrics.outer, style.direction);
+        count += 1;
+    }
+    if count > 1 {
+        total += style.gap * (count - 1) as f32;
+    }
+    total
+}
+
+fn aligned_main_axis(
+    justify_content: JustifyContent,
+    base_gap: f32,
+    free_space: f32,
+    child_count: usize,
+) -> (f32, f32) {
+    match justify_content {
+        JustifyContent::Start => (0.0, base_gap),
+        JustifyContent::Center => (free_space / 2.0, base_gap),
+        JustifyContent::End => (free_space, base_gap),
+        JustifyContent::SpaceBetween if child_count > 1 => {
+            (0.0, base_gap + free_space / (child_count - 1) as f32)
+        }
+        JustifyContent::SpaceBetween => (0.0, base_gap),
+    }
+}
+
+fn aligned_cross_axis(align_items: AlignItems, available: f32, outer: f32) -> f32 {
+    let free_space = (available - outer).max(0.0);
+    match align_items {
+        AlignItems::Start | AlignItems::Stretch => 0.0,
+        AlignItems::Center => free_space / 2.0,
+        AlignItems::End => free_space,
+    }
+}
+
+fn flow_child_parent_rect(
+    content_rect: Rect,
+    direction: Direction,
+    cursor_main: f32,
+    cursor_cross: f32,
+    available: Size,
+) -> Rect {
+    match direction {
+        Direction::Column => Rect::new(
+            content_rect.origin.x + cursor_cross,
+            content_rect.origin.y + cursor_main,
+            available.width,
+            available.height,
+        ),
+        Direction::Row => Rect::new(
+            content_rect.origin.x + cursor_main,
+            content_rect.origin.y + cursor_cross,
+            available.width,
+            available.height,
+        ),
+    }
+}
+
+fn main_axis_size(size: Size, direction: Direction) -> f32 {
+    match direction {
+        Direction::Column => size.height,
+        Direction::Row => size.width,
+    }
+}
+
+fn cross_axis_size(size: Size, direction: Direction) -> f32 {
+    match direction {
+        Direction::Column => size.width,
+        Direction::Row => size.height,
+    }
 }
 
 fn positioned_rect(style: &ComputedStyle, containing_rect: Rect, measured: Size) -> Rect {
@@ -450,7 +644,9 @@ pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&Res
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
 
-    let may_hit_children = frame.style.overflow_y != Overflow::Scroll || frame.rect.contains(point);
+    let clips_overflow =
+        frame.style.overflow_x == Overflow::Scroll || frame.style.overflow_y == Overflow::Scroll;
+    let may_hit_children = !clips_overflow || frame.rect.contains(point);
     if may_hit_children
         && let Some(mut child_path) = children
             .into_iter()
