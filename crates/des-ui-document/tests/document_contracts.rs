@@ -232,6 +232,28 @@ fn transitioned_state_rules_ease_visual_style_properties() {
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.style.background, Some(Color::rgb(31, 48, 62)));
+    assert!(!output.metrics.reused_input_layout);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(2.0, 2.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert!(card.style.background.unwrap().r > 31);
+    assert!(output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_style);
+    assert!(!output.metrics.animation_changed_layout);
+    assert!(output.metrics.animation_changed_paint);
 
     let output = (0..28)
         .map(|_| {
@@ -340,6 +362,27 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
     assert_eq!(card.style.border_width, Insets::all(4.0));
     assert_eq!(card.style.radius, CornerRadii::all(8.0));
     assert_eq!(card.style.font_size, 14.0);
+    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_style);
+    assert!(output.metrics.animation_changed_layout);
+    assert!(output.metrics.animation_changed_paint);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(4.0, 4.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_layout);
 }
 
 #[test]

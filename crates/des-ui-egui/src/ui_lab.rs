@@ -243,6 +243,14 @@ impl UiLabState {
                             "style changed: {}",
                             self.last_perf.metrics.animation_changed_style
                         ));
+                        ui.label(format!(
+                            "layout changed: {}",
+                            self.last_perf.metrics.animation_changed_layout
+                        ));
+                        ui.label(format!(
+                            "paint changed: {}",
+                            self.last_perf.metrics.animation_changed_paint
+                        ));
                     });
             });
     }

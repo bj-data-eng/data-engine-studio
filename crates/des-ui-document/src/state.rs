@@ -62,6 +62,8 @@ pub struct DocumentMetrics {
     pub reused_input_layout: bool,
     pub input_changed_state: bool,
     pub animation_changed_style: bool,
+    pub animation_changed_layout: bool,
+    pub animation_changed_paint: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

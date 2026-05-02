@@ -69,10 +69,8 @@ impl DocumentEngine {
         let animation_update = self.update_style_animation(document, stylesheet);
         let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
 
-        let needs_final_layout = input_update.changed
-            || clamp_changed
-            || animation_update.changed
-            || scrollbar_animation_update.changed;
+        let needs_final_layout =
+            input_update.changed || clamp_changed || animation_update.layout_changed;
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
             let mut scroll_limits = HashMap::new();
             let layout = layout_element(
@@ -87,7 +85,17 @@ impl DocumentEngine {
             let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
             (layout, scroll_chrome, false)
         } else {
-            (input_layout, input_scroll_chrome, true)
+            let mut layout = input_layout;
+            if animation_update.paint_changed {
+                apply_rendered_styles(&mut layout, &self.states);
+            }
+            let scroll_chrome =
+                if animation_update.paint_changed || scrollbar_animation_update.paint_changed {
+                    scroll_chrome(&layout, &self.states, &self.scroll_limits)
+                } else {
+                    input_scroll_chrome
+                };
+            (layout, scroll_chrome, true)
         };
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
@@ -103,8 +111,11 @@ impl DocumentEngine {
                 scroll_chrome_count,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
-                animation_changed_style: animation_update.changed
-                    || scrollbar_animation_update.changed,
+                animation_changed_style: animation_update.changed()
+                    || scrollbar_animation_update.changed(),
+                animation_changed_layout: animation_update.layout_changed,
+                animation_changed_paint: animation_update.paint_changed
+                    || scrollbar_animation_update.paint_changed,
             },
         }
     }
@@ -388,9 +399,22 @@ impl DocumentEngine {
         let changed = current_slot.is_none_or(|value| (value - next).abs() > f32::EPSILON);
         *current_slot = Some(next);
         AnimationUpdate {
-            changed,
+            paint_changed: changed,
+            layout_changed: false,
             animating: (next - target).abs() > snap_epsilon,
         }
+    }
+}
+
+fn apply_rendered_styles(frame: &mut ResolvedElement, states: &HashMap<ElementId, ElementState>) {
+    if let Some(style) = states
+        .get(&frame.id)
+        .and_then(|state| state.rendered_style.clone())
+    {
+        frame.style = style;
+    }
+    for child in &mut frame.children {
+        apply_rendered_styles(child, states);
     }
 }
 

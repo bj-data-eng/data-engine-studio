@@ -6,8 +6,15 @@ use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct AnimationUpdate {
-    pub changed: bool,
+    pub paint_changed: bool,
+    pub layout_changed: bool,
     pub animating: bool,
+}
+
+impl AnimationUpdate {
+    pub(crate) fn changed(self) -> bool {
+        self.paint_changed || self.layout_changed
+    }
 }
 
 pub(crate) fn update_element_style_animation(
@@ -33,7 +40,7 @@ pub(crate) fn update_element_style_animation(
             (_, None) => None,
         };
         state.rendered_style = next_style;
-        update.changed |= state.rendered_style != previous;
+        update += classify_style_update(previous.as_ref(), state.rendered_style.as_ref());
     }
 
     for child in &element.children {
@@ -45,9 +52,50 @@ pub(crate) fn update_element_style_animation(
 
 impl std::ops::AddAssign for AnimationUpdate {
     fn add_assign(&mut self, rhs: Self) {
-        self.changed |= rhs.changed;
+        self.paint_changed |= rhs.paint_changed;
+        self.layout_changed |= rhs.layout_changed;
         self.animating |= rhs.animating;
     }
+}
+
+fn classify_style_update(
+    previous: Option<&ComputedStyle>,
+    next: Option<&ComputedStyle>,
+) -> AnimationUpdate {
+    match (previous, next) {
+        (Some(previous), Some(next)) if previous == next => AnimationUpdate::default(),
+        (Some(previous), Some(next)) => AnimationUpdate {
+            paint_changed: true,
+            layout_changed: layout_relevant_style_changed(previous, next),
+            animating: false,
+        },
+        (None, None) => AnimationUpdate::default(),
+        _ => AnimationUpdate {
+            paint_changed: true,
+            layout_changed: true,
+            animating: false,
+        },
+    }
+}
+
+fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle) -> bool {
+    previous.direction != next.direction
+        || previous.wrap != next.wrap
+        || previous.align_items != next.align_items
+        || previous.justify_content != next.justify_content
+        || previous.gap != next.gap
+        || previous.margin != next.margin
+        || previous.padding != next.padding
+        || previous.width != next.width
+        || previous.height != next.height
+        || previous.min_size != next.min_size
+        || previous.max_size != next.max_size
+        || previous.border_width != next.border_width
+        || previous.font_size != next.font_size
+        || previous.overflow_x != next.overflow_x
+        || previous.overflow_y != next.overflow_y
+        || previous.position != next.position
+        || previous.inset != next.inset
 }
 
 fn eased_style(
