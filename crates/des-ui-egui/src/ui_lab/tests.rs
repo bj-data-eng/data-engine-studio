@@ -10,6 +10,8 @@ use des_ui_document::{
 };
 use egui_kittest::Harness;
 
+const INTERACTION_LOOP_SCROLL_Y: f32 = 300.0;
+
 fn lab_harness(initial_view: &str) -> Harness<'_, UiLabState> {
     test_harness(UiLabState::new(Some(initial_view)), |ui, state| {
         state.render(ui, false);
@@ -75,7 +77,16 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
 fn state_output(state: &UiLabState) -> DocumentOutput {
     let mut engine = DocumentEngine::default();
     let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    engine.update(&document, &stylesheet())
+    engine.update(&document, &state.active_stylesheet())
+}
+
+fn state_output_with_scroll(state: &UiLabState, scroll_y: f32) -> DocumentOutput {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = state.active_stylesheet();
+    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    engine.update(&document, &stylesheet);
+    engine.element_state_mut("stage").unwrap().scroll_y = scroll_y;
+    engine.update(&document, &stylesheet)
 }
 
 fn has_class(frame: &ResolvedElement, class: &str) -> bool {
@@ -90,6 +101,24 @@ fn assert_close(actual: f32, expected: f32) {
         (actual - expected).abs() < 0.01,
         "expected {actual} to be close to {expected}"
     );
+}
+
+fn center(rect: des_ui_document::Rect) -> egui::Pos2 {
+    egui::pos2(
+        rect.origin.x + rect.size.width / 2.0,
+        rect.origin.y + rect.size.height / 2.0,
+    )
+}
+
+fn scroll_harness_stage(harness: &mut Harness<'_, UiLabState>, scroll_y: f32) {
+    harness.run();
+    harness
+        .state_mut()
+        .document_engine
+        .element_state_mut("stage")
+        .unwrap()
+        .scroll_y = scroll_y;
+    harness.run();
 }
 
 fn assert_scroll_chrome(output: &DocumentOutput, id: &str, axis: ScrollAxis) {
@@ -299,18 +328,26 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
         "loop-source-duckdb"
     ));
 
-    for id in [
+    scroll_harness_stage(&mut harness, INTERACTION_LOOP_SCROLL_Y);
+    let loop_button = frame(
+        &state_output_with_scroll(harness.state(), INTERACTION_LOOP_SCROLL_Y),
         "loop-action-button",
+    )
+    .rect;
+    let target = center(loop_button);
+    harness.hover_at(target);
+    harness.drag_at(target);
+    harness.drop_at(target);
+    harness.run();
+
+    scroll_harness_stage(&mut harness, 0.0);
+    for id in [
         "control-checkbox",
         "control-radio-remote",
         "control-dropdown",
         "control-dropdown-option-python",
     ] {
-        let rect = state_rect(harness.state(), id);
-        let target = egui::pos2(
-            rect.origin.x + rect.size.width / 2.0,
-            rect.origin.y + rect.size.height / 2.0,
-        );
+        let target = center(state_rect(harness.state(), id));
         harness.hover_at(target);
         harness.drag_at(target);
         harness.drop_at(target);
@@ -367,13 +404,15 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
 #[test]
 fn interaction_update_loop_refreshes_text_on_repeated_button_clicks() {
     let mut harness = lab_harness("interaction");
+    scroll_harness_stage(&mut harness, INTERACTION_LOOP_SCROLL_Y);
 
     for expected in 1..=2 {
-        let rect = state_rect(harness.state(), "loop-action-button");
-        let target = egui::pos2(
-            rect.origin.x + rect.size.width / 2.0,
-            rect.origin.y + rect.size.height / 2.0,
-        );
+        let rect = frame(
+            &state_output_with_scroll(harness.state(), INTERACTION_LOOP_SCROLL_Y),
+            "loop-action-button",
+        )
+        .rect;
+        let target = center(rect);
         harness.hover_at(target);
         harness.drag_at(target);
         harness.drop_at(target);
@@ -391,6 +430,103 @@ fn interaction_update_loop_refreshes_text_on_repeated_button_clicks() {
             Some(expected_value.as_str())
         );
     }
+}
+
+#[test]
+fn interaction_drag_drop_grid_moves_items_between_cells() {
+    let mut harness = lab_harness("interaction");
+
+    assert_eq!(harness.state().drag_item_cells, [0, 2, 4]);
+
+    let start = center(state_rect(harness.state(), "drag-item-0"));
+    let destination = center(state_rect(harness.state(), "drag-cell-3"));
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.run();
+    assert_eq!(harness.state().active_drag_item(), Some(0));
+    assert!(harness.state().active_drag.is_some());
+
+    harness.hover_at(destination);
+    harness.run();
+    let output = state_output(harness.state());
+    let overlay = frame(&output, "drag-overlay");
+    assert_eq!(overlay.text.as_deref(), None);
+    assert!(has_class(overlay, "drag-overlay"));
+    assert!(
+        frame(&output, "drag-cell-0")
+            .children
+            .iter()
+            .all(|child| child.id.as_str() != "drag-item-0"),
+        "active drag item should be lifted out of its source cell"
+    );
+    assert!(
+        overlay
+            .rect
+            .contains(Point::new(destination.x, destination.y)),
+        "drag overlay should follow the pointer before drop"
+    );
+
+    harness.event(egui::Event::PointerButton {
+        pos: destination,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+
+    assert_eq!(harness.state().active_drag_item(), None);
+    assert!(harness.state().active_drag.is_none());
+    assert_eq!(harness.state().drag_item_cells[0], 3);
+
+    let output = state_output(harness.state());
+    let item = frame(&output, "drag-item-0");
+    let cell = frame(&output, "drag-cell-3");
+    assert_eq!(item.value.as_deref(), Some("Customers"));
+    assert!(
+        cell.rect.contains(Point::new(
+            item.rect.origin.x + item.rect.size.width / 2.0,
+            item.rect.origin.y + item.rect.size.height / 2.0,
+        )),
+        "moved item should be laid out inside the destination cell"
+    );
+}
+
+#[test]
+fn interaction_drag_drop_uses_snapshot_path_for_drop_targets() {
+    let output = lab_output("interaction");
+    let cell = frame(&output, "drag-cell-5").rect;
+    let point = Point::new(
+        cell.origin.x + cell.size.width / 2.0,
+        cell.origin.y + cell.size.height / 2.0,
+    );
+    assert_eq!(drop_cell_at(&output, point), Some(5));
+}
+
+#[test]
+fn interaction_drag_drop_cells_expand_to_fit_stacked_items() {
+    let mut state = UiLabState::new(Some("interaction"));
+    state.drag_item_cells = [0, 0, 0];
+    let output = state_output(&state);
+    let cell = frame(&output, "drag-cell-0");
+
+    assert!(
+        cell.rect.size.height > 140.0,
+        "stacked drag cell should expand beyond the single-item minimum height"
+    );
+    for item in ["drag-item-0", "drag-item-1", "drag-item-2"] {
+        let item = frame(&output, item);
+        assert!(
+            cell.rect.contains(Point::new(
+                item.rect.origin.x + item.rect.size.width / 2.0,
+                item.rect.origin.y + item.rect.size.height / 2.0,
+            )),
+            "stacked drag item should remain inside the expanded drop cell"
+        );
+    }
+    assert!(
+        frame(&output, "drag-grid").rect.bottom() >= cell.rect.bottom(),
+        "drag grid should expand around an expanded drop cell"
+    );
 }
 
 #[test]

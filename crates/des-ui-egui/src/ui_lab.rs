@@ -9,8 +9,9 @@ use styles::stylesheet;
 use views::{render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentEventKind, DocumentMetrics, DocumentOutput,
-    DocumentUpdate, ElementId, ElementRole, ElementSpec, Size, StyleSheet,
+    Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentMetrics,
+    DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Length, PointerInput,
+    Size, Style, StyleSelector, StyleSheet,
 };
 use eframe::egui;
 use std::time::{Duration, Instant};
@@ -92,6 +93,8 @@ pub(crate) struct UiLabState {
     dropdown_open: bool,
     dropdown_choice: usize,
     loop_action_count: usize,
+    drag_item_cells: [usize; 3],
+    active_drag: Option<DocumentDrag>,
     last_perf: UiLabPerf,
 }
 
@@ -108,6 +111,8 @@ impl Default for UiLabState {
             dropdown_open: false,
             dropdown_choice: 1,
             loop_action_count: 0,
+            drag_item_cells: [0, 2, 4],
+            active_drag: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -127,16 +132,14 @@ impl UiLabState {
         let viewport = ui.max_rect().size();
         let document_start = Instant::now();
         let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
+        let stylesheet = self.active_stylesheet();
         let document_time = document_start.elapsed();
         let input = document_input(ui, origin);
-        let primary_clicked = input
-            .pointer
-            .map(|pointer| pointer.primary_clicked)
-            .unwrap_or(false);
+        let pointer = input.pointer;
         let engine_start = Instant::now();
         let output = self
             .document_engine
-            .update_with_input(&document, &self.stylesheet, input);
+            .update_with_input(&document, &stylesheet, input);
         let engine_time = engine_start.elapsed();
 
         let paint_start = Instant::now();
@@ -149,7 +152,7 @@ impl UiLabState {
             paint_time,
             metrics: output.metrics,
         };
-        self.apply_clicks(ui, &output, primary_clicked);
+        self.apply_document_events(ui, &output, pointer);
         if debug_overlay {
             self.paint_debug_overlay(ui);
         }
@@ -158,15 +161,39 @@ impl UiLabState {
         }
     }
 
-    fn apply_clicks(&mut self, ui: &egui::Ui, output: &DocumentOutput, primary_clicked: bool) {
+    fn apply_document_events(
+        &mut self,
+        ui: &egui::Ui,
+        output: &DocumentOutput,
+        pointer: Option<PointerInput>,
+    ) {
         let was_dropdown_open = self.dropdown_open;
+        let primary_clicked = pointer
+            .map(|pointer| pointer.primary_clicked)
+            .unwrap_or(false);
+        let previous_drag = self.active_drag.clone();
+        self.active_drag = output.active_drag.clone();
+        if self.active_drag != previous_drag {
+            ui.ctx().request_repaint();
+        }
+        if let Some(drag) = &output.completed_drag {
+            self.finish_drag(output, drag);
+            ui.ctx().request_repaint();
+        }
         for event in &output.events {
-            if event.kind != DocumentEventKind::Clicked {
-                continue;
-            }
-            if let Some(action) = lab_action_for_id(event.target.as_str()) {
-                self.apply_lab_action(action);
-                ui.ctx().request_repaint();
+            match event.kind {
+                DocumentEventKind::Clicked => {
+                    if let Some(action) = lab_action_for_id(event.target.as_str()) {
+                        self.apply_lab_action(action);
+                        ui.ctx().request_repaint();
+                    }
+                }
+                DocumentEventKind::Pressed => {
+                    if drag_item_for_id(event.target.as_str()).is_some() {
+                        ui.ctx().request_repaint();
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -178,6 +205,15 @@ impl UiLabState {
             self.dropdown_open = false;
             ui.ctx().request_repaint();
         }
+    }
+
+    fn finish_drag(&mut self, output: &DocumentOutput, drag: &DocumentDrag) {
+        if let Some(item) = drag_item_for_id(drag.target.as_str())
+            && let Some(cell) = drop_cell_at(output, drag.current)
+        {
+            self.drag_item_cells[item] = cell;
+        }
+        self.active_drag = None;
     }
 
     fn apply_lab_action(&mut self, action: LabAction) {
@@ -217,6 +253,9 @@ impl UiLabState {
                                 self.radio_choice,
                                 self.dropdown_open,
                                 self.dropdown_choice,
+                                self.drag_item_cells,
+                                self.active_drag_item(),
+                                self.active_drag.as_ref().map(|drag| drag.current),
                             );
                         },
                     );
@@ -227,6 +266,27 @@ impl UiLabState {
             document.apply_update(&self.interaction_document_update());
         }
         document
+    }
+
+    fn active_drag_item(&self) -> Option<usize> {
+        self.active_drag
+            .as_ref()
+            .and_then(|drag| drag_item_for_id(drag.target.as_str()))
+    }
+
+    fn active_stylesheet(&self) -> StyleSheet {
+        let mut stylesheet = self.stylesheet.clone();
+        if let Some(drag) = &self.active_drag {
+            stylesheet.push_rule(
+                StyleSelector::id("drag-overlay"),
+                Style::default()
+                    .absolute_viewport()
+                    .left(Length::Px(drag.current.x - drag.pointer_offset.x))
+                    .top(Length::Px(drag.current.y - drag.pointer_offset.y))
+                    .z_index(100),
+            );
+        }
+        stylesheet
     }
 
     fn interaction_document_update(&self) -> DocumentUpdate {
@@ -369,6 +429,27 @@ impl UiLabState {
                     });
             });
     }
+}
+
+fn drag_item_for_id(id: &str) -> Option<usize> {
+    id.strip_prefix("drag-item-")
+        .and_then(|suffix| suffix.parse::<usize>().ok())
+        .filter(|index| *index < 3)
+}
+
+fn drop_cell_at(output: &DocumentOutput, point: des_ui_document::Point) -> Option<usize> {
+    output
+        .snapshot()
+        .elements_with_class("drag-cell")
+        .into_iter()
+        .filter(|element| element.rect().contains(point))
+        .find_map(|element| drop_cell_for_id(element.id().as_str()))
+}
+
+fn drop_cell_for_id(id: &str) -> Option<usize> {
+    id.strip_prefix("drag-cell-")
+        .and_then(|suffix| suffix.parse::<usize>().ok())
+        .filter(|index| *index < 6)
 }
 
 fn lab_action_for_id(id: &str) -> Option<LabAction> {

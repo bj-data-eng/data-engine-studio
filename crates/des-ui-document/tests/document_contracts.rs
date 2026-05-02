@@ -1242,6 +1242,95 @@ fn pointer_input_emits_document_interaction_events() {
 }
 
 #[test]
+fn document_engine_captures_primary_pointer_drag() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("card"),
+        Style::default().size(100.0, 40.0),
+    );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+            |_| {},
+        );
+    });
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(12.0, 10.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    let drag = output.active_drag.expect("pressed card should start drag");
+    assert_eq!(drag.target, ElementId::new("card"));
+    assert_eq!(drag.origin, Point::new(12.0, 10.0));
+    assert_eq!(drag.current, Point::new(12.0, 10.0));
+    assert_eq!(drag.delta, Point::ZERO);
+    assert_eq!(drag.pointer_offset, Point::new(12.0, 10.0));
+    assert!(output.completed_drag.is_none());
+    assert!(output.events.contains(&DocumentEvent::drag_started("card")));
+    assert!(engine.element_state("card").unwrap().dragging);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(180.0, 120.0),
+                primary_delta: Point::new(168.0, 110.0),
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    let drag = output
+        .active_drag
+        .expect("drag should remain captured off card");
+    assert_eq!(drag.target, ElementId::new("card"));
+    assert_eq!(drag.origin, Point::new(12.0, 10.0));
+    assert_eq!(drag.current, Point::new(180.0, 120.0));
+    assert_eq!(drag.delta, Point::new(168.0, 110.0));
+    assert!(output.completed_drag.is_none());
+    assert_eq!(output.hit_id, Some(ElementId::new("card")));
+    assert!(output.events.contains(&DocumentEvent::drag_moved("card")));
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(180.0, 120.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    let completed = output
+        .completed_drag
+        .expect("release should expose completed drag");
+    assert!(output.active_drag.is_none());
+    assert_eq!(completed.target, ElementId::new("card"));
+    assert_eq!(completed.current, Point::new(180.0, 120.0));
+    assert_eq!(completed.delta, Point::new(168.0, 110.0));
+    assert!(output.events.contains(&DocumentEvent::drag_ended("card")));
+    assert!(!engine.element_state("card").unwrap().dragging);
+}
+
+#[test]
 fn scroll_delta_updates_hovered_scroll_container_state() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

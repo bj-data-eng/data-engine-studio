@@ -781,6 +781,70 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default().background(Color::rgb(38, 32, 48)),
         )
         .rule(
+            StyleSelector::class("drag-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width(Length::Px(520.0))
+                .height(Length::Auto)
+                .padding(Insets::all(8.0))
+                .gap(8.0)
+                .background(Color::rgb(17, 21, 25))
+                .border(Color::rgb(42, 50, 58))
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("drag-cell"),
+            Style::default()
+                .width(Length::Px(244.0))
+                .height(Length::Auto)
+                .min_size(0.0, 70.0)
+                .padding(Insets::all(7.0))
+                .gap(5.0)
+                .background(Color::rgb(20, 25, 30))
+                .border(Color::rgb(48, 57, 65))
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class_state("drag-cell", ElementStateSelector::Hovered),
+            Style::default()
+                .background(Color::rgb(25, 32, 38))
+                .border(Color::rgb(88, 157, 230)),
+        )
+        .rule(
+            StyleSelector::class("drag-item"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(34.0))
+                .padding(Insets::symmetric(9.0, 6.0))
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(CARD_SELECTED)
+                .border(STROKE_SELECTED)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class_state("drag-item", ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(42, 74, 102)),
+        )
+        .rule(
+            StyleSelector::class_state("drag-item", ElementStateSelector::Pressed),
+            Style::default().background(CARD_PRESSED),
+        )
+        .rule(
+            StyleSelector::class("drag-item-active"),
+            Style::default()
+                .background(Color::rgb(45, 37, 68))
+                .border(PURPLE),
+        )
+        .rule(
+            StyleSelector::class("drag-overlay"),
+            Style::default()
+                .width(Length::Px(230.0))
+                .height(Length::Px(34.0))
+                .z_index(100),
+        )
+        .rule(
             StyleSelector::class("feature-card"),
             Style::default()
                 .size(250.0, 98.0)

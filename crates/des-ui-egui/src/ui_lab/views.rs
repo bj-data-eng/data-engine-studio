@@ -88,6 +88,9 @@ pub(super) fn render_stage(
     radio_choice: usize,
     dropdown_open: bool,
     dropdown_choice: usize,
+    drag_item_cells: [usize; 3],
+    active_drag_item: Option<usize>,
+    drag_pointer: Option<des_ui_document::Point>,
 ) {
     ui.element(
         "stage",
@@ -102,6 +105,9 @@ pub(super) fn render_stage(
                 radio_choice,
                 dropdown_open,
                 dropdown_choice,
+                drag_item_cells,
+                active_drag_item,
+                drag_pointer,
             ),
             LabView::Styling => render_styling_view(ui, dense_mode),
             LabView::Animation => render_animation_view(ui),
@@ -554,6 +560,9 @@ fn render_interaction_view(
     radio_choice: usize,
     dropdown_open: bool,
     dropdown_choice: usize,
+    drag_item_cells: [usize; 3],
+    active_drag_item: Option<usize>,
+    drag_pointer: Option<des_ui_document::Point>,
 ) {
     ui.text_element(
         "interaction-heading",
@@ -622,6 +631,7 @@ fn render_interaction_view(
             control_text_inputs(ui);
         },
     );
+    render_drag_drop_lab(ui, drag_item_cells, active_drag_item, drag_pointer);
     render_document_update_loop(ui);
 }
 
@@ -718,6 +728,88 @@ fn loop_result_card(
                 text_id,
                 ElementSpec::new(ElementRole::Text).class("control-label"),
                 fallback,
+            );
+        },
+    );
+}
+
+fn render_drag_drop_lab(
+    ui: &mut des_ui_document::DocumentBuilder,
+    drag_item_cells: [usize; 3],
+    active_drag_item: Option<usize>,
+    drag_pointer: Option<des_ui_document::Point>,
+) {
+    ui.text_element(
+        "drag-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Drag and drop grid",
+    );
+    ui.element(
+        "drag-grid",
+        ElementSpec::new(ElementRole::Panel).class("drag-grid"),
+        |ui| {
+            for cell in 0..6 {
+                let column = if cell % 2 == 0 { "Left" } else { "Right" };
+                let row = cell / 2 + 1;
+                ui.element(
+                    format!("drag-cell-{cell}"),
+                    ElementSpec::new(ElementRole::Panel).class("drag-cell"),
+                    |ui| {
+                        ui.text_element(
+                            format!("drag-cell-{cell}-label"),
+                            ElementSpec::new(ElementRole::Text).class("muted"),
+                            format!("{column} row {row}"),
+                        );
+                        for (item, item_cell) in drag_item_cells.iter().enumerate() {
+                            if *item_cell == cell && active_drag_item != Some(item) {
+                                drag_item(ui, item, active_drag_item == Some(item));
+                            }
+                        }
+                    },
+                );
+            }
+        },
+    );
+    if let Some(item) = active_drag_item
+        && drag_pointer.is_some()
+    {
+        drag_overlay(ui, item);
+    }
+}
+
+fn drag_item(ui: &mut des_ui_document::DocumentBuilder, item: usize, active: bool) {
+    let label = ["Customers", "Orders", "Rates"][item];
+    let mut spec = ElementSpec::new(ElementRole::Card)
+        .class("drag-item")
+        .interactive()
+        .value(label);
+    if active {
+        spec = spec.class("drag-item-active").selected(true);
+    }
+    ui.element(format!("drag-item-{item}"), spec, |ui| {
+        ui.text_element(
+            format!("drag-item-{item}-label"),
+            ElementSpec::new(ElementRole::Text).class("control-label"),
+            label,
+        );
+    });
+}
+
+fn drag_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
+    let label = ["Customers", "Orders", "Rates"][item];
+    ui.element(
+        "drag-overlay",
+        ElementSpec::new(ElementRole::Card)
+            .class("drag-item")
+            .class("drag-item-active")
+            .class("drag-overlay")
+            .selected(true)
+            .value(label),
+        |ui| {
+            ui.text_element(
+                "drag-overlay-label",
+                ElementSpec::new(ElementRole::Text).class("control-label"),
+                label,
             );
         },
     );

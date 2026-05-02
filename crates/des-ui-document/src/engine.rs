@@ -4,8 +4,8 @@ use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, layout_element};
 use crate::scroll::scroll_chrome;
 use crate::state::{
-    ChangeSet, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput, ElementState,
-    PointerInput, ResolvedElement, ScrollChrome,
+    ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
+    ElementState, PointerInput, ResolvedElement, ScrollChrome,
 };
 use crate::style::{
     ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change, resolve_style,
@@ -18,9 +18,34 @@ struct ScrollDrag {
     pointer_offset_from_handle_start: f32,
 }
 
+#[derive(Clone, Debug)]
+struct PointerDrag {
+    target: ElementId,
+    origin: crate::geometry::Point,
+    current: crate::geometry::Point,
+    pointer_offset: crate::geometry::Point,
+}
+
+impl PointerDrag {
+    fn document_drag(&self) -> DocumentDrag {
+        DocumentDrag {
+            target: self.target.clone(),
+            origin: self.origin,
+            current: self.current,
+            delta: crate::geometry::Point::new(
+                self.current.x - self.origin.x,
+                self.current.y - self.origin.y,
+            ),
+            pointer_offset: self.pointer_offset,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 struct InputUpdate {
     hit_id: Option<ElementId>,
+    active_drag: Option<DocumentDrag>,
+    completed_drag: Option<DocumentDrag>,
     events: Vec<DocumentEvent>,
     changed: bool,
     layout_changed: bool,
@@ -32,6 +57,7 @@ struct InteractionSnapshot {
     scroll_y: f32,
     hovered: bool,
     pressed: bool,
+    dragging: bool,
     scrollbar_hovered_axis: Option<ScrollAxis>,
     scrollbar_dragged_axis: Option<ScrollAxis>,
     scrollbar_visual_width_x: Option<f32>,
@@ -39,11 +65,19 @@ struct InteractionSnapshot {
     click_count: u32,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+struct PointerDragUpdate {
+    changed: bool,
+    active_drag: Option<DocumentDrag>,
+    completed_drag: Option<DocumentDrag>,
+}
+
 #[derive(Default)]
 pub struct DocumentEngine {
     states: HashMap<ElementId, ElementState>,
     scroll_limits: HashMap<ElementId, Size>,
     active_scroll_drag: Option<ScrollDrag>,
+    active_pointer_drag: Option<PointerDrag>,
     cached_layout: Option<ResolvedElement>,
     cached_document_root: Option<Element>,
 }
@@ -134,6 +168,8 @@ impl DocumentEngine {
             changes,
             layout,
             hit_id: input_update.hit_id,
+            active_drag: input_update.active_drag,
+            completed_drag: input_update.completed_drag,
             events: input_update.events,
             scroll_chrome,
             animating: animation_update.animating || scrollbar_animation_update.animating,
@@ -209,11 +245,16 @@ impl DocumentEngine {
         for state in self.states.values_mut() {
             state.hovered = false;
             state.pressed = false;
+            state.dragging = false;
             state.scrollbar_hovered_axis = None;
             state.scrollbar_dragged_axis = None;
         }
 
         let Some(pointer) = input.pointer else {
+            if let Some(drag) = self.active_pointer_drag.take() {
+                update.completed_drag = Some(drag.document_drag());
+                update.changed = true;
+            }
             return finalize_input_update(update, &self.states, &previous);
         };
         let scrollbar_hit = scroll_chrome
@@ -238,6 +279,33 @@ impl DocumentEngine {
                 state.scrollbar_dragged_axis = Some(active_drag.axis);
             }
             update.hit_id = Some(active_drag.element_id.clone());
+            return finalize_input_update(update, &self.states, &previous);
+        }
+
+        if self.active_pointer_drag.is_some() {
+            let drag_update = self.update_pointer_drag(pointer, None);
+            update.changed |= drag_update.changed;
+            update.active_drag = drag_update.active_drag;
+            update.completed_drag = drag_update.completed_drag;
+            if let Some(active_drag) = &update.active_drag {
+                update.hit_id = Some(active_drag.target.clone());
+            } else if let Some(completed_drag) = &update.completed_drag {
+                update.hit_id = Some(completed_drag.target.clone());
+            }
+            if let Some(hit_id) = &update.hit_id
+                && let Some(state) = self.states.get_mut(hit_id)
+            {
+                state.hovered = true;
+                state.pressed = pointer.primary_down;
+                state.dragging = pointer.primary_down;
+                if update
+                    .completed_drag
+                    .as_ref()
+                    .is_some_and(|drag| drag_delta_is_click(drag))
+                {
+                    state.click_count += 1;
+                }
+            }
             return finalize_input_update(update, &self.states, &previous);
         }
 
@@ -289,8 +357,70 @@ impl DocumentEngine {
                 state.click_count += 1;
             }
         }
+        let hit_frame = update
+            .hit_id
+            .as_ref()
+            .and_then(|hit_id| path.iter().find(|frame| frame.id == *hit_id));
+        let drag_update = self.update_pointer_drag(pointer, hit_frame.copied());
+        update.changed |= drag_update.changed;
+        update.active_drag = drag_update.active_drag;
+        update.completed_drag = drag_update.completed_drag;
+        if let Some(active_drag) = &self.active_pointer_drag
+            && let Some(state) = self.states.get_mut(&active_drag.target)
+        {
+            state.dragging = true;
+        }
 
         finalize_input_update(update, &self.states, &previous)
+    }
+
+    fn update_pointer_drag(
+        &mut self,
+        pointer: PointerInput,
+        hit_frame: Option<&ResolvedElement>,
+    ) -> PointerDragUpdate {
+        if !pointer.primary_down {
+            return self
+                .active_pointer_drag
+                .take()
+                .map(|drag| PointerDragUpdate {
+                    changed: true,
+                    active_drag: None,
+                    completed_drag: Some(drag.document_drag()),
+                })
+                .unwrap_or_default();
+        }
+
+        if let Some(drag) = &mut self.active_pointer_drag {
+            let changed = drag.current != pointer.position;
+            drag.current = pointer.position;
+            return PointerDragUpdate {
+                changed,
+                active_drag: Some(drag.document_drag()),
+                completed_drag: None,
+            };
+        }
+
+        let Some(hit_frame) = hit_frame.filter(|frame| frame.interactive) else {
+            return PointerDragUpdate::default();
+        };
+        self.active_pointer_drag = Some(PointerDrag {
+            target: hit_frame.id.clone(),
+            origin: pointer.position,
+            current: pointer.position,
+            pointer_offset: crate::geometry::Point::new(
+                pointer.position.x - hit_frame.rect.origin.x,
+                pointer.position.y - hit_frame.rect.origin.y,
+            ),
+        });
+        PointerDragUpdate {
+            changed: true,
+            active_drag: self
+                .active_pointer_drag
+                .as_ref()
+                .map(PointerDrag::document_drag),
+            completed_drag: None,
+        }
     }
 
     fn apply_scrollbar_input(
@@ -501,6 +631,10 @@ fn set_f32(target: &mut f32, value: f32) -> bool {
     changed
 }
 
+fn drag_delta_is_click(drag: &DocumentDrag) -> bool {
+    drag.delta.x.abs() <= f32::EPSILON && drag.delta.y.abs() <= f32::EPSILON
+}
+
 fn interaction_snapshot(
     states: &HashMap<ElementId, ElementState>,
 ) -> HashMap<ElementId, InteractionSnapshot> {
@@ -514,6 +648,7 @@ fn interaction_snapshot(
                     scroll_y: state.scroll_y,
                     hovered: state.hovered,
                     pressed: state.pressed,
+                    dragging: state.dragging,
                     scrollbar_hovered_axis: state.scrollbar_hovered_axis,
                     scrollbar_dragged_axis: state.scrollbar_dragged_axis,
                     scrollbar_visual_width_x: state.scrollbar_visual_width_x,
@@ -536,6 +671,7 @@ fn interaction_changed(
                 scroll_y: state.scroll_y,
                 hovered: state.hovered,
                 pressed: state.pressed,
+                dragging: state.dragging,
                 scrollbar_hovered_axis: state.scrollbar_hovered_axis,
                 scrollbar_dragged_axis: state.scrollbar_dragged_axis,
                 scrollbar_visual_width_x: state.scrollbar_visual_width_x,
@@ -550,7 +686,9 @@ fn finalize_input_update(
     states: &HashMap<ElementId, ElementState>,
     previous: &HashMap<ElementId, InteractionSnapshot>,
 ) -> InputUpdate {
-    update.events = interaction_events(states, previous);
+    let mut events = interaction_events(states, previous);
+    events.append(&mut update.events);
+    update.events = events;
     update.changed |= interaction_changed(states, previous);
     update.layout_changed |= scroll_position_changed(states, previous);
     update
@@ -581,6 +719,15 @@ fn interaction_events(
         }
         if previous.pressed && !state.pressed {
             events.push(DocumentEvent::released(id.clone()));
+        }
+        if !previous.dragging && state.dragging {
+            events.push(DocumentEvent::drag_started(id.clone()));
+        }
+        if previous.dragging && state.dragging {
+            events.push(DocumentEvent::drag_moved(id.clone()));
+        }
+        if previous.dragging && !state.dragging {
+            events.push(DocumentEvent::drag_ended(id.clone()));
         }
         if state.click_count > previous.click_count {
             events.push(DocumentEvent::clicked(id.clone()));

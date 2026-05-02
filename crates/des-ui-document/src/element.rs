@@ -27,6 +27,7 @@ pub enum Glyph {
 pub enum ElementStateSelector {
     Hovered,
     Pressed,
+    Dragged,
     ScrollbarHovered,
     ScrollbarDragged,
     Focused,

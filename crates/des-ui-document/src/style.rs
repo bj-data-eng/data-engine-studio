@@ -990,6 +990,7 @@ fn state_selector_matches(
     match selector {
         ElementStateSelector::Hovered => state.is_some_and(|state| state.hovered),
         ElementStateSelector::Pressed => state.is_some_and(|state| state.pressed),
+        ElementStateSelector::Dragged => state.is_some_and(|state| state.dragging),
         ElementStateSelector::ScrollbarHovered => {
             state.is_some_and(|state| state.scrollbar_hovered_axis.is_some())
         }

@@ -9,6 +9,7 @@ pub struct ElementState {
     pub scroll_y: f32,
     pub hovered: bool,
     pub pressed: bool,
+    pub dragging: bool,
     pub scrollbar_hovered_axis: Option<ScrollAxis>,
     pub scrollbar_dragged_axis: Option<ScrollAxis>,
     pub(crate) scrollbar_visual_width_x: Option<f32>,
@@ -53,6 +54,8 @@ pub struct DocumentOutput {
     pub changes: ChangeSet,
     pub layout: ResolvedElement,
     pub hit_id: Option<ElementId>,
+    pub active_drag: Option<DocumentDrag>,
+    pub completed_drag: Option<DocumentDrag>,
     pub events: Vec<DocumentEvent>,
     pub scroll_chrome: Vec<ScrollChrome>,
     pub animating: bool,
@@ -102,6 +105,18 @@ impl DocumentEvent {
     pub fn scrolled(target: impl Into<ElementId>, axis: ScrollAxis) -> Self {
         Self::new(target, DocumentEventKind::Scrolled(axis))
     }
+
+    pub fn drag_started(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::DragStarted)
+    }
+
+    pub fn drag_moved(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::DragMoved)
+    }
+
+    pub fn drag_ended(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::DragEnded)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -111,7 +126,19 @@ pub enum DocumentEventKind {
     Pressed,
     Released,
     Clicked,
+    DragStarted,
+    DragMoved,
+    DragEnded,
     Scrolled(ScrollAxis),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentDrag {
+    pub target: ElementId,
+    pub origin: Point,
+    pub current: Point,
+    pub delta: Point,
+    pub pointer_offset: Point,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
