@@ -1,4 +1,6 @@
 mod app;
+#[cfg(test)]
+mod test_graphics;
 mod theme;
 mod ui_lab;
 

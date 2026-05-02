@@ -19,3 +19,4 @@ iconflow = { workspace = true, features = ["pack-lucide"] }
 
 [dev-dependencies]
 egui_kittest = { version = "0.34.1", features = ["wgpu"] }
+image = { version = "0.25", default-features = false, features = ["png"] }

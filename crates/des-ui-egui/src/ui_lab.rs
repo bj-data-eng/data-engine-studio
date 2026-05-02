@@ -1119,26 +1119,26 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 #[cfg(test)]
 mod graphical_tests {
     use super::*;
+    use crate::test_graphics::{
+        TEST_HEIGHT, TEST_WIDTH, assert_exact_image_match, compare_images, image_stats,
+        render_harness, test_harness,
+    };
     use egui_kittest::Harness;
 
     fn lab_harness(initial_view: &str) -> Harness<'_, UiLabState> {
-        Harness::builder()
-            .with_size(egui::vec2(1320.0, 780.0))
-            .with_pixels_per_point(1.0)
-            .with_step_dt(1.0 / 60.0)
-            .with_max_steps(24)
-            .wgpu()
-            .build_ui_state(
-                |ui, state: &mut UiLabState| {
-                    state.render(ui, false);
-                },
-                UiLabState::new(Some(initial_view)),
-            )
+        test_harness(UiLabState::new(Some(initial_view)), |ui, state| {
+            state.render(ui, false);
+        })
+    }
+
+    fn lab_image(initial_view: &str) -> image::RgbaImage {
+        render_harness(&mut lab_harness(initial_view))
     }
 
     fn lab_rect(id: &str) -> des_ui_runtime::Rect {
         let mut runtime = Runtime::default();
-        let scene = UiLabState::new(Some("layout")).scene(Size::new(1320.0, 780.0), false);
+        let scene =
+            UiLabState::new(Some("layout")).scene(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
         let output = runtime.update(&scene, &stylesheet());
         find_frame(&output.layout, id)
             .unwrap_or_else(|| panic!("expected layout frame for {id}"))
@@ -1169,15 +1169,13 @@ mod graphical_tests {
 
     #[test]
     fn kittest_renders_lab_frame_to_pixels() {
-        let mut harness = lab_harness("layout");
+        let image = lab_image("layout");
+        let stats = image_stats(&image);
 
-        harness.run();
-        let image = harness.render().expect("render UI lab through kittest");
-
-        assert_eq!(image.width(), 1320);
-        assert_eq!(image.height(), 780);
+        assert_eq!(stats.width, TEST_WIDTH as u32);
+        assert_eq!(stats.height, TEST_HEIGHT as u32);
         assert!(
-            image.pixels().any(|pixel| pixel.0[3] > 0),
+            stats.non_transparent_pixels > stats.total_pixels / 4,
             "expected the rendered UI lab image to contain visible pixels"
         );
     }
@@ -1197,5 +1195,45 @@ mod graphical_tests {
         harness.run();
 
         assert_eq!(harness.state().view, LabView::Interaction);
+    }
+
+    #[test]
+    fn graphical_comparison_matches_identical_lab_views() {
+        let first = lab_image("layout");
+        let second = lab_image("layout");
+
+        assert_exact_image_match(&first, &second);
+    }
+
+    #[test]
+    fn graphical_comparison_detects_different_lab_views() {
+        let layout = lab_image("layout");
+        let scrolling = lab_image("scrolling");
+        let comparison = compare_images(&layout, &scrolling);
+
+        assert!(
+            comparison.differing_pixels > comparison.compared_pixels / 20,
+            "expected visibly different lab views, got {comparison:?}"
+        );
+    }
+
+    #[test]
+    fn clicked_nav_view_matches_directly_seeded_view() {
+        let mut clicked = lab_harness("layout");
+        let rect = lab_rect("view-interaction");
+        let interaction_nav_item = egui::pos2(
+            rect.origin.x + rect.size.width / 2.0,
+            rect.origin.y + rect.size.height / 2.0,
+        );
+
+        clicked.hover_at(interaction_nav_item);
+        clicked.drag_at(interaction_nav_item);
+        clicked.drop_at(interaction_nav_item);
+        clicked.run();
+
+        let clicked_image = render_harness(&mut clicked);
+        let direct_image = lab_image("interaction");
+
+        assert_exact_image_match(&clicked_image, &direct_image);
     }
 }

@@ -216,6 +216,14 @@ Harness knobs:
 
 Use `-DebugOverlay` for UI lab diagnostics. As the runtime lab grows, prefer seeding views through launch-time options and app commands rather than test-only branches in the product UI.
 
+UI graphical testing:
+
+```powershell
+just ui-test
+```
+
+See `docs/UI_TESTING.md` for the runtime assertion, reference-test, graphical comparison, interaction, and manual lab testing layers.
+
 Fast UI launch for local iteration:
 
 ```powershell
