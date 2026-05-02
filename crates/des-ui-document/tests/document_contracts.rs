@@ -1008,6 +1008,84 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
 }
 
 #[test]
+fn nested_scroll_chrome_is_clipped_by_ancestor_scroll_viewport() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("horizontal-parent"),
+            Style::default()
+                .direction(des_ui_document::Direction::Row)
+                .size(120.0, 96.0)
+                .gap(10.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("nested-list"),
+            Style::default()
+                .size(70.0, 74.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0),
+        )
+        .rule(
+            StyleSelector::class("nested-row"),
+            Style::default().size(54.0, 28.0),
+        );
+    let document = Document::build(Size::new(180.0, 140.0), |ui| {
+        ui.element(
+            "horizontal-parent",
+            ElementSpec::new(ElementRole::Panel),
+            |ui| {
+                for list_index in 0..3 {
+                    ui.element(
+                        format!("nested-list-{list_index}"),
+                        ElementSpec::new(ElementRole::Panel).class("nested-list"),
+                        |ui| {
+                            for row_index in 0..5 {
+                                ui.element(
+                                    format!("nested-list-{list_index}-row-{row_index}"),
+                                    ElementSpec::new(ElementRole::Card).class("nested-row"),
+                                    |_| {},
+                                );
+                            }
+                        },
+                    );
+                }
+            },
+        );
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let visible_parent_right = output
+        .layout
+        .find("horizontal-parent")
+        .unwrap()
+        .rect
+        .right();
+    let nested_vertical_chrome: Vec<_> = output
+        .scroll_chrome
+        .iter()
+        .filter(|chrome| {
+            chrome.element_id.as_str().starts_with("nested-list-")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .collect();
+
+    assert_eq!(
+        nested_vertical_chrome.len(),
+        1,
+        "only the fully visible nested list should expose vertical chrome"
+    );
+    let chrome = nested_vertical_chrome[0];
+    assert_eq!(chrome.element_id, ElementId::new("nested-list-0"));
+    assert!(chrome.hit_rect.right() <= visible_parent_right);
+    assert!(chrome.track_rect.right() <= visible_parent_right);
+    assert!(chrome.handle_rect.right() <= visible_parent_right);
+}
+
+#[test]
 fn scroll_delta_is_clamped_when_content_does_not_overflow() {
     let mut engine = DocumentEngine::default();
     let stylesheet = scroll_fixture_stylesheet(120.0);

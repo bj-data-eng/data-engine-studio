@@ -9,7 +9,7 @@ pub(crate) fn scroll_chrome(
     scroll_limits: &HashMap<ElementId, Size>,
 ) -> Vec<ScrollChrome> {
     let mut chrome = Vec::new();
-    collect_scroll_chrome(frame, states, scroll_limits, &mut chrome);
+    collect_scroll_chrome(frame, states, scroll_limits, None, &mut chrome);
     chrome
 }
 
@@ -17,29 +17,37 @@ fn collect_scroll_chrome(
     frame: &ResolvedElement,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &HashMap<ElementId, Size>,
+    clip_rect: Option<Rect>,
     chrome: &mut Vec<ScrollChrome>,
 ) {
     if let Some(max_scroll) = scroll_limits.get(&frame.id).copied() {
         if frame.style.overflow_y == Overflow::Scroll && max_scroll.height > 0.0 {
-            chrome.push(scroll_chrome_for_frame(
+            if let Some(scroll_chrome) = scroll_chrome_for_frame(
                 frame,
                 states,
                 ScrollAxis::Vertical,
                 max_scroll.height,
-            ));
+                clip_rect,
+            ) {
+                chrome.push(scroll_chrome);
+            }
         }
         if frame.style.overflow_x == Overflow::Scroll && max_scroll.width > 0.0 {
-            chrome.push(scroll_chrome_for_frame(
+            if let Some(scroll_chrome) = scroll_chrome_for_frame(
                 frame,
                 states,
                 ScrollAxis::Horizontal,
                 max_scroll.width,
-            ));
+                clip_rect,
+            ) {
+                chrome.push(scroll_chrome);
+            }
         }
     }
 
+    let child_clip = child_clip_rect(frame, clip_rect);
     for child in &frame.children {
-        collect_scroll_chrome(child, states, scroll_limits, chrome);
+        collect_scroll_chrome(child, states, scroll_limits, child_clip, chrome);
     }
 }
 
@@ -48,7 +56,8 @@ fn scroll_chrome_for_frame(
     states: &HashMap<ElementId, ElementState>,
     axis: ScrollAxis,
     max_scroll: f32,
-) -> ScrollChrome {
+    clip_rect: Option<Rect>,
+) -> Option<ScrollChrome> {
     const HIT_WIDTH: f32 = 12.0;
     const MIN_HANDLE_LENGTH: f32 = 18.0;
 
@@ -148,6 +157,15 @@ fn scroll_chrome_for_frame(
             ),
         ),
     };
+    let (track_rect, hit_rect, handle_rect) = if let Some(clip_rect) = clip_rect {
+        (
+            track_rect.intersect(clip_rect)?,
+            hit_rect.intersect(clip_rect)?,
+            handle_rect.intersect(clip_rect)?,
+        )
+    } else {
+        (track_rect, hit_rect, handle_rect)
+    };
     let handle_color = if dragged {
         frame
             .style
@@ -201,7 +219,7 @@ fn scroll_chrome_for_frame(
         frame.style.scrollbar_handle_border_width
     };
 
-    ScrollChrome {
+    Some(ScrollChrome {
         element_id: frame.id.clone(),
         axis,
         track_rect,
@@ -217,5 +235,41 @@ fn scroll_chrome_for_frame(
         expanded,
         hovered: scrollbar_hovered,
         dragged,
+    })
+}
+
+fn child_clip_rect(frame: &ResolvedElement, parent_clip: Option<Rect>) -> Option<Rect> {
+    if frame.style.overflow_x != Overflow::Scroll && frame.style.overflow_y != Overflow::Scroll {
+        return parent_clip;
     }
+
+    let viewport_rect = frame
+        .rect
+        .inset(frame.style.border_width)
+        .inset(frame.style.padding);
+    let left = if frame.style.overflow_x == Overflow::Scroll {
+        viewport_rect.origin.x
+    } else {
+        parent_clip.map_or(f32::NEG_INFINITY, |clip| clip.origin.x)
+    };
+    let right = if frame.style.overflow_x == Overflow::Scroll {
+        viewport_rect.right()
+    } else {
+        parent_clip.map_or(f32::INFINITY, Rect::right)
+    };
+    let top = if frame.style.overflow_y == Overflow::Scroll {
+        viewport_rect.origin.y
+    } else {
+        parent_clip.map_or(f32::NEG_INFINITY, |clip| clip.origin.y)
+    };
+    let bottom = if frame.style.overflow_y == Overflow::Scroll {
+        viewport_rect.bottom()
+    } else {
+        parent_clip.map_or(f32::INFINITY, Rect::bottom)
+    };
+
+    let scroll_clip = Rect::new(left, top, right - left, bottom - top);
+    parent_clip
+        .and_then(|clip| clip.intersect(scroll_clip))
+        .or(Some(scroll_clip))
 }

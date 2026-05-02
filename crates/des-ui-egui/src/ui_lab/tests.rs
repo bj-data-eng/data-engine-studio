@@ -31,10 +31,23 @@ fn lab_rect(id: &str) -> des_ui_document::Rect {
 }
 
 fn lab_output(initial_view: &str) -> DocumentOutput {
+    lab_output_with_size(initial_view, Size::new(TEST_WIDTH, TEST_HEIGHT))
+}
+
+fn lab_output_with_size(initial_view: &str, size: Size) -> DocumentOutput {
+    let mut engine = DocumentEngine::default();
+    let document = UiLabState::new(Some(initial_view)).document(size, false);
+    engine.update(&document, &stylesheet())
+}
+
+fn lab_output_with_stage_scroll(initial_view: &str, scroll_y: f32) -> DocumentOutput {
     let mut engine = DocumentEngine::default();
     let document =
         UiLabState::new(Some(initial_view)).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    engine.update(&document, &stylesheet())
+    let stylesheet = stylesheet();
+    engine.update(&document, &stylesheet);
+    engine.element_state_mut("stage").unwrap().scroll_y = scroll_y;
+    engine.update(&document, &stylesheet)
 }
 
 fn find_frame<'a>(frame: &'a ResolvedElement, id: &str) -> Option<&'a ResolvedElement> {
@@ -151,7 +164,7 @@ fn clicked_nav_view_matches_directly_seeded_view() {
 
 #[test]
 fn box_model_specimens_cover_size_inset_and_flow_contracts() {
-    let output = lab_output("layout");
+    let output = lab_output_with_size("layout", Size::new(TEST_WIDTH, 1600.0));
 
     assert!(
         output.scroll_chrome.iter().any(|chrome| {
@@ -325,17 +338,17 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     let absolute_window_child = frame(&output, "box-absolute-window-child");
     assert_eq!(absolute_window_child.rect.origin, Point::new(420.0, 140.0));
 
+    let overflow_output = lab_output_with_stage_scroll("layout", 620.0);
     assert!(
-        output.scroll_chrome.iter().any(|chrome| {
+        overflow_output.scroll_chrome.iter().any(|chrome| {
             chrome.element_id.as_str() == "box-scroll-overflow-subject"
                 && chrome.axis == ScrollAxis::Vertical
-                && chrome.handle_rect.size.width == 2.0
                 && chrome.handle_color.a == 118
         }),
         "scroll overflow specimen should emit scroll chrome"
     );
     assert!(
-        output.scroll_chrome.iter().any(|chrome| {
+        overflow_output.scroll_chrome.iter().any(|chrome| {
             chrome.element_id.as_str() == "box-scroll-x-overflow-subject"
                 && chrome.axis == ScrollAxis::Horizontal
                 && chrome.handle_rect.size.height == 2.0
@@ -343,7 +356,7 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
         }),
         "horizontal scroll specimen should emit horizontal scroll chrome"
     );
-    let two_axis_count = output
+    let two_axis_count = overflow_output
         .scroll_chrome
         .iter()
         .filter(|chrome| chrome.element_id.as_str() == "box-scroll-xy-overflow-subject")
@@ -367,23 +380,33 @@ fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
     );
     assert_scroll_chrome(&output, "scroll-panel-c-list", ScrollAxis::Horizontal);
     assert_scroll_chrome(&output, "scroll-panel-c-list", ScrollAxis::Vertical);
-    assert_scroll_chrome(&output, "scroll-nested-vertical-list", ScrollAxis::Vertical);
+
+    let nested_output = lab_output_with_stage_scroll("scrolling", 340.0);
     assert_scroll_chrome(
-        &output,
+        &nested_output,
+        "scroll-nested-vertical-list",
+        ScrollAxis::Vertical,
+    );
+    assert_scroll_chrome(
+        &nested_output,
         "scroll-nested-horizontal-list",
         ScrollAxis::Horizontal,
     );
     assert_scroll_chrome(
-        &output,
+        &nested_output,
         "scroll-nested-horizontal-row-0-mini-list",
         ScrollAxis::Vertical,
     );
     assert_scroll_chrome(
-        &output,
+        &nested_output,
         "scroll-nested-two-axis-list",
         ScrollAxis::Horizontal,
     );
-    assert_scroll_chrome(&output, "scroll-nested-two-axis-list", ScrollAxis::Vertical);
+    assert_scroll_chrome(
+        &nested_output,
+        "scroll-nested-two-axis-list",
+        ScrollAxis::Vertical,
+    );
 }
 
 #[test]

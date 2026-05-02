@@ -61,6 +61,18 @@ impl Rect {
             && point.y >= self.origin.y
             && point.y <= self.bottom()
     }
+
+    pub fn intersect(self, other: Self) -> Option<Self> {
+        let left = self.origin.x.max(other.origin.x);
+        let top = self.origin.y.max(other.origin.y);
+        let right = self.right().min(other.right());
+        let bottom = self.bottom().min(other.bottom());
+        if right <= left || bottom <= top {
+            return None;
+        }
+
+        Some(Self::new(left, top, right - left, bottom - top))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
