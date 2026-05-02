@@ -74,7 +74,7 @@ impl From<String> for ElementId {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ClassName(String);
 
 impl ClassName {
