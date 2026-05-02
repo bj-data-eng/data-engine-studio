@@ -1,7 +1,7 @@
 use des_ui_runtime::{
     Color, Direction, ElementRole, ElementSpec, ElementStateSelector, Insets, LayoutFrame,
     Overflow, Point, PointerInput, Runtime, RuntimeInput, RuntimeOutput, Scene, Size, StylePatch,
-    StyleSelector, StyleSheet,
+    StyleSelector, StyleSheet, Transition,
 };
 use eframe::egui;
 use std::collections::BTreeMap;
@@ -26,15 +26,31 @@ enum LabView {
     Layout,
     Interaction,
     Styling,
+    Scrolling,
+    Nesting,
     Graph,
 }
 
 impl LabView {
+    fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "layout" | "view-layout" => Some(Self::Layout),
+            "interaction" | "view-interaction" => Some(Self::Interaction),
+            "styling" | "view-styling" => Some(Self::Styling),
+            "scrolling" | "view-scrolling" => Some(Self::Scrolling),
+            "nesting" | "view-nesting" => Some(Self::Nesting),
+            "graph" | "view-graph" => Some(Self::Graph),
+            _ => None,
+        }
+    }
+
     fn id(self) -> &'static str {
         match self {
             Self::Layout => "view-layout",
             Self::Interaction => "view-interaction",
             Self::Styling => "view-styling",
+            Self::Scrolling => "view-scrolling",
+            Self::Nesting => "view-nesting",
             Self::Graph => "view-graph",
         }
     }
@@ -44,6 +60,8 @@ impl LabView {
             Self::Layout => "Layout",
             Self::Interaction => "Interaction",
             Self::Styling => "Styling",
+            Self::Scrolling => "Scrolling",
+            Self::Nesting => "Nesting",
             Self::Graph => "Graph",
         }
     }
@@ -70,6 +88,14 @@ impl Default for UiLabState {
 }
 
 impl UiLabState {
+    pub(crate) fn new(initial_view: Option<&str>) -> Self {
+        let mut state = Self::default();
+        if let Some(view) = initial_view.and_then(LabView::from_id) {
+            state.view = view;
+        }
+        state
+    }
+
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
@@ -80,7 +106,11 @@ impl UiLabState {
             .update_with_input(&scene, &stylesheet, runtime_input(ui, origin));
 
         paint_frame(ui, origin, &output.layout);
+        paint_scroll_chrome(ui, origin, &output.scroll_chrome);
         self.apply_clicks(ui, &output);
+        if output.animating {
+            ui.ctx().request_repaint();
+        }
     }
 
     fn apply_clicks(&mut self, ui: &egui::Ui, _output: &RuntimeOutput) {
@@ -91,6 +121,8 @@ impl UiLabState {
                 LabAction::SelectView(LabView::Interaction),
             ),
             ("view-styling", LabAction::SelectView(LabView::Styling)),
+            ("view-scrolling", LabAction::SelectView(LabView::Scrolling)),
+            ("view-nesting", LabAction::SelectView(LabView::Nesting)),
             ("view-graph", LabAction::SelectView(LabView::Graph)),
             ("toggle-optional-card", LabAction::ToggleOptionalCard),
             ("toggle-density", LabAction::ToggleDensity),
@@ -179,6 +211,8 @@ fn render_nav(ui: &mut des_ui_runtime::Ui, selected: LabView) {
                 LabView::Layout,
                 LabView::Interaction,
                 LabView::Styling,
+                LabView::Scrolling,
+                LabView::Nesting,
                 LabView::Graph,
             ] {
                 ui.element(
@@ -210,6 +244,8 @@ fn view_hint(view: LabView) -> &'static str {
         LabView::Layout => "nesting, margins, rows, columns",
         LabView::Interaction => "hover, press, click ownership",
         LabView::Styling => "roles, classes, states, ids",
+        LabView::Scrolling => "runtime scroll ownership",
+        LabView::Nesting => "relative nested boxes",
         LabView::Graph => "canvas and bezier planning",
     }
 }
@@ -227,6 +263,8 @@ fn render_stage(
             LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
             LabView::Interaction => render_interaction_view(ui),
             LabView::Styling => render_styling_view(ui, dense_mode),
+            LabView::Scrolling => render_scrolling_view(ui),
+            LabView::Nesting => render_nesting_view(ui),
             LabView::Graph => render_graph_view(ui),
         },
     );
@@ -382,25 +420,25 @@ fn render_styling_view(ui: &mut des_ui_runtime::Ui, dense_mode: bool) {
         "style-stack",
         ElementSpec::new(ElementRole::Panel).class("stack"),
         |ui| {
-            labeled_row(
+            interactive_labeled_row(
                 ui,
                 "style-row-role",
                 "Role",
                 "ElementRole::Card sets base surface behavior.",
             );
-            labeled_row(
+            interactive_labeled_row(
                 ui,
                 "style-row-class",
                 "Class",
                 ".feature-card changes color, radius, and size.",
             );
-            labeled_row(
+            interactive_labeled_row(
                 ui,
                 "style-row-state",
                 "State",
                 ".feature-card:hover and :pressed adjust paint.",
             );
-            labeled_row(
+            interactive_labeled_row(
                 ui,
                 "style-row-density",
                 "App State",
@@ -408,6 +446,80 @@ fn render_styling_view(ui: &mut des_ui_runtime::Ui, dense_mode: bool) {
                     "Dense mode is active from the layout view toggle."
                 } else {
                     "Dense mode is inactive from the layout view toggle."
+                },
+            );
+        },
+    );
+}
+
+fn render_scrolling_view(ui: &mut des_ui_runtime::Ui) {
+    ui.text_element(
+        "scroll-heading",
+        ElementSpec::new(ElementRole::Text).class("heading"),
+        "Runtime Scrolling",
+    );
+    ui.text_element(
+        "scroll-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Use the wheel or touchpad over either panel. The scroll offset lives in des-ui-runtime.",
+    );
+    ui.element(
+        "scroll-row",
+        ElementSpec::new(ElementRole::Panel).class("card-row"),
+        |ui| {
+            scroll_panel(ui, "scroll-panel-a", "Project List", 12);
+            scroll_panel(ui, "scroll-panel-b", "Preview Rows", 18);
+        },
+    );
+}
+
+fn render_nesting_view(ui: &mut des_ui_runtime::Ui) {
+    ui.text_element(
+        "nesting-heading",
+        ElementSpec::new(ElementRole::Text).class("heading"),
+        "Nested Relative Boxes",
+    );
+    ui.text_element(
+        "nesting-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Each child is positioned relative to its parent content rect. Absolute positioning comes next.",
+    );
+    ui.element(
+        "nest-outer",
+        ElementSpec::new(ElementRole::Panel).class("nest-outer"),
+        |ui| {
+            ui.text_element(
+                "nest-outer-title",
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                "Outer panel",
+            );
+            ui.element(
+                "nest-middle",
+                ElementSpec::new(ElementRole::Card).class("nest-middle"),
+                |ui| {
+                    ui.text_element(
+                        "nest-middle-title",
+                        ElementSpec::new(ElementRole::Text).class("card-title"),
+                        "Middle card",
+                    );
+                    ui.element(
+                        "nest-inner",
+                        ElementSpec::new(ElementRole::Card)
+                            .class("nest-inner")
+                            .interactive(),
+                        |ui| {
+                            ui.text_element(
+                                "nest-inner-title",
+                                ElementSpec::new(ElementRole::Text).class("card-title"),
+                                "Inner interactive box",
+                            );
+                            ui.text_element(
+                                "nest-inner-body",
+                                ElementSpec::new(ElementRole::Text).class("muted"),
+                                "Hover proves hit testing through nested relative frames.",
+                            );
+                        },
+                    );
                 },
             );
         },
@@ -469,7 +581,7 @@ fn metric_card(
     );
 }
 
-fn labeled_row(
+fn interactive_labeled_row(
     ui: &mut des_ui_runtime::Ui,
     id: &'static str,
     label: &'static str,
@@ -477,7 +589,10 @@ fn labeled_row(
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Card).class("list-row"),
+        ElementSpec::new(ElementRole::Card)
+            .class("list-row")
+            .class("specificity-proof")
+            .interactive(),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
@@ -488,6 +603,46 @@ fn labeled_row(
                 format!("{id}-body"),
                 ElementSpec::new(ElementRole::Text).class("muted"),
                 body,
+            );
+        },
+    );
+}
+
+fn scroll_panel(
+    ui: &mut des_ui_runtime::Ui,
+    id: &'static str,
+    title: &'static str,
+    row_count: usize,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Panel).class("scroll-panel"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-title"),
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                title,
+            );
+            ui.element(
+                format!("{id}-list"),
+                ElementSpec::new(ElementRole::Panel).class("scroll-list"),
+                |ui| {
+                    for index in 0..row_count {
+                        ui.element(
+                            format!("{id}-row-{index}"),
+                            ElementSpec::new(ElementRole::Card)
+                                .class("scroll-row-card")
+                                .interactive(),
+                            |ui| {
+                                ui.text_element(
+                                    format!("{id}-row-{index}-label"),
+                                    ElementSpec::new(ElementRole::Text).class("muted"),
+                                    format!("runtime-owned scroll row {:02}", index + 1),
+                                );
+                            },
+                        );
+                    }
+                },
             );
         },
     );
@@ -578,7 +733,8 @@ fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::Class("nav-item"),
             StylePatch::default()
-                .size(218.0, 64.0)
+                .width_fill()
+                .height(des_ui_runtime::Length::Px(64.0))
                 .background(CARD)
                 .border(STROKE),
         )
@@ -678,6 +834,103 @@ fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
+            StyleSelector::Class("specificity-proof"),
+            StylePatch::default()
+                .background(Color::rgb(30, 37, 43))
+                .border(Color::rgb(80, 91, 103)),
+        )
+        .rule(
+            StyleSelector::ClassState("specificity-proof", ElementStateSelector::Hovered),
+            StylePatch::default()
+                .background(Color::rgb(38, 55, 64))
+                .border(GREEN),
+        )
+        .rule(
+            StyleSelector::Id("style-row-state"),
+            StylePatch::default().border(PURPLE),
+        )
+        .rule(
+            StyleSelector::IdState("style-row-state", ElementStateSelector::Hovered),
+            StylePatch::default()
+                .background(Color::rgb(50, 41, 68))
+                .border(TEXT_ACCENT),
+        )
+        .rule(
+            StyleSelector::Class("scroll-panel"),
+            StylePatch::default()
+                .size(318.0, 420.0)
+                .padding(Insets::all(10.0))
+                .gap(7.0)
+                .background(Color::rgb(20, 24, 28))
+                .border(STROKE)
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::Class("scroll-list"),
+            StylePatch::default()
+                .width_fill()
+                .height(des_ui_runtime::Length::Px(370.0))
+                .padding(Insets::symmetric(4.0, 4.0))
+                .gap(7.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::ClassState("scroll-panel", ElementStateSelector::Hovered),
+            StylePatch::default().border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::Class("scroll-row-card"),
+            StylePatch::default()
+                .width_fill()
+                .height(des_ui_runtime::Length::Px(34.0))
+                .padding(Insets::symmetric(9.0, 7.0))
+                .background(Color::rgb(29, 34, 39))
+                .border(Color::rgb(48, 57, 65))
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::ClassState("scroll-row-card", ElementStateSelector::Hovered),
+            StylePatch::default()
+                .background(Color::rgb(38, 47, 54))
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::Class("nest-outer"),
+            StylePatch::default()
+                .size(650.0, 430.0)
+                .padding(Insets::all(28.0))
+                .gap(16.0)
+                .background(Color::rgb(20, 24, 29))
+                .border(STROKE)
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::Class("nest-middle"),
+            StylePatch::default()
+                .size(500.0, 270.0)
+                .padding(Insets::all(24.0))
+                .gap(14.0)
+                .background(Color::rgb(31, 43, 52))
+                .border(STROKE_SELECTED)
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::Class("nest-inner"),
+            StylePatch::default()
+                .size(360.0, 130.0)
+                .padding(Insets::all(18.0))
+                .gap(6.0)
+                .background(Color::rgb(42, 37, 57))
+                .border(PURPLE)
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::ClassState("nest-inner", ElementStateSelector::Hovered),
+            StylePatch::default()
+                .background(Color::rgb(55, 50, 78))
+                .border(TEXT_ACCENT),
+        )
+        .rule(
             StyleSelector::Class("canvas-placeholder"),
             StylePatch::default()
                 .size(720.0, 360.0)
@@ -711,11 +964,19 @@ fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::IdState("interaction-card-two", ElementStateSelector::Hovered),
-            StylePatch::default().border(GREEN),
+            StylePatch::default()
+                .border(GREEN)
+                .transition(Transition::ease_out(0.24)),
+        )
+        .rule(
+            StyleSelector::Id("interaction-card-three"),
+            StylePatch::default().transition(Transition::ease_out(0.06)),
         )
         .rule(
             StyleSelector::IdState("interaction-card-three", ElementStateSelector::Pressed),
-            StylePatch::default().border(PURPLE),
+            StylePatch::default()
+                .background(Color::rgb(53, 38, 70))
+                .border(PURPLE),
         )
 }
 
@@ -723,13 +984,25 @@ fn runtime_input(ui: &egui::Ui, origin: egui::Pos2) -> RuntimeInput {
     ui.input(|input| RuntimeInput {
         pointer: input.pointer.hover_pos().map(|position| PointerInput {
             position: Point::new(position.x - origin.x, position.y - origin.y),
+            primary_delta: Point::new(input.pointer.delta().x, input.pointer.delta().y),
             primary_down: input.pointer.primary_down(),
             primary_clicked: input.pointer.primary_clicked(),
         }),
+        scroll_delta: Point::new(input.smooth_scroll_delta.x, input.smooth_scroll_delta.y),
     })
 }
 
 fn paint_frame(ui: &mut egui::Ui, origin: egui::Pos2, frame: &LayoutFrame) {
+    paint_frame_clipped(ui, origin, frame, ui.clip_rect());
+}
+
+fn paint_frame_clipped(
+    ui: &mut egui::Ui,
+    origin: egui::Pos2,
+    frame: &LayoutFrame,
+    clip_rect: egui::Rect,
+) {
+    let painter = ui.painter().with_clip_rect(clip_rect);
     if frame.id.as_str() != "root" {
         let rect = egui::Rect::from_min_size(
             egui::pos2(
@@ -740,21 +1013,20 @@ fn paint_frame(ui: &mut egui::Ui, origin: egui::Pos2, frame: &LayoutFrame) {
         );
 
         if let Some(color) = frame.style.background {
-            ui.painter()
-                .rect_filled(rect, frame.style.radius, to_egui_color(color));
+            painter.rect_filled(rect, frame.style.radius, to_egui_color(color));
         }
 
         if let Some(color) = frame.style.border {
-            ui.painter().rect_stroke(
+            painter.rect_stroke(
                 rect,
                 frame.style.radius,
-                egui::Stroke::new(1.0, to_egui_color(color)),
+                egui::Stroke::new(frame.style.border_width, to_egui_color(color)),
                 egui::StrokeKind::Inside,
             );
         }
 
         if let Some(text) = &frame.text {
-            ui.painter().text(
+            painter.text(
                 rect.min,
                 egui::Align2::LEFT_TOP,
                 text,
@@ -766,11 +1038,164 @@ fn paint_frame(ui: &mut egui::Ui, origin: egui::Pos2, frame: &LayoutFrame) {
 
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
+    let next_clip = if frame.style.overflow_y == Overflow::Scroll {
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(
+                origin.x + frame.rect.origin.x,
+                origin.y + frame.rect.origin.y,
+            ),
+            egui::vec2(frame.rect.size.width, frame.rect.size.height),
+        );
+        let content_rect = egui::Rect::from_min_max(
+            egui::pos2(
+                rect.left() + frame.style.border_width + frame.style.padding.left,
+                rect.top() + frame.style.border_width + frame.style.padding.top,
+            ),
+            egui::pos2(
+                rect.right() - frame.style.border_width - frame.style.padding.right,
+                rect.bottom() - frame.style.border_width - frame.style.padding.bottom,
+            ),
+        );
+        clip_rect.intersect(content_rect)
+    } else {
+        clip_rect
+    };
     for child in children {
-        paint_frame(ui, origin, child);
+        paint_frame_clipped(ui, origin, child, next_clip);
     }
+}
+
+fn paint_scroll_chrome(
+    ui: &mut egui::Ui,
+    origin: egui::Pos2,
+    chromes: &[des_ui_runtime::ScrollChrome],
+) {
+    let painter = ui.painter();
+    for chrome in chromes {
+        if !chrome.visible {
+            continue;
+        }
+
+        let track = runtime_rect_to_egui(origin, chrome.track_rect);
+        let handle = runtime_rect_to_egui(origin, chrome.handle_rect);
+        let alpha = if chrome.dragged {
+            235
+        } else if chrome.hovered {
+            220
+        } else {
+            118
+        };
+        let track_alpha = if chrome.dragged || chrome.hovered {
+            84
+        } else {
+            0
+        };
+        if track_alpha > 0 {
+            painter.rect_filled(
+                track,
+                6.0,
+                egui::Color32::from_rgba_unmultiplied(2, 8, 12, track_alpha),
+            );
+        }
+        painter.rect_filled(
+            handle,
+            6.0,
+            egui::Color32::from_rgba_unmultiplied(232, 236, 240, alpha),
+        );
+    }
+}
+
+fn runtime_rect_to_egui(origin: egui::Pos2, rect: des_ui_runtime::Rect) -> egui::Rect {
+    egui::Rect::from_min_size(
+        egui::pos2(origin.x + rect.origin.x, origin.y + rect.origin.y),
+        egui::vec2(rect.size.width, rect.size.height),
+    )
 }
 
 fn to_egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
+}
+
+#[cfg(test)]
+mod graphical_tests {
+    use super::*;
+    use egui_kittest::Harness;
+
+    fn lab_harness(initial_view: &str) -> Harness<'_, UiLabState> {
+        Harness::builder()
+            .with_size(egui::vec2(1320.0, 780.0))
+            .with_pixels_per_point(1.0)
+            .with_step_dt(1.0 / 60.0)
+            .with_max_steps(24)
+            .wgpu()
+            .build_ui_state(
+                |ui, state: &mut UiLabState| {
+                    state.render(ui, false);
+                },
+                UiLabState::new(Some(initial_view)),
+            )
+    }
+
+    fn lab_rect(id: &str) -> des_ui_runtime::Rect {
+        let mut runtime = Runtime::default();
+        let scene = UiLabState::new(Some("layout")).scene(Size::new(1320.0, 780.0), false);
+        let output = runtime.update(&scene, &stylesheet());
+        find_frame(&output.layout, id)
+            .unwrap_or_else(|| panic!("expected layout frame for {id}"))
+            .rect
+    }
+
+    fn find_frame<'a>(frame: &'a LayoutFrame, id: &str) -> Option<&'a LayoutFrame> {
+        if frame.id.as_str() == id {
+            return Some(frame);
+        }
+        frame
+            .children
+            .iter()
+            .find_map(|child| find_frame(child, id))
+    }
+
+    #[test]
+    fn kittest_renders_lab_frame_to_shapes() {
+        let mut harness = lab_harness("layout");
+
+        harness.run();
+
+        assert!(
+            harness.output().shapes.len() > 20,
+            "expected the UI lab to produce a non-trivial painted scene"
+        );
+    }
+
+    #[test]
+    fn kittest_renders_lab_frame_to_pixels() {
+        let mut harness = lab_harness("layout");
+
+        harness.run();
+        let image = harness.render().expect("render UI lab through kittest");
+
+        assert_eq!(image.width(), 1320);
+        assert_eq!(image.height(), 780);
+        assert!(
+            image.pixels().any(|pixel| pixel.0[3] > 0),
+            "expected the rendered UI lab image to contain visible pixels"
+        );
+    }
+
+    #[test]
+    fn kittest_pointer_click_reaches_runtime_owned_nav_item() {
+        let mut harness = lab_harness("layout");
+        let rect = lab_rect("view-interaction");
+        let interaction_nav_item = egui::pos2(
+            rect.origin.x + rect.size.width / 2.0,
+            rect.origin.y + rect.size.height / 2.0,
+        );
+
+        harness.hover_at(interaction_nav_item);
+        harness.drag_at(interaction_nav_item);
+        harness.drop_at(interaction_nav_item);
+        harness.run();
+
+        assert_eq!(harness.state().view, LabView::Interaction);
+    }
 }

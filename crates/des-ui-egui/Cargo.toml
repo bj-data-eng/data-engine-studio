@@ -16,3 +16,6 @@ des-ui-runtime.workspace = true
 eframe.workspace = true
 egui.workspace = true
 iconflow = { workspace = true, features = ["pack-lucide"] }
+
+[dev-dependencies]
+egui_kittest = { version = "0.34.1", features = ["wgpu"] }

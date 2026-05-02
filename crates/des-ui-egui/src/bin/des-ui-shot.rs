@@ -11,6 +11,7 @@ fn main() {
         title,
         inner_size: [width, height],
         debug_overlay: env_bool("DES_UI_DEBUG_OVERLAY"),
+        initial_lab_view: std::env::var("DES_UI_LAB_VIEW").ok(),
         startup_commands: startup_commands(),
     };
 

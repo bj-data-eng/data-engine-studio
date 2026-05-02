@@ -10,6 +10,7 @@ pub(crate) struct StudioEguiApp {
 
 pub(crate) struct StudioEguiAppOptions {
     pub(crate) debug_overlay: bool,
+    pub(crate) initial_lab_view: Option<String>,
     pub(crate) startup_commands: Vec<AppCommand>,
 }
 
@@ -22,7 +23,7 @@ impl StudioEguiApp {
 
         Self {
             _state: state,
-            ui_lab: UiLabState::default(),
+            ui_lab: UiLabState::new(options.initial_lab_view.as_deref()),
             debug_overlay: options.debug_overlay,
         }
     }
