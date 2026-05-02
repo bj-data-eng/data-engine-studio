@@ -32,6 +32,7 @@ pub struct ResolvedElement {
     pub rect: Rect,
     pub style: ComputedStyle,
     pub text: Option<String>,
+    pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub interactive: bool,
     pub children: Vec<ResolvedElement>,

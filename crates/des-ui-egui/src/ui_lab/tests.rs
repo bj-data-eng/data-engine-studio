@@ -72,6 +72,19 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
     find_frame(&output.layout, id).unwrap_or_else(|| panic!("expected layout frame for {id}"))
 }
 
+fn state_output(state: &UiLabState) -> DocumentOutput {
+    let mut engine = DocumentEngine::default();
+    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    engine.update(&document, &stylesheet())
+}
+
+fn has_class(frame: &ResolvedElement, class: &str) -> bool {
+    frame
+        .classes
+        .iter()
+        .any(|element_class| element_class.as_str() == class)
+}
+
 fn assert_close(actual: f32, expected: f32) {
     assert!(
         (actual - expected).abs() < 0.01,
@@ -260,6 +273,124 @@ fn dropdown_click_away_closes_open_menu() {
     harness.run();
 
     assert!(!harness.state().dropdown_open);
+}
+
+#[test]
+fn interaction_update_loop_mutates_target_boxes_from_control_events() {
+    let mut harness = lab_harness("interaction");
+    let output = state_output(harness.state());
+
+    assert_eq!(
+        frame(&output, "loop-checkbox-result").text.as_deref(),
+        Some("Profiling: enabled by checkbox")
+    );
+    assert!(
+        frame(&output, "loop-checkbox-result-box")
+            .style
+            .background
+            .is_some()
+    );
+    assert!(has_class(
+        frame(&output, "loop-radio-result-box"),
+        "loop-runtime-local"
+    ));
+    assert!(has_class(
+        frame(&output, "loop-dropdown-result-box"),
+        "loop-source-duckdb"
+    ));
+
+    for id in [
+        "loop-action-button",
+        "control-checkbox",
+        "control-radio-remote",
+        "control-dropdown",
+        "control-dropdown-option-python",
+    ] {
+        let rect = state_rect(harness.state(), id);
+        let target = egui::pos2(
+            rect.origin.x + rect.size.width / 2.0,
+            rect.origin.y + rect.size.height / 2.0,
+        );
+        harness.hover_at(target);
+        harness.drag_at(target);
+        harness.drop_at(target);
+        harness.run();
+    }
+
+    let output = state_output(harness.state());
+
+    assert_eq!(harness.state().loop_action_count, 1);
+    assert_eq!(
+        frame(&output, "loop-button-result").text.as_deref(),
+        Some("Button events received: 1")
+    );
+    assert_eq!(
+        frame(&output, "loop-button-result-box").value.as_deref(),
+        Some("button-count=1")
+    );
+    assert_eq!(
+        frame(&output, "loop-checkbox-result").text.as_deref(),
+        Some("Profiling: disabled by checkbox")
+    );
+    assert!(
+        !frame(&output, "loop-checkbox-result-box")
+            .style
+            .background
+            .is_some_and(|color| color == Color::rgb(31, 52, 43))
+    );
+    assert_eq!(
+        frame(&output, "loop-radio-result").text.as_deref(),
+        Some("Runtime target: Remote worker")
+    );
+    assert!(has_class(
+        frame(&output, "loop-radio-result-box"),
+        "loop-runtime-remote"
+    ));
+    assert_eq!(
+        frame(&output, "loop-dropdown-result").text.as_deref(),
+        Some("Source adapter: Python node")
+    );
+    assert!(has_class(
+        frame(&output, "loop-dropdown-result-box"),
+        "loop-source-python"
+    ));
+    assert_eq!(
+        frame(&output, "loop-summary-result").text.as_deref(),
+        Some("profile off | remote | python | 1 click")
+    );
+    assert_eq!(
+        frame(&output, "loop-summary-result-box").style.border,
+        Some(PURPLE)
+    );
+}
+
+#[test]
+fn interaction_update_loop_refreshes_text_on_repeated_button_clicks() {
+    let mut harness = lab_harness("interaction");
+
+    for expected in 1..=2 {
+        let rect = state_rect(harness.state(), "loop-action-button");
+        let target = egui::pos2(
+            rect.origin.x + rect.size.width / 2.0,
+            rect.origin.y + rect.size.height / 2.0,
+        );
+        harness.hover_at(target);
+        harness.drag_at(target);
+        harness.drop_at(target);
+        harness.run();
+
+        let output = state_output(harness.state());
+        let expected_text = format!("Button events received: {expected}");
+        let expected_value = format!("button-count={expected}");
+        assert_eq!(
+            frame(&output, "loop-button-result").text.as_deref(),
+            Some(expected_text.as_str())
+        );
+        assert_eq!(
+            frame(&output, "loop-button-result-box").value.as_deref(),
+            Some(expected_value.as_str())
+        );
+    }
 }
 
 #[test]

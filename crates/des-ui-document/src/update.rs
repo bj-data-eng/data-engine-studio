@@ -47,6 +47,51 @@ impl DocumentUpdate {
         self
     }
 
+    /// Replaces text content on the target element.
+    pub fn set_text(mut self, target: impl Into<ElementId>, text: impl Into<String>) -> Self {
+        self.operations.push(ElementUpdate {
+            target: target.into(),
+            action: ElementUpdateAction::SetText(text.into()),
+        });
+        self
+    }
+
+    /// Replaces form/control value data on the target element.
+    pub fn set_value(mut self, target: impl Into<ElementId>, value: impl Into<String>) -> Self {
+        self.operations.push(ElementUpdate {
+            target: target.into(),
+            action: ElementUpdateAction::SetValue(value.into()),
+        });
+        self
+    }
+
+    /// Sets the authored selected state used by state selectors.
+    pub fn set_selected(mut self, target: impl Into<ElementId>, selected: bool) -> Self {
+        self.operations.push(ElementUpdate {
+            target: target.into(),
+            action: ElementUpdateAction::SetSelected(selected),
+        });
+        self
+    }
+
+    /// Sets the authored disabled state used by state selectors and hit testing.
+    pub fn set_disabled(mut self, target: impl Into<ElementId>, disabled: bool) -> Self {
+        self.operations.push(ElementUpdate {
+            target: target.into(),
+            action: ElementUpdateAction::SetDisabled(disabled),
+        });
+        self
+    }
+
+    /// Sets the authored focused state used by state selectors.
+    pub fn set_focused(mut self, target: impl Into<ElementId>, focused: bool) -> Self {
+        self.operations.push(ElementUpdate {
+            target: target.into(),
+            action: ElementUpdateAction::SetFocused(focused),
+        });
+        self
+    }
+
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
@@ -63,6 +108,11 @@ enum ElementUpdateAction {
     AddClass(ClassName),
     RemoveClass(ClassName),
     ToggleClass(ClassName),
+    SetText(String),
+    SetValue(String),
+    SetSelected(bool),
+    SetDisabled(bool),
+    SetFocused(bool),
 }
 
 /// Summary of how a [`DocumentUpdate`] interacted with a concrete document.
@@ -126,6 +176,15 @@ fn apply_element_update(element: &mut Element, action: &ElementUpdateAction) -> 
                 add_class(element, class)
             }
         }
+        ElementUpdateAction::SetText(text) => set_option_string(&mut element.text, text),
+        ElementUpdateAction::SetValue(value) => set_option_string(&mut element.spec.value, value),
+        ElementUpdateAction::SetSelected(selected) => {
+            set_bool(&mut element.spec.selected, *selected)
+        }
+        ElementUpdateAction::SetDisabled(disabled) => {
+            set_bool(&mut element.spec.disabled, *disabled)
+        }
+        ElementUpdateAction::SetFocused(focused) => set_bool(&mut element.spec.focused, *focused),
     }
 }
 
@@ -146,4 +205,20 @@ fn remove_class(element: &mut Element, class: &ClassName) -> bool {
     let original_len = element.spec.classes.len();
     element.spec.classes.retain(|existing| existing != class);
     element.spec.classes.len() != original_len
+}
+
+fn set_option_string(target: &mut Option<String>, value: &str) -> bool {
+    if target.as_deref() == Some(value) {
+        return false;
+    }
+    *target = Some(value.to_owned());
+    true
+}
+
+fn set_bool(target: &mut bool, value: bool) -> bool {
+    if *target == value {
+        return false;
+    }
+    *target = value;
+    true
 }

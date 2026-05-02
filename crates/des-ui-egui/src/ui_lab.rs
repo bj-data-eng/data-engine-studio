@@ -9,8 +9,8 @@ use styles::stylesheet;
 use views::{render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentEventKind, DocumentMetrics, DocumentOutput, ElementId,
-    ElementRole, ElementSpec, Size, StyleSheet,
+    Color, Document, DocumentEngine, DocumentEventKind, DocumentMetrics, DocumentOutput,
+    DocumentUpdate, ElementId, ElementRole, ElementSpec, Size, StyleSheet,
 };
 use eframe::egui;
 use std::time::{Duration, Instant};
@@ -91,6 +91,7 @@ pub(crate) struct UiLabState {
     radio_choice: usize,
     dropdown_open: bool,
     dropdown_choice: usize,
+    loop_action_count: usize,
     last_perf: UiLabPerf,
 }
 
@@ -106,6 +107,7 @@ impl Default for UiLabState {
             radio_choice: 0,
             dropdown_open: false,
             dropdown_choice: 1,
+            loop_action_count: 0,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -190,11 +192,12 @@ impl UiLabState {
                 self.dropdown_choice = choice;
                 self.dropdown_open = false;
             }
+            LabAction::IncrementLoopAction => self.loop_action_count += 1,
         }
     }
 
     fn document(&self, viewport: Size, debug_overlay: bool) -> Document {
-        Document::build(viewport, |ui| {
+        let mut document = Document::build(viewport, |ui| {
             ui.element(
                 "lab-root",
                 ElementSpec::new(ElementRole::Panel).class("lab-root"),
@@ -219,7 +222,94 @@ impl UiLabState {
                     );
                 },
             );
-        })
+        });
+        if self.view == LabView::Interaction {
+            document.apply_update(&self.interaction_document_update());
+        }
+        document
+    }
+
+    fn interaction_document_update(&self) -> DocumentUpdate {
+        let mut update = DocumentUpdate::new()
+            .set_text(
+                "loop-button-result",
+                format!("Button events received: {}", self.loop_action_count),
+            )
+            .set_value(
+                "loop-button-result-box",
+                format!("button-count={}", self.loop_action_count),
+            )
+            .set_text(
+                "loop-checkbox-result",
+                if self.checkbox_enabled {
+                    "Profiling: enabled by checkbox"
+                } else {
+                    "Profiling: disabled by checkbox"
+                },
+            )
+            .set_selected("loop-checkbox-result-box", self.checkbox_enabled)
+            .set_text(
+                "loop-radio-result",
+                format!(
+                    "Runtime target: {}",
+                    ["Local runtime", "Remote worker", "Hybrid"][self.radio_choice]
+                ),
+            )
+            .set_text(
+                "loop-dropdown-result",
+                format!(
+                    "Source adapter: {}",
+                    ["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]
+                ),
+            )
+            .set_text(
+                "loop-summary-result",
+                format!(
+                    "{} | {} | {} | {} click{}",
+                    if self.checkbox_enabled {
+                        "profile on"
+                    } else {
+                        "profile off"
+                    },
+                    ["local", "remote", "hybrid"][self.radio_choice],
+                    ["csv", "duckdb", "python"][self.dropdown_choice],
+                    self.loop_action_count,
+                    if self.loop_action_count == 1 { "" } else { "s" }
+                ),
+            )
+            .set_focused("loop-summary-result-box", self.loop_action_count > 0);
+
+        for (index, class) in [
+            "loop-runtime-local",
+            "loop-runtime-remote",
+            "loop-runtime-hybrid",
+        ]
+        .iter()
+        .enumerate()
+        {
+            if self.radio_choice == index {
+                update = update.add_class("loop-radio-result-box", *class);
+            } else {
+                update = update.remove_class("loop-radio-result-box", *class);
+            }
+        }
+
+        for (index, class) in [
+            "loop-source-csv",
+            "loop-source-duckdb",
+            "loop-source-python",
+        ]
+        .iter()
+        .enumerate()
+        {
+            if self.dropdown_choice == index {
+                update = update.add_class("loop-dropdown-result-box", *class);
+            } else {
+                update = update.remove_class("loop-dropdown-result-box", *class);
+            }
+        }
+
+        update
     }
 
     fn paint_debug_overlay(&self, ui: &egui::Ui) {
@@ -300,6 +390,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
         "control-dropdown-option-csv" => Some(LabAction::SelectDropdown(0)),
         "control-dropdown-option-duckdb" => Some(LabAction::SelectDropdown(1)),
         "control-dropdown-option-python" => Some(LabAction::SelectDropdown(2)),
+        "loop-action-button" => Some(LabAction::IncrementLoopAction),
         _ => None,
     }
 }
@@ -323,6 +414,7 @@ enum LabAction {
     SelectRadio(usize),
     ToggleDropdown,
     SelectDropdown(usize),
+    IncrementLoopAction,
 }
 
 #[derive(Clone, Copy, Debug, Default)]

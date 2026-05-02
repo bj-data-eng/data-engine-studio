@@ -45,6 +45,7 @@ pub struct DocumentEngine {
     scroll_limits: HashMap<ElementId, Size>,
     active_scroll_drag: Option<ScrollDrag>,
     cached_layout: Option<ResolvedElement>,
+    cached_document_root: Option<Element>,
 }
 
 impl DocumentEngine {
@@ -62,7 +63,7 @@ impl DocumentEngine {
         let viewport_rect = Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height);
         let reused_cached_layout = changes.created.is_empty()
             && changes.removed.is_empty()
-            && self.cached_layout_matches(viewport_rect);
+            && self.cached_layout_matches(viewport_rect, &document.root);
         let input_layout = if reused_cached_layout {
             self.cached_layout
                 .clone()
@@ -125,6 +126,7 @@ impl DocumentEngine {
             (layout, scroll_chrome, true)
         };
         self.cached_layout = Some(layout.clone());
+        self.cached_document_root = Some(document.root.clone());
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
 
@@ -162,10 +164,14 @@ impl DocumentEngine {
         self.states.get_mut(&ElementId::new(id))
     }
 
-    fn cached_layout_matches(&self, viewport_rect: Rect) -> bool {
-        self.cached_layout
-            .as_ref()
-            .is_some_and(|layout| layout.rect == viewport_rect)
+    fn cached_layout_matches(&self, viewport_rect: Rect, document_root: &Element) -> bool {
+        self.cached_layout.as_ref().is_some_and(|layout| {
+            layout.rect == viewport_rect
+                && self
+                    .cached_document_root
+                    .as_ref()
+                    .is_some_and(|cached_root| cached_root == document_root)
+        })
     }
 
     fn sync_element_states(&mut self, document: &Document) -> ChangeSet {

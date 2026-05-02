@@ -125,6 +125,7 @@ pub struct ElementSpec {
     pub selected: bool,
     pub disabled: bool,
     pub focused: bool,
+    pub value: Option<String>,
     pub glyph: Option<Glyph>,
 }
 
@@ -137,6 +138,7 @@ impl ElementSpec {
             selected: false,
             disabled: false,
             focused: false,
+            value: None,
             glyph: None,
         }
     }
@@ -163,6 +165,11 @@ impl ElementSpec {
 
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+
+    pub fn value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
         self
     }
 

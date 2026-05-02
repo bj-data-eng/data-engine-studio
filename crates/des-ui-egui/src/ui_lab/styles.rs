@@ -698,6 +698,89 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border(Color::rgb(40, 46, 52)),
         )
         .rule(
+            StyleSelector::class("loop-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width_fill()
+                .height(Length::Auto)
+                .gap(10.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("loop-control-card"),
+            Style::default()
+                .width(Length::Px(190.0))
+                .height(Length::Px(104.0))
+                .padding(Insets::all(10.0))
+                .gap(8.0),
+        )
+        .rule(
+            StyleSelector::class("loop-button"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(34.0))
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(CARD_SELECTED)
+                .border(STROKE_SELECTED)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class_state("loop-button", ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(42, 74, 102)),
+        )
+        .rule(
+            StyleSelector::class_state("loop-button", ElementStateSelector::Pressed),
+            Style::default().background(CARD_PRESSED),
+        )
+        .rule(
+            StyleSelector::class("loop-result-card"),
+            Style::default()
+                .width(Length::Px(190.0))
+                .height(Length::Px(104.0))
+                .padding(Insets::all(10.0))
+                .gap(8.0)
+                .background(CARD)
+                .border(STROKE),
+        )
+        .rule(
+            StyleSelector::class_state("loop-result-card", ElementStateSelector::Selected),
+            Style::default()
+                .background(Color::rgb(31, 52, 43))
+                .border(GREEN),
+        )
+        .rule(
+            StyleSelector::class_state("loop-result-card", ElementStateSelector::Focused),
+            Style::default()
+                .background(Color::rgb(39, 35, 62))
+                .border(PURPLE),
+        )
+        .rule(
+            StyleSelector::class("loop-runtime-local"),
+            Style::default().border(Color::rgb(88, 157, 230)),
+        )
+        .rule(
+            StyleSelector::class("loop-runtime-remote"),
+            Style::default().border(Color::rgb(95, 204, 140)),
+        )
+        .rule(
+            StyleSelector::class("loop-runtime-hybrid"),
+            Style::default().border(Color::rgb(151, 93, 219)),
+        )
+        .rule(
+            StyleSelector::class("loop-source-csv"),
+            Style::default().background(Color::rgb(31, 43, 55)),
+        )
+        .rule(
+            StyleSelector::class("loop-source-duckdb"),
+            Style::default().background(Color::rgb(42, 39, 31)),
+        )
+        .rule(
+            StyleSelector::class("loop-source-python"),
+            Style::default().background(Color::rgb(38, 32, 48)),
+        )
+        .rule(
             StyleSelector::class("feature-card"),
             Style::default()
                 .size(250.0, 98.0)

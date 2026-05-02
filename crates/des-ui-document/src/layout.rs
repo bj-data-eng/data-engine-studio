@@ -82,6 +82,7 @@ fn layout_element_in_viewport(
         rect,
         style,
         text: element.text.clone(),
+        value: element.spec.value.clone(),
         glyph: element.spec.glyph,
         interactive: element.spec.interactive && !element.spec.disabled,
         children,

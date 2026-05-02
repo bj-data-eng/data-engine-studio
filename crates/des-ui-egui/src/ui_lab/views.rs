@@ -622,6 +622,105 @@ fn render_interaction_view(
             control_text_inputs(ui);
         },
     );
+    render_document_update_loop(ui);
+}
+
+fn render_document_update_loop(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.text_element(
+        "loop-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Event to document update loop",
+    );
+    ui.element(
+        "loop-grid",
+        ElementSpec::new(ElementRole::Panel).class("loop-grid"),
+        |ui| {
+            ui.element(
+                "loop-action-card",
+                ElementSpec::new(ElementRole::Card).class("loop-control-card"),
+                |ui| {
+                    ui.text_element(
+                        "loop-action-title",
+                        ElementSpec::new(ElementRole::Text).class("card-title"),
+                        "Button event",
+                    );
+                    ui.element(
+                        "loop-action-button",
+                        ElementSpec::new(ElementRole::Control)
+                            .class("loop-button")
+                            .interactive(),
+                        |ui| {
+                            ui.text_element(
+                                "loop-action-button-label",
+                                ElementSpec::new(ElementRole::Text).class("control-label"),
+                                "Send update",
+                            );
+                        },
+                    );
+                },
+            );
+            loop_result_card(
+                ui,
+                "loop-button-result-box",
+                "loop-button-result",
+                "Button target",
+                "waiting for button event",
+            );
+            loop_result_card(
+                ui,
+                "loop-checkbox-result-box",
+                "loop-checkbox-result",
+                "Checkbox target",
+                "profiling state pending",
+            );
+            loop_result_card(
+                ui,
+                "loop-radio-result-box",
+                "loop-radio-result",
+                "Radio target",
+                "runtime state pending",
+            );
+            loop_result_card(
+                ui,
+                "loop-dropdown-result-box",
+                "loop-dropdown-result",
+                "Dropdown target",
+                "source adapter pending",
+            );
+            loop_result_card(
+                ui,
+                "loop-summary-result-box",
+                "loop-summary-result",
+                "Combined target",
+                "waiting for updates",
+            );
+        },
+    );
+}
+
+fn loop_result_card(
+    ui: &mut des_ui_document::DocumentBuilder,
+    box_id: &'static str,
+    text_id: &'static str,
+    title: &'static str,
+    fallback: &'static str,
+) {
+    ui.element(
+        box_id,
+        ElementSpec::new(ElementRole::Card).class("loop-result-card"),
+        |ui| {
+            ui.text_element(
+                format!("{text_id}-title"),
+                ElementSpec::new(ElementRole::Text).class("muted"),
+                title,
+            );
+            ui.text_element(
+                text_id,
+                ElementSpec::new(ElementRole::Text).class("control-label"),
+                fallback,
+            );
+        },
+    );
 }
 
 fn control_checkbox(ui: &mut des_ui_document::DocumentBuilder, checked: bool) {

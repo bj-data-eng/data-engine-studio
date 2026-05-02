@@ -140,6 +140,66 @@ fn document_update_can_add_remove_and_toggle_classes_before_layout() {
 }
 
 #[test]
+fn document_update_can_set_text_value_and_authored_states() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Text),
+            Style::default().text_color(Color::rgb(20, 20, 20)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Selected),
+            Style::default().background(Color::rgb(35, 56, 78)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Disabled),
+            Style::default().text_color(Color::rgb(90, 96, 102)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Focused),
+            Style::default().border(Color::rgb(88, 157, 230)),
+        );
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.text("label", "Short");
+        ui.element(
+            "control",
+            ElementSpec::new(ElementRole::Control)
+                .interactive()
+                .value("initial"),
+            |_| {},
+        );
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let label = output.layout.find("label").unwrap();
+    assert_eq!(label.text.as_deref(), Some("Short"));
+    assert_eq!(label.rect.size.width, 37.5);
+
+    let report = document.apply_update(
+        &DocumentUpdate::new()
+            .set_text("label", "Much longer text")
+            .set_value("control", "updated")
+            .set_selected("control", true)
+            .set_disabled("control", true)
+            .set_focused("control", true),
+    );
+    assert_eq!(report.matched, 5);
+    assert_eq!(report.changed, 5);
+
+    let output = engine.update(&document, &stylesheet);
+    let label = output.layout.find("label").unwrap();
+    let control = output.layout.find("control").unwrap();
+
+    assert_eq!(label.text.as_deref(), Some("Much longer text"));
+    assert_eq!(label.rect.size.width, 120.0);
+    assert_eq!(control.value.as_deref(), Some("updated"));
+    assert_eq!(control.style.background, Some(Color::rgb(35, 56, 78)));
+    assert_eq!(control.style.text_color, Color::rgb(90, 96, 102));
+    assert_eq!(control.style.border, Some(Color::rgb(88, 157, 230)));
+    assert!(!control.interactive);
+}
+
+#[test]
 fn compound_selectors_require_all_parts_without_specificity_weighting() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
