@@ -86,7 +86,9 @@ pub(super) fn render_stage(
 ) {
     ui.element(
         "stage",
-        ElementSpec::new(ElementRole::Panel).class("stage"),
+        ElementSpec::new(ElementRole::Panel)
+            .class("stage")
+            .class("styled-scrollbar"),
         |ui| match view {
             LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
             LabView::Interaction => render_interaction_view(ui),
@@ -350,11 +352,16 @@ fn box_model_subject(
     case_id: &'static str,
     subject_class: &'static str,
 ) {
+    let mut spec = ElementSpec::new(ElementRole::Panel)
+        .class("box-subject")
+        .class(subject_class);
+    if subject_class == "box-subject-scroll-overflow" {
+        spec = spec.class("styled-scrollbar");
+    }
+
     ui.element(
         format!("{case_id}-subject"),
-        ElementSpec::new(ElementRole::Panel)
-            .class("box-subject")
-            .class(subject_class),
+        spec,
         |ui| match subject_class {
             "box-subject-auto" => {
                 box_chip(ui, case_id, 0);
@@ -921,7 +928,9 @@ fn scroll_panel(
             );
             ui.element(
                 format!("{id}-list"),
-                ElementSpec::new(ElementRole::Panel).class("scroll-list"),
+                ElementSpec::new(ElementRole::Panel)
+                    .class("scroll-list")
+                    .class("styled-scrollbar"),
                 |ui| {
                     for index in 0..row_count {
                         ui.element(

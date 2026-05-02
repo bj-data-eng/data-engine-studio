@@ -27,6 +27,6 @@ pub use state::{
     ScrollChrome,
 };
 pub use style::{
-    ComputedStyle, CornerStyle, Easing, EdgeStyle, Style, StyleRule, StyleSelector, StyleSheet,
-    Transition,
+    CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle, Style, StyleRule,
+    StyleSelector, StyleSheet, Transition,
 };

@@ -12,6 +12,15 @@ pub enum StyleSelector {
     State(ElementStateSelector),
     ClassState(ClassName, ElementStateSelector),
     IdState(ElementId, ElementStateSelector),
+    Compound(CompoundSelector),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct CompoundSelector {
+    pub(crate) role: Option<ElementRole>,
+    pub(crate) id: Option<ElementId>,
+    pub(crate) classes: Vec<ClassName>,
+    pub(crate) states: Vec<ElementStateSelector>,
 }
 
 impl StyleSelector {
@@ -29,6 +38,36 @@ impl StyleSelector {
 
     pub fn id_state(id: impl Into<ElementId>, state: ElementStateSelector) -> Self {
         Self::IdState(id.into(), state)
+    }
+
+    pub fn compound() -> CompoundSelector {
+        CompoundSelector::default()
+    }
+}
+
+impl CompoundSelector {
+    pub fn role(mut self, role: ElementRole) -> Self {
+        self.role = Some(role);
+        self
+    }
+
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+
+    pub fn class(mut self, class: impl Into<ClassName>) -> Self {
+        self.classes.push(class.into());
+        self
+    }
+
+    pub fn state(mut self, state: ElementStateSelector) -> Self {
+        self.states.push(state);
+        self
+    }
+
+    pub fn selector(self) -> StyleSelector {
+        StyleSelector::Compound(self)
     }
 }
 
@@ -646,7 +685,35 @@ fn selector_matches(
         StyleSelector::IdState(id, selector) => {
             &element.id == id && state_selector_matches(*selector, element, state)
         }
+        StyleSelector::Compound(selector) => compound_selector_matches(selector, element, state),
     }
+}
+
+fn compound_selector_matches(
+    selector: &CompoundSelector,
+    element: &Element,
+    state: Option<&ElementState>,
+) -> bool {
+    if selector.role.is_some_and(|role| element.spec.role != role) {
+        return false;
+    }
+    if selector.id.as_ref().is_some_and(|id| &element.id != id) {
+        return false;
+    }
+    if !selector.classes.iter().all(|class| {
+        element
+            .spec
+            .classes
+            .iter()
+            .any(|element_class| element_class == class)
+    }) {
+        return false;
+    }
+
+    selector
+        .states
+        .iter()
+        .all(|selector| state_selector_matches(*selector, element, state))
 }
 
 fn state_selector_matches(

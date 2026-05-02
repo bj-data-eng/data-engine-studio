@@ -88,6 +88,64 @@ fn style_rules_resolve_role_class_state_and_id_in_order() {
 }
 
 #[test]
+fn compound_selectors_require_all_parts_without_specificity_weighting() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("surface"),
+            Style::default().background(Color::rgb(20, 20, 20)),
+        )
+        .rule(
+            StyleSelector::compound()
+                .role(ElementRole::Card)
+                .class("surface")
+                .class("compact")
+                .selector(),
+            Style::default().background(Color::rgb(35, 56, 78)),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("surface")
+                .class("compact")
+                .state(ElementStateSelector::Selected)
+                .selector(),
+            Style::default().border(Color::rgb(90, 180, 240)),
+        )
+        .rule(
+            StyleSelector::class("surface"),
+            Style::default().radius(3.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "matching",
+            ElementSpec::new(ElementRole::Card)
+                .class("surface")
+                .class("compact")
+                .selected(true)
+                .interactive(),
+            |_| {},
+        );
+        ui.element(
+            "missing-compact",
+            ElementSpec::new(ElementRole::Card)
+                .class("surface")
+                .interactive(),
+            |_| {},
+        );
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let matching = output.layout.find("matching").unwrap();
+    let missing = output.layout.find("missing-compact").unwrap();
+
+    assert_eq!(matching.style.background, Some(Color::rgb(35, 56, 78)));
+    assert_eq!(matching.style.border, Some(Color::rgb(90, 180, 240)));
+    assert_eq!(matching.style.radius, CornerRadii::all(3.0));
+    assert_eq!(missing.style.background, Some(Color::rgb(20, 20, 20)));
+    assert_eq!(missing.style.border, None);
+}
+
+#[test]
 fn border_and_radius_rules_can_target_individual_sides_and_corners() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
