@@ -1,8 +1,8 @@
+mod catalog;
 mod command;
-mod model;
-mod sample_data;
+mod sample_catalog;
 mod state;
 
+pub use catalog::*;
 pub use command::AppCommand;
-pub use model::*;
 pub use state::StudioAppState;

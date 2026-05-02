@@ -1,6 +1,6 @@
 use crate::element::{Element, ElementId, ElementRole, ElementStateSelector};
 use crate::geometry::{Direction, Insets, Overflow, Point, Rect, Size};
-use crate::state::{ElementState, LayoutFrame};
+use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ComputedStyle, StyleSelector, StyleSheet};
 use std::collections::HashMap;
 
@@ -10,7 +10,7 @@ pub(crate) fn layout_element(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, f32>,
-) -> LayoutFrame {
+) -> ResolvedElement {
     let style = resolve_style(element, stylesheet, states.get(&element.id));
     let style = states
         .get(&element.id)
@@ -40,7 +40,7 @@ pub(crate) fn layout_element(
         scroll_limits,
     );
 
-    LayoutFrame {
+    ResolvedElement {
         id: element.id.clone(),
         role: element.spec.role,
         classes: element.spec.classes.clone(),
@@ -130,7 +130,7 @@ fn layout_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, f32>,
-) -> Vec<LayoutFrame> {
+) -> Vec<ResolvedElement> {
     let mut cursor = content_rect.origin;
     let mut frames = Vec::with_capacity(element.children.len());
 
@@ -248,7 +248,7 @@ fn measure_children(
     Size::new(width.min(parent_size.width), height)
 }
 
-pub(crate) fn hit_path(frame: &LayoutFrame, point: Point) -> Option<Vec<&LayoutFrame>> {
+pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {
     if !frame.rect.contains(point) {
         return None;
     }

@@ -1,10 +1,10 @@
 use crate::element::ElementId;
 use crate::geometry::{Insets, Overflow, Rect};
-use crate::state::{ElementState, LayoutFrame, ScrollChrome};
+use crate::state::{ElementState, ResolvedElement, ScrollChrome};
 use std::collections::HashMap;
 
 pub(crate) fn scroll_chrome(
-    frame: &LayoutFrame,
+    frame: &ResolvedElement,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &HashMap<ElementId, f32>,
 ) -> Vec<ScrollChrome> {
@@ -14,7 +14,7 @@ pub(crate) fn scroll_chrome(
 }
 
 fn collect_scroll_chrome(
-    frame: &LayoutFrame,
+    frame: &ResolvedElement,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &HashMap<ElementId, f32>,
     chrome: &mut Vec<ScrollChrome>,
@@ -32,7 +32,7 @@ fn collect_scroll_chrome(
 }
 
 fn scroll_chrome_for_frame(
-    frame: &LayoutFrame,
+    frame: &ResolvedElement,
     states: &HashMap<ElementId, ElementState>,
     max_scroll: f32,
 ) -> ScrollChrome {

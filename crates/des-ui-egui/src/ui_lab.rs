@@ -1,14 +1,16 @@
-mod runtime_adapter;
+mod egui_adapter;
 mod styles;
 #[cfg(test)]
 mod tests;
 mod views;
 
-use runtime_adapter::{paint_frame, paint_scroll_chrome, runtime_input};
+use egui_adapter::{document_input, paint_frame, paint_scroll_chrome};
 use styles::stylesheet;
 use views::{render_nav, render_stage, render_topbar};
 
-use des_ui_runtime::{Color, ElementRole, ElementSpec, Runtime, RuntimeOutput, Scene, Size};
+use des_ui_document::{
+    Color, Document, DocumentEngine, DocumentOutput, ElementRole, ElementSpec, Size,
+};
 use eframe::egui;
 use std::collections::BTreeMap;
 
@@ -74,7 +76,7 @@ impl LabView {
 }
 
 pub(crate) struct UiLabState {
-    runtime: Runtime,
+    document_engine: DocumentEngine,
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
@@ -84,7 +86,7 @@ pub(crate) struct UiLabState {
 impl Default for UiLabState {
     fn default() -> Self {
         Self {
-            runtime: Runtime::default(),
+            document_engine: DocumentEngine::default(),
             view: LabView::Layout,
             show_optional_card: true,
             dense_mode: false,
@@ -106,10 +108,12 @@ impl UiLabState {
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
         let stylesheet = stylesheet();
-        let scene = self.scene(Size::new(viewport.x, viewport.y), debug_overlay);
-        let output = self
-            .runtime
-            .update_with_input(&scene, &stylesheet, runtime_input(ui, origin));
+        let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
+        let output = self.document_engine.update_with_input(
+            &document,
+            &stylesheet,
+            document_input(ui, origin),
+        );
 
         paint_frame(ui, origin, &output.layout);
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
@@ -119,7 +123,7 @@ impl UiLabState {
         }
     }
 
-    fn apply_clicks(&mut self, ui: &egui::Ui, _output: &RuntimeOutput) {
+    fn apply_clicks(&mut self, ui: &egui::Ui, _output: &DocumentOutput) {
         for (id, action) in [
             ("view-layout", LabAction::SelectView(LabView::Layout)),
             (
@@ -134,7 +138,7 @@ impl UiLabState {
             ("toggle-density", LabAction::ToggleDensity),
         ] {
             let count = self
-                .runtime
+                .document_engine
                 .element_state(id)
                 .map(|state| state.click_count)
                 .unwrap_or_default();
@@ -152,8 +156,8 @@ impl UiLabState {
         }
     }
 
-    fn scene(&self, viewport: Size, debug_overlay: bool) -> Scene {
-        Scene::build(viewport, |ui| {
+    fn document(&self, viewport: Size, debug_overlay: bool) -> Document {
+        Document::build(viewport, |ui| {
             ui.element(
                 "lab-root",
                 ElementSpec::new(ElementRole::Panel).class("lab-root"),

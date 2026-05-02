@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn render_topbar(ui: &mut des_ui_runtime::Ui, debug_overlay: bool) {
+pub(super) fn render_topbar(ui: &mut des_ui_document::DocumentBuilder, debug_overlay: bool) {
     ui.element(
         "topbar",
         ElementSpec::new(ElementRole::Panel).class("topbar"),
@@ -14,16 +14,16 @@ pub(super) fn render_topbar(ui: &mut des_ui_runtime::Ui, debug_overlay: bool) {
                 "subtitle",
                 ElementSpec::new(ElementRole::Text).class("muted"),
                 if debug_overlay {
-                    "runtime layout, style, input, and graph experiments / debug"
+                    "document layout, style, input, and graph experiments / debug"
                 } else {
-                    "runtime layout, style, input, and graph experiments"
+                    "document layout, style, input, and graph experiments"
                 },
             );
         },
     );
 }
 
-pub(super) fn render_nav(ui: &mut des_ui_runtime::Ui, selected: LabView) {
+pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: LabView) {
     ui.element(
         "nav",
         ElementSpec::new(ElementRole::Panel).class("nav"),
@@ -70,14 +70,14 @@ fn view_hint(view: LabView) -> &'static str {
         LabView::Layout => "nesting, margins, rows, columns",
         LabView::Interaction => "hover, press, click ownership",
         LabView::Styling => "roles, classes, states, ids",
-        LabView::Scrolling => "runtime scroll ownership",
+        LabView::Scrolling => "document scroll ownership",
         LabView::Nesting => "relative nested boxes",
         LabView::Graph => "canvas and bezier planning",
     }
 }
 
 pub(super) fn render_stage(
-    ui: &mut des_ui_runtime::Ui,
+    ui: &mut des_ui_document::DocumentBuilder,
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
@@ -96,7 +96,11 @@ pub(super) fn render_stage(
     );
 }
 
-fn render_layout_view(ui: &mut des_ui_runtime::Ui, _show_optional_card: bool, _dense_mode: bool) {
+fn render_layout_view(
+    ui: &mut des_ui_document::DocumentBuilder,
+    _show_optional_card: bool,
+    _dense_mode: bool,
+) {
     ui.text_element(
         "layout-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -248,7 +252,11 @@ fn render_layout_view(ui: &mut des_ui_runtime::Ui, _show_optional_card: bool, _d
     );
 }
 
-fn box_model_section_label(ui: &mut des_ui_runtime::Ui, id: &'static str, label: &'static str) {
+fn box_model_section_label(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+) {
     ui.text_element(
         id,
         ElementSpec::new(ElementRole::Text).class("box-section-label"),
@@ -257,9 +265,9 @@ fn box_model_section_label(ui: &mut des_ui_runtime::Ui, id: &'static str, label:
 }
 
 fn box_model_row(
-    ui: &mut des_ui_runtime::Ui,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
-    add_contents: impl FnOnce(&mut des_ui_runtime::Ui),
+    add_contents: impl FnOnce(&mut des_ui_document::DocumentBuilder),
 ) {
     ui.element(
         id,
@@ -269,7 +277,7 @@ fn box_model_row(
 }
 
 fn box_model_case(
-    ui: &mut des_ui_runtime::Ui,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     note: &'static str,
@@ -307,7 +315,7 @@ fn box_model_case(
 }
 
 fn box_model_subject(
-    ui: &mut des_ui_runtime::Ui,
+    ui: &mut des_ui_document::DocumentBuilder,
     case_id: &'static str,
     subject_class: &'static str,
 ) {
@@ -384,7 +392,7 @@ fn box_model_subject(
     );
 }
 
-fn box_chip(ui: &mut des_ui_runtime::Ui, case_id: &'static str, index: usize) {
+fn box_chip(ui: &mut des_ui_document::DocumentBuilder, case_id: &'static str, index: usize) {
     ui.element(
         format!("{case_id}-chip-{index}"),
         ElementSpec::new(ElementRole::Panel).class("box-chip"),
@@ -392,16 +400,16 @@ fn box_chip(ui: &mut des_ui_runtime::Ui, case_id: &'static str, index: usize) {
     );
 }
 
-fn render_interaction_view(ui: &mut des_ui_runtime::Ui) {
+fn render_interaction_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "interaction-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
-        "Interaction Runtime",
+        "Document Interaction",
     );
     ui.text_element(
         "interaction-copy",
         ElementSpec::new(ElementRole::Text).class("muted"),
-        "Hover and click styles are resolved by runtime state. Inner text does not own clicks.",
+        "Hover and click styles are resolved by document state. Inner text does not own clicks.",
     );
     ui.element(
         "interaction-row",
@@ -447,7 +455,7 @@ fn render_interaction_view(ui: &mut des_ui_runtime::Ui) {
     );
 }
 
-fn render_styling_view(ui: &mut des_ui_runtime::Ui, dense_mode: bool) {
+fn render_styling_view(ui: &mut des_ui_document::DocumentBuilder, dense_mode: bool) {
     ui.text_element(
         "styling-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -494,16 +502,16 @@ fn render_styling_view(ui: &mut des_ui_runtime::Ui, dense_mode: bool) {
     );
 }
 
-fn render_scrolling_view(ui: &mut des_ui_runtime::Ui) {
+fn render_scrolling_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "scroll-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
-        "Runtime Scrolling",
+        "Document Scrolling",
     );
     ui.text_element(
         "scroll-copy",
         ElementSpec::new(ElementRole::Text).class("muted"),
-        "Use the wheel or touchpad over either panel. The scroll offset lives in des-ui-runtime.",
+        "Use the wheel or touchpad over either panel. The scroll offset lives in des-ui-document.",
     );
     ui.element(
         "scroll-row",
@@ -515,7 +523,7 @@ fn render_scrolling_view(ui: &mut des_ui_runtime::Ui) {
     );
 }
 
-fn render_nesting_view(ui: &mut des_ui_runtime::Ui) {
+fn render_nesting_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "nesting-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -568,7 +576,7 @@ fn render_nesting_view(ui: &mut des_ui_runtime::Ui) {
     );
 }
 
-fn render_graph_view(ui: &mut des_ui_runtime::Ui) {
+fn render_graph_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "graph-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -591,14 +599,14 @@ fn render_graph_view(ui: &mut des_ui_runtime::Ui) {
             ui.text_element(
                 "graph-canvas-body",
                 ElementSpec::new(ElementRole::Text).class("muted"),
-                "Next: runtime-managed canvas bounds with egui/epaint geometry inside.",
+                "Next: document-managed canvas bounds with egui/epaint geometry inside.",
             );
         },
     );
 }
 
 fn interactive_labeled_row(
-    ui: &mut des_ui_runtime::Ui,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
@@ -625,7 +633,7 @@ fn interactive_labeled_row(
 }
 
 fn scroll_panel(
-    ui: &mut des_ui_runtime::Ui,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     row_count: usize,
@@ -653,7 +661,7 @@ fn scroll_panel(
                                 ui.text_element(
                                     format!("{id}-row-{index}-label"),
                                     ElementSpec::new(ElementRole::Text).class("muted"),
-                                    format!("runtime-owned scroll row {:02}", index + 1),
+                                    format!("document-owned scroll row {:02}", index + 1),
                                 );
                             },
                         );

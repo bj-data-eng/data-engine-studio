@@ -744,23 +744,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-ui-document"
+version = "0.1.0"
+
+[[package]]
 name = "des-ui-egui"
 version = "0.1.0"
 dependencies = [
  "des-app",
  "des-core",
  "des-graph-egui",
- "des-ui-runtime",
+ "des-ui-document",
  "eframe",
  "egui",
  "egui_kittest",
  "iconflow",
  "image",
 ]
-
-[[package]]
-name = "des-ui-runtime"
-version = "0.1.0"
 
 [[package]]
 name = "dispatch"

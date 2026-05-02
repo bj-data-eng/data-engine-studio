@@ -1,10 +1,10 @@
-use des_ui_runtime::{
-    Color, LayoutFrame, Overflow, Point, PointerInput, Rect, RuntimeInput, ScrollChrome,
+use des_ui_document::{
+    Color, DocumentInput, Overflow, Point, PointerInput, Rect, ResolvedElement, ScrollChrome,
 };
 use eframe::egui;
 
-pub(super) fn runtime_input(ui: &egui::Ui, origin: egui::Pos2) -> RuntimeInput {
-    ui.input(|input| RuntimeInput {
+pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
+    ui.input(|input| DocumentInput {
         pointer: input.pointer.hover_pos().map(|position| PointerInput {
             position: Point::new(position.x - origin.x, position.y - origin.y),
             primary_delta: Point::new(input.pointer.delta().x, input.pointer.delta().y),
@@ -15,14 +15,14 @@ pub(super) fn runtime_input(ui: &egui::Ui, origin: egui::Pos2) -> RuntimeInput {
     })
 }
 
-pub(super) fn paint_frame(ui: &mut egui::Ui, origin: egui::Pos2, frame: &LayoutFrame) {
+pub(super) fn paint_frame(ui: &mut egui::Ui, origin: egui::Pos2, frame: &ResolvedElement) {
     paint_frame_clipped(ui, origin, frame, ui.clip_rect());
 }
 
 fn paint_frame_clipped(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
-    frame: &LayoutFrame,
+    frame: &ResolvedElement,
     clip_rect: egui::Rect,
 ) {
     let painter = ui.painter().with_clip_rect(clip_rect);
@@ -95,8 +95,8 @@ pub(super) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes
             continue;
         }
 
-        let track = runtime_rect_to_egui(origin, chrome.track_rect);
-        let handle = runtime_rect_to_egui(origin, chrome.handle_rect);
+        let track = document_rect_to_egui(origin, chrome.track_rect);
+        let handle = document_rect_to_egui(origin, chrome.handle_rect);
         let alpha = if chrome.dragged {
             235
         } else if chrome.hovered {
@@ -124,7 +124,7 @@ pub(super) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes
     }
 }
 
-fn runtime_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
+fn document_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
     egui::Rect::from_min_size(
         egui::pos2(origin.x + rect.origin.x, origin.y + rect.origin.y),
         egui::vec2(rect.size.width, rect.size.height),

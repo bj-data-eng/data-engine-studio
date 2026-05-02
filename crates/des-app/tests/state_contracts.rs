@@ -9,7 +9,7 @@ fn new_state_selects_first_flow() {
     assert_eq!(state.selected_project_id(), Some("customer-360"));
     assert_eq!(state.selected_group_id(), Some("customer-etl"));
     assert_eq!(state.selected_flow_id(), Some("customer-analytics"));
-    assert_eq!(state.home().flows.len(), 9);
+    assert_eq!(state.catalog().flows.len(), 9);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn dispatch_move_graph_node_updates_selected_flow_node_position() {
 
     let join = state
         .snapshot()
-        .home
+        .catalog
         .flows
         .into_iter()
         .find(|flow| flow.id == "customer-analytics")

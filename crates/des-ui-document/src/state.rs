@@ -22,7 +22,7 @@ pub struct ChangeSet {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct LayoutFrame {
+pub struct ResolvedElement {
     pub id: ElementId,
     pub role: ElementRole,
     pub classes: Vec<ClassName>,
@@ -30,10 +30,10 @@ pub struct LayoutFrame {
     pub style: ComputedStyle,
     pub text: Option<String>,
     pub interactive: bool,
-    pub children: Vec<LayoutFrame>,
+    pub children: Vec<ResolvedElement>,
 }
 
-impl LayoutFrame {
+impl ResolvedElement {
     pub fn find(&self, id: &str) -> Option<&Self> {
         if self.id.as_str() == id {
             return Some(self);
@@ -43,16 +43,16 @@ impl LayoutFrame {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct RuntimeOutput {
+pub struct DocumentOutput {
     pub changes: ChangeSet,
-    pub layout: LayoutFrame,
+    pub layout: ResolvedElement,
     pub hit_id: Option<ElementId>,
     pub scroll_chrome: Vec<ScrollChrome>,
     pub animating: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct RuntimeInput {
+pub struct DocumentInput {
     pub pointer: Option<PointerInput>,
     pub scroll_delta: Point,
 }

@@ -1,11 +1,11 @@
 use super::*;
-use crate::test_graphics::{
+use crate::graphics_testing::{
     TEST_HEIGHT, TEST_WIDTH, assert_exact_image_match, compare_images, image_stats, render_harness,
     test_harness,
 };
-use des_ui_runtime::{
-    ElementRole, ElementSpec, Insets, LayoutFrame, Length, Runtime, RuntimeOutput, Scene, Size,
-    StylePatch, StyleSelector, StyleSheet,
+use des_ui_document::{
+    Document, DocumentEngine, DocumentOutput, ElementRole, ElementSpec, Insets, Length,
+    ResolvedElement, Size, StylePatch, StyleSelector, StyleSheet,
 };
 use egui_kittest::Harness;
 
@@ -19,23 +19,24 @@ fn lab_image(initial_view: &str) -> image::RgbaImage {
     render_harness(&mut lab_harness(initial_view))
 }
 
-fn lab_rect(id: &str) -> des_ui_runtime::Rect {
-    let mut runtime = Runtime::default();
-    let scene = UiLabState::new(Some("layout")).scene(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let output = runtime.update(&scene, &stylesheet());
+fn lab_rect(id: &str) -> des_ui_document::Rect {
+    let mut engine = DocumentEngine::default();
+    let document =
+        UiLabState::new(Some("layout")).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let output = engine.update(&document, &stylesheet());
     find_frame(&output.layout, id)
         .unwrap_or_else(|| panic!("expected layout frame for {id}"))
         .rect
 }
 
-fn lab_output(initial_view: &str) -> RuntimeOutput {
-    let mut runtime = Runtime::default();
-    let scene =
-        UiLabState::new(Some(initial_view)).scene(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    runtime.update(&scene, &stylesheet())
+fn lab_output(initial_view: &str) -> DocumentOutput {
+    let mut engine = DocumentEngine::default();
+    let document =
+        UiLabState::new(Some(initial_view)).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    engine.update(&document, &stylesheet())
 }
 
-fn find_frame<'a>(frame: &'a LayoutFrame, id: &str) -> Option<&'a LayoutFrame> {
+fn find_frame<'a>(frame: &'a ResolvedElement, id: &str) -> Option<&'a ResolvedElement> {
     if frame.id.as_str() == id {
         return Some(frame);
     }
@@ -45,7 +46,7 @@ fn find_frame<'a>(frame: &'a LayoutFrame, id: &str) -> Option<&'a LayoutFrame> {
         .find_map(|child| find_frame(child, id))
 }
 
-fn frame<'a>(output: &'a RuntimeOutput, id: &str) -> &'a LayoutFrame {
+fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
     find_frame(&output.layout, id).unwrap_or_else(|| panic!("expected layout frame for {id}"))
 }
 
@@ -64,7 +65,7 @@ fn kittest_renders_lab_frame_to_shapes() {
 
     assert!(
         harness.output().shapes.len() > 20,
-        "expected the UI lab to produce a non-trivial painted scene"
+        "expected the UI lab to produce a non-trivial painted document"
     );
 }
 
@@ -82,7 +83,7 @@ fn kittest_renders_lab_frame_to_pixels() {
 }
 
 #[test]
-fn kittest_pointer_click_reaches_runtime_owned_nav_item() {
+fn kittest_pointer_click_reaches_document_owned_nav_item() {
     let mut harness = lab_harness("layout");
     let rect = lab_rect("view-interaction");
     let interaction_nav_item = egui::pos2(
@@ -250,8 +251,8 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
 }
 
 #[test]
-fn external_style_contract_can_drive_runtime_without_ui_lab_internals() {
-    let mut runtime = Runtime::default();
+fn external_style_contract_can_drive_document_without_ui_lab_internals() {
+    let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::Id("outer"),
@@ -273,7 +274,7 @@ fn external_style_contract_can_drive_runtime_without_ui_lab_internals() {
         .rule(
             StyleSelector::Class("row"),
             StylePatch::default()
-                .direction(des_ui_runtime::Direction::Row)
+                .direction(des_ui_document::Direction::Row)
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(4.0),
@@ -282,7 +283,7 @@ fn external_style_contract_can_drive_runtime_without_ui_lab_internals() {
             StyleSelector::Class("cell"),
             StylePatch::default().size(10.0, 10.0),
         );
-    let scene = Scene::build(Size::new(240.0, 160.0), |ui| {
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
         ui.element("outer", ElementSpec::new(ElementRole::Panel), |ui| {
             ui.element("inner", ElementSpec::new(ElementRole::Panel), |ui| {
                 for row in 0..3 {
@@ -304,7 +305,7 @@ fn external_style_contract_can_drive_runtime_without_ui_lab_internals() {
         });
     });
 
-    let output = runtime.update(&scene, &stylesheet);
+    let output = engine.update(&document, &stylesheet);
 
     assert_close(output.layout.find("outer").unwrap().rect.size.width, 58.0);
     assert_close(output.layout.find("outer").unwrap().rect.size.height, 58.0);

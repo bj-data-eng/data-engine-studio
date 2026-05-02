@@ -1,7 +1,7 @@
-use crate::model::*;
+use crate::catalog::*;
 use des_core::{AppInfo, Diagnostic};
 
-impl StudioHomeModel {
+impl StudioCatalog {
     pub fn sample() -> Self {
         Self {
             app_info: AppInfo::current(),

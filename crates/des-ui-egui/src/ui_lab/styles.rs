@@ -2,7 +2,7 @@ use super::{
     BACKGROUND, CARD, CARD_HOVER, CARD_PRESSED, CARD_SELECTED, GREEN, PANEL, PANEL_ALT, PURPLE,
     STROKE, STROKE_SELECTED, TEXT, TEXT_ACCENT, TEXT_MUTED,
 };
-use des_ui_runtime::{
+use des_ui_document::{
     Color, Direction, ElementRole, ElementStateSelector, Insets, Length, Overflow, StylePatch,
     StyleSelector, StyleSheet, Transition,
 };
@@ -319,7 +319,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::Class("nav-item"),
             StylePatch::default()
                 .width_fill()
-                .height(des_ui_runtime::Length::Px(64.0))
+                .height(des_ui_document::Length::Px(64.0))
                 .background(CARD)
                 .border(STROKE),
         )
@@ -454,7 +454,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::Class("scroll-list"),
             StylePatch::default()
                 .width_fill()
-                .height(des_ui_runtime::Length::Px(370.0))
+                .height(des_ui_document::Length::Px(370.0))
                 .padding(Insets::symmetric(4.0, 4.0))
                 .gap(7.0)
                 .overflow_y(Overflow::Scroll),
@@ -467,7 +467,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::Class("scroll-row-card"),
             StylePatch::default()
                 .width_fill()
-                .height(des_ui_runtime::Length::Px(34.0))
+                .height(des_ui_document::Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 7.0))
                 .background(Color::rgb(29, 34, 39))
                 .border(Color::rgb(48, 57, 65))

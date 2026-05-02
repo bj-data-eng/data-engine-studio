@@ -158,14 +158,14 @@ impl Element {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Scene {
+pub struct Document {
     pub viewport: Size,
     pub root: Element,
 }
 
-impl Scene {
-    pub fn build(viewport: Size, add_contents: impl FnOnce(&mut Ui)) -> Self {
-        let mut ui = Ui::default();
+impl Document {
+    pub fn build(viewport: Size, add_contents: impl FnOnce(&mut DocumentBuilder)) -> Self {
+        let mut ui = DocumentBuilder::default();
         add_contents(&mut ui);
         Self {
             viewport,
@@ -180,18 +180,18 @@ impl Scene {
 }
 
 #[derive(Default)]
-pub struct Ui {
+pub struct DocumentBuilder {
     children: Vec<Element>,
 }
 
-impl Ui {
+impl DocumentBuilder {
     pub fn element(
         &mut self,
         id: impl Into<ElementId>,
         spec: ElementSpec,
-        add_contents: impl FnOnce(&mut Ui),
+        add_contents: impl FnOnce(&mut DocumentBuilder),
     ) {
-        let mut child_ui = Ui::default();
+        let mut child_ui = DocumentBuilder::default();
         add_contents(&mut child_ui);
         self.children.push(Element {
             id: id.into(),

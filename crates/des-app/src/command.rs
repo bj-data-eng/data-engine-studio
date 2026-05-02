@@ -1,4 +1,4 @@
-use crate::model::CanvasPoint;
+use crate::catalog::CanvasPoint;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppCommand {

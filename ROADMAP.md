@@ -10,7 +10,7 @@ This roadmap is intentionally architecture-first. The core product requirement i
 - Prefer typed commands, events, snapshots, and reports over shared mutable structures.
 - Keep graph, project, validation, query, and execution logic independent from `egui` and Python.
 - Keep Python as packaging and process entry only.
-- Keep `egui` as a host adapter. Product layout, hit testing, z-order, retained UI state, and input routing should move toward `des-ui-runtime`.
+- Keep `egui` as a host adapter. Product layout, hit testing, z-order, retained UI state, and input routing should move toward `des-ui-document`.
 - Keep Studio as the app; a selected workspace must not become the application identity.
 - Make runtime truth explicit through snapshots and events; logs are history, not the control plane.
 - Design for unit tests at crate boundaries before integration tests across the full app.
@@ -31,8 +31,8 @@ Initial crates:
 - `des-artifacts`: previews, profiling outputs, debug artifacts, schema snapshots, parquet/json metadata, and artifact indexing.
 - `des-duckdb`: DuckDB connection management, SQL lowering, query execution, and result materialization.
 - `des-polars`: Polars LazyFrame/DataFrame support, previews, profiling, and local transform lowering.
-- `des-ui-runtime`: product-specific UI runtime with DOM-like element trees, deterministic CSS-like style sheets, layout frames, retained interaction state, z-order, hit testing, and input routing.
-- `des-ui-egui`: egui host adapter, temporary egui-native widgets, canvas, panels, inspector, and runtime paint/input integration.
+- `des-ui-document`: standalone-style UI document and style model with DOM-like element trees, deterministic CSS-like style sheets, resolved elements, retained interaction state, z-order, hit testing, and input routing.
+- `des-ui-egui`: egui host adapter, temporary egui-native widgets, canvas, panels, inspector, and document paint/input integration.
 - `des-app`: application orchestration, command handling, undo/redo, document lifecycle, validation/runtime wiring.
 - `des-python`: PyO3 extension module exposing the native app launcher to Python.
 
@@ -43,7 +43,7 @@ python package
   -> des-python
     -> des-app
       -> des-ui-egui
-        -> des-ui-runtime
+        -> des-ui-document
       -> des-project
       -> des-validation
       -> des-runtime
@@ -66,13 +66,13 @@ Examples:
 - `des-project`: `ProjectDocument`, `ProjectCommand`, `ProjectChangeSet`, `ProjectLoadResult`, `ProjectSaveResult`.
 - `des-graph`: `GraphDocument`, `GraphCommand`, `GraphChangeSet`, `NodeId`, `PortId`, `EdgeId`.
 - `des-nodes`: `NodeDefinition`, `NodeRegistry`, `NodeKind`, `PortDefinition`, `ConfigSchema`.
-- `des-ui-runtime`: `Scene`, `ElementSpec`, `StyleSheet`, `StyleSelector`, `Runtime`, `RuntimeInput`, `RuntimeOutput`, `LayoutFrame`.
+- `des-ui-document`: `Document`, `ElementSpec`, `StyleSheet`, `StyleSelector`, `DocumentEngine`, `DocumentInput`, `DocumentOutput`, `ResolvedElement`.
 
 Internal modules can change freely, but public API types should be deliberate and tested.
 
-## UI Runtime Direction
+## UI Document Direction
 
-Studio needs complex, browser-grade composition behavior without adopting HTML/CSS/JavaScript as the product platform. The UI runtime should provide the low-level machinery that raw egui code makes difficult to coordinate manually:
+Studio needs complex, browser-grade composition behavior without adopting HTML/CSS/JavaScript as the product platform. The UI document engine should provide the low-level machinery that raw egui code makes difficult to coordinate manually:
 
 - nesting and stable element identity
 - deterministic style and size resolution
@@ -83,15 +83,15 @@ Studio needs complex, browser-grade composition behavior without adopting HTML/C
 - graph/canvas geometry integration
 - host-independent layout tests
 
-The runtime should be CSS-like, not CSS-compatible. Avoid CSS specificity rules. Preferred style resolution order:
+The document style model should be CSS-like, not CSS-compatible. Avoid CSS specificity rules. Preferred style resolution order:
 
 ```text
 role defaults -> classes in rule/declaration order -> state variants -> id overrides
 ```
 
-The element tree defines what exists: identity, nesting, semantic role, classes, text, and event intent. The style sheet defines how it is sized, positioned, layered, and painted. `des-ui-egui` should increasingly become an adapter that translates egui input into runtime input and paints runtime layout frames through egui/epaint.
+The document tree defines what exists: identity, nesting, semantic role, classes, text, and event intent. The style sheet defines how it is sized, positioned, layered, and painted. `des-ui-egui` should increasingly become an adapter that translates egui input into document input and paints resolved document elements through egui/epaint.
 
-Specialized engines should plug into this runtime rather than being reimplemented inside it. Markdown rendering, code editing, syntax highlighting, virtualized data grids, charts, graph canvases, and transform visualizations can be dedicated subsystems with runtime-managed bounds, focus, z-order, and input ownership.
+Specialized engines should plug into this document layer rather than being reimplemented inside it. Markdown rendering, code editing, syntax highlighting, virtualized data grids, charts, graph canvases, and transform visualizations can be dedicated subsystems with document-managed bounds, focus, z-order, and input ownership.
 
 ## Packaging Plan
 
@@ -320,7 +320,7 @@ Lessons carried forward from `data-engine`:
 
 ### Milestone 5: egui Shell
 
-- Use the runtime-backed UI lab as the first screen while the UI platform is being built. The lab should expose each runtime feature in one or more views before that feature is used in the app proper.
+- Use the document-engine-backed UI lab as the first screen while the UI platform is being built. The lab should expose each document feature in one or more views before that feature is used in the app proper.
 - Build the first usable app shell:
   - menu/toolbar
   - left node palette
@@ -330,7 +330,7 @@ Lessons carried forward from `data-engine`:
 - Split `des-ui-egui` into internal modules for shell, workspace browser, flow list, flow editor, graph canvas, node palette, inspector, runtime panel, and theme as those surfaces become real.
 - Implement selection, panning, zooming, adding nodes, moving nodes, and connecting ports.
 - Keep UI state out of graph/project state.
-- Begin migrating reusable layout/interaction behavior into `des-ui-runtime`.
+- Begin migrating reusable layout/interaction behavior into `des-ui-document`.
 - Keep egui-specific code focused on hosting, painting, font access, and platform input.
 
 ### Milestone 6: Query And Backend Foundations

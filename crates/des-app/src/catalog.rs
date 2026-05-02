@@ -109,7 +109,7 @@ pub struct FlowSummary {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StudioHomeModel {
+pub struct StudioCatalog {
     pub app_info: AppInfo,
     pub workspace_roots: Vec<WorkspaceRootSummary>,
     pub workspaces: Vec<WorkspaceSummary>,
@@ -121,7 +121,7 @@ pub struct StudioHomeModel {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AppSnapshot {
-    pub home: StudioHomeModel,
+    pub catalog: StudioCatalog,
     pub selected_root_id: Option<String>,
     pub selected_workspace_id: Option<String>,
     pub selected_project_id: Option<String>,

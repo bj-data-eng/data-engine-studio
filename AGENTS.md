@@ -10,9 +10,9 @@ Current workspace:
 
 - `crates/des-core`: shared primitives such as app info, diagnostics, errors, and small stable types.
 - `crates/des-app`: app state, command handling, snapshots, and orchestration. This is the composition layer.
-- `crates/des-ui-runtime`: DOM-like element tree, deterministic CSS-like style resolution, layout frames, retained UI state, and input routing. This crate must not depend on egui.
+- `crates/des-ui-document`: standalone-style UI document and style model with deterministic style resolution, resolved layout output, retained element state, and input routing. This crate must not depend on egui.
 - `crates/des-graph-egui`: vendored graph interaction crate kept while graph UX is still being explored.
-- `crates/des-ui-egui`: egui host adapter and current UI lab. UI renders snapshots/runtime output and sends commands.
+- `crates/des-ui-egui`: egui host adapter and current UI lab. UI renders app snapshots/document output and sends commands.
 - `crates/des-python`: PyO3 extension module exposed to Python as `data_engine_studio._native`.
 - `python/data_engine_studio`: Python launcher/wrapper package.
 - `ROADMAP.md`: architecture-first plan and milestone map.
@@ -34,9 +34,9 @@ Keep app identity centralized.
 - Export intentional front-door types from `lib.rs`; keep implementation modules private unless there is a clear reason.
 - Prefer typed commands, events, snapshots, reports, and change sets over shared mutable state.
 - Keep graph, project, validation, query, and execution logic independent from `egui` and Python.
-- Keep `des-ui-runtime` independent from `egui` and Python. It should expose product-neutral UI runtime contracts: element trees, style sheets, layout frames, input events, and retained interaction state.
+- Keep `des-ui-document` independent from `egui` and Python. It should expose product-neutral UI document contracts: element trees, style sheets, resolved elements, input events, and retained interaction state.
 - Keep `des-ui-egui` out of business logic. UI should render state and dispatch commands.
-- Treat `des-ui-egui` as an adapter/host for the runtime where possible: translate egui input into runtime input and paint runtime output through egui/epaint.
+- Treat `des-ui-egui` as an adapter/host for the document engine where possible: translate egui input into document input and paint resolved document output through egui/epaint.
 - Keep `des-python` thin. It should expose native launch/runtime diagnostics, not own app behavior.
 - `des-app` may coordinate crates, but should coordinate through public APIs rather than reaching into internals.
 - If a small behavior change requires touching many crates, revisit the boundary before continuing.
@@ -48,7 +48,7 @@ python package
   -> des-python
     -> des-app
       -> des-ui-egui
-        -> des-ui-runtime
+        -> des-ui-document
       -> domain/service crates
         -> des-core
 ```
@@ -62,12 +62,12 @@ The UI is allowed to drive architecture discovery, but it must not absorb the ar
 Preferred pattern:
 
 ```text
-des-ui-runtime
-  resolves element trees + style sheets
-  owns layout, z-order, hit testing, and retained UI state
+des-ui-document
+  owns the document tree + style model
+  resolves layout, z-order, hit testing, and retained UI state
 
 des-ui-egui
-  adapts egui input/output to the runtime
+  adapts egui input/output to the document engine
   renders AppSnapshot and sends AppCommand
 
 des-app
@@ -81,9 +81,9 @@ domain crates
 
 The primary product surface is a full-window graph workspace. Workspace roots, workspaces, and grouped flows can appear as high-level graph nodes. The node graph for a selected flow expands from the flow card into source/transform/sink nodes.
 
-When adding product behavior, add the corresponding command/snapshot shape in `des-app` first or at the same time. When adding low-level UI behavior such as layout, z-order, hover, press, focus, scroll ownership, clipping, or event routing, prefer adding it to `des-ui-runtime` rather than patching around it in product UI code.
+When adding product behavior, add the corresponding command/snapshot shape in `des-app` first or at the same time. When adding low-level UI behavior such as layout, z-order, hover, press, focus, scroll ownership, clipping, or event routing, prefer adding it to `des-ui-document` rather than patching around it in product UI code.
 
-Do not recreate CSS specificity. Runtime style resolution should stay deterministic and boring:
+Do not recreate CSS specificity. Document engine style resolution should stay deterministic and boring:
 
 ```text
 role defaults
@@ -95,10 +95,10 @@ then explicit local overrides later if needed
 
 The element tree defines identity, nesting, roles, classes, text, and event intent. The style sheet defines visual and layout properties such as size, margin, padding, z-index, color, borders, overflow, and layout direction.
 
-Avoid a monolithic GUI crate. The current first screen is a runtime-backed UI lab, not the final product shell. Use it to exercise layout, styling, input, graph/canvas, table, editor, markdown, and other UI features before promoting them into app surfaces. Split `des-ui-egui` internally by product surface and responsibility as it grows. Prefer small modules such as:
+Avoid a monolithic GUI crate. The current first screen is a document-engine-backed UI lab, not the final product shell. Use it to exercise layout, styling, input, graph/canvas, table, editor, markdown, and other UI features before promoting them into app surfaces. Split `des-ui-egui` internally by product surface and responsibility as it grows. Prefer small modules such as:
 
-- `ui_lab`: runtime-backed testing UI for all emerging UI features.
-- `runtime_adapter`: egui input/output translation for `des-ui-runtime`.
+- `ui_lab`: document-engine-backed testing UI for all emerging UI features.
+- `egui_adapter`: egui input/output translation for `des-ui-document`.
 - `shell`: top-level frame, menus, command routing, global layout.
 - `workspace_browser`: workspace roots, workspace list, ownership/status affordances.
 - `flow_list`: grouped built ETL flow cards embedded in the workspace/root graph node.
@@ -214,7 +214,7 @@ Harness knobs:
 .\scripts\capture-ui.ps1 -DebugOverlay
 ```
 
-Use `-DebugOverlay` for UI lab diagnostics. As the runtime lab grows, prefer seeding views through launch-time options and app commands rather than test-only branches in the product UI.
+Use `-DebugOverlay` for UI lab diagnostics. As the document lab grows, prefer seeding views through launch-time options and app commands rather than test-only branches in the product UI.
 
 UI graphical testing:
 
@@ -222,7 +222,7 @@ UI graphical testing:
 just ui-test
 ```
 
-See `docs/UI_TESTING.md` for the runtime assertion, reference-test, graphical comparison, interaction, and manual lab testing layers.
+See `docs/UI_TESTING.md` for the document assertion, reference-test, graphical comparison, interaction, and manual lab testing layers.
 
 Fast UI launch for local iteration:
 

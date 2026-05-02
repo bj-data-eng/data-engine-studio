@@ -1,10 +1,11 @@
 use crate::animation::update_element_style_animation;
-use crate::element::{ElementId, Scene};
+use crate::element::{Document, ElementId};
 use crate::geometry::{Overflow, Rect};
 use crate::layout::{hit_path, layout_element};
 use crate::scroll::scroll_chrome;
 use crate::state::{
-    ChangeSet, ElementState, LayoutFrame, PointerInput, RuntimeInput, RuntimeOutput, ScrollChrome,
+    ChangeSet, DocumentInput, DocumentOutput, ElementState, PointerInput, ResolvedElement,
+    ScrollChrome,
 };
 use crate::style::StyleSheet;
 use std::collections::{BTreeSet, HashMap};
@@ -15,28 +16,28 @@ struct ScrollDrag {
 }
 
 #[derive(Default)]
-pub struct Runtime {
+pub struct DocumentEngine {
     states: HashMap<ElementId, ElementState>,
     scroll_limits: HashMap<ElementId, f32>,
     active_scroll_drag: Option<ScrollDrag>,
 }
 
-impl Runtime {
-    pub fn update(&mut self, scene: &Scene, stylesheet: &StyleSheet) -> RuntimeOutput {
-        self.update_with_input(scene, stylesheet, RuntimeInput::default())
+impl DocumentEngine {
+    pub fn update(&mut self, document: &Document, stylesheet: &StyleSheet) -> DocumentOutput {
+        self.update_with_input(document, stylesheet, DocumentInput::default())
     }
 
     pub fn update_with_input(
         &mut self,
-        scene: &Scene,
+        document: &Document,
         stylesheet: &StyleSheet,
-        input: RuntimeInput,
-    ) -> RuntimeOutput {
-        let changes = self.sync_element_states(scene);
+        input: DocumentInput,
+    ) -> DocumentOutput {
+        let changes = self.sync_element_states(document);
         let mut scroll_limits = HashMap::new();
         let input_layout = layout_element(
-            &scene.root,
-            Rect::new(0.0, 0.0, scene.viewport.width, scene.viewport.height),
+            &document.root,
+            Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height),
             stylesheet,
             &self.states,
             &mut scroll_limits,
@@ -45,12 +46,12 @@ impl Runtime {
         let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
         let hit_id = self.apply_input(&input_layout, &input_scroll_chrome, input);
         self.clamp_scroll_states();
-        let input_animating = self.update_style_animation(scene, stylesheet);
+        let input_animating = self.update_style_animation(document, stylesheet);
 
         let mut scroll_limits = HashMap::new();
         let layout = layout_element(
-            &scene.root,
-            Rect::new(0.0, 0.0, scene.viewport.width, scene.viewport.height),
+            &document.root,
+            Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height),
             stylesheet,
             &self.states,
             &mut scroll_limits,
@@ -59,7 +60,7 @@ impl Runtime {
         self.clamp_scroll_states();
         let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
 
-        RuntimeOutput {
+        DocumentOutput {
             changes,
             layout,
             hit_id,
@@ -76,9 +77,9 @@ impl Runtime {
         self.states.get_mut(&ElementId::new(id))
     }
 
-    fn sync_element_states(&mut self, scene: &Scene) -> ChangeSet {
+    fn sync_element_states(&mut self, document: &Document) -> ChangeSet {
         let mut next_ids = BTreeSet::new();
-        scene.root.collect_ids(&mut next_ids);
+        document.root.collect_ids(&mut next_ids);
 
         let existing_ids: BTreeSet<_> = self.states.keys().cloned().collect();
         let mut changes = ChangeSet::default();
@@ -102,9 +103,9 @@ impl Runtime {
 
     fn apply_input(
         &mut self,
-        layout: &LayoutFrame,
+        layout: &ResolvedElement,
         scroll_chrome: &[ScrollChrome],
-        input: RuntimeInput,
+        input: DocumentInput,
     ) -> Option<ElementId> {
         for state in self.states.values_mut() {
             state.hovered = false;
@@ -239,8 +240,8 @@ impl Runtime {
         }
     }
 
-    fn update_style_animation(&mut self, scene: &Scene, stylesheet: &StyleSheet) -> bool {
+    fn update_style_animation(&mut self, document: &Document, stylesheet: &StyleSheet) -> bool {
         const SNAP_EPSILON: f32 = 0.001;
-        update_element_style_animation(&scene.root, stylesheet, &mut self.states, SNAP_EPSILON)
+        update_element_style_animation(&document.root, stylesheet, &mut self.states, SNAP_EPSILON)
     }
 }
