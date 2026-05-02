@@ -1,5 +1,7 @@
 use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
-use crate::geometry::{CornerRadii, Direction, Insets, Length, Overflow, Size};
+use crate::geometry::{
+    CornerRadii, Direction, Insets, Length, Overflow, Position, PositionInsets, Size,
+};
 use crate::state::ElementState;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -85,6 +87,8 @@ pub struct Style {
     pub font_size: Option<f32>,
     pub radius: CornerStyle,
     pub overflow_y: Option<Overflow>,
+    pub position: Option<Position>,
+    pub inset: PositionInsets,
     pub z_index: Option<i32>,
     pub transition: Option<Transition>,
 }
@@ -304,6 +308,56 @@ impl Style {
         self
     }
 
+    pub fn position(mut self, position: Position) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    pub fn absolute_parent(mut self) -> Self {
+        self.position = Some(Position::AbsoluteParent);
+        self
+    }
+
+    pub fn absolute_viewport(mut self) -> Self {
+        self.position = Some(Position::AbsoluteViewport);
+        self
+    }
+
+    pub fn inset(mut self, inset: PositionInsets) -> Self {
+        self.inset = inset;
+        self
+    }
+
+    pub fn inset_px(mut self, top: f32, right: f32, bottom: f32, left: f32) -> Self {
+        self.inset = PositionInsets::from_insets(Insets {
+            top,
+            right,
+            bottom,
+            left,
+        });
+        self
+    }
+
+    pub fn top(mut self, top: Length) -> Self {
+        self.inset.top = Some(top);
+        self
+    }
+
+    pub fn right(mut self, right: Length) -> Self {
+        self.inset.right = Some(right);
+        self
+    }
+
+    pub fn bottom(mut self, bottom: Length) -> Self {
+        self.inset.bottom = Some(bottom);
+        self
+    }
+
+    pub fn left(mut self, left: Length) -> Self {
+        self.inset.left = Some(left);
+        self
+    }
+
     pub fn z_index(mut self, z_index: i32) -> Self {
         self.z_index = Some(z_index);
         self
@@ -332,6 +386,8 @@ pub struct ComputedStyle {
     pub font_size: f32,
     pub radius: CornerRadii,
     pub overflow_y: Overflow,
+    pub position: Position,
+    pub inset: PositionInsets,
     pub z_index: i32,
     pub transition: Option<Transition>,
 }
@@ -354,6 +410,8 @@ impl Default for ComputedStyle {
             font_size: 13.0,
             radius: CornerRadii::ZERO,
             overflow_y: Overflow::Visible,
+            position: Position::Flow,
+            inset: PositionInsets::ZERO,
             z_index: 0,
             transition: None,
         }
@@ -424,6 +482,21 @@ impl ComputedStyle {
         }
         if let Some(value) = style.overflow_y {
             self.overflow_y = value;
+        }
+        if let Some(value) = style.position {
+            self.position = value;
+        }
+        if let Some(value) = style.inset.top {
+            self.inset.top = Some(value);
+        }
+        if let Some(value) = style.inset.right {
+            self.inset.right = Some(value);
+        }
+        if let Some(value) = style.inset.bottom {
+            self.inset.bottom = Some(value);
+        }
+        if let Some(value) = style.inset.left {
+            self.inset.left = Some(value);
         }
         if let Some(value) = style.z_index {
             self.z_index = value;
@@ -518,7 +591,9 @@ fn state_selector_matches(
     match selector {
         ElementStateSelector::Hovered => state.is_some_and(|state| state.hovered),
         ElementStateSelector::Pressed => state.is_some_and(|state| state.pressed),
-        ElementStateSelector::Focused => state.is_some_and(|state| state.focused),
+        ElementStateSelector::Focused => {
+            element.spec.focused || state.is_some_and(|state| state.focused)
+        }
         ElementStateSelector::Selected => element.spec.selected,
         ElementStateSelector::Disabled => element.spec.disabled,
     }

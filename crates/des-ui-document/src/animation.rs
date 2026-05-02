@@ -1,5 +1,5 @@
 use crate::element::{Color, Element, ElementId};
-use crate::geometry::{CornerRadii, Insets};
+use crate::geometry::{CornerRadii, Insets, Length, Size};
 use crate::state::ElementState;
 use crate::style::{ComputedStyle, StyleSheet, Transition, resolve_style};
 use std::collections::HashMap;
@@ -60,6 +60,24 @@ fn eased_style(
     }
     animating |= next.text_color != target.text_color;
 
+    next.gap = ease_f32(current.gap, target.gap, amount, snap_epsilon);
+    animating |= (next.gap - target.gap).abs() > snap_epsilon;
+
+    next.margin = ease_insets(current.margin, target.margin, amount, snap_epsilon);
+    animating |= next.margin != target.margin;
+
+    next.padding = ease_insets(current.padding, target.padding, amount, snap_epsilon);
+    animating |= next.padding != target.padding;
+
+    next.width = ease_length(current.width, target.width, amount, snap_epsilon);
+    animating |= next.width != target.width;
+
+    next.height = ease_length(current.height, target.height, amount, snap_epsilon);
+    animating |= next.height != target.height;
+
+    next.min_size = ease_size(current.min_size, target.min_size, amount, snap_epsilon);
+    animating |= next.min_size != target.min_size;
+
     next.border_width = ease_insets(
         current.border_width,
         target.border_width,
@@ -70,6 +88,9 @@ fn eased_style(
 
     next.radius = ease_corner_radii(current.radius, target.radius, amount, snap_epsilon);
     animating |= next.radius != target.radius;
+
+    next.font_size = ease_f32(current.font_size, target.font_size, amount, snap_epsilon);
+    animating |= (next.font_size - target.font_size).abs() > snap_epsilon;
 
     (next, animating)
 }
@@ -132,6 +153,25 @@ fn ease_insets(current: Insets, target: Insets, amount: f32, snap_epsilon: f32) 
         right: ease_f32(current.right, target.right, amount, snap_epsilon),
         bottom: ease_f32(current.bottom, target.bottom, amount, snap_epsilon),
         left: ease_f32(current.left, target.left, amount, snap_epsilon),
+    }
+}
+
+fn ease_size(current: Size, target: Size, amount: f32, snap_epsilon: f32) -> Size {
+    Size {
+        width: ease_f32(current.width, target.width, amount, snap_epsilon),
+        height: ease_f32(current.height, target.height, amount, snap_epsilon),
+    }
+}
+
+fn ease_length(current: Length, target: Length, amount: f32, snap_epsilon: f32) -> Length {
+    match (current, target) {
+        (Length::Px(current), Length::Px(target)) => {
+            Length::Px(ease_f32(current, target, amount, snap_epsilon))
+        }
+        (Length::Percent(current), Length::Percent(target)) => {
+            Length::Percent(ease_f32(current, target, amount, snap_epsilon))
+        }
+        _ => target,
     }
 }
 

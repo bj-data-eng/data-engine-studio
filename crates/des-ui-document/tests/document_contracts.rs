@@ -199,6 +199,70 @@ fn transitioned_state_rules_ease_visual_style_properties() {
 }
 
 #[test]
+fn transitioned_state_rules_ease_layout_and_box_model_properties() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .min_size(20.0, 20.0)
+                .padding(Insets::all(4.0))
+                .margin(Insets::all(2.0))
+                .gap(4.0)
+                .border_width(2.0)
+                .radius(4.0)
+                .font_size(12.0)
+                .transition(Transition::linear(0.25)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default()
+                .size(140.0, 80.0)
+                .min_size(40.0, 60.0)
+                .padding(Insets::all(12.0))
+                .margin(Insets::all(10.0))
+                .gap(20.0)
+                .border_width(10.0)
+                .radius(20.0)
+                .font_size(20.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element(
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+            |_| {},
+        );
+    });
+
+    engine.update(&document, &stylesheet);
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(4.0, 4.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.rect.size, Size::new(110.0, 50.0));
+    assert_eq!(card.style.min_size, Size::new(25.0, 30.0));
+    assert_eq!(card.style.padding, Insets::all(6.0));
+    assert_eq!(card.style.margin, Insets::all(4.0));
+    assert_eq!(card.style.gap, 8.0);
+    assert_eq!(card.style.border_width, Insets::all(4.0));
+    assert_eq!(card.style.radius, CornerRadii::all(8.0));
+    assert_eq!(card.style.font_size, 14.0);
+}
+
+#[test]
 fn column_layout_applies_padding_gap_and_margin() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
@@ -334,6 +398,129 @@ fn fill_size_does_not_inflate_auto_sized_parent_during_intrinsic_measurement() {
     let panel = output.layout.find("panel").unwrap();
 
     assert_eq!(panel.rect.size, Size::new(24.0, 24.0));
+}
+
+#[test]
+fn absolute_parent_position_uses_parent_content_rect_and_leaves_flow_measurement() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .padding(Insets::all(10.0))
+                .border_width(2.0),
+        )
+        .rule(
+            StyleSelector::id("flow-child"),
+            Style::default().size(50.0, 20.0),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(7.0))
+                .top(Length::Px(5.0))
+                .size(40.0, 20.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element(
+                "absolute-child",
+                ElementSpec::new(ElementRole::Card),
+                |_| {},
+            );
+            ui.element("flow-child", ElementSpec::new(ElementRole::Card), |_| {});
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let panel = output.layout.find("panel").unwrap();
+    let absolute_child = output.layout.find("absolute-child").unwrap();
+    let flow_child = output.layout.find("flow-child").unwrap();
+
+    assert_eq!(panel.rect.size, Size::new(74.0, 44.0));
+    assert_eq!(flow_child.rect.origin, Point::new(12.0, 12.0));
+    assert_eq!(absolute_child.rect.origin, Point::new(19.0, 17.0));
+}
+
+#[test]
+fn absolute_viewport_position_uses_window_rect() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .size(120.0, 80.0)
+                .padding(Insets::all(10.0)),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_viewport()
+                .right(Length::Px(8.0))
+                .bottom(Length::Px(9.0))
+                .size(40.0, 20.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element(
+                "absolute-child",
+                ElementSpec::new(ElementRole::Card),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let absolute_child = output.layout.find("absolute-child").unwrap();
+
+    assert_eq!(absolute_child.rect.origin, Point::new(272.0, 171.0));
+}
+
+#[test]
+fn pointer_input_can_target_absolute_child_outside_parent_box() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default().size(60.0, 40.0),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(140.0))
+                .top(Length::Px(80.0))
+                .size(40.0, 20.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element(
+                "absolute-child",
+                ElementSpec::new(ElementRole::Card).interactive(),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(150.0, 90.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: true,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.hit_id, Some(ElementId::new("absolute-child")));
+    assert!(engine.element_state("absolute-child").unwrap().pressed);
 }
 
 #[test]

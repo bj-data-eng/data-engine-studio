@@ -106,6 +106,7 @@ pub struct ElementSpec {
     pub interactive: bool,
     pub selected: bool,
     pub disabled: bool,
+    pub focused: bool,
 }
 
 impl ElementSpec {
@@ -116,6 +117,7 @@ impl ElementSpec {
             interactive: false,
             selected: false,
             disabled: false,
+            focused: false,
         }
     }
 
@@ -136,6 +138,11 @@ impl ElementSpec {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
         self
     }
 }

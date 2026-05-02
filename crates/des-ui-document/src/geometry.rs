@@ -157,6 +157,48 @@ pub enum Overflow {
     Scroll,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Position {
+    Flow,
+    AbsoluteParent,
+    AbsoluteViewport,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PositionInsets {
+    pub top: Option<Length>,
+    pub right: Option<Length>,
+    pub bottom: Option<Length>,
+    pub left: Option<Length>,
+}
+
+impl PositionInsets {
+    pub const ZERO: Self = Self {
+        top: None,
+        right: None,
+        bottom: None,
+        left: None,
+    };
+
+    pub fn top_left(top: Length, left: Length) -> Self {
+        Self {
+            top: Some(top),
+            right: None,
+            bottom: None,
+            left: Some(left),
+        }
+    }
+
+    pub fn from_insets(insets: Insets) -> Self {
+        Self {
+            top: Some(Length::Px(insets.top)),
+            right: Some(Length::Px(insets.right)),
+            bottom: Some(Length::Px(insets.bottom)),
+            left: Some(Length::Px(insets.left)),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Length {
     Auto,

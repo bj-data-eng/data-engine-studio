@@ -4,8 +4,8 @@ use crate::graphics_testing::{
     test_harness,
 };
 use des_ui_document::{
-    Document, DocumentEngine, DocumentOutput, ElementRole, ElementSpec, Insets, Length,
-    ResolvedElement, Size, Style, StyleSelector, StyleSheet,
+    Color, Document, DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec,
+    Insets, Length, Point, PointerInput, ResolvedElement, Size, Style, StyleSelector, StyleSheet,
 };
 use egui_kittest::Harness;
 
@@ -244,12 +244,114 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
         34.0,
     );
 
+    let absolute_parent_frame = frame(&output, "box-absolute-parent-parent");
+    let absolute_parent_child = frame(&output, "box-absolute-parent-child");
+    assert_close(
+        absolute_parent_child.rect.origin.x - absolute_parent_frame.rect.origin.x,
+        24.0,
+    );
+    assert_close(
+        absolute_parent_child.rect.origin.y - absolute_parent_frame.rect.origin.y,
+        18.0,
+    );
+    assert_close(
+        frame(&output, "box-absolute-parent-subject")
+            .rect
+            .size
+            .width,
+        88.0,
+    );
+
+    let absolute_window_child = frame(&output, "box-absolute-window-child");
+    assert_eq!(absolute_window_child.rect.origin, Point::new(420.0, 140.0));
+
     assert!(
         output
             .scroll_chrome
             .iter()
             .any(|chrome| chrome.element_id.as_str() == "box-scroll-overflow-subject"),
         "scroll overflow specimen should emit scroll chrome"
+    );
+}
+
+#[test]
+fn animation_view_renders_state_driven_specimens() {
+    let output = lab_output("animation");
+
+    assert!(frame(&output, "animation-hover-size-box").interactive);
+    assert!(frame(&output, "animation-hover-margin-target").interactive);
+    assert!(frame(&output, "animation-pressed-border-box").interactive);
+
+    let selected = frame(&output, "animation-selected-spacing-box");
+    assert_eq!(selected.style.width, Length::Px(210.0));
+    assert_eq!(selected.style.height, Length::Px(92.0));
+    assert_close(selected.style.padding.top, 16.0);
+    assert_close(selected.style.margin.top, 10.0);
+    assert_close(selected.style.gap, 18.0);
+    assert_eq!(selected.style.background, Some(Color::rgb(43, 76, 82)));
+    assert_close(
+        frame(&output, "animation-selected-spacing-box-label")
+            .style
+            .font_size,
+        18.0,
+    );
+
+    let disabled = frame(&output, "animation-disabled-color-box");
+    assert!(!disabled.interactive);
+    assert_eq!(disabled.style.background, Some(Color::rgb(28, 31, 34)));
+
+    let focused = frame(&output, "animation-focused-min-size-box");
+    assert_eq!(focused.style.width, Length::Px(226.0));
+    assert_eq!(focused.style.height, Length::Px(88.0));
+    assert_close(focused.style.min_size.width, 210.0);
+    assert_close(focused.style.min_size.height, 78.0);
+    assert_close(focused.style.border_width.top, 6.0);
+    assert_eq!(focused.style.background, Some(Color::rgb(48, 38, 79)));
+}
+
+#[test]
+fn animation_margin_specimen_expands_layout_on_hover() {
+    let mut engine = DocumentEngine::default();
+    let document =
+        UiLabState::new(Some("animation")).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let stylesheet = stylesheet();
+    let base = engine.update(&document, &stylesheet);
+    let target = frame(&base, "animation-hover-margin-target");
+    let row = frame(&base, "animation-hover-margin-row");
+    let after = frame(&base, "animation-hover-margin-after");
+    let pointer = Point::new(
+        target.rect.origin.x + target.rect.size.width / 2.0,
+        target.rect.origin.y + target.rect.size.height / 2.0,
+    );
+
+    let hovered = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: pointer,
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let hovered_target = frame(&hovered, "animation-hover-margin-target");
+    let hovered_row = frame(&hovered, "animation-hover-margin-row");
+    let hovered_after = frame(&hovered, "animation-hover-margin-after");
+
+    assert!(
+        hovered_target.style.margin.left > 0.0,
+        "expected hover to ease margin above zero"
+    );
+    assert!(
+        hovered_after.rect.origin.x > after.rect.origin.x,
+        "expected animated target margin to push the following chip"
+    );
+    assert!(
+        hovered_row.rect.size.height > row.rect.size.height,
+        "expected auto-height parent to expand around animated child margin"
     );
 }
 

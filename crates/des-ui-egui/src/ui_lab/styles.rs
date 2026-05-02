@@ -326,6 +326,59 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(141, 207, 164)),
         )
         .rule(
+            StyleSelector::class("box-subject-absolute-parent"),
+            Style::default().width(Length::Auto).height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::class("box-absolute-parent-frame"),
+            Style::default()
+                .size(88.0, 64.0)
+                .padding(Insets::all(8.0))
+                .border(PURPLE)
+                .border_width(2.0)
+                .background(Color::rgb(65, 121, 164)),
+        )
+        .rule(
+            StyleSelector::class("box-absolute-flow-child"),
+            Style::default()
+                .size(16.0, 16.0)
+                .background(Color::rgb(77, 136, 179)),
+        )
+        .rule(
+            StyleSelector::class("box-absolute-parent-child"),
+            Style::default()
+                .absolute_parent()
+                .top(Length::Px(8.0))
+                .left(Length::Px(14.0))
+                .size(26.0, 26.0)
+                .z_index(2)
+                .background(Color::rgb(141, 207, 164))
+                .border(GREEN),
+        )
+        .rule(
+            StyleSelector::class("box-subject-absolute-window"),
+            Style::default().width(Length::Auto).height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::class("box-absolute-window-host"),
+            Style::default()
+                .size(88.0, 64.0)
+                .border(PURPLE)
+                .border_width(2.0)
+                .background(Color::rgb(45, 58, 76)),
+        )
+        .rule(
+            StyleSelector::class("box-absolute-window-child"),
+            Style::default()
+                .absolute_viewport()
+                .top(Length::Px(140.0))
+                .left(Length::Px(420.0))
+                .size(26.0, 26.0)
+                .z_index(20)
+                .background(Color::rgb(155, 129, 255))
+                .border(PURPLE),
+        )
+        .rule(
             StyleSelector::class("nav-item"),
             Style::default()
                 .width_fill()
@@ -449,6 +502,150 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .background(Color::rgb(50, 41, 68))
                 .border(TEXT_ACCENT),
+        )
+        .rule(
+            StyleSelector::class("animation-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width_fill()
+                .height(Length::Auto)
+                .gap(12.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("animation-specimen"),
+            Style::default()
+                .width(Length::Px(318.0))
+                .height(Length::Auto)
+                .padding(Insets::all(8.0))
+                .gap(3.0)
+                .background(Color::rgb(20, 24, 28))
+                .border(Color::rgb(45, 54, 62))
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class("animation-surface"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(132.0))
+                .padding(Insets::all(10.0))
+                .background(Color::rgb(13, 16, 19))
+                .border(Color::rgb(39, 48, 56)),
+        )
+        .rule(
+            StyleSelector::class("animation-box"),
+            Style::default()
+                .size(150.0, 58.0)
+                .min_size(120.0, 44.0)
+                .padding(Insets::all(8.0))
+                .gap(4.0)
+                .background(Color::rgb(35, 56, 78))
+                .border(STROKE_SELECTED)
+                .border_width(2.0)
+                .radius(4.0)
+                .transition(Transition::ease_out(0.14)),
+        )
+        .rule(
+            StyleSelector::class("animation-box-label"),
+            Style::default().font_size(13.0).text_color(TEXT),
+        )
+        .rule(
+            StyleSelector::class("animation-box-body"),
+            Style::default().font_size(11.0).text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class("animation-margin-row"),
+            Style::default()
+                .direction(Direction::Row)
+                .width_fill()
+                .height(Length::Auto)
+                .padding(Insets::all(8.0))
+                .gap(0.0)
+                .background(Color::rgb(17, 21, 24))
+                .border(Color::rgb(48, 58, 66))
+                .radius(3.0),
+        )
+        .rule(
+            StyleSelector::class("animation-margin-chip"),
+            Style::default()
+                .size(48.0, 48.0)
+                .background(Color::rgb(39, 48, 56))
+                .border(Color::rgb(70, 82, 92))
+                .border_width(2.0)
+                .radius(4.0)
+                .transition(Transition::ease_out(0.18)),
+        )
+        .rule(
+            StyleSelector::class("animation-margin-reference"),
+            Style::default().background(Color::rgb(31, 37, 43)),
+        )
+        .rule(
+            StyleSelector::class_state("animation-box-hover-size", ElementStateSelector::Hovered),
+            Style::default().size(220.0, 84.0),
+        )
+        .rule(
+            StyleSelector::class_state("animation-box-hover-margin", ElementStateSelector::Hovered),
+            Style::default()
+                .margin(Insets::all(18.0))
+                .background(Color::rgb(66, 91, 58))
+                .border(Color::rgb(168, 224, 137)),
+        )
+        .rule(
+            StyleSelector::class_state(
+                "animation-box-pressed-border",
+                ElementStateSelector::Pressed,
+            ),
+            Style::default().border_width(10.0).radius(22.0),
+        )
+        .rule(
+            StyleSelector::class_state(
+                "animation-box-selected-spacing",
+                ElementStateSelector::Selected,
+            ),
+            Style::default()
+                .size(210.0, 92.0)
+                .padding(Insets::all(16.0))
+                .margin(Insets::all(10.0))
+                .gap(18.0)
+                .background(Color::rgb(43, 76, 82))
+                .border(Color::rgb(104, 222, 171))
+                .radius(12.0),
+        )
+        .rule(
+            StyleSelector::class_state("animation-box-label", ElementStateSelector::Selected),
+            Style::default().font_size(18.0),
+        )
+        .rule(
+            StyleSelector::class_state(
+                "animation-box-disabled-color",
+                ElementStateSelector::Disabled,
+            ),
+            Style::default()
+                .background(Color::rgb(28, 31, 34))
+                .border(Color::rgb(77, 83, 90))
+                .text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class_state("animation-box-label", ElementStateSelector::Disabled),
+            Style::default().text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class_state("animation-box-body", ElementStateSelector::Disabled),
+            Style::default().text_color(Color::rgb(115, 124, 132)),
+        )
+        .rule(
+            StyleSelector::class_state(
+                "animation-box-focused-min-size",
+                ElementStateSelector::Focused,
+            ),
+            Style::default()
+                .size(226.0, 88.0)
+                .min_size(210.0, 78.0)
+                .border_width(6.0)
+                .border(Color::rgb(155, 129, 255))
+                .background(Color::rgb(48, 38, 79))
+                .radius(16.0),
         )
         .rule(
             StyleSelector::class("scroll-panel"),

@@ -37,6 +37,7 @@ pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: La
                 LabView::Layout,
                 LabView::Interaction,
                 LabView::Styling,
+                LabView::Animation,
                 LabView::Scrolling,
                 LabView::Nesting,
                 LabView::Graph,
@@ -70,6 +71,7 @@ fn view_hint(view: LabView) -> &'static str {
         LabView::Layout => "nesting, margins, rows, columns",
         LabView::Interaction => "hover, press, click ownership",
         LabView::Styling => "roles, classes, states, ids",
+        LabView::Animation => "state transitions and easing",
         LabView::Scrolling => "document scroll ownership",
         LabView::Nesting => "relative nested boxes",
         LabView::Graph => "canvas and bezier planning",
@@ -89,6 +91,7 @@ pub(super) fn render_stage(
             LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
             LabView::Interaction => render_interaction_view(ui),
             LabView::Styling => render_styling_view(ui, dense_mode),
+            LabView::Animation => render_animation_view(ui),
             LabView::Scrolling => render_scrolling_view(ui),
             LabView::Nesting => render_nesting_view(ui),
             LabView::Graph => render_graph_view(ui),
@@ -235,6 +238,24 @@ fn render_layout_view(
                     "CSS-like layered edges",
                     "base: border width all sides 2; radius all corners 4 | override: left border width 8; bottom border width 5 | override: top-right radius 14; bottom-left radius 0",
                     "box-subject-side-radius",
+                );
+            });
+            box_model_row(ui, "box-row-positioning", |ui| {
+                box_model_case(
+                    ui,
+                    "box-absolute-parent",
+                    "Absolute parent",
+                    "child is anchored to parent content",
+                    "parent: size 88 by 64; padding all sides 8; border width all sides 2 | child: position AbsoluteParent; top 8; left 14",
+                    "box-subject-absolute-parent",
+                );
+                box_model_case(
+                    ui,
+                    "box-absolute-window",
+                    "Absolute window",
+                    "child is anchored to viewport coordinates",
+                    "child: position AbsoluteViewport; top 140; left 420",
+                    "box-subject-absolute-window",
                 );
             });
             box_model_section_label(ui, "box-combo-title", "Nested Awareness");
@@ -397,6 +418,37 @@ fn box_model_subject(
                     },
                 );
             }
+            "box-subject-absolute-parent" => {
+                ui.element(
+                    format!("{case_id}-parent"),
+                    ElementSpec::new(ElementRole::Panel).class("box-absolute-parent-frame"),
+                    |ui| {
+                        ui.element(
+                            format!("{case_id}-flow-child"),
+                            ElementSpec::new(ElementRole::Panel).class("box-absolute-flow-child"),
+                            |_| {},
+                        );
+                        ui.element(
+                            format!("{case_id}-child"),
+                            ElementSpec::new(ElementRole::Panel).class("box-absolute-parent-child"),
+                            |_| {},
+                        );
+                    },
+                );
+            }
+            "box-subject-absolute-window" => {
+                ui.element(
+                    format!("{case_id}-host"),
+                    ElementSpec::new(ElementRole::Panel).class("box-absolute-window-host"),
+                    |ui| {
+                        ui.element(
+                            format!("{case_id}-child"),
+                            ElementSpec::new(ElementRole::Panel).class("box-absolute-window-child"),
+                            |_| {},
+                        );
+                    },
+                );
+            }
             _ => {}
         },
     );
@@ -506,6 +558,216 @@ fn render_styling_view(ui: &mut des_ui_document::DocumentBuilder, dense_mode: bo
                     "Dense mode is active from the layout view toggle."
                 } else {
                     "Dense mode is inactive from the layout view toggle."
+                },
+            );
+        },
+    );
+}
+
+fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.text_element(
+        "animation-heading",
+        ElementSpec::new(ElementRole::Text).class("heading"),
+        "Animation Specimens",
+    );
+    ui.text_element(
+        "animation-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Each specimen isolates one state selector and the style properties it animates.",
+    );
+    ui.element(
+        "animation-grid",
+        ElementSpec::new(ElementRole::Panel).class("animation-grid"),
+        |ui| {
+            animation_specimen(
+                ui,
+                "animation-hover-size",
+                "Hovered",
+                "width and height animate while the pointer is over the specimen",
+                "base: width Px(150); height Px(58) | hovered: width Px(220); height Px(84)",
+                "animation-box-hover-size",
+                false,
+                false,
+                false,
+            );
+            animation_margin_specimen(ui);
+            animation_specimen(
+                ui,
+                "animation-pressed-border",
+                "Pressed",
+                "border width and corner radius animate while primary pointer is down",
+                "base: border width all sides 2; radius all corners 4 | pressed: border width all sides 10; radius all corners 22",
+                "animation-box-pressed-border",
+                false,
+                false,
+                false,
+            );
+            animation_specimen(
+                ui,
+                "animation-selected-spacing",
+                "Selected",
+                "size, spacing, color, radius, and font size animate from selected state",
+                "base: width 150; height 58; padding 8; margin 0; radius 4 | selected: width 210; height 92; padding 16; margin 10; radius 12",
+                "animation-box-selected-spacing",
+                true,
+                false,
+                false,
+            );
+            animation_specimen(
+                ui,
+                "animation-disabled-color",
+                "Disabled",
+                "background, border color, and text color animate from disabled state",
+                "base: background; border; text color | disabled: muted background; muted border; muted text color",
+                "animation-box-disabled-color",
+                false,
+                true,
+                false,
+            );
+            animation_specimen(
+                ui,
+                "animation-focused-min-size",
+                "Focused",
+                "size, border width, color, and radius animate from focused state",
+                "base: width 150; height 58; border width 2; radius 4 | focused: width 226; height 88; border width 6; radius 16",
+                "animation-box-focused-min-size",
+                false,
+                false,
+                true,
+            );
+        },
+    );
+}
+
+fn animation_margin_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "animation-hover-margin",
+        ElementSpec::new(ElementRole::Panel).class("animation-specimen"),
+        |ui| {
+            ui.text_element(
+                "animation-hover-margin-title",
+                ElementSpec::new(ElementRole::Text).class("box-label"),
+                "Hovered Margin",
+            );
+            ui.text_element(
+                "animation-hover-margin-note",
+                ElementSpec::new(ElementRole::Text).class("box-note"),
+                "margin animates inside the parent and pushes neighboring boxes",
+            );
+            ui.text_element(
+                "animation-hover-margin-rule-0",
+                ElementSpec::new(ElementRole::Text).class("box-rule"),
+                "base: margin all sides 0",
+            );
+            ui.text_element(
+                "animation-hover-margin-rule-1",
+                ElementSpec::new(ElementRole::Text).class("box-rule"),
+                "hovered: margin all sides 18",
+            );
+            ui.element(
+                "animation-hover-margin-surface",
+                ElementSpec::new(ElementRole::Panel).class("animation-surface"),
+                |ui| {
+                    ui.element(
+                        "animation-hover-margin-row",
+                        ElementSpec::new(ElementRole::Panel).class("animation-margin-row"),
+                        |ui| {
+                            for id in [
+                                "animation-hover-margin-before",
+                                "animation-hover-margin-target",
+                                "animation-hover-margin-after",
+                            ] {
+                                let spec = ElementSpec::new(ElementRole::Card)
+                                    .class("animation-margin-chip")
+                                    .class(match id {
+                                        "animation-hover-margin-target" => {
+                                            "animation-box-hover-margin"
+                                        }
+                                        _ => "animation-margin-reference",
+                                    });
+
+                                let spec = if id == "animation-hover-margin-target" {
+                                    spec.interactive()
+                                } else {
+                                    spec
+                                };
+
+                                ui.element(id, spec, |_| {});
+                            }
+                        },
+                    );
+                },
+            );
+        },
+    );
+}
+
+fn animation_specimen(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    title: &'static str,
+    note: &'static str,
+    rule_text: &'static str,
+    box_class: &'static str,
+    selected: bool,
+    disabled: bool,
+    focused: bool,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Panel).class("animation-specimen"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-title"),
+                ElementSpec::new(ElementRole::Text).class("box-label"),
+                title,
+            );
+            ui.text_element(
+                format!("{id}-note"),
+                ElementSpec::new(ElementRole::Text).class("box-note"),
+                note,
+            );
+            for (line_index, line) in rule_text.split(" | ").enumerate() {
+                ui.text_element(
+                    format!("{id}-rule-{line_index}"),
+                    ElementSpec::new(ElementRole::Text).class("box-rule"),
+                    line,
+                );
+            }
+            ui.element(
+                format!("{id}-surface"),
+                ElementSpec::new(ElementRole::Panel).class("animation-surface"),
+                |ui| {
+                    ui.element(
+                        format!("{id}-box"),
+                        ElementSpec::new(ElementRole::Card)
+                            .class("animation-box")
+                            .class(box_class)
+                            .interactive()
+                            .selected(selected)
+                            .disabled(disabled)
+                            .focused(focused),
+                        |ui| {
+                            ui.text_element(
+                                format!("{id}-box-label"),
+                                ElementSpec::new(ElementRole::Text)
+                                    .class("animation-box-label")
+                                    .selected(selected)
+                                    .disabled(disabled)
+                                    .focused(focused),
+                                title,
+                            );
+                            ui.text_element(
+                                format!("{id}-box-body"),
+                                ElementSpec::new(ElementRole::Text)
+                                    .class("animation-box-body")
+                                    .selected(selected)
+                                    .disabled(disabled)
+                                    .focused(focused),
+                                "state-driven transition",
+                            );
+                        },
+                    );
                 },
             );
         },

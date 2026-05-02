@@ -1,5 +1,5 @@
 use crate::element::{Element, ElementId, ElementRole};
-use crate::geometry::{Direction, Length, Overflow, Point, Rect, Size};
+use crate::geometry::{Direction, Length, Overflow, Point, Position, Rect, Size};
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ComputedStyle, StyleSheet, resolve_style};
 use std::collections::HashMap;
@@ -11,12 +11,33 @@ pub(crate) fn layout_element(
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, f32>,
 ) -> ResolvedElement {
-    let style = resolve_style(element, stylesheet, states.get(&element.id));
-    let style = states
-        .get(&element.id)
-        .and_then(|state| state.rendered_style.clone())
-        .unwrap_or(style);
-    let rect = element_rect(element, &style, parent_rect, stylesheet, states);
+    layout_element_in_viewport(
+        element,
+        parent_rect,
+        parent_rect,
+        stylesheet,
+        states,
+        scroll_limits,
+    )
+}
+
+fn layout_element_in_viewport(
+    element: &Element,
+    parent_rect: Rect,
+    viewport_rect: Rect,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+    scroll_limits: &mut HashMap<ElementId, f32>,
+) -> ResolvedElement {
+    let style = computed_style_for(element, stylesheet, states);
+    let rect = element_rect(
+        element,
+        &style,
+        parent_rect,
+        viewport_rect,
+        stylesheet,
+        states,
+    );
     let inner_rect = rect.inset(style.border_width);
     let mut content_rect = inner_rect.inset(style.padding);
     let content_size = measure_children(element, &style, content_rect.size, stylesheet, states);
@@ -35,6 +56,7 @@ pub(crate) fn layout_element(
         element,
         &style,
         content_rect,
+        viewport_rect,
         stylesheet,
         states,
         scroll_limits,
@@ -52,10 +74,23 @@ pub(crate) fn layout_element(
     }
 }
 
+fn computed_style_for(
+    element: &Element,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+) -> ComputedStyle {
+    let style = resolve_style(element, stylesheet, states.get(&element.id));
+    states
+        .get(&element.id)
+        .and_then(|state| state.rendered_style.clone())
+        .unwrap_or(style)
+}
+
 fn element_rect(
     element: &Element,
     style: &ComputedStyle,
     parent_rect: Rect,
+    viewport_rect: Rect,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
 ) -> Rect {
@@ -64,6 +99,15 @@ fn element_rect(
     }
 
     let measured = measure_element(element, style, parent_rect.size, stylesheet, states);
+    if style.position != Position::Flow {
+        let containing_rect = match style.position {
+            Position::Flow => parent_rect,
+            Position::AbsoluteParent => parent_rect,
+            Position::AbsoluteViewport => viewport_rect,
+        };
+        return positioned_rect(style, containing_rect, measured);
+    }
+
     Rect::new(
         parent_rect.origin.x + style.margin.left,
         parent_rect.origin.y + style.margin.top,
@@ -76,6 +120,7 @@ fn layout_children(
     element: &Element,
     style: &ComputedStyle,
     content_rect: Rect,
+    viewport_rect: Rect,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, f32>,
@@ -85,7 +130,19 @@ fn layout_children(
     let mut frames = Vec::with_capacity(element.children.len());
 
     for child in &element.children {
-        let child_style = resolve_style(child, stylesheet, states.get(&child.id));
+        let child_style = computed_style_for(child, stylesheet, states);
+        if child_style.position != Position::Flow {
+            frames.push(layout_element_in_viewport(
+                child,
+                content_rect,
+                viewport_rect,
+                stylesheet,
+                states,
+                scroll_limits,
+            ));
+            continue;
+        }
+
         let child_available = Size::new(
             (content_rect.size.width - child_style.margin.horizontal()).max(0.0),
             (content_rect.size.height - child_style.margin.vertical()).max(0.0),
@@ -111,9 +168,10 @@ fn layout_children(
             child_available.width,
             child_available.height,
         );
-        frames.push(layout_element(
+        frames.push(layout_element_in_viewport(
             child,
             child_rect,
+            viewport_rect,
             stylesheet,
             states,
             scroll_limits,
@@ -129,6 +187,44 @@ fn layout_children(
     }
 
     frames
+}
+
+fn positioned_rect(style: &ComputedStyle, containing_rect: Rect, measured: Size) -> Rect {
+    let available = containing_rect.size;
+    let left = style
+        .inset
+        .left
+        .map(|value| value.resolve(available.width, 0.0));
+    let right = style
+        .inset
+        .right
+        .map(|value| value.resolve(available.width, 0.0));
+    let top = style
+        .inset
+        .top
+        .map(|value| value.resolve(available.height, 0.0));
+    let bottom = style
+        .inset
+        .bottom
+        .map(|value| value.resolve(available.height, 0.0));
+
+    let x = if let Some(left) = left {
+        containing_rect.origin.x + left + style.margin.left
+    } else if let Some(right) = right {
+        containing_rect.right() - right - measured.width - style.margin.right
+    } else {
+        containing_rect.origin.x + style.margin.left
+    };
+
+    let y = if let Some(top) = top {
+        containing_rect.origin.y + top + style.margin.top
+    } else if let Some(bottom) = bottom {
+        containing_rect.bottom() - bottom - measured.height - style.margin.bottom
+    } else {
+        containing_rect.origin.y + style.margin.top
+    };
+
+    Rect::new(x, y, measured.width, measured.height)
 }
 
 fn measure_element(
@@ -240,10 +336,15 @@ fn measure_children(
 
     let mut width: f32 = 0.0;
     let mut height: f32 = 0.0;
-    let child_count = element.children.len();
+    let mut flow_child_count = 0;
 
     for child in &element.children {
-        let child_style = resolve_style(child, stylesheet, states.get(&child.id));
+        let child_style = computed_style_for(child, stylesheet, states);
+        if child_style.position != Position::Flow {
+            continue;
+        }
+        flow_child_count += 1;
+
         let child_available = Size::new(
             (parent_size.width - child_style.margin.horizontal()).max(0.0),
             (parent_size.height - child_style.margin.vertical()).max(0.0),
@@ -264,8 +365,8 @@ fn measure_children(
         }
     }
 
-    if child_count > 1 {
-        let gap = style.gap * (child_count - 1) as f32;
+    if flow_child_count > 1 {
+        let gap = style.gap * (flow_child_count - 1) as f32;
         match style.direction {
             Direction::Column => height += gap,
             Direction::Row => width += gap,
@@ -289,7 +390,11 @@ fn measure_wrapped_children(
     let mut line_has_child = false;
 
     for child in &element.children {
-        let child_style = resolve_style(child, stylesheet, states.get(&child.id));
+        let child_style = computed_style_for(child, stylesheet, states);
+        if child_style.position != Position::Flow {
+            continue;
+        }
+
         let child_available = Size::new(
             (parent_size.width - child_style.margin.horizontal()).max(0.0),
             (parent_size.height - child_style.margin.vertical()).max(0.0),
@@ -325,21 +430,24 @@ fn measure_wrapped_children(
 }
 
 pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {
-    if !frame.rect.contains(point) {
-        return None;
-    }
-
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
 
-    let mut path = vec![frame];
-    if let Some(mut child_path) = children
-        .into_iter()
-        .rev()
-        .find_map(|child| hit_path(child, point))
+    let may_hit_children = frame.style.overflow_y != Overflow::Scroll || frame.rect.contains(point);
+    if may_hit_children
+        && let Some(mut child_path) = children
+            .into_iter()
+            .rev()
+            .find_map(|child| hit_path(child, point))
     {
+        let mut path = vec![frame];
         path.append(&mut child_path);
+        return Some(path);
     }
 
-    Some(path)
+    if frame.rect.contains(point) {
+        return Some(vec![frame]);
+    }
+
+    None
 }
