@@ -87,6 +87,12 @@ pub struct Style {
     pub font_size: Option<f32>,
     pub radius: CornerStyle,
     pub overflow_y: Option<Overflow>,
+    pub scrollbar_width: Option<f32>,
+    pub scrollbar_handle_color: Option<Color>,
+    pub scrollbar_track_color: Option<Color>,
+    pub scrollbar_handle_border_color: Option<Color>,
+    pub scrollbar_handle_border_width: Option<f32>,
+    pub scrollbar_radius: Option<f32>,
     pub position: Option<Position>,
     pub inset: PositionInsets,
     pub z_index: Option<i32>,
@@ -308,6 +314,36 @@ impl Style {
         self
     }
 
+    pub fn scrollbar_width(mut self, width: f32) -> Self {
+        self.scrollbar_width = Some(width.max(0.0));
+        self
+    }
+
+    pub fn scrollbar_handle_color(mut self, color: Color) -> Self {
+        self.scrollbar_handle_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_track_color(mut self, color: Color) -> Self {
+        self.scrollbar_track_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_handle_border_color(mut self, color: Color) -> Self {
+        self.scrollbar_handle_border_color = Some(color);
+        self
+    }
+
+    pub fn scrollbar_handle_border_width(mut self, width: f32) -> Self {
+        self.scrollbar_handle_border_width = Some(width.max(0.0));
+        self
+    }
+
+    pub fn scrollbar_radius(mut self, radius: f32) -> Self {
+        self.scrollbar_radius = Some(radius.max(0.0));
+        self
+    }
+
     pub fn position(mut self, position: Position) -> Self {
         self.position = Some(position);
         self
@@ -386,6 +422,12 @@ pub struct ComputedStyle {
     pub font_size: f32,
     pub radius: CornerRadii,
     pub overflow_y: Overflow,
+    pub scrollbar_width: f32,
+    pub scrollbar_handle_color: Color,
+    pub scrollbar_track_color: Option<Color>,
+    pub scrollbar_handle_border_color: Option<Color>,
+    pub scrollbar_handle_border_width: f32,
+    pub scrollbar_radius: f32,
     pub position: Position,
     pub inset: PositionInsets,
     pub z_index: i32,
@@ -410,6 +452,12 @@ impl Default for ComputedStyle {
             font_size: 13.0,
             radius: CornerRadii::ZERO,
             overflow_y: Overflow::Visible,
+            scrollbar_width: 2.0,
+            scrollbar_handle_color: Color::rgba(232, 236, 240, 118),
+            scrollbar_track_color: None,
+            scrollbar_handle_border_color: None,
+            scrollbar_handle_border_width: 0.0,
+            scrollbar_radius: 6.0,
             position: Position::Flow,
             inset: PositionInsets::ZERO,
             z_index: 0,
@@ -482,6 +530,24 @@ impl ComputedStyle {
         }
         if let Some(value) = style.overflow_y {
             self.overflow_y = value;
+        }
+        if let Some(value) = style.scrollbar_width {
+            self.scrollbar_width = value.max(0.0);
+        }
+        if let Some(value) = style.scrollbar_handle_color {
+            self.scrollbar_handle_color = value;
+        }
+        if let Some(value) = style.scrollbar_track_color {
+            self.scrollbar_track_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_handle_border_color {
+            self.scrollbar_handle_border_color = Some(value);
+        }
+        if let Some(value) = style.scrollbar_handle_border_width {
+            self.scrollbar_handle_border_width = value.max(0.0);
+        }
+        if let Some(value) = style.scrollbar_radius {
+            self.scrollbar_radius = value.max(0.0);
         }
         if let Some(value) = style.position {
             self.position = value;
@@ -591,6 +657,12 @@ fn state_selector_matches(
     match selector {
         ElementStateSelector::Hovered => state.is_some_and(|state| state.hovered),
         ElementStateSelector::Pressed => state.is_some_and(|state| state.pressed),
+        ElementStateSelector::ScrollbarHovered => {
+            state.is_some_and(|state| state.scrollbar_hovered)
+        }
+        ElementStateSelector::ScrollbarDragged => {
+            state.is_some_and(|state| state.scrollbar_dragged)
+        }
         ElementStateSelector::Focused => {
             element.spec.focused || state.is_some_and(|state| state.focused)
         }

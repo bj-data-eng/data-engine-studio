@@ -1,4 +1,4 @@
-use crate::element::{ClassName, ElementId, ElementRole};
+use crate::element::{ClassName, Color, ElementId, ElementRole};
 use crate::geometry::{Point, Rect};
 use crate::style::ComputedStyle;
 
@@ -71,6 +71,11 @@ pub struct ScrollChrome {
     pub track_rect: Rect,
     pub hit_rect: Rect,
     pub handle_rect: Rect,
+    pub handle_color: Color,
+    pub track_color: Option<Color>,
+    pub handle_border_color: Option<Color>,
+    pub handle_border_width: f32,
+    pub radius: f32,
     pub max_scroll: f32,
     pub visible: bool,
     pub expanded: bool,

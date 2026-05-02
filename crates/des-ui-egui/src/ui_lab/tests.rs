@@ -143,6 +143,16 @@ fn clicked_nav_view_matches_directly_seeded_view() {
 fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     let output = lab_output("layout");
 
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id.as_str() == "stage"
+                && chrome.handle_rect.size.width == 2.0
+                && chrome.handle_color.a == 118
+                && chrome.track_color.is_some()
+        }),
+        "stage view pane should use styled scrollbar chrome"
+    );
+
     assert_close(frame(&output, "box-auto-subject").rect.size.width, 12.0);
     assert_close(frame(&output, "box-auto-subject").rect.size.height, 12.0);
     assert_close(frame(&output, "box-px-subject").rect.size.width, 96.0);
@@ -266,10 +276,11 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     assert_eq!(absolute_window_child.rect.origin, Point::new(420.0, 140.0));
 
     assert!(
-        output
-            .scroll_chrome
-            .iter()
-            .any(|chrome| chrome.element_id.as_str() == "box-scroll-overflow-subject"),
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id.as_str() == "box-scroll-overflow-subject"
+                && chrome.handle_rect.size.width == 2.0
+                && chrome.handle_color.a == 118
+        }),
         "scroll overflow specimen should emit scroll chrome"
     );
 }

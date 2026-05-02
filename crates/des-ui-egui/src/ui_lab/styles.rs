@@ -88,7 +88,27 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(PANEL_ALT)
                 .border(STROKE)
                 .radius(8.0)
-                .overflow_y(Overflow::Scroll),
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_radius(6.0)
+                .transition(Transition::ease_out(0.2)),
+        )
+        .rule(
+            StyleSelector::class_state("stage", ElementStateSelector::ScrollbarHovered),
+            Style::default()
+                .scrollbar_width(10.0)
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84)),
+        )
+        .rule(
+            StyleSelector::class_state("stage", ElementStateSelector::Pressed),
+            Style::default()
+                .scrollbar_width(10.0)
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_handle_color(Color::rgba(190, 217, 255, 238))
+                .scrollbar_handle_border_color(Color::rgba(255, 255, 255, 120))
+                .scrollbar_handle_border_width(1.0),
         )
         .rule(
             StyleSelector::class("box-model-grid"),
@@ -247,7 +267,33 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("box-subject-scroll-overflow"),
             Style::default()
                 .size(44.0, 44.0)
-                .overflow_y(Overflow::Scroll),
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_radius(6.0)
+                .transition(Transition::ease_out(0.2)),
+        )
+        .rule(
+            StyleSelector::class_state(
+                "box-subject-scroll-overflow",
+                ElementStateSelector::ScrollbarHovered,
+            ),
+            Style::default()
+                .scrollbar_width(10.0)
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84)),
+        )
+        .rule(
+            StyleSelector::class_state(
+                "box-subject-scroll-overflow",
+                ElementStateSelector::Pressed,
+            ),
+            Style::default()
+                .scrollbar_width(10.0)
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_handle_color(Color::rgba(190, 217, 255, 238))
+                .scrollbar_handle_border_color(Color::rgba(255, 255, 255, 120))
+                .scrollbar_handle_border_width(1.0),
         )
         .rule(
             StyleSelector::class("box-subject-side-radius"),
@@ -664,11 +710,31 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(des_ui_document::Length::Px(370.0))
                 .padding(Insets::symmetric(4.0, 4.0))
                 .gap(7.0)
-                .overflow_y(Overflow::Scroll),
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_radius(6.0)
+                .transition(Transition::ease_out(0.2)),
         )
         .rule(
             StyleSelector::class_state("scroll-panel", ElementStateSelector::Hovered),
             Style::default().border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("scroll-list", ElementStateSelector::ScrollbarHovered),
+            Style::default()
+                .scrollbar_width(10.0)
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84)),
+        )
+        .rule(
+            StyleSelector::class_state("scroll-list", ElementStateSelector::Pressed),
+            Style::default()
+                .scrollbar_width(10.0)
+                .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+                .scrollbar_handle_color(Color::rgba(190, 217, 255, 238))
+                .scrollbar_handle_border_color(Color::rgba(255, 255, 255, 120))
+                .scrollbar_handle_border_width(1.0),
         )
         .rule(
             StyleSelector::class("scroll-row-card"),

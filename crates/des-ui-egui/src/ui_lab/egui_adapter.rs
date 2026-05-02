@@ -165,30 +165,20 @@ pub(super) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes
 
         let track = document_rect_to_egui(origin, chrome.track_rect);
         let handle = document_rect_to_egui(origin, chrome.handle_rect);
-        let alpha = if chrome.dragged {
-            235
-        } else if chrome.hovered {
-            220
-        } else {
-            118
-        };
-        let track_alpha = if chrome.dragged || chrome.hovered {
-            84
-        } else {
-            0
-        };
-        if track_alpha > 0 {
-            painter.rect_filled(
-                track,
-                6.0,
-                egui::Color32::from_rgba_unmultiplied(2, 8, 12, track_alpha),
+        if let Some(track_color) = chrome.track_color {
+            painter.rect_filled(track, chrome.radius, to_egui_color(track_color));
+        }
+        painter.rect_filled(handle, chrome.radius, to_egui_color(chrome.handle_color));
+        if let Some(border_color) = chrome.handle_border_color
+            && chrome.handle_border_width > 0.0
+        {
+            painter.rect_stroke(
+                handle,
+                chrome.radius,
+                egui::Stroke::new(chrome.handle_border_width, to_egui_color(border_color)),
+                egui::StrokeKind::Inside,
             );
         }
-        painter.rect_filled(
-            handle,
-            6.0,
-            egui::Color32::from_rgba_unmultiplied(232, 236, 240, alpha),
-        );
     }
 }
 

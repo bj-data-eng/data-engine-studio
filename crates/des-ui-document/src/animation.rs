@@ -92,6 +92,55 @@ fn eased_style(
     next.font_size = ease_f32(current.font_size, target.font_size, amount, snap_epsilon);
     animating |= (next.font_size - target.font_size).abs() > snap_epsilon;
 
+    next.scrollbar_width = ease_f32(
+        current.scrollbar_width,
+        target.scrollbar_width,
+        amount,
+        snap_epsilon,
+    );
+    animating |= (next.scrollbar_width - target.scrollbar_width).abs() > snap_epsilon;
+
+    next.scrollbar_handle_color = current
+        .scrollbar_handle_color
+        .lerp(target.scrollbar_handle_color, amount);
+    if color_distance(next.scrollbar_handle_color, target.scrollbar_handle_color) <= snap_epsilon {
+        next.scrollbar_handle_color = target.scrollbar_handle_color;
+    }
+    animating |= next.scrollbar_handle_color != target.scrollbar_handle_color;
+
+    next.scrollbar_track_color = ease_optional_color(
+        current.scrollbar_track_color,
+        target.scrollbar_track_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.scrollbar_track_color != target.scrollbar_track_color;
+
+    next.scrollbar_handle_border_color = ease_optional_color(
+        current.scrollbar_handle_border_color,
+        target.scrollbar_handle_border_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.scrollbar_handle_border_color != target.scrollbar_handle_border_color;
+
+    next.scrollbar_handle_border_width = ease_f32(
+        current.scrollbar_handle_border_width,
+        target.scrollbar_handle_border_width,
+        amount,
+        snap_epsilon,
+    );
+    animating |= (next.scrollbar_handle_border_width - target.scrollbar_handle_border_width).abs()
+        > snap_epsilon;
+
+    next.scrollbar_radius = ease_f32(
+        current.scrollbar_radius,
+        target.scrollbar_radius,
+        amount,
+        snap_epsilon,
+    );
+    animating |= (next.scrollbar_radius - target.scrollbar_radius).abs() > snap_epsilon;
+
     (next, animating)
 }
 

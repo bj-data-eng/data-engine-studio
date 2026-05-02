@@ -36,8 +36,6 @@ fn scroll_chrome_for_frame(
     states: &HashMap<ElementId, ElementState>,
     max_scroll: f32,
 ) -> ScrollChrome {
-    const BAR_WIDTH: f32 = 10.0;
-    const IDLE_WIDTH: f32 = 2.0;
     const HIT_WIDTH: f32 = 12.0;
     const MIN_HANDLE_LENGTH: f32 = 18.0;
 
@@ -47,7 +45,7 @@ fn scroll_chrome_for_frame(
     let dragged = state.is_some_and(|state| state.scrollbar_dragged);
     let visible = container_hovered || scrollbar_hovered || dragged;
     let expanded = scrollbar_hovered || dragged;
-    let visual_width = if expanded { BAR_WIDTH } else { IDLE_WIDTH };
+    let visual_width = frame.style.scrollbar_width.max(0.0);
     let viewport_rect = frame
         .rect
         .inset(frame.style.border_width)
@@ -91,6 +89,11 @@ fn scroll_chrome_for_frame(
         track_rect,
         hit_rect,
         handle_rect,
+        handle_color: frame.style.scrollbar_handle_color,
+        track_color: frame.style.scrollbar_track_color,
+        handle_border_color: frame.style.scrollbar_handle_border_color,
+        handle_border_width: frame.style.scrollbar_handle_border_width,
+        radius: frame.style.scrollbar_radius,
         max_scroll,
         visible,
         expanded,

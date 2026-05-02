@@ -15,6 +15,8 @@ pub enum ElementRole {
 pub enum ElementStateSelector {
     Hovered,
     Pressed,
+    ScrollbarHovered,
+    ScrollbarDragged,
     Focused,
     Selected,
     Disabled,
@@ -31,6 +33,10 @@ pub struct Color {
 impl Color {
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b, a: 255 }
+    }
+
+    pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self { r, g, b, a }
     }
 
     pub(crate) fn lerp(self, target: Self, amount: f32) -> Self {
