@@ -3,7 +3,9 @@ use crate::geometry::{
     AlignItems, Direction, JustifyContent, Length, Overflow, Point, Position, Rect, Size,
 };
 use crate::state::{ElementState, ResolvedElement};
-use crate::style::{AnchorPlacement, ComputedStyle, StyleSheet, resolve_style};
+use crate::style::{
+    AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position,
+};
 use std::collections::HashMap;
 
 pub(crate) fn layout_element(
@@ -22,6 +24,7 @@ pub(crate) fn layout_element(
         states,
         scroll_limits,
         &anchors,
+        None,
     )
 }
 
@@ -33,8 +36,9 @@ fn layout_element_in_viewport(
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
     anchors: &HashMap<ElementId, Rect>,
+    position: Option<ChildPosition>,
 ) -> ResolvedElement {
-    let style = computed_style_for(element, stylesheet, states);
+    let style = computed_style_for(element, stylesheet, states, position);
     let rect = element_rect(
         element,
         &style,
@@ -93,12 +97,17 @@ fn computed_style_for(
     element: &Element,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    position: Option<ChildPosition>,
 ) -> ComputedStyle {
-    let style = resolve_style(element, stylesheet, states.get(&element.id));
+    let style = resolve_style_with_position(element, stylesheet, states.get(&element.id), position);
     states
         .get(&element.id)
         .and_then(|state| state.rendered_style.clone())
         .unwrap_or(style)
+}
+
+fn child_position(index: usize, sibling_count: usize) -> Option<ChildPosition> {
+    (sibling_count > 0).then_some(ChildPosition::new(index, sibling_count))
 }
 
 fn element_rect(
@@ -163,8 +172,14 @@ fn layout_children(
     let flow_metrics: Vec<_> = element
         .children
         .iter()
-        .map(|child| {
-            let child_style = computed_style_for(child, stylesheet, states);
+        .enumerate()
+        .map(|(index, child)| {
+            let child_style = computed_style_for(
+                child,
+                stylesheet,
+                states,
+                child_position(index, element.children.len()),
+            );
             if child_style.position != Position::Flow {
                 return None;
             }
@@ -194,7 +209,12 @@ fn layout_children(
     let mut child_anchors = anchors.clone();
 
     for (index, (child, metrics)) in element.children.iter().zip(flow_metrics.iter()).enumerate() {
-        let child_style = computed_style_for(child, stylesheet, states);
+        let child_style = computed_style_for(
+            child,
+            stylesheet,
+            states,
+            child_position(index, element.children.len()),
+        );
         if child_style.position != Position::Flow {
             continue;
         }
@@ -219,6 +239,7 @@ fn layout_children(
             states,
             scroll_limits,
             &child_anchors,
+            child_position(index, element.children.len()),
         );
         collect_frame_rects(&frame, &mut child_anchors);
         frames[index] = Some(frame);
@@ -238,6 +259,7 @@ fn layout_children(
             states,
             scroll_limits,
             &child_anchors,
+            child_position(index, element.children.len()),
         );
         collect_frame_rects(&frame, &mut child_anchors);
         frames[index] = Some(frame);
@@ -262,7 +284,12 @@ fn layout_wrapped_children(
     let mut child_anchors = anchors.clone();
 
     for (index, child) in element.children.iter().enumerate() {
-        let child_style = computed_style_for(child, stylesheet, states);
+        let child_style = computed_style_for(
+            child,
+            stylesheet,
+            states,
+            child_position(index, element.children.len()),
+        );
         if child_style.position != Position::Flow {
             continue;
         }
@@ -290,6 +317,7 @@ fn layout_wrapped_children(
             states,
             scroll_limits,
             &child_anchors,
+            child_position(index, element.children.len()),
         );
         collect_frame_rects(&frame, &mut child_anchors);
         frames[index] = Some(frame);
@@ -310,6 +338,7 @@ fn layout_wrapped_children(
             states,
             scroll_limits,
             &child_anchors,
+            child_position(index, element.children.len()),
         );
         collect_frame_rects(&frame, &mut child_anchors);
         frames[index] = Some(frame);
@@ -636,8 +665,13 @@ fn measure_children(
     let mut height: f32 = 0.0;
     let mut flow_child_count = 0;
 
-    for child in &element.children {
-        let child_style = computed_style_for(child, stylesheet, states);
+    for (index, child) in element.children.iter().enumerate() {
+        let child_style = computed_style_for(
+            child,
+            stylesheet,
+            states,
+            child_position(index, element.children.len()),
+        );
         if child_style.position != Position::Flow {
             continue;
         }
@@ -687,8 +721,13 @@ fn measure_wrapped_children(
     let mut line_height: f32 = 0.0;
     let mut line_has_child = false;
 
-    for child in &element.children {
-        let child_style = computed_style_for(child, stylesheet, states);
+    for (index, child) in element.children.iter().enumerate() {
+        let child_style = computed_style_for(
+            child,
+            stylesheet,
+            states,
+            child_position(index, element.children.len()),
+        );
         if child_style.position != Position::Flow {
             continue;
         }

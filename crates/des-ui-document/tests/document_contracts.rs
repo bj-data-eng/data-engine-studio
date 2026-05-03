@@ -343,6 +343,65 @@ fn compound_selectors_require_all_parts_without_specificity_weighting() {
 }
 
 #[test]
+fn structural_selectors_match_first_last_and_nth_children() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default().size(20.0, 20.0),
+        )
+        .rule(
+            StyleSelector::first_child(),
+            Style::default().background(Color::rgb(10, 20, 30)),
+        )
+        .rule(
+            StyleSelector::nth_child(2),
+            Style::default().background(Color::rgb(40, 50, 60)),
+        )
+        .rule(
+            StyleSelector::last_child(),
+            Style::default().border(Color::rgb(70, 80, 90)),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("item")
+                .nth_child(3)
+                .selector(),
+            Style::default().radius(9.0),
+        );
+    let document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            ui.element(
+                "first",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+            ui.element(
+                "second",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+            ui.element(
+                "third",
+                ElementSpec::new(ElementRole::Card).class("item"),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let first = output.layout.find("first").unwrap();
+    let second = output.layout.find("second").unwrap();
+    let third = output.layout.find("third").unwrap();
+
+    assert_eq!(first.style.background, Some(Color::rgb(10, 20, 30)));
+    assert_eq!(first.style.border, None);
+    assert_eq!(second.style.background, Some(Color::rgb(40, 50, 60)));
+    assert_eq!(third.style.border, Some(Color::rgb(70, 80, 90)));
+    assert_eq!(third.style.radius, CornerRadii::all(9.0));
+}
+
+#[test]
 fn border_and_radius_rules_can_target_individual_sides_and_corners() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
@@ -1270,15 +1329,13 @@ fn document_engine_captures_primary_pointer_drag() {
         },
     );
 
-    let drag = output.active_drag.expect("pressed card should start drag");
-    assert_eq!(drag.target, ElementId::new("card"));
-    assert_eq!(drag.origin, Point::new(12.0, 10.0));
-    assert_eq!(drag.current, Point::new(12.0, 10.0));
-    assert_eq!(drag.delta, Point::ZERO);
-    assert_eq!(drag.pointer_offset, Point::new(12.0, 10.0));
+    assert!(
+        output.active_drag.is_none(),
+        "pointer down should capture a pending drag without activating it"
+    );
     assert!(output.completed_drag.is_none());
-    assert!(output.events.contains(&DocumentEvent::drag_started("card")));
-    assert!(engine.element_state("card").unwrap().dragging);
+    assert!(!output.events.contains(&DocumentEvent::drag_started("card")));
+    assert!(!engine.element_state("card").unwrap().dragging);
 
     let output = engine.update_with_input(
         &document,
@@ -1296,14 +1353,15 @@ fn document_engine_captures_primary_pointer_drag() {
 
     let drag = output
         .active_drag
-        .expect("drag should remain captured off card");
+        .expect("movement past activation distance should start drag");
     assert_eq!(drag.target, ElementId::new("card"));
     assert_eq!(drag.origin, Point::new(12.0, 10.0));
     assert_eq!(drag.current, Point::new(180.0, 120.0));
     assert_eq!(drag.delta, Point::new(168.0, 110.0));
+    assert_eq!(drag.pointer_offset, Point::new(12.0, 10.0));
     assert!(output.completed_drag.is_none());
     assert_eq!(output.hit_id, Some(ElementId::new("card")));
-    assert!(output.events.contains(&DocumentEvent::drag_moved("card")));
+    assert!(output.events.contains(&DocumentEvent::drag_started("card")));
 
     let output = engine.update_with_input(
         &document,

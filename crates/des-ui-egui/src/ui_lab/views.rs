@@ -89,8 +89,10 @@ pub(super) fn render_stage(
     dropdown_open: bool,
     dropdown_choice: usize,
     drag_item_cells: [usize; 3],
+    drag_item_order: [usize; 3],
     active_drag_item: Option<usize>,
     drag_pointer: Option<des_ui_document::Point>,
+    drag_drop_preview: Option<super::DragDropPreview>,
 ) {
     ui.element(
         "stage",
@@ -106,8 +108,10 @@ pub(super) fn render_stage(
                 dropdown_open,
                 dropdown_choice,
                 drag_item_cells,
+                drag_item_order,
                 active_drag_item,
                 drag_pointer,
+                drag_drop_preview,
             ),
             LabView::Styling => render_styling_view(ui, dense_mode),
             LabView::Animation => render_animation_view(ui),
@@ -561,8 +565,10 @@ fn render_interaction_view(
     dropdown_open: bool,
     dropdown_choice: usize,
     drag_item_cells: [usize; 3],
+    drag_item_order: [usize; 3],
     active_drag_item: Option<usize>,
     drag_pointer: Option<des_ui_document::Point>,
+    drag_drop_preview: Option<super::DragDropPreview>,
 ) {
     ui.text_element(
         "interaction-heading",
@@ -631,7 +637,14 @@ fn render_interaction_view(
             control_text_inputs(ui);
         },
     );
-    render_drag_drop_lab(ui, drag_item_cells, active_drag_item, drag_pointer);
+    render_drag_drop_lab(
+        ui,
+        drag_item_cells,
+        drag_item_order,
+        active_drag_item,
+        drag_pointer,
+        drag_drop_preview,
+    );
     render_document_update_loop(ui);
 }
 
@@ -736,8 +749,10 @@ fn loop_result_card(
 fn render_drag_drop_lab(
     ui: &mut des_ui_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
+    drag_item_order: [usize; 3],
     active_drag_item: Option<usize>,
     drag_pointer: Option<des_ui_document::Point>,
+    drag_drop_preview: Option<super::DragDropPreview>,
 ) {
     ui.text_element(
         "drag-title",
@@ -760,9 +775,17 @@ fn render_drag_drop_lab(
                             ElementSpec::new(ElementRole::Text).class("muted"),
                             format!("{column} row {row}"),
                         );
-                        for (item, item_cell) in drag_item_cells.iter().enumerate() {
-                            if *item_cell == cell && active_drag_item != Some(item) {
-                                drag_item(ui, item, active_drag_item == Some(item));
+                        let mut cell_items: Vec<_> = drag_item_cells
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(item, item_cell)| (*item_cell == cell).then_some(item))
+                            .collect();
+                        cell_items.sort_by_key(|item| drag_item_order[*item]);
+                        for item in cell_items {
+                            if active_drag_item == Some(item) {
+                                drag_item(ui, item, drag_drop_preview, true);
+                            } else {
+                                drag_item(ui, item, drag_drop_preview, false);
                             }
                         }
                     },
@@ -777,21 +800,52 @@ fn render_drag_drop_lab(
     }
 }
 
-fn drag_item(ui: &mut des_ui_document::DocumentBuilder, item: usize, active: bool) {
+fn drag_item(
+    ui: &mut des_ui_document::DocumentBuilder,
+    item: usize,
+    drag_drop_preview: Option<super::DragDropPreview>,
+    origin_space: bool,
+) {
     let label = ["Customers", "Orders", "Rates"][item];
     let mut spec = ElementSpec::new(ElementRole::Card)
         .class("drag-item")
-        .interactive()
         .value(label);
-    if active {
-        spec = spec.class("drag-item-active").selected(true);
+    if origin_space {
+        spec = spec.class("drag-origin-space");
+        if drag_drop_preview.is_some() {
+            spec = spec.class("drag-origin-collapsed");
+        }
+    }
+    if let Some(preview) = drag_drop_preview
+        && preview.nearest_item == Some(item)
+    {
+        spec = spec.class(match preview.edge {
+            super::DropEdge::Before => "drag-gap-before",
+            super::DropEdge::After => "drag-gap-after",
+        });
     }
     ui.element(format!("drag-item-{item}"), spec, |ui| {
-        ui.text_element(
-            format!("drag-item-{item}-label"),
-            ElementSpec::new(ElementRole::Text).class("control-label"),
-            label,
-        );
+        let mut label_spec = ElementSpec::new(ElementRole::Text).class("control-label");
+        if origin_space {
+            label_spec = label_spec.class("drag-origin-content");
+        }
+        ui.text_element(format!("drag-item-{item}-label"), label_spec, label);
+        drag_handle(ui, item, origin_space);
+    });
+}
+
+fn drag_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_space: bool) {
+    let mut handle_spec = ElementSpec::new(ElementRole::Control)
+        .class("drag-handle")
+        .interactive()
+        .value(format!("drag-item-{item}"));
+    let mut glyph_spec = ElementSpec::new(ElementRole::Text).class("drag-handle-glyph");
+    if origin_space {
+        handle_spec = handle_spec.class("drag-origin-content");
+        glyph_spec = glyph_spec.class("drag-origin-content");
+    }
+    ui.element(format!("drag-handle-{item}"), handle_spec, |ui| {
+        ui.text_element(format!("drag-handle-{item}-glyph"), glyph_spec, "::");
     });
 }
 

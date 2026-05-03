@@ -2,8 +2,8 @@ use crate::element::{Color, Element, ElementId};
 use crate::geometry::{CornerRadii, Insets, Length, Size};
 use crate::state::ElementState;
 use crate::style::{
-    ComputedStyle, StyleInvalidation, StyleSheet, Transition, classify_computed_style_change,
-    resolve_style,
+    ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, Transition,
+    classify_computed_style_change, resolve_style_with_position,
 };
 use std::collections::HashMap;
 
@@ -26,7 +26,18 @@ pub(crate) fn update_element_style_animation(
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
 ) -> AnimationUpdate {
-    let target_style = resolve_style(element, stylesheet, states.get(&element.id));
+    update_element_style_animation_at(element, stylesheet, states, snap_epsilon, None)
+}
+
+fn update_element_style_animation_at(
+    element: &Element,
+    stylesheet: &StyleSheet,
+    states: &mut HashMap<ElementId, ElementState>,
+    snap_epsilon: f32,
+    position: Option<ChildPosition>,
+) -> AnimationUpdate {
+    let target_style =
+        resolve_style_with_position(element, stylesheet, states.get(&element.id), position);
     let mut update = AnimationUpdate::default();
 
     if let Some(state) = states.get_mut(&element.id) {
@@ -46,8 +57,14 @@ pub(crate) fn update_element_style_animation(
         update += classify_computed_style_change(previous.as_ref(), state.rendered_style.as_ref());
     }
 
-    for child in &element.children {
-        update += update_element_style_animation(child, stylesheet, states, snap_epsilon);
+    for (index, child) in element.children.iter().enumerate() {
+        update += update_element_style_animation_at(
+            child,
+            stylesheet,
+            states,
+            snap_epsilon,
+            Some(ChildPosition::new(index, element.children.len())),
+        );
     }
 
     update

@@ -11,9 +11,46 @@ pub enum StyleSelector {
     Class(ClassName),
     Id(ElementId),
     State(ElementStateSelector),
+    FirstChild,
+    LastChild,
+    NthChild(usize),
     ClassState(ClassName, ElementStateSelector),
     IdState(ElementId, ElementStateSelector),
     Compound(CompoundSelector),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ChildPosition {
+    pub index: usize,
+    pub sibling_count: usize,
+}
+
+impl ChildPosition {
+    pub fn new(index: usize, sibling_count: usize) -> Self {
+        Self {
+            index,
+            sibling_count,
+        }
+    }
+
+    pub fn is_first(self) -> bool {
+        self.index == 0
+    }
+
+    pub fn is_last(self) -> bool {
+        self.index + 1 == self.sibling_count
+    }
+
+    pub fn is_nth(self, nth: usize) -> bool {
+        nth > 0 && self.index + 1 == nth
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChildPositionSelector {
+    First,
+    Last,
+    Nth(usize),
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -22,6 +59,7 @@ pub struct CompoundSelector {
     pub(crate) id: Option<ElementId>,
     pub(crate) classes: Vec<ClassName>,
     pub(crate) states: Vec<ElementStateSelector>,
+    pub(crate) child_position: Option<ChildPositionSelector>,
 }
 
 impl StyleSelector {
@@ -39,6 +77,18 @@ impl StyleSelector {
 
     pub fn id_state(id: impl Into<ElementId>, state: ElementStateSelector) -> Self {
         Self::IdState(id.into(), state)
+    }
+
+    pub fn first_child() -> Self {
+        Self::FirstChild
+    }
+
+    pub fn last_child() -> Self {
+        Self::LastChild
+    }
+
+    pub fn nth_child(nth: usize) -> Self {
+        Self::NthChild(nth)
     }
 
     pub fn compound() -> CompoundSelector {
@@ -64,6 +114,21 @@ impl CompoundSelector {
 
     pub fn state(mut self, state: ElementStateSelector) -> Self {
         self.states.push(state);
+        self
+    }
+
+    pub fn first_child(mut self) -> Self {
+        self.child_position = Some(ChildPositionSelector::First);
+        self
+    }
+
+    pub fn last_child(mut self) -> Self {
+        self.child_position = Some(ChildPositionSelector::Last);
+        self
+    }
+
+    pub fn nth_child(mut self, nth: usize) -> Self {
+        self.child_position = Some(ChildPositionSelector::Nth(nth));
         self
     }
 
@@ -848,15 +913,16 @@ impl StyleSheet {
     }
 }
 
-pub(crate) fn resolve_style(
+pub(crate) fn resolve_style_with_position(
     element: &Element,
     stylesheet: &StyleSheet,
     state: Option<&ElementState>,
+    position: Option<ChildPosition>,
 ) -> ComputedStyle {
     let mut style = ComputedStyle::default();
 
     for rule in &stylesheet.rules {
-        if selector_matches(&rule.selector, element, state) {
+        if selector_matches(&rule.selector, element, state, position) {
             style.apply(&rule.style);
         }
     }
@@ -930,6 +996,7 @@ fn selector_matches(
     selector: &StyleSelector,
     element: &Element,
     state: Option<&ElementState>,
+    position: Option<ChildPosition>,
 ) -> bool {
     match selector {
         StyleSelector::Role(role) => element.spec.role == *role,
@@ -940,6 +1007,9 @@ fn selector_matches(
             .any(|element_class| element_class == class),
         StyleSelector::Id(id) => &element.id == id,
         StyleSelector::State(selector) => state_selector_matches(*selector, element, state),
+        StyleSelector::FirstChild => position.is_some_and(ChildPosition::is_first),
+        StyleSelector::LastChild => position.is_some_and(ChildPosition::is_last),
+        StyleSelector::NthChild(nth) => position.is_some_and(|position| position.is_nth(*nth)),
         StyleSelector::ClassState(class, selector) => {
             element
                 .spec
@@ -951,7 +1021,9 @@ fn selector_matches(
         StyleSelector::IdState(id, selector) => {
             &element.id == id && state_selector_matches(*selector, element, state)
         }
-        StyleSelector::Compound(selector) => compound_selector_matches(selector, element, state),
+        StyleSelector::Compound(selector) => {
+            compound_selector_matches(selector, element, state, position)
+        }
     }
 }
 
@@ -959,6 +1031,7 @@ fn compound_selector_matches(
     selector: &CompoundSelector,
     element: &Element,
     state: Option<&ElementState>,
+    position: Option<ChildPosition>,
 ) -> bool {
     if selector.role.is_some_and(|role| element.spec.role != role) {
         return false;
@@ -976,10 +1049,36 @@ fn compound_selector_matches(
         return false;
     }
 
-    selector
+    if !selector
         .states
         .iter()
         .all(|selector| state_selector_matches(*selector, element, state))
+    {
+        return false;
+    }
+
+    if selector
+        .child_position
+        .is_some_and(|selector| !child_position_selector_matches(selector, position))
+    {
+        return false;
+    }
+
+    true
+}
+
+fn child_position_selector_matches(
+    selector: ChildPositionSelector,
+    position: Option<ChildPosition>,
+) -> bool {
+    let Some(position) = position else {
+        return false;
+    };
+    match selector {
+        ChildPositionSelector::First => position.is_first(),
+        ChildPositionSelector::Last => position.is_last(),
+        ChildPositionSelector::Nth(nth) => position.is_nth(nth),
+    }
 }
 
 fn state_selector_matches(

@@ -8,9 +8,12 @@ use crate::state::{
     ElementState, PointerInput, ResolvedElement, ScrollChrome,
 };
 use crate::style::{
-    ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change, resolve_style,
+    ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change,
+    resolve_style_with_position,
 };
 use std::collections::{BTreeSet, HashMap};
+
+const POINTER_DRAG_ACTIVATION_DISTANCE: f32 = 5.0;
 
 struct ScrollDrag {
     element_id: ElementId,
@@ -24,6 +27,7 @@ struct PointerDrag {
     origin: crate::geometry::Point,
     current: crate::geometry::Point,
     pointer_offset: crate::geometry::Point,
+    activated: bool,
 }
 
 impl PointerDrag {
@@ -282,22 +286,38 @@ impl DocumentEngine {
             return finalize_input_update(update, &self.states, &previous);
         }
 
+        if self
+            .active_pointer_drag
+            .as_ref()
+            .is_some_and(|drag| !drag.activated && !pointer.primary_down)
+        {
+            self.active_pointer_drag = None;
+        }
+
         if self.active_pointer_drag.is_some() {
             let drag_update = self.update_pointer_drag(pointer, None);
             update.changed |= drag_update.changed;
             update.active_drag = drag_update.active_drag;
             update.completed_drag = drag_update.completed_drag;
-            if let Some(active_drag) = &update.active_drag {
-                update.hit_id = Some(active_drag.target.clone());
-            } else if let Some(completed_drag) = &update.completed_drag {
-                update.hit_id = Some(completed_drag.target.clone());
-            }
+            update.hit_id = self
+                .active_pointer_drag
+                .as_ref()
+                .map(|drag| drag.target.clone())
+                .or_else(|| {
+                    update
+                        .completed_drag
+                        .as_ref()
+                        .map(|drag| drag.target.clone())
+                });
             if let Some(hit_id) = &update.hit_id
                 && let Some(state) = self.states.get_mut(hit_id)
             {
                 state.hovered = true;
                 state.pressed = pointer.primary_down;
-                state.dragging = pointer.primary_down;
+                state.dragging = self
+                    .active_pointer_drag
+                    .as_ref()
+                    .is_some_and(|drag| drag.activated && pointer.primary_down);
                 if update
                     .completed_drag
                     .as_ref()
@@ -368,7 +388,7 @@ impl DocumentEngine {
         if let Some(active_drag) = &self.active_pointer_drag
             && let Some(state) = self.states.get_mut(&active_drag.target)
         {
-            state.dragging = true;
+            state.dragging = active_drag.activated;
         }
 
         finalize_input_update(update, &self.states, &previous)
@@ -383,6 +403,7 @@ impl DocumentEngine {
             return self
                 .active_pointer_drag
                 .take()
+                .filter(|drag| drag.activated)
                 .map(|drag| PointerDragUpdate {
                     changed: true,
                     active_drag: None,
@@ -394,9 +415,20 @@ impl DocumentEngine {
         if let Some(drag) = &mut self.active_pointer_drag {
             let changed = drag.current != pointer.position;
             drag.current = pointer.position;
+            let delta = crate::geometry::Point::new(
+                drag.current.x - drag.origin.x,
+                drag.current.y - drag.origin.y,
+            );
+            let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+            let activated = if drag.activated {
+                false
+            } else {
+                distance >= POINTER_DRAG_ACTIVATION_DISTANCE
+            };
+            drag.activated |= activated;
             return PointerDragUpdate {
-                changed,
-                active_drag: Some(drag.document_drag()),
+                changed: changed || activated,
+                active_drag: drag.activated.then(|| drag.document_drag()),
                 completed_drag: None,
             };
         }
@@ -412,13 +444,11 @@ impl DocumentEngine {
                 pointer.position.x - hit_frame.rect.origin.x,
                 pointer.position.y - hit_frame.rect.origin.y,
             ),
+            activated: false,
         });
         PointerDragUpdate {
-            changed: true,
-            active_drag: self
-                .active_pointer_drag
-                .as_ref()
-                .map(PointerDrag::document_drag),
+            changed: false,
+            active_drag: None,
             completed_drag: None,
         }
     }
@@ -583,12 +613,29 @@ fn classify_resolved_style_invalidation(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
 ) -> StyleInvalidation {
-    let next_style = resolved_style_for(element, states, stylesheet);
+    classify_resolved_style_invalidation_at(frame, element, stylesheet, states, None)
+}
+
+fn classify_resolved_style_invalidation_at(
+    frame: &ResolvedElement,
+    element: &Element,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+    position: Option<ChildPosition>,
+) -> StyleInvalidation {
+    let next_style = resolved_style_for(element, states, stylesheet, position);
     let mut invalidation = classify_computed_style_change(Some(&frame.style), Some(&next_style));
 
-    for (child_frame, child_element) in frame.children.iter().zip(&element.children) {
-        invalidation +=
-            classify_resolved_style_invalidation(child_frame, child_element, stylesheet, states);
+    for (index, (child_frame, child_element)) in
+        frame.children.iter().zip(&element.children).enumerate()
+    {
+        invalidation += classify_resolved_style_invalidation_at(
+            child_frame,
+            child_element,
+            stylesheet,
+            states,
+            Some(ChildPosition::new(index, element.children.len())),
+        );
     }
 
     invalidation
@@ -600,9 +647,27 @@ fn apply_resolved_styles(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
 ) {
-    frame.style = resolved_style_for(element, states, stylesheet);
-    for (child_frame, child_element) in frame.children.iter_mut().zip(&element.children) {
-        apply_resolved_styles(child_frame, child_element, stylesheet, states);
+    apply_resolved_styles_at(frame, element, stylesheet, states, None);
+}
+
+fn apply_resolved_styles_at(
+    frame: &mut ResolvedElement,
+    element: &Element,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+    position: Option<ChildPosition>,
+) {
+    frame.style = resolved_style_for(element, states, stylesheet, position);
+    for (index, (child_frame, child_element)) in
+        frame.children.iter_mut().zip(&element.children).enumerate()
+    {
+        apply_resolved_styles_at(
+            child_frame,
+            child_element,
+            stylesheet,
+            states,
+            Some(ChildPosition::new(index, element.children.len())),
+        );
     }
 }
 
@@ -610,11 +675,14 @@ fn resolved_style_for(
     element: &Element,
     states: &HashMap<ElementId, ElementState>,
     stylesheet: &StyleSheet,
+    position: Option<ChildPosition>,
 ) -> ComputedStyle {
     states
         .get(&element.id)
         .and_then(|state| state.rendered_style.clone())
-        .unwrap_or_else(|| resolve_style(element, stylesheet, states.get(&element.id)))
+        .unwrap_or_else(|| {
+            resolve_style_with_position(element, stylesheet, states.get(&element.id), position)
+        })
 }
 
 fn count_resolved_elements(frame: &ResolvedElement) -> usize {

@@ -438,26 +438,28 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
 
     assert_eq!(harness.state().drag_item_cells, [0, 2, 4]);
 
-    let start = center(state_rect(harness.state(), "drag-item-0"));
+    let start = center(state_rect(harness.state(), "drag-handle-0"));
     let destination = center(state_rect(harness.state(), "drag-cell-3"));
     harness.hover_at(start);
     harness.drag_at(start);
     harness.run();
-    assert_eq!(harness.state().active_drag_item(), Some(0));
-    assert!(harness.state().active_drag.is_some());
+    assert_eq!(
+        harness.state().active_drag_item(),
+        None,
+        "pointer down should not activate drag until movement passes threshold"
+    );
 
     harness.hover_at(destination);
     harness.run();
+    assert_eq!(harness.state().active_drag_item(), Some(0));
+    assert!(harness.state().active_drag.is_some());
     let output = state_output(harness.state());
     let overlay = frame(&output, "drag-overlay");
     assert_eq!(overlay.text.as_deref(), None);
     assert!(has_class(overlay, "drag-overlay"));
     assert!(
-        frame(&output, "drag-cell-0")
-            .children
-            .iter()
-            .all(|child| child.id.as_str() != "drag-item-0"),
-        "active drag item should be lifted out of its source cell"
+        has_class(frame(&output, "drag-item-0"), "drag-origin-collapsed"),
+        "source placeholder should collapse once a new drop position opens"
     );
     assert!(
         overlay
@@ -488,6 +490,126 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
             item.rect.origin.y + item.rect.size.height / 2.0,
         )),
         "moved item should be laid out inside the destination cell"
+    );
+}
+
+#[test]
+fn interaction_drag_drop_reorders_with_nearest_item_gap() {
+    let mut harness = lab_harness("interaction");
+    harness.state_mut().drag_item_cells = [0, 0, 2];
+    harness.state_mut().drag_item_order = [0, 1, 2];
+    harness.run();
+
+    let start = center(state_rect(harness.state(), "drag-handle-0"));
+    let activation_point = egui::pos2(start.x + 8.0, start.y);
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(activation_point);
+    harness.run();
+
+    let output = state_output(harness.state());
+    let second_item = frame(&output, "drag-item-1").rect;
+    let destination = egui::pos2(
+        second_item.origin.x + second_item.size.width / 2.0,
+        second_item.origin.y + second_item.size.height - 4.0,
+    );
+    harness.hover_at(destination);
+    harness.run_steps(4);
+
+    let output = state_output(harness.state());
+    assert!(harness.state().drag_drop_preview.is_some());
+    assert!(
+        has_class(frame(&output, "drag-item-0"), "drag-origin-collapsed"),
+        "source placeholder should collapse while an insertion gap opens"
+    );
+
+    harness.event(egui::Event::PointerButton {
+        pos: destination,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+
+    assert_eq!(harness.state().drag_item_cells[0], 0);
+    assert!(harness.state().drag_item_order[0] > harness.state().drag_item_order[1]);
+}
+
+#[test]
+fn interaction_drag_drop_suppresses_gap_at_original_position() {
+    let mut harness = lab_harness("interaction");
+    harness.state_mut().drag_item_cells = [0, 0, 2];
+    harness.state_mut().drag_item_order = [0, 1, 2];
+    harness.run();
+
+    let start = center(state_rect(harness.state(), "drag-handle-1"));
+    let first_item = state_rect(harness.state(), "drag-item-0");
+    let original_position = egui::pos2(
+        first_item.origin.x + first_item.size.width / 2.0,
+        first_item.origin.y + first_item.size.height + 8.0,
+    );
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.run();
+    harness.hover_at(original_position);
+    harness.run();
+
+    let output = state_output(harness.state());
+    assert!(harness.state().drag_source_placeholder_visible());
+    assert!(
+        has_class(frame(&output, "drag-item-1"), "drag-origin-space"),
+        "source item should keep one hidden placeholder"
+    );
+    assert!(
+        !has_class(frame(&output, "drag-item-0"), "drag-gap-after"),
+        "no second insertion gap should appear at the original position"
+    );
+}
+
+#[test]
+fn interaction_drag_drop_requires_handle_to_drag_parent() {
+    let mut harness = lab_harness("interaction");
+
+    let card_center = center(state_rect(harness.state(), "drag-item-0"));
+    let destination = center(state_rect(harness.state(), "drag-cell-3"));
+    harness.hover_at(card_center);
+    harness.drag_at(card_center);
+    harness.run();
+
+    assert_eq!(harness.state().active_drag_item(), None);
+
+    harness.hover_at(destination);
+    harness.event(egui::Event::PointerButton {
+        pos: destination,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+
+    assert_eq!(harness.state().drag_item_cells[0], 0);
+}
+
+#[test]
+fn interaction_drag_drop_styles_are_animated() {
+    let mut harness = lab_harness("interaction");
+    let start = center(state_rect(harness.state(), "drag-handle-0"));
+    let destination = center(state_rect(harness.state(), "drag-cell-3"));
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(destination);
+    harness.run();
+    let output = state_output(harness.state());
+
+    for id in ["drag-grid", "drag-cell-0", "drag-item-1", "drag-handle-1"] {
+        assert!(
+            frame(&output, id).style.transition.is_some(),
+            "{id} should define a transition for drag/drop styling"
+        );
+    }
+    assert!(
+        frame(&output, "drag-overlay").style.transition.is_some(),
+        "drag overlay should define a transition for drag/drop styling"
     );
 }
 

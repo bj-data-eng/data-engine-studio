@@ -791,7 +791,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(8.0)
                 .background(Color::rgb(17, 21, 25))
                 .border(Color::rgb(42, 50, 58))
-                .radius(6.0),
+                .radius(6.0)
+                .transition(Transition::ease_out(0.12)),
         )
         .rule(
             StyleSelector::class("drag-cell"),
@@ -803,7 +804,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(5.0)
                 .background(Color::rgb(20, 25, 30))
                 .border(Color::rgb(48, 57, 65))
-                .radius(5.0),
+                .radius(5.0)
+                .transition(Transition::ease_out(0.12)),
         )
         .rule(
             StyleSelector::class_state("drag-cell", ElementStateSelector::Hovered),
@@ -814,14 +816,63 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("drag-item"),
             Style::default()
+                .direction(Direction::Row)
                 .width_fill()
                 .height(Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 6.0))
                 .align_items(AlignItems::Center)
-                .justify_content(JustifyContent::Center)
+                .justify_content(JustifyContent::SpaceBetween)
                 .background(CARD_SELECTED)
                 .border(STROKE_SELECTED)
-                .radius(5.0),
+                .radius(5.0)
+                .transition(Transition::ease_out(0.14)),
+        )
+        .rule(
+            StyleSelector::class("drag-origin-space"),
+            Style::default()
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0))
+                .text_color(Color::rgba(0, 0, 0, 0)),
+        )
+        .rule(
+            StyleSelector::class("drag-origin-collapsed"),
+            Style::default()
+                .height(Length::Px(0.0))
+                .padding(Insets::ZERO)
+                .border_width(0.0)
+                .margin(Insets {
+                    top: 0.0,
+                    right: 0.0,
+                    bottom: -5.0,
+                    left: 0.0,
+                }),
+        )
+        .rule(
+            StyleSelector::class("drag-handle"),
+            Style::default()
+                .size(24.0, 22.0)
+                .padding(Insets::symmetric(4.0, 2.0))
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0))
+                .radius(3.0)
+                .transition(Transition::ease_out(0.1)),
+        )
+        .rule(
+            StyleSelector::class_state("drag-handle", ElementStateSelector::Hovered),
+            Style::default().background(Color::rgba(232, 236, 240, 24)),
+        )
+        .rule(
+            StyleSelector::class("drag-handle-glyph"),
+            Style::default().font_size(12.0).text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class("drag-origin-content"),
+            Style::default()
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0))
+                .text_color(Color::rgba(0, 0, 0, 0)),
         )
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Hovered),
@@ -830,6 +881,18 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Pressed),
             Style::default().background(CARD_PRESSED),
+        )
+        .rule(
+            StyleSelector::class_state("drag-origin-space", ElementStateSelector::Hovered),
+            Style::default()
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0)),
+        )
+        .rule(
+            StyleSelector::class_state("drag-origin-space", ElementStateSelector::Pressed),
+            Style::default()
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0)),
         )
         .rule(
             StyleSelector::class("drag-item-active"),
@@ -842,7 +905,26 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .width(Length::Px(230.0))
                 .height(Length::Px(34.0))
-                .z_index(100),
+                .z_index(100)
+                .transition(Transition::ease_out(0.08)),
+        )
+        .rule(
+            StyleSelector::class("drag-gap-before"),
+            Style::default().margin(Insets {
+                top: 39.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            }),
+        )
+        .rule(
+            StyleSelector::class("drag-gap-after"),
+            Style::default().margin(Insets {
+                top: 0.0,
+                right: 0.0,
+                bottom: 39.0,
+                left: 0.0,
+            }),
         )
         .rule(
             StyleSelector::class("feature-card"),
