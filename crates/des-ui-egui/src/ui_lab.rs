@@ -64,6 +64,7 @@ const TEXT_MENU_RADIUS: CornerRadii = CornerRadii {
 enum LabView {
     Layout,
     Interaction,
+    Draggable,
     Styling,
     Animation,
     Scrolling,
@@ -78,6 +79,7 @@ impl LabView {
         match id {
             "layout" | "view-layout" => Some(Self::Layout),
             "interaction" | "view-interaction" => Some(Self::Interaction),
+            "draggable" | "view-draggable" => Some(Self::Draggable),
             "styling" | "view-styling" => Some(Self::Styling),
             "animation" | "view-animation" => Some(Self::Animation),
             "scrolling" | "view-scrolling" => Some(Self::Scrolling),
@@ -93,6 +95,7 @@ impl LabView {
         match self {
             Self::Layout => "view-layout",
             Self::Interaction => "view-interaction",
+            Self::Draggable => "view-draggable",
             Self::Styling => "view-styling",
             Self::Animation => "view-animation",
             Self::Scrolling => "view-scrolling",
@@ -107,6 +110,7 @@ impl LabView {
         match self {
             Self::Layout => "Layout",
             Self::Interaction => "Interaction",
+            Self::Draggable => "Draggable",
             Self::Styling => "Styling",
             Self::Animation => "Animation",
             Self::Scrolling => "Scrolling",
@@ -867,6 +871,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
     match id {
         "view-layout" => Some(LabAction::SelectView(LabView::Layout)),
         "view-interaction" => Some(LabAction::SelectView(LabView::Interaction)),
+        "view-draggable" => Some(LabAction::SelectView(LabView::Draggable)),
         "view-styling" => Some(LabAction::SelectView(LabView::Styling)),
         "view-animation" => Some(LabAction::SelectView(LabView::Animation)),
         "view-scrolling" => Some(LabAction::SelectView(LabView::Scrolling)),

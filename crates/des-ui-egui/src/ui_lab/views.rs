@@ -37,6 +37,7 @@ pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: La
             for view in [
                 LabView::Layout,
                 LabView::Interaction,
+                LabView::Draggable,
                 LabView::Styling,
                 LabView::Animation,
                 LabView::Scrolling,
@@ -73,6 +74,7 @@ fn view_hint(view: LabView) -> &'static str {
     match view {
         LabView::Layout => "nesting, margins, rows, columns",
         LabView::Interaction => "hover, press, click ownership",
+        LabView::Draggable => "clone layers, handles, sorting",
         LabView::Styling => "roles, classes, states, ids",
         LabView::Animation => "state transitions and easing",
         LabView::Scrolling => "document scroll ownership",
@@ -117,6 +119,9 @@ pub(super) fn render_stage(
                 radio_choice,
                 dropdown_open,
                 dropdown_choice,
+            ),
+            LabView::Draggable => render_draggable_view(
+                ui,
                 drag_item_cells,
                 drag_item_order,
                 scroll_list_item_order,
@@ -128,12 +133,7 @@ pub(super) fn render_stage(
                 scroll_list_drop_preview,
             ),
             LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
-            LabView::Animation => render_animation_view(
-                ui,
-                scroll_list_item_order,
-                active_scroll_list_drag_item,
-                scroll_list_drop_preview,
-            ),
+            LabView::Animation => render_animation_view(ui),
             LabView::Scrolling => render_scrolling_view(ui),
             LabView::Table => render_table_view(ui),
             LabView::Text => render_text_view(ui),
@@ -585,15 +585,6 @@ fn render_interaction_view(
     radio_choice: usize,
     dropdown_open: bool,
     dropdown_choice: usize,
-    drag_item_cells: [usize; 3],
-    drag_item_order: [usize; 3],
-    scroll_list_item_order: [usize; 14],
-    pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_ui_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    drag_pointer: Option<des_ui_document::Point>,
-    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.text_element(
         "interaction-heading",
@@ -662,6 +653,31 @@ fn render_interaction_view(
             control_text_inputs(ui);
         },
     );
+    render_document_update_loop(ui);
+}
+
+fn render_draggable_view(
+    ui: &mut des_ui_document::DocumentBuilder,
+    drag_item_cells: [usize; 3],
+    drag_item_order: [usize; 3],
+    scroll_list_item_order: [usize; 14],
+    pressed_drag_source: Option<&str>,
+    active_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    drag_pointer: Option<des_ui_document::Point>,
+    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+) {
+    ui.text_element(
+        "draggable-heading",
+        ElementSpec::new(ElementRole::Text).class("heading"),
+        "Document Draggables",
+    );
+    ui.text_element(
+        "draggable-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Sortable drag/drop uses document events, visual subtree clones, optional handles, and style-owned overlays.",
+    );
     render_drag_drop_lab(
         ui,
         drag_item_cells,
@@ -674,7 +690,6 @@ fn render_interaction_view(
         drag_drop_preview,
         scroll_list_drop_preview,
     );
-    render_document_update_loop(ui);
 }
 
 fn render_document_update_loop(ui: &mut des_ui_document::DocumentBuilder) {
@@ -1913,12 +1928,7 @@ fn structural_nested_item(
     );
 }
 
-fn render_animation_view(
-    ui: &mut des_ui_document::DocumentBuilder,
-    scroll_list_item_order: [usize; 14],
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
-) {
+fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "animation-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -1990,24 +2000,6 @@ fn render_animation_view(
                 true,
             );
         },
-    );
-    ui.text_element(
-        "animation-drag-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
-        "Elevation drag layer",
-    );
-    ui.text_element(
-        "animation-drag-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
-        "Drag a list row by its handle. Resting, pressed, and floating states use animated elevation.",
-    );
-    render_elevated_scrollable_drag_list(
-        ui,
-        "Animated elevation list",
-        scroll_list_item_order,
-        active_scroll_list_drag_item,
-        scroll_list_drop_preview,
-        None,
     );
 }
 

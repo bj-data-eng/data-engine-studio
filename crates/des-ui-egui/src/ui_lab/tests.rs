@@ -236,6 +236,22 @@ fn clicked_nav_view_matches_directly_seeded_view() {
 }
 
 #[test]
+fn clicked_draggable_nav_view_matches_directly_seeded_view() {
+    let mut clicked = lab_harness("layout");
+    let draggable_nav_item = center(lab_rect("view-draggable"));
+
+    clicked.hover_at(draggable_nav_item);
+    clicked.drag_at(draggable_nav_item);
+    clicked.drop_at(draggable_nav_item);
+    clicked.run();
+
+    let clicked_image = render_harness(&mut clicked);
+    let direct_image = lab_image("draggable");
+
+    assert_exact_image_match(&clicked_image, &direct_image);
+}
+
+#[test]
 fn clicked_table_nav_view_matches_directly_seeded_view() {
     let mut clicked = lab_harness("layout");
     let table_nav_item = center(lab_rect("view-table"));
@@ -537,8 +553,8 @@ fn interaction_update_loop_refreshes_text_on_repeated_button_clicks() {
 }
 
 #[test]
-fn interaction_drag_drop_grid_moves_items_between_cells() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_drop_grid_moves_items_between_cells() {
+    let mut harness = lab_harness("draggable");
 
     assert_eq!(harness.state().drag_item_cells, [0, 2, 4]);
     let source_style = frame(
@@ -666,8 +682,8 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
 }
 
 #[test]
-fn interaction_drag_drop_reorders_with_nearest_item_gap() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_drop_reorders_with_nearest_item_gap() {
+    let mut harness = lab_harness("draggable");
     harness.state_mut().drag_item_cells = [0, 0, 2];
     harness.state_mut().drag_item_order = [0, 1, 2];
     harness.run();
@@ -722,8 +738,8 @@ fn interaction_drag_drop_reorders_with_nearest_item_gap() {
 }
 
 #[test]
-fn interaction_drag_drop_suppresses_gap_at_original_position() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_drop_suppresses_gap_at_original_position() {
+    let mut harness = lab_harness("draggable");
     harness.state_mut().drag_item_cells = [0, 0, 2];
     harness.state_mut().drag_item_order = [0, 1, 2];
     harness.run();
@@ -770,8 +786,8 @@ fn interaction_drag_drop_suppresses_gap_at_original_position() {
 }
 
 #[test]
-fn interaction_drag_drop_requires_handle_to_drag_parent() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_drop_requires_handle_to_drag_parent() {
+    let mut harness = lab_harness("draggable");
 
     let card_center = center(state_rect(harness.state(), "drag-item-0"));
     let destination = center(state_rect(harness.state(), "drag-cell-3"));
@@ -794,8 +810,8 @@ fn interaction_drag_drop_requires_handle_to_drag_parent() {
 }
 
 #[test]
-fn interaction_drag_drop_sets_handle_cursors() {
-    let state = UiLabState::new(Some("interaction"));
+fn draggable_drag_drop_sets_handle_cursors() {
+    let state = UiLabState::new(Some("draggable"));
     let output = state_output(&state);
     let start = center(frame(&output, "drag-handle-0").rect);
     let mut engine = DocumentEngine::default();
@@ -837,8 +853,8 @@ fn interaction_drag_drop_sets_handle_cursors() {
 }
 
 #[test]
-fn interaction_drag_handle_press_keeps_parent_lifted() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_handle_press_keeps_parent_lifted() {
+    let mut harness = lab_harness("draggable");
     let start = center(state_rect_with_egui_text(
         harness.state(),
         &harness.ctx,
@@ -861,8 +877,8 @@ fn interaction_drag_handle_press_keeps_parent_lifted() {
 }
 
 #[test]
-fn interaction_drag_drop_styles_are_animated() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_drop_styles_are_animated() {
+    let mut harness = lab_harness("draggable");
     let start = center(state_rect(harness.state(), "drag-handle-0"));
     let destination = center(state_rect(harness.state(), "drag-cell-3"));
     harness.hover_at(start);
@@ -899,8 +915,8 @@ fn interaction_drag_drop_styles_are_animated() {
 }
 
 #[test]
-fn interaction_drag_drop_auto_scrolls_opted_in_list_pane() {
-    let mut harness = lab_harness("interaction");
+fn draggable_drag_drop_auto_scrolls_opted_in_list_pane() {
+    let mut harness = lab_harness("draggable");
     let start = center(state_rect_with_egui_text(
         harness.state(),
         &harness.ctx,
@@ -931,8 +947,8 @@ fn interaction_drag_drop_auto_scrolls_opted_in_list_pane() {
 }
 
 #[test]
-fn interaction_drag_drop_uses_snapshot_path_for_drop_targets() {
-    let output = lab_output("interaction");
+fn draggable_drag_drop_uses_snapshot_path_for_drop_targets() {
+    let output = lab_output("draggable");
     let cell = frame(&output, "drag-cell-5").rect;
     let point = Point::new(
         cell.origin.x + cell.size.width / 2.0,
@@ -942,8 +958,8 @@ fn interaction_drag_drop_uses_snapshot_path_for_drop_targets() {
 }
 
 #[test]
-fn interaction_drag_drop_cells_expand_to_fit_stacked_items() {
-    let mut state = UiLabState::new(Some("interaction"));
+fn draggable_drag_drop_cells_expand_to_fit_stacked_items() {
+    let mut state = UiLabState::new(Some("draggable"));
     state.drag_item_cells = [0, 0, 0];
     let output = state_output(&state);
     let cell = frame(&output, "drag-cell-0");
@@ -1403,14 +1419,9 @@ fn animation_view_renders_state_driven_specimens() {
     assert_close(focused.style.border_width.top, 6.0);
     assert_eq!(focused.style.background, Some(SECONDARY_CONTAINER));
 
-    assert_eq!(
-        frame(&output, "drag-scroll-list-card").style.shadows.len(),
-        0,
-        "animation drag list should start flat at rest"
-    );
     assert!(
-        frame(&output, "drag-scroll-handle-0").interactive,
-        "animation drag specimen should preserve the real handle interaction"
+        output.snapshot().find("drag-scroll-list-card").is_none(),
+        "animation view should leave drag/drop specimens to the dedicated draggable view"
     );
 }
 
