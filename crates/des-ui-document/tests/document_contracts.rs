@@ -4,7 +4,7 @@ use des_ui_document::{
     Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextSelectionGranularity,
-    TextWrapMode, Transition,
+    TextWrapMode, Transition, VisualCloneOptions,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -69,6 +69,78 @@ fn update_reports_created_retained_and_removed_elements() {
             .contains(&ElementId::new("Projects"))
     );
     assert_eq!(engine.element_state("catalog").unwrap().scroll_y, 42.0);
+}
+
+#[test]
+fn visual_clone_preserves_visual_subtree_with_rewritten_ids() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("card-source"),
+            Style::default().size(120.0, 48.0),
+        )
+        .rule(
+            StyleSelector::class("clone-root"),
+            Style::default().size(120.0, 48.0),
+        );
+    let source = Document::build(Size::new(300.0, 180.0), |ui| {
+        ui.element(
+            "card",
+            ElementSpec::new(ElementRole::Card)
+                .class("card-source")
+                .interactive()
+                .value("source-value"),
+            |ui| {
+                ui.text_element(
+                    "card-label",
+                    ElementSpec::new(ElementRole::Text).class("label"),
+                    "Card label",
+                );
+                ui.element(
+                    "card-icon",
+                    ElementSpec::new(ElementRole::Icon).glyph(des_ui_document::Glyph::DragHandle),
+                    |_| {},
+                );
+            },
+        );
+    });
+    let source_output = engine.update(&source, &stylesheet);
+    let clone = source_output
+        .snapshot()
+        .find("card")
+        .expect("source card exists")
+        .visual_clone();
+
+    let cloned = Document::build(Size::new(300.0, 180.0), |ui| {
+        ui.visual_clone(
+            &clone,
+            VisualCloneOptions::new("overlay", "overlay/")
+                .root_class("clone-root")
+                .interactive(false),
+        );
+    });
+    let cloned_output = engine.update(&cloned, &stylesheet);
+
+    let overlay = cloned_output.snapshot().find("overlay").unwrap();
+    assert!(overlay.has_class("card-source"));
+    assert!(overlay.has_class("clone-root"));
+    assert_eq!(overlay.value(), Some("source-value"));
+    assert!(!overlay.interactive());
+
+    let label = cloned_output.snapshot().find("overlay/card-label").unwrap();
+    assert_eq!(label.text(), Some("Card label"));
+    assert!(label.has_class("label"));
+
+    let icon = cloned_output.snapshot().find("overlay/card-icon").unwrap();
+    assert_eq!(icon.role(), ElementRole::Icon);
+    assert_eq!(
+        clone
+            .cloned_ids(&VisualCloneOptions::new("overlay", "overlay/").root_class("clone-root"))
+            .into_iter()
+            .map(|id| id.as_str().to_owned())
+            .collect::<Vec<_>>(),
+        vec!["overlay", "overlay/card-label", "overlay/card-icon"]
+    );
 }
 
 #[test]

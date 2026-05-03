@@ -599,12 +599,12 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
         "drag overlay should keep the broader hover shadow after pickup"
     );
     assert!(
-        has_class(frame(&output, "drag-overlay-handle"), "drag-handle"),
+        has_class(frame(&output, "drag-overlay/drag-handle-0"), "drag-handle"),
         "drag overlay should preserve the source grab handle"
     );
     assert!(
         has_class(
-            frame(&output, "drag-overlay-handle-glyph"),
+            frame(&output, "drag-overlay/drag-handle-0-glyph"),
             "drag-handle-glyph"
         ),
         "drag overlay should preserve the source grab handle glyph"

@@ -1,4 +1,4 @@
-use crate::element::{ClassName, ElementId, ElementRole};
+use crate::element::{ClassName, ElementId, ElementRole, VisualElementClone};
 use crate::geometry::{Point, Rect};
 use crate::layout::hit_path;
 use crate::state::ResolvedElement;
@@ -114,6 +114,10 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn interactive(&self) -> bool {
         self.element.interactive
+    }
+
+    pub fn visual_clone(&self) -> VisualElementClone {
+        VisualElementClone::from_resolved(self.element)
     }
 }
 

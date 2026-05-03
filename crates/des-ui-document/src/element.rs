@@ -1,4 +1,5 @@
 use crate::geometry::Size;
+use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
 use std::collections::BTreeSet;
 
@@ -238,6 +239,120 @@ pub struct Document {
     pub root: Element,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct VisualElementClone {
+    pub source_id: ElementId,
+    pub role: ElementRole,
+    pub classes: Vec<ClassName>,
+    pub text: Option<String>,
+    pub value: Option<String>,
+    pub glyph: Option<Glyph>,
+    pub children: Vec<VisualElementClone>,
+}
+
+impl VisualElementClone {
+    pub fn from_resolved(element: &ResolvedElement) -> Self {
+        Self {
+            source_id: element.id.clone(),
+            role: element.role,
+            classes: element.classes.clone(),
+            text: element.text.clone(),
+            value: element.value.clone(),
+            glyph: element.glyph,
+            children: element.children.iter().map(Self::from_resolved).collect(),
+        }
+    }
+
+    pub fn cloned_ids(&self, options: &VisualCloneOptions) -> Vec<ElementId> {
+        let mut ids = Vec::new();
+        self.collect_cloned_ids(options, true, &mut ids);
+        ids
+    }
+
+    pub fn source_ids(&self) -> Vec<ElementId> {
+        let mut ids = Vec::new();
+        self.collect_source_ids(&mut ids);
+        ids
+    }
+
+    fn collect_cloned_ids(
+        &self,
+        options: &VisualCloneOptions,
+        is_root: bool,
+        ids: &mut Vec<ElementId>,
+    ) {
+        ids.push(self.clone_id(options, is_root));
+        for child in &self.children {
+            child.collect_cloned_ids(options, false, ids);
+        }
+    }
+
+    fn collect_source_ids(&self, ids: &mut Vec<ElementId>) {
+        ids.push(self.source_id.clone());
+        for child in &self.children {
+            child.collect_source_ids(ids);
+        }
+    }
+
+    fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> Element {
+        let mut spec = ElementSpec::new(self.role);
+        spec.classes = self.classes.clone();
+        if is_root {
+            spec.classes.extend(options.root_classes.iter().cloned());
+        }
+        spec.value = self.value.clone();
+        spec.glyph = self.glyph;
+        spec.interactive = options.interactive;
+
+        Element {
+            id: self.clone_id(options, is_root),
+            spec,
+            text: self.text.clone(),
+            children: self
+                .children
+                .iter()
+                .map(|child| child.to_element(options, false))
+                .collect(),
+        }
+    }
+
+    fn clone_id(&self, options: &VisualCloneOptions, is_root: bool) -> ElementId {
+        if is_root {
+            return options.root_id.clone();
+        }
+        ElementId::new(format!("{}{}", options.id_prefix, self.source_id.as_str()))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VisualCloneOptions {
+    pub root_id: ElementId,
+    pub id_prefix: String,
+    pub root_classes: Vec<ClassName>,
+    pub interactive: bool,
+}
+
+impl VisualCloneOptions {
+    pub fn new(root_id: impl Into<ElementId>, id_prefix: impl Into<String>) -> Self {
+        Self {
+            root_id: root_id.into(),
+            id_prefix: id_prefix.into(),
+            root_classes: Vec::new(),
+            interactive: false,
+        }
+    }
+
+    pub fn root_class(mut self, class: impl Into<ClassName>) -> Self {
+        self.root_classes.push(class.into());
+        self
+    }
+
+    pub fn interactive(mut self, interactive: bool) -> Self {
+        self.interactive = interactive;
+        self
+    }
+}
+
 impl Document {
     pub fn build(viewport: Size, add_contents: impl FnOnce(&mut DocumentBuilder)) -> Self {
         let mut ui = DocumentBuilder::default();
@@ -292,5 +407,9 @@ impl DocumentBuilder {
             text: Some(text.into()),
             children: Vec::new(),
         });
+    }
+
+    pub fn visual_clone(&mut self, clone: &VisualElementClone, options: VisualCloneOptions) {
+        self.children.push(clone.to_element(&options, true));
     }
 }

@@ -17,7 +17,8 @@ use des_ui_document::{
     Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
     DocumentMetrics, DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec,
     ElementStateSelector, Insets, Length, Point, PointerInput, Shadow, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions,
+    VisualElementClone,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -136,6 +137,7 @@ pub(crate) struct UiLabState {
     active_drag: Option<DocumentDrag>,
     drag_parent_offset: Option<Point>,
     drag_source_size: Option<Size>,
+    drag_visual_clone: Option<VisualElementClone>,
     pressed_drag_source: Option<String>,
     drag_drop_preview: Option<SortableDropPreview>,
     scroll_list_drop_preview: Option<SortableDropPreview>,
@@ -172,6 +174,7 @@ impl Default for UiLabState {
             active_drag: None,
             drag_parent_offset: None,
             drag_source_size: None,
+            drag_visual_clone: None,
             pressed_drag_source: None,
             drag_drop_preview: None,
             scroll_list_drop_preview: None,
@@ -336,6 +339,10 @@ impl UiLabState {
                 .find(item_id.as_str())
                 .map(|element| element.rect())
         {
+            self.drag_visual_clone = output
+                .snapshot()
+                .find(item_id.as_str())
+                .map(|element| element.visual_clone());
             self.drag_parent_offset = Some(Point::new(
                 drag.origin.x - rect.origin.x,
                 drag.origin.y - rect.origin.y,
@@ -406,23 +413,15 @@ impl UiLabState {
 
     fn snap_drag_pickup_animation(&mut self, item_id: &str) {
         self.document_engine.snap_element_animation(item_id);
-        self.document_engine.snap_element_animation("drag-overlay");
-        self.document_engine
-            .snap_element_animation("drag-overlay-label");
-        if let Some(item) = item_id.strip_prefix("drag-scroll-item-") {
-            self.document_engine
-                .snap_element_animation(&format!("drag-scroll-item-{item}-label"));
-            self.document_engine
-                .snap_element_animation(&format!("drag-scroll-handle-{item}"));
-            self.document_engine
-                .snap_element_animation(&format!("drag-scroll-handle-{item}-glyph"));
-        } else if let Some(item) = item_id.strip_prefix("drag-item-") {
-            self.document_engine
-                .snap_element_animation(&format!("drag-item-{item}-label"));
-            self.document_engine
-                .snap_element_animation(&format!("drag-handle-{item}"));
-            self.document_engine
-                .snap_element_animation(&format!("drag-handle-{item}-glyph"));
+        if let Some(clone) = &self.drag_visual_clone {
+            for id in clone.source_ids() {
+                self.document_engine.snap_element_animation(id.as_str());
+            }
+            let options =
+                VisualCloneOptions::new("drag-overlay", "drag-overlay/").root_class("drag-overlay");
+            for id in clone.cloned_ids(&options) {
+                self.document_engine.snap_element_animation(id.as_str());
+            }
         }
     }
 
@@ -536,6 +535,7 @@ impl UiLabState {
         self.active_drag = None;
         self.drag_parent_offset = None;
         self.drag_source_size = None;
+        self.drag_visual_clone = None;
         self.pressed_drag_source = None;
         self.drag_drop_preview = None;
         self.scroll_list_drop_preview = None;
@@ -645,9 +645,8 @@ impl UiLabState {
                     );
                     render_drag_overlay_layer(
                         ui,
-                        self.active_drag_item(),
-                        self.active_scroll_list_drag_item(),
                         self.active_drag.as_ref().map(|drag| drag.current),
+                        self.drag_visual_clone.as_ref(),
                     );
                 },
             );

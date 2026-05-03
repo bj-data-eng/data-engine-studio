@@ -899,21 +899,16 @@ fn render_elevated_scrollable_drag_list(
 
 pub(super) fn render_drag_overlay_layer(
     ui: &mut des_ui_document::DocumentBuilder,
-    active_drag_item: Option<des_ui_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
+    drag_visual_clone: Option<&des_ui_document::VisualElementClone>,
 ) {
     if drag_pointer.is_none() {
         drag_overlay_placeholder(ui);
         return;
     }
-    if let Some(item) = active_drag_item {
-        drag_overlay(ui, item.0);
-    }
-    if let Some(item) = active_scroll_list_drag_item {
-        drag_scroll_overlay(ui, item.0);
-    }
-    if active_drag_item.is_none() && active_scroll_list_drag_item.is_none() {
+    if let Some(clone) = drag_visual_clone {
+        drag_visual_overlay(ui, clone);
+    } else {
         drag_overlay_placeholder(ui);
     }
 }
@@ -1145,22 +1140,14 @@ fn drag_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_sp
     });
 }
 
-fn drag_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
-    let label = ["Customers", "Orders", "Rates"][item];
-    ui.element(
-        "drag-overlay",
-        ElementSpec::new(ElementRole::Card)
-            .class("drag-item")
-            .class("drag-overlay")
-            .value(label),
-        |ui| {
-            ui.text_element(
-                "drag-overlay-label",
-                ElementSpec::new(ElementRole::Text).class("control-label"),
-                label,
-            );
-            overlay_drag_handle(ui, format!("drag-item-{item}"));
-        },
+fn drag_visual_overlay(
+    ui: &mut des_ui_document::DocumentBuilder,
+    clone: &des_ui_document::VisualElementClone,
+) {
+    ui.visual_clone(
+        clone,
+        des_ui_document::VisualCloneOptions::new("drag-overlay", "drag-overlay/")
+            .root_class("drag-overlay"),
     );
 }
 
@@ -1172,45 +1159,6 @@ fn drag_overlay_placeholder(ui: &mut des_ui_document::DocumentBuilder) {
             .class("drag-overlay-idle")
             .value(""),
         |_| {},
-    );
-}
-
-fn drag_scroll_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
-    let label = format!("auto-scroll row {:02}", item + 1);
-    ui.element(
-        "drag-overlay",
-        ElementSpec::new(ElementRole::Card)
-            .class("drag-item")
-            .class("drag-scroll-item")
-            .class("drag-overlay")
-            .class("drag-scroll-overlay")
-            .value(label.clone()),
-        |ui| {
-            ui.text_element(
-                "drag-overlay-label",
-                ElementSpec::new(ElementRole::Text).class("control-label"),
-                label,
-            );
-            overlay_drag_handle(ui, format!("drag-scroll-item-{item}"));
-        },
-    );
-}
-
-fn overlay_drag_handle(ui: &mut des_ui_document::DocumentBuilder, source_id: String) {
-    ui.element(
-        "drag-overlay-handle",
-        ElementSpec::new(ElementRole::Control)
-            .class("drag-handle")
-            .value(source_id),
-        |ui| {
-            ui.element(
-                "drag-overlay-handle-glyph",
-                ElementSpec::new(ElementRole::Icon)
-                    .class("drag-handle-glyph")
-                    .glyph(Glyph::DragHandle),
-                |_| {},
-            );
-        },
     );
 }
 

@@ -20,7 +20,7 @@ mod update;
 
 pub use element::{
     ClassName, Color, Document, DocumentBuilder, Element, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector, Glyph,
+    ElementStateSelector, Glyph, VisualCloneOptions, VisualElementClone,
 };
 pub use engine::DocumentEngine;
 pub use geometry::{
