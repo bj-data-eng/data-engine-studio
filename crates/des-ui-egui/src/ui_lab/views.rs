@@ -95,6 +95,7 @@ pub(super) fn render_stage(
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
+    pressed_drag_source: Option<&str>,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
@@ -119,6 +120,7 @@ pub(super) fn render_stage(
                 drag_item_cells,
                 drag_item_order,
                 scroll_list_item_order,
+                pressed_drag_source,
                 active_drag_item,
                 active_scroll_list_drag_item,
                 drag_pointer,
@@ -586,6 +588,7 @@ fn render_interaction_view(
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
+    pressed_drag_source: Option<&str>,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
@@ -664,6 +667,7 @@ fn render_interaction_view(
         drag_item_cells,
         drag_item_order,
         scroll_list_item_order,
+        pressed_drag_source,
         active_drag_item,
         active_scroll_list_drag_item,
         drag_pointer,
@@ -776,6 +780,7 @@ fn render_drag_drop_lab(
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
+    pressed_drag_source: Option<&str>,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     _drag_pointer: Option<des_ui_document::Point>,
@@ -797,6 +802,7 @@ fn render_drag_drop_lab(
                 scroll_list_item_order,
                 active_scroll_list_drag_item,
                 scroll_list_drop_preview,
+                pressed_drag_source,
             );
             ui.element(
                 "drag-grid",
@@ -826,9 +832,21 @@ fn render_drag_drop_lab(
                                     if active_drag_item
                                         == Some(des_ui_widgets::SortableItemId(item))
                                     {
-                                        drag_item(ui, item, drag_drop_preview, true);
+                                        drag_item(
+                                            ui,
+                                            item,
+                                            drag_drop_preview,
+                                            true,
+                                            pressed_drag_source,
+                                        );
                                     } else {
-                                        drag_item(ui, item, drag_drop_preview, false);
+                                        drag_item(
+                                            ui,
+                                            item,
+                                            drag_drop_preview,
+                                            false,
+                                            pressed_drag_source,
+                                        );
                                     }
                                 }
                             },
@@ -846,6 +864,7 @@ fn render_elevated_scrollable_drag_list(
     scroll_list_item_order: [usize; 14],
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    pressed_drag_source: Option<&str>,
 ) {
     ui.element(
         "drag-scroll-list-card",
@@ -869,6 +888,7 @@ fn render_elevated_scrollable_drag_list(
                             scroll_list_drop_preview,
                             active_scroll_list_drag_item
                                 == Some(des_ui_widgets::SortableItemId(item)),
+                            pressed_drag_source,
                         );
                     }
                 },
@@ -1014,12 +1034,16 @@ fn drag_scroll_item(
     item: usize,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
+    pressed_drag_source: Option<&str>,
 ) {
     let label = format!("auto-scroll row {:02}", item + 1);
     let mut spec = ElementSpec::new(ElementRole::Card)
         .class("drag-item")
         .class("drag-scroll-item")
         .value(label.clone());
+    if pressed_drag_source == Some(format!("drag-scroll-item-{item}").as_str()) {
+        spec = spec.class("drag-handle-pressed");
+    }
     if origin_space {
         spec = spec.class("drag-origin-space");
         if drag_drop_preview.is_some() {
@@ -1069,11 +1093,15 @@ fn drag_item(
     item: usize,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
+    pressed_drag_source: Option<&str>,
 ) {
     let label = ["Customers", "Orders", "Rates"][item];
     let mut spec = ElementSpec::new(ElementRole::Card)
         .class("drag-item")
         .value(label);
+    if pressed_drag_source == Some(format!("drag-item-{item}").as_str()) {
+        spec = spec.class("drag-handle-pressed");
+    }
     if origin_space {
         spec = spec.class("drag-origin-space");
         if drag_drop_preview.is_some() {
@@ -2031,6 +2059,7 @@ fn render_animation_view(
         scroll_list_item_order,
         active_scroll_list_drag_item,
         scroll_list_drop_preview,
+        None,
     );
 }
 

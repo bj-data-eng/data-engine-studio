@@ -837,6 +837,30 @@ fn interaction_drag_drop_sets_handle_cursors() {
 }
 
 #[test]
+fn interaction_drag_handle_press_keeps_parent_lifted() {
+    let mut harness = lab_harness("interaction");
+    let start = center(state_rect_with_egui_text(
+        harness.state(),
+        &harness.ctx,
+        "drag-handle-0",
+    ));
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.run();
+    let output = state_output_with_egui_text(harness.state(), &harness.ctx);
+    let item = frame(&output, "drag-item-0");
+    assert!(
+        has_class(item, "drag-handle-pressed"),
+        "pressing a drag handle should keep the parent card in the lifted style"
+    );
+    assert!(
+        item.style.shadows[0].blur > 5.0,
+        "pressed handle state should keep the hover shadow instead of falling back to rest"
+    );
+}
+
+#[test]
 fn interaction_drag_drop_styles_are_animated() {
     let mut harness = lab_harness("interaction");
     let start = center(state_rect(harness.state(), "drag-handle-0"));

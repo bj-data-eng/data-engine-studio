@@ -891,14 +891,18 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class_state("drag-item", ElementStateSelector::Hovered),
             Style::default()
                 .background(CARD)
-                .border(STROKE_SELECTED)
                 .shadows(drag_hover_shadow()),
         )
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Pressed),
             Style::default()
-                .background(PRIMARY_CONTAINER)
-                .border(PURPLE)
+                .background(CARD)
+                .shadows(drag_hover_shadow()),
+        )
+        .rule(
+            StyleSelector::class("drag-handle-pressed"),
+            Style::default()
+                .background(CARD)
                 .shadows(drag_hover_shadow()),
         )
         .rule(

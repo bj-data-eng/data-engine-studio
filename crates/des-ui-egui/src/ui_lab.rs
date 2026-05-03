@@ -136,6 +136,7 @@ pub(crate) struct UiLabState {
     active_drag: Option<DocumentDrag>,
     drag_parent_offset: Option<Point>,
     drag_source_size: Option<Size>,
+    pressed_drag_source: Option<String>,
     drag_drop_preview: Option<SortableDropPreview>,
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
@@ -171,6 +172,7 @@ impl Default for UiLabState {
             active_drag: None,
             drag_parent_offset: None,
             drag_source_size: None,
+            pressed_drag_source: None,
             drag_drop_preview: None,
             scroll_list_drop_preview: None,
             text_context_menu: None,
@@ -234,6 +236,18 @@ impl UiLabState {
             );
             self.sync_drag_state(ui, &output);
         }
+        if self.sync_drag_press_state(&output, pointer) {
+            let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
+            let stylesheet = self.active_stylesheet();
+            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+            output = self.document_engine.update_with_input_and_text_measurer(
+                &document,
+                &stylesheet,
+                input,
+                &mut text_measurer,
+            );
+            self.sync_drag_state(ui, &output);
+        }
         let engine_time = engine_start.elapsed();
         copy_selected_text_on_command(ui, &output);
         apply_cursor_icon(ui, &output);
@@ -268,6 +282,7 @@ impl UiLabState {
         let primary_clicked = pointer
             .map(|pointer| pointer.primary_clicked)
             .unwrap_or(false);
+        self.sync_drag_press_state(output, pointer);
         self.sync_drag_state(ui, output);
         if let Some(drag) = &output.completed_drag {
             self.finish_drag(output, drag);
@@ -365,6 +380,28 @@ impl UiLabState {
             ui.ctx().request_repaint();
         }
         previous_drag.is_none() && self.active_drag.is_some()
+    }
+
+    fn sync_drag_press_state(
+        &mut self,
+        output: &DocumentOutput,
+        pointer: Option<PointerInput>,
+    ) -> bool {
+        let next = if output.active_drag.is_none()
+            && pointer.is_some_and(|pointer| pointer.primary_down)
+        {
+            output
+                .hit_id
+                .as_ref()
+                .and_then(|id| source_item_element_id(id.as_str()))
+        } else {
+            None
+        };
+        if self.pressed_drag_source == next {
+            return false;
+        }
+        self.pressed_drag_source = next;
+        true
     }
 
     fn snap_drag_pickup_animation(&mut self, item_id: &str) {
@@ -499,6 +536,7 @@ impl UiLabState {
         self.active_drag = None;
         self.drag_parent_offset = None;
         self.drag_source_size = None;
+        self.pressed_drag_source = None;
         self.drag_drop_preview = None;
         self.scroll_list_drop_preview = None;
     }
@@ -594,6 +632,7 @@ impl UiLabState {
                                 self.drag_item_cells,
                                 self.drag_item_order,
                                 self.scroll_list_item_order,
+                                self.pressed_drag_source.as_deref(),
                                 self.active_drag_item(),
                                 self.active_scroll_list_drag_item(),
                                 self.active_drag.as_ref().map(|drag| drag.current),
