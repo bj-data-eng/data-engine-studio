@@ -15,9 +15,9 @@ use views::{
 
 use des_ui_document::{
     Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentMetrics, DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Insets,
-    Length, Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
-    TableColumnSpec, TableSpec, TableTrackSize,
+    DocumentMetrics, DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec,
+    ElementStateSelector, Insets, Length, Point, PointerInput, Shadow, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -47,6 +47,7 @@ const SECONDARY_CONTAINER: Color = Color::rgb(232, 222, 248);
 const TERTIARY_CONTAINER: Color = Color::rgb(255, 216, 228);
 const SUCCESS_CONTAINER: Color = Color::rgb(205, 239, 221);
 const WARNING_CONTAINER: Color = Color::rgb(255, 241, 204);
+const SHADOW_COLOR: Color = Color::rgb(0, 0, 0);
 const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
 const DRAG_ITEM_COUNT: usize = 3;
 const DROP_ZONE_COUNT: usize = 6;
@@ -127,6 +128,8 @@ pub(crate) struct UiLabState {
     dropdown_open: bool,
     dropdown_choice: usize,
     loop_action_count: usize,
+    shadow_tune: ShadowTuneState,
+    shadow_hover_tune: ShadowTuneState,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; SCROLL_LIST_ITEM_COUNT],
@@ -160,6 +163,8 @@ impl Default for UiLabState {
             dropdown_open: false,
             dropdown_choice: 1,
             loop_action_count: 0,
+            shadow_tune: ShadowTuneState::default(),
+            shadow_hover_tune: ShadowTuneState::hover_default(),
             drag_item_cells: [0, 2, 4],
             drag_item_order: [0, 1, 2],
             scroll_list_item_order: core::array::from_fn(|index| index),
@@ -211,14 +216,27 @@ impl UiLabState {
         let pointer = input.pointer;
         let engine_start = Instant::now();
         let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
-        let output = self.document_engine.update_with_input_and_text_measurer(
+        let mut output = self.document_engine.update_with_input_and_text_measurer(
             &document,
             &stylesheet,
             input,
             &mut text_measurer,
         );
+        if self.sync_drag_state(ui, &output) {
+            let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
+            let stylesheet = self.active_stylesheet();
+            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+            output = self.document_engine.update_with_input_and_text_measurer(
+                &document,
+                &stylesheet,
+                input,
+                &mut text_measurer,
+            );
+            self.sync_drag_state(ui, &output);
+        }
         let engine_time = engine_start.elapsed();
         copy_selected_text_on_command(ui, &output);
+        apply_cursor_icon(ui, &output);
 
         let paint_start = Instant::now();
         paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
@@ -250,58 +268,7 @@ impl UiLabState {
         let primary_clicked = pointer
             .map(|pointer| pointer.primary_clicked)
             .unwrap_or(false);
-        let previous_drag = self.active_drag.clone();
-        self.active_drag = output.active_drag.clone();
-        if previous_drag.is_none()
-            && let Some(drag) = &self.active_drag
-            && let Some(item_id) = source_item_element_id(drag.target.as_str())
-            && let Some(rect) = output
-                .snapshot()
-                .find(item_id.as_str())
-                .map(|element| element.rect())
-        {
-            self.drag_parent_offset = Some(Point::new(
-                drag.origin.x - rect.origin.x,
-                drag.origin.y - rect.origin.y,
-            ));
-            self.drag_source_size = Some(rect.size);
-        }
-        self.drag_drop_preview = None;
-        self.scroll_list_drop_preview = None;
-        if let Some(drag) = &self.active_drag {
-            if let Some(active_item) = active_grid_drag_item(drag.target.as_str()) {
-                self.drag_drop_preview = sortable_config()
-                    .preview_at(output, drag.current, Some(active_item))
-                    .filter(|preview| {
-                        self.sortable_model()
-                            .preview_changes_position(active_item, *preview)
-                    });
-            } else if let Some(active_item) = active_scroll_list_drag_item(drag.target.as_str()) {
-                self.scroll_list_drop_preview = scroll_list_config()
-                    .preview_at(output, drag.current, Some(active_item))
-                    .filter(|preview| {
-                        self.scroll_list_model()
-                            .preview_changes_position(active_item, *preview)
-                    });
-            }
-        }
-        if let Some(drag) = &self.active_drag
-            && AutoScroller::new(AutoScrollOptions {
-                threshold_x: 0.0,
-                threshold_y: 0.24,
-                acceleration: 10.0,
-                ..AutoScrollOptions::default()
-            })
-            .scroll_drag_with_filter(&mut self.document_engine, output, drag.current, |id| {
-                id.as_str().starts_with("drag-scroll-list-")
-            })
-            .is_some()
-        {
-            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
-        }
-        if self.active_drag != previous_drag {
-            ui.ctx().request_repaint();
-        }
+        self.sync_drag_state(ui, output);
         if let Some(drag) = &output.completed_drag {
             self.finish_drag(output, drag);
             ui.ctx().request_repaint();
@@ -340,6 +307,85 @@ impl UiLabState {
         {
             self.dropdown_open = false;
             ui.ctx().request_repaint();
+        }
+    }
+
+    fn sync_drag_state(&mut self, ui: &egui::Ui, output: &DocumentOutput) -> bool {
+        let previous_drag = self.active_drag.clone();
+        self.active_drag = output.active_drag.clone();
+        if previous_drag.is_none()
+            && let Some(drag) = &self.active_drag
+            && let Some(item_id) = source_item_element_id(drag.target.as_str())
+            && let Some(rect) = output
+                .snapshot()
+                .find(item_id.as_str())
+                .map(|element| element.rect())
+        {
+            self.drag_parent_offset = Some(Point::new(
+                drag.origin.x - rect.origin.x,
+                drag.origin.y - rect.origin.y,
+            ));
+            self.drag_source_size = Some(rect.size);
+            self.snap_drag_pickup_animation(item_id.as_str());
+        }
+        self.drag_drop_preview = None;
+        self.scroll_list_drop_preview = None;
+        if let Some(drag) = &self.active_drag {
+            if let Some(active_item) = active_grid_drag_item(drag.target.as_str()) {
+                self.drag_drop_preview = sortable_config()
+                    .preview_at(output, drag.current, Some(active_item))
+                    .filter(|preview| {
+                        self.sortable_model()
+                            .preview_changes_position(active_item, *preview)
+                    });
+            } else if let Some(active_item) = active_scroll_list_drag_item(drag.target.as_str()) {
+                self.scroll_list_drop_preview = scroll_list_config()
+                    .preview_at(output, drag.current, Some(active_item))
+                    .filter(|preview| {
+                        self.scroll_list_model()
+                            .preview_changes_position(active_item, *preview)
+                    });
+            }
+        }
+        if let Some(drag) = &self.active_drag
+            && AutoScroller::new(AutoScrollOptions {
+                threshold_x: 0.0,
+                threshold_y: 0.24,
+                acceleration: 10.0,
+                ..AutoScrollOptions::default()
+            })
+            .scroll_drag_with_filter(&mut self.document_engine, output, drag.current, |id| {
+                id.as_str().starts_with("drag-scroll-list-")
+            })
+            .is_some()
+        {
+            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
+        }
+        if self.active_drag != previous_drag {
+            ui.ctx().request_repaint();
+        }
+        previous_drag.is_none() && self.active_drag.is_some()
+    }
+
+    fn snap_drag_pickup_animation(&mut self, item_id: &str) {
+        self.document_engine.snap_element_animation(item_id);
+        self.document_engine.snap_element_animation("drag-overlay");
+        self.document_engine
+            .snap_element_animation("drag-overlay-label");
+        if let Some(item) = item_id.strip_prefix("drag-scroll-item-") {
+            self.document_engine
+                .snap_element_animation(&format!("drag-scroll-item-{item}-label"));
+            self.document_engine
+                .snap_element_animation(&format!("drag-scroll-handle-{item}"));
+            self.document_engine
+                .snap_element_animation(&format!("drag-scroll-handle-{item}-glyph"));
+        } else if let Some(item) = item_id.strip_prefix("drag-item-") {
+            self.document_engine
+                .snap_element_animation(&format!("drag-item-{item}-label"));
+            self.document_engine
+                .snap_element_animation(&format!("drag-handle-{item}"));
+            self.document_engine
+                .snap_element_animation(&format!("drag-handle-{item}-glyph"));
         }
     }
 
@@ -512,6 +558,15 @@ impl UiLabState {
                 self.dropdown_open = false;
             }
             LabAction::IncrementLoopAction => self.loop_action_count += 1,
+            LabAction::AdjustShadowTune {
+                target,
+                layer,
+                field,
+                direction,
+            } => self.shadow_tune_mut(target).adjust(layer, field, direction),
+            LabAction::ToggleShadowLayer { target, layer } => {
+                self.shadow_tune_mut(target).toggle(layer)
+            }
         }
     }
 
@@ -544,6 +599,8 @@ impl UiLabState {
                                 self.active_drag.as_ref().map(|drag| drag.current),
                                 self.drag_drop_preview,
                                 self.scroll_list_drop_preview,
+                                self.shadow_tune,
+                                self.shadow_hover_tune,
                             );
                         },
                     );
@@ -588,7 +645,27 @@ impl UiLabState {
             }
             stylesheet.push_rule(StyleSelector::id("drag-overlay"), overlay_style);
         }
+        if self.view == LabView::Styling {
+            stylesheet.push_rule(
+                StyleSelector::class("shadow-tune-preview-card"),
+                Style::default().shadows(self.shadow_tune.shadows(SHADOW_COLOR)),
+            );
+            stylesheet.push_rule(
+                StyleSelector::class_state(
+                    "shadow-tune-preview-card",
+                    ElementStateSelector::Hovered,
+                ),
+                Style::default().shadows(self.shadow_hover_tune.shadows(SHADOW_COLOR)),
+            );
+        }
         stylesheet
+    }
+
+    fn shadow_tune_mut(&mut self, target: ShadowTuneTarget) -> &mut ShadowTuneState {
+        match target {
+            ShadowTuneTarget::Base => &mut self.shadow_tune,
+            ShadowTuneTarget::Hover => &mut self.shadow_hover_tune,
+        }
     }
 
     fn paint_debug_overlay_document(
@@ -770,7 +847,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
         "control-dropdown-option-duckdb" => Some(LabAction::SelectDropdown(1)),
         "control-dropdown-option-python" => Some(LabAction::SelectDropdown(2)),
         "loop-action-button" => Some(LabAction::IncrementLoopAction),
-        _ => None,
+        _ => shadow_tune_action_for_id(id),
     }
 }
 
@@ -784,6 +861,27 @@ fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {
     })
 }
 
+fn apply_cursor_icon(ui: &egui::Ui, output: &DocumentOutput) {
+    if let Some(cursor) = cursor_icon_for_output(output) {
+        ui.ctx().set_cursor_icon(cursor);
+    }
+}
+
+fn cursor_icon_for_output(output: &DocumentOutput) -> Option<egui::CursorIcon> {
+    if output.active_drag.is_some() {
+        return Some(egui::CursorIcon::PointingHand);
+    }
+    if output.hit_id.as_ref().is_some_and(|id| {
+        output
+            .snapshot()
+            .find(id.as_str())
+            .is_some_and(|frame| frame.has_class("drag-handle"))
+    }) {
+        return Some(egui::CursorIcon::PointingHand);
+    }
+    None
+}
+
 #[derive(Clone, Copy)]
 enum LabAction {
     SelectView(LabView),
@@ -794,6 +892,194 @@ enum LabAction {
     ToggleDropdown,
     SelectDropdown(usize),
     IncrementLoopAction,
+    AdjustShadowTune {
+        target: ShadowTuneTarget,
+        layer: usize,
+        field: ShadowTuneField,
+        direction: i8,
+    },
+    ToggleShadowLayer {
+        target: ShadowTuneTarget,
+        layer: usize,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ShadowTuneTarget {
+    Base,
+    Hover,
+}
+
+impl ShadowTuneTarget {
+    fn id_prefix(self) -> &'static str {
+        match self {
+            Self::Base => "base",
+            Self::Hover => "hover",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Base => "Base",
+            Self::Hover => "Hover",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ShadowTuneField {
+    X,
+    Y,
+    Blur,
+    Spread,
+    Alpha,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ShadowTuneState {
+    layers: [ShadowTuneLayer; 2],
+}
+
+impl Default for ShadowTuneState {
+    fn default() -> Self {
+        Self {
+            layers: [
+                ShadowTuneLayer {
+                    enabled: true,
+                    x: 0.0,
+                    y: 0.0,
+                    blur: 7.0,
+                    spread: -7.0,
+                    alpha: 80,
+                },
+                ShadowTuneLayer {
+                    enabled: false,
+                    x: 0.0,
+                    y: 0.0,
+                    blur: 0.0,
+                    spread: 0.0,
+                    alpha: 0,
+                },
+            ],
+        }
+    }
+}
+
+impl ShadowTuneState {
+    fn hover_default() -> Self {
+        Self {
+            layers: [
+                ShadowTuneLayer {
+                    enabled: true,
+                    x: 0.0,
+                    y: 5.0,
+                    blur: 20.0,
+                    spread: -15.0,
+                    alpha: 80,
+                },
+                ShadowTuneLayer {
+                    enabled: false,
+                    x: 10.0,
+                    y: 20.0,
+                    blur: 15.0,
+                    spread: -15.0,
+                    alpha: 10,
+                },
+            ],
+        }
+    }
+
+    fn adjust(&mut self, layer: usize, field: ShadowTuneField, direction: i8) {
+        let Some(layer) = self.layers.get_mut(layer) else {
+            return;
+        };
+        let sign = if direction < 0 { -1.0 } else { 1.0 };
+        match field {
+            ShadowTuneField::X => layer.x = (layer.x + sign).clamp(-80.0, 80.0),
+            ShadowTuneField::Y => layer.y = (layer.y + sign).clamp(-80.0, 80.0),
+            ShadowTuneField::Blur => layer.blur = (layer.blur + sign).clamp(0.0, 120.0),
+            ShadowTuneField::Spread => layer.spread = (layer.spread + sign).clamp(-40.0, 40.0),
+            ShadowTuneField::Alpha => {
+                let next = layer.alpha as i16 + if direction < 0 { -1 } else { 1 };
+                layer.alpha = next.clamp(0, 255) as u8;
+            }
+        }
+    }
+
+    fn toggle(&mut self, layer: usize) {
+        if let Some(layer) = self.layers.get_mut(layer) {
+            layer.enabled = !layer.enabled;
+        }
+    }
+
+    fn shadows(self, color: Color) -> Vec<Shadow> {
+        self.layers
+            .into_iter()
+            .filter(|layer| layer.enabled && layer.alpha > 0)
+            .map(|layer| Shadow {
+                offset: Point::new(layer.x, layer.y),
+                blur: layer.blur,
+                spread: layer.spread,
+                color: Color {
+                    a: layer.alpha,
+                    ..color
+                },
+            })
+            .collect()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ShadowTuneLayer {
+    enabled: bool,
+    x: f32,
+    y: f32,
+    blur: f32,
+    spread: f32,
+    alpha: u8,
+}
+
+fn shadow_tune_action_for_id(id: &str) -> Option<LabAction> {
+    let rest = id.strip_prefix("shadow-tune-")?;
+    let (target, rest) = if let Some(rest) = rest.strip_prefix("base-") {
+        (ShadowTuneTarget::Base, rest)
+    } else if let Some(rest) = rest.strip_prefix("hover-") {
+        (ShadowTuneTarget::Hover, rest)
+    } else {
+        return None;
+    };
+    if let Some(layer) = rest
+        .strip_prefix("layer-")
+        .and_then(|value| value.strip_suffix("-toggle"))
+        .and_then(|value| value.parse::<usize>().ok())
+    {
+        return Some(LabAction::ToggleShadowLayer { target, layer });
+    }
+
+    let mut parts = rest.split('-');
+    let layer = parts.next()?.strip_prefix("l")?.parse::<usize>().ok()?;
+    let field = match parts.next()? {
+        "x" => ShadowTuneField::X,
+        "y" => ShadowTuneField::Y,
+        "blur" => ShadowTuneField::Blur,
+        "spread" => ShadowTuneField::Spread,
+        "alpha" => ShadowTuneField::Alpha,
+        _ => return None,
+    };
+    let direction = match parts.next()? {
+        "dec" => -1,
+        "inc" => 1,
+        _ => return None,
+    };
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(LabAction::AdjustShadowTune {
+        target,
+        layer,
+        field,
+        direction,
+    })
 }
 
 #[derive(Clone, Copy, Debug, Default)]

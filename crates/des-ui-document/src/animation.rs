@@ -99,34 +99,47 @@ fn eased_style(
     let mut next = target.clone();
     let mut animating = false;
 
-    next.background =
-        ease_optional_color(current.background, target.background, amount, snap_epsilon);
-    animating |= next.background != target.background;
+    if target.animate_paint {
+        next.background =
+            ease_optional_color(current.background, target.background, amount, snap_epsilon);
+        animating |= next.background != target.background;
 
-    next.border = ease_optional_color(current.border, target.border, amount, snap_epsilon);
-    animating |= next.border != target.border;
+        next.border = ease_optional_color(current.border, target.border, amount, snap_epsilon);
+        animating |= next.border != target.border;
 
-    next.shadows = ease_shadows(&current.shadows, &target.shadows, amount, snap_epsilon);
-    animating |= next.shadows != target.shadows;
+        if target.animate_shadows {
+            next.shadows = ease_shadows(&current.shadows, &target.shadows, amount, snap_epsilon);
+            animating |= next.shadows != target.shadows;
+        } else {
+            next.shadows = target.shadows.clone();
+        }
 
-    next.text_color = ease_color(current.text_color, target.text_color, amount, snap_epsilon);
-    animating |= next.text_color != target.text_color;
+        next.text_color = ease_color(current.text_color, target.text_color, amount, snap_epsilon);
+        animating |= next.text_color != target.text_color;
 
-    next.text_selection_background = ease_color(
-        current.text_selection_background,
-        target.text_selection_background,
-        amount,
-        snap_epsilon,
-    );
-    animating |= next.text_selection_background != target.text_selection_background;
+        next.text_selection_background = ease_color(
+            current.text_selection_background,
+            target.text_selection_background,
+            amount,
+            snap_epsilon,
+        );
+        animating |= next.text_selection_background != target.text_selection_background;
 
-    next.text_selection_color = ease_color(
-        current.text_selection_color,
-        target.text_selection_color,
-        amount,
-        snap_epsilon,
-    );
-    animating |= next.text_selection_color != target.text_selection_color;
+        next.text_selection_color = ease_color(
+            current.text_selection_color,
+            target.text_selection_color,
+            amount,
+            snap_epsilon,
+        );
+        animating |= next.text_selection_color != target.text_selection_color;
+    } else {
+        next.background = target.background;
+        next.border = target.border;
+        next.shadows = target.shadows.clone();
+        next.text_color = target.text_color;
+        next.text_selection_background = target.text_selection_background;
+        next.text_selection_color = target.text_selection_color;
+    }
 
     next.gap = ease_f32(current.gap, target.gap, amount, snap_epsilon);
     animating |= (next.gap - target.gap).abs() > snap_epsilon;
@@ -137,17 +150,24 @@ fn eased_style(
     next.padding = ease_insets(current.padding, target.padding, amount, snap_epsilon);
     animating |= next.padding != target.padding;
 
-    next.width = ease_length(current.width, target.width, amount, snap_epsilon);
-    animating |= next.width != target.width;
+    if target.animate_size {
+        next.width = ease_length(current.width, target.width, amount, snap_epsilon);
+        animating |= next.width != target.width;
 
-    next.height = ease_length(current.height, target.height, amount, snap_epsilon);
-    animating |= next.height != target.height;
+        next.height = ease_length(current.height, target.height, amount, snap_epsilon);
+        animating |= next.height != target.height;
 
-    next.min_size = ease_size(current.min_size, target.min_size, amount, snap_epsilon);
-    animating |= next.min_size != target.min_size;
+        next.min_size = ease_size(current.min_size, target.min_size, amount, snap_epsilon);
+        animating |= next.min_size != target.min_size;
 
-    next.max_size = ease_size(current.max_size, target.max_size, amount, snap_epsilon);
-    animating |= next.max_size != target.max_size;
+        next.max_size = ease_size(current.max_size, target.max_size, amount, snap_epsilon);
+        animating |= next.max_size != target.max_size;
+    } else {
+        next.width = target.width;
+        next.height = target.height;
+        next.min_size = target.min_size;
+        next.max_size = target.max_size;
+    }
 
     next.border_width = ease_insets(
         current.border_width,

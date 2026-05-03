@@ -305,12 +305,14 @@ fn styling_view_renders_structural_selector_specimens() {
         Some(PURPLE),
         "last-child should resolve within each nested parent"
     );
-    assert_eq!(frame(&output, "shadow-single").style.shadows.len(), 2);
-    assert_eq!(frame(&output, "shadow-layered").style.shadows.len(), 2);
-    assert_eq!(frame(&output, "shadow-light-top").style.shadows.len(), 2);
+    assert_eq!(frame(&output, "shadow-single").style.shadows.len(), 1);
+    assert_eq!(frame(&output, "shadow-layered").style.shadows.len(), 1);
+    assert_eq!(frame(&output, "shadow-light-top").style.shadows.len(), 1);
+    assert_eq!(frame(&output, "shadow-web-top").style.shadows.len(), 1);
+    assert_eq!(frame(&output, "shadow-web-bottom").style.shadows.len(), 0);
     assert_close(
-        frame(&output, "shadow-negative-spread").style.shadows[1].spread,
-        6.0,
+        frame(&output, "shadow-negative-spread").style.shadows[0].spread,
+        0.0,
     );
 }
 
@@ -539,6 +541,12 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
     let mut harness = lab_harness("interaction");
 
     assert_eq!(harness.state().drag_item_cells, [0, 2, 4]);
+    let source_style = frame(
+        &state_output_with_egui_text(harness.state(), &harness.ctx),
+        "drag-item-0",
+    )
+    .style
+    .clone();
 
     let start = center(state_rect_with_egui_text(
         harness.state(),
@@ -567,6 +575,40 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
     let overlay = frame(&output, "drag-overlay");
     assert_eq!(overlay.text.as_deref(), None);
     assert!(has_class(overlay, "drag-overlay"));
+    assert!(
+        !has_class(overlay, "drag-item-active"),
+        "drag overlay should clone source styling without active visual classes"
+    );
+    assert_eq!(
+        Some(overlay.rect.size),
+        harness.state().drag_source_size,
+        "drag overlay should resolve to the exact original source item size"
+    );
+    assert_eq!(overlay.style.background, source_style.background);
+    assert_eq!(overlay.style.border, source_style.border);
+    assert_eq!(overlay.style.border_width, source_style.border_width);
+    assert_eq!(overlay.style.radius, source_style.radius);
+    assert_eq!(overlay.style.padding, source_style.padding);
+    assert_eq!(overlay.style.shadows.len(), source_style.shadows.len());
+    assert!(
+        overlay.style.shadows[0].offset.y > source_style.shadows[0].offset.y,
+        "drag overlay should use the lifted hover shadow rather than the resting source shadow"
+    );
+    assert!(
+        overlay.style.shadows[0].blur > source_style.shadows[0].blur,
+        "drag overlay should keep the broader hover shadow after pickup"
+    );
+    assert!(
+        has_class(frame(&output, "drag-overlay-handle"), "drag-handle"),
+        "drag overlay should preserve the source grab handle"
+    );
+    assert!(
+        has_class(
+            frame(&output, "drag-overlay-handle-glyph"),
+            "drag-handle-glyph"
+        ),
+        "drag overlay should preserve the source grab handle glyph"
+    );
     assert!(
         has_class(frame(&output, "drag-item-0"), "drag-origin-collapsed"),
         "source placeholder should collapse once a new drop position opens"
@@ -706,6 +748,21 @@ fn interaction_drag_drop_suppresses_gap_at_original_position() {
         has_class(frame(&output, "drag-item-1"), "drag-origin-space"),
         "source item should keep one hidden placeholder"
     );
+    assert_eq!(
+        frame(&output, "drag-item-1").style.shadows.len(),
+        0,
+        "hidden placeholders should reserve layout without painting a shadow"
+    );
+    assert_eq!(
+        frame(&output, "drag-item-1").style.animate_paint,
+        false,
+        "hidden placeholders should snap old paint away without changing layout animation timing"
+    );
+    assert_eq!(
+        frame(&output, "drag-item-1").style.animate_shadows,
+        false,
+        "hidden placeholders should explicitly snap shadows away"
+    );
     assert!(
         !has_class(frame(&output, "drag-item-0"), "drag-gap-after"),
         "no second insertion gap should appear at the original position"
@@ -737,6 +794,49 @@ fn interaction_drag_drop_requires_handle_to_drag_parent() {
 }
 
 #[test]
+fn interaction_drag_drop_sets_handle_cursors() {
+    let state = UiLabState::new(Some("interaction"));
+    let output = state_output(&state);
+    let start = center(frame(&output, "drag-handle-0").rect);
+    let mut engine = DocumentEngine::default();
+    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let output = engine.update_with_input(
+        &document,
+        &state.active_stylesheet(),
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(start.x, start.y),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    assert_eq!(
+        cursor_icon_for_output(&output),
+        Some(egui::CursorIcon::PointingHand)
+    );
+
+    let mut output = state_output(&state);
+    output.active_drag = Some(DocumentDrag {
+        target: ElementId::new("drag-handle-0"),
+        origin: Point::new(start.x, start.y),
+        current: Point::new(start.x + 40.0, start.y),
+        delta: Point::new(40.0, 0.0),
+        pointer_offset: Point::ZERO,
+    });
+    assert_eq!(
+        cursor_icon_for_output(&output),
+        Some(egui::CursorIcon::PointingHand)
+    );
+}
+
+#[test]
 fn interaction_drag_drop_styles_are_animated() {
     let mut harness = lab_harness("interaction");
     let start = center(state_rect(harness.state(), "drag-handle-0"));
@@ -759,13 +859,18 @@ fn interaction_drag_drop_styles_are_animated() {
     );
     assert_eq!(
         frame(&output, "drag-overlay").style.shadows.len(),
-        2,
-        "drag overlay should use material elevation layers"
+        1,
+        "drag overlay should inherit the source item's one soft shadow"
+    );
+    assert_eq!(
+        frame(&output, "drag-overlay").style.animate_size,
+        false,
+        "drag overlay should snap to source size instead of easing in from idle width"
     );
     assert_eq!(
         frame(&output, "drag-scroll-list-card").style.shadows.len(),
-        2,
-        "scrollable drag list should use resting elevation"
+        0,
+        "resting drag list container should not cast a shadow"
     );
 }
 
@@ -1276,8 +1381,8 @@ fn animation_view_renders_state_driven_specimens() {
 
     assert_eq!(
         frame(&output, "drag-scroll-list-card").style.shadows.len(),
-        2,
-        "animation view should include the elevated drag list specimen"
+        0,
+        "animation drag list should start flat at rest"
     );
     assert!(
         frame(&output, "drag-scroll-handle-0").interactive,

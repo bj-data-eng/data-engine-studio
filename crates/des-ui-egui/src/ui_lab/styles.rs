@@ -1,8 +1,8 @@
 use super::{
     BACKGROUND, CARD, CARD_HOVER, CARD_PRESSED, CARD_SELECTED, GREEN, PANEL, PANEL_ALT,
-    PRIMARY_CONTAINER, PURPLE, SECONDARY_CONTAINER, STROKE, STROKE_SELECTED, SUCCESS_CONTAINER,
-    SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TERTIARY_CONTAINER, TEXT, TEXT_ACCENT, TEXT_MUTED,
-    WARNING_CONTAINER,
+    PRIMARY_CONTAINER, PURPLE, SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED,
+    SUCCESS_CONTAINER, SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TERTIARY_CONTAINER, TEXT,
+    TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
 use des_ui_document::{
     AlignItems, Color, Direction, ElementRole, ElementStateSelector, Insets, JustifyContent,
@@ -831,10 +831,10 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::symmetric(9.0, 6.0))
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::SpaceBetween)
-                .background(CARD_SELECTED)
-                .border(STROKE_SELECTED)
-                .radius(5.0)
-                .shadows(material_elevation(1, PURPLE))
+                .background(CARD)
+                .border(STROKE)
+                .radius(6.0)
+                .shadows(drag_rest_shadow())
                 .transition(Transition::ease_out(0.14)),
         )
         .rule(
@@ -842,8 +842,10 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .background(Color::rgba(0, 0, 0, 0))
                 .border(Color::rgba(0, 0, 0, 0))
-                .shadows(material_elevation(0, PURPLE))
-                .text_color(Color::rgba(0, 0, 0, 0)),
+                .text_color(Color::rgba(0, 0, 0, 0))
+                .shadows(web_elevation(0, SHADOW_COLOR))
+                .animate_paint(false)
+                .animate_shadows(false),
         )
         .rule(
             StyleSelector::class("drag-origin-collapsed"),
@@ -888,43 +890,37 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Hovered),
             Style::default()
-                .background(PRIMARY_CONTAINER)
-                .shadows(material_elevation(2, PURPLE)),
+                .background(CARD)
+                .border(STROKE_SELECTED)
+                .shadows(drag_hover_shadow()),
         )
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Pressed),
             Style::default()
-                .background(CARD_PRESSED)
-                .shadows(material_elevation(3, PURPLE)),
+                .background(PRIMARY_CONTAINER)
+                .border(PURPLE)
+                .shadows(drag_hover_shadow()),
         )
         .rule(
             StyleSelector::class_state("drag-origin-space", ElementStateSelector::Hovered),
             Style::default()
                 .background(Color::rgba(0, 0, 0, 0))
                 .border(Color::rgba(0, 0, 0, 0))
-                .shadows(material_elevation(0, PURPLE)),
+                .shadows(web_elevation(0, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class_state("drag-origin-space", ElementStateSelector::Pressed),
             Style::default()
                 .background(Color::rgba(0, 0, 0, 0))
                 .border(Color::rgba(0, 0, 0, 0))
-                .shadows(material_elevation(0, PURPLE)),
-        )
-        .rule(
-            StyleSelector::class("drag-item-active"),
-            Style::default()
-                .background(SECONDARY_CONTAINER)
-                .border(PURPLE)
-                .shadows(material_elevation(4, PURPLE)),
+                .shadows(web_elevation(0, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("drag-overlay"),
             Style::default()
-                .width(Length::Px(230.0))
-                .height(Length::Px(34.0))
                 .z_index(1000)
-                .shadows(material_elevation(5, PURPLE))
+                .shadows(drag_hover_shadow())
+                .animate_size(false)
                 .transition(Transition::ease_out(0.18)),
         )
         .rule(
@@ -936,7 +932,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .z_index(-1)
                 .background(Color::rgba(0, 0, 0, 0))
                 .border(Color::rgba(0, 0, 0, 0))
-                .shadows(material_elevation(0, PURPLE)),
+                .shadows(web_elevation(0, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("drag-gap-before"),
@@ -964,8 +960,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(8.0)
                 .background(PANEL_ALT)
                 .border(STROKE)
-                .radius(6.0)
-                .shadows(material_elevation(1, PURPLE)),
+                .radius(6.0),
         )
         .rule(
             StyleSelector::class("drag-scroll-list"),
@@ -1194,15 +1189,15 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("shadow-single"),
-            Style::default().shadows(material_elevation(2, PURPLE)),
+            Style::default().shadows(web_elevation(1, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("shadow-layered"),
-            Style::default().shadows(material_elevation(3, PURPLE)),
+            Style::default().shadows(web_elevation(2, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("shadow-negative-spread"),
-            Style::default().shadows(material_elevation(5, PURPLE)),
+            Style::default().shadows(web_elevation(3, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("shadow-light-stage"),
@@ -1226,11 +1221,11 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(Color::rgb(250, 250, 252))
                 .border(Color::rgba(198, 188, 205, 145))
                 .radius(6.0)
-                .shadows(material_elevation(1, Color::rgb(76, 55, 112))),
+                .shadows(web_elevation(1, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("shadow-light-card-raised"),
-            Style::default().shadows(material_elevation(3, Color::rgb(76, 55, 112))),
+            Style::default().shadows(web_elevation(2, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("shadow-light-label"),
@@ -1246,6 +1241,186 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .text_color(Color::rgb(120, 137, 153))
                 .background(Color::rgba(232, 231, 236, 190))
                 .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-web-stage"),
+            Style::default()
+                .width(Length::Px(370.0))
+                .height(Length::Auto)
+                .padding(Insets::symmetric(18.0, 16.0))
+                .gap(18.0)
+                .background(Color::rgb(235, 244, 247))
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-web-card"),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::SpaceBetween)
+                .width(Length::Px(306.0))
+                .height(Length::Px(76.0))
+                .padding(Insets::symmetric(20.0, 0.0))
+                .background(Color::rgb(255, 255, 255))
+                .border(Color::rgba(188, 183, 196, 120))
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-web-card-raised"),
+            Style::default().shadows(web_elevation(2, SHADOW_COLOR)),
+        )
+        .rule(
+            StyleSelector::class("shadow-web-label"),
+            Style::default()
+                .font_size(15.0)
+                .text_color(Color::rgb(116, 111, 125)),
+        )
+        .rule(
+            StyleSelector::class("shadow-web-handle"),
+            Style::default()
+                .size(36.0, 48.0)
+                .font_size(14.0)
+                .text_color(Color::rgb(120, 137, 153))
+                .background(Color::rgba(242, 242, 244, 220))
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-panel"),
+            Style::default()
+                .direction(Direction::Row)
+                .width_fill()
+                .height(Length::Auto)
+                .padding(Insets::all(12.0))
+                .gap(14.0)
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-preview"),
+            Style::default()
+                .width(Length::Px(370.0))
+                .height(Length::Px(280.0))
+                .padding(Insets::all(20.0))
+                .gap(14.0)
+                .background(Color::rgb(235, 244, 247))
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-preview-card"),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::SpaceBetween)
+                .width(Length::Px(306.0))
+                .height(Length::Px(76.0))
+                .padding(Insets::symmetric(20.0, 0.0))
+                .background(Color::rgb(255, 255, 255))
+                .border(Color::rgba(188, 183, 196, 120))
+                .radius(5.0)
+                .transition(Transition::ease_out(0.12)),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-controls"),
+            Style::default()
+                .direction(Direction::Column)
+                .width(Length::Px(320.0))
+                .height(Length::Auto)
+                .gap(10.0)
+                .background(SURFACE_CONTAINER),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-layer"),
+            Style::default()
+                .width(Length::Px(300.0))
+                .height(Length::Auto)
+                .padding(Insets::all(8.0))
+                .gap(6.0)
+                .background(CARD)
+                .border(STROKE)
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-header"),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::SpaceBetween)
+                .width_fill()
+                .height(Length::Px(30.0))
+                .background(CARD),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-toggle"),
+            Style::default()
+                .width(Length::Px(70.0))
+                .height(Length::Px(28.0))
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class_state("shadow-tune-toggle", ElementStateSelector::Hovered),
+            Style::default()
+                .background(CARD_HOVER)
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-row"),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .width_fill()
+                .height(Length::Px(28.0))
+                .gap(5.0)
+                .background(CARD),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-label"),
+            Style::default()
+                .width(Length::Px(48.0))
+                .height(Length::Px(18.0))
+                .font_size(12.0)
+                .text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-value"),
+            Style::default()
+                .width(Length::Px(48.0))
+                .height(Length::Px(18.0))
+                .font_size(12.0)
+                .text_color(TEXT),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-button"),
+            Style::default()
+                .size(28.0, 24.0)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::class_state("shadow-tune-button", ElementStateSelector::Hovered),
+            Style::default()
+                .background(CARD_HOVER)
+                .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class_state("shadow-tune-button", ElementStateSelector::Pressed),
+            Style::default().background(CARD_PRESSED),
+        )
+        .rule(
+            StyleSelector::class("shadow-tune-output"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(42.0))
+                .font_size(11.0)
+                .text_color(TEXT_MUTED)
+                .text_wrap(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::class("structural-grid"),
@@ -1674,7 +1849,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border(STROKE)
                 .radius(6.0)
                 .z_index(2000)
-                .shadows(material_elevation(2, PURPLE)),
+                .shadows(web_elevation(1, SHADOW_COLOR)),
         )
         .rule(
             StyleSelector::class("debug-overlay-title"),
@@ -1763,40 +1938,40 @@ fn styled_scrollbar_style() -> Style {
         .transition(Transition::ease_out(0.14))
 }
 
-fn material_elevation(level: u8, color: Color) -> Vec<Shadow> {
+fn web_elevation(level: u8, color: Color) -> Vec<Shadow> {
     match level.min(5) {
         0 => Vec::new(),
-        1 => material_elevation_layers(color, 1.0, 2.0, 0.0, 1.0, 3.0, 1.0),
-        2 => material_elevation_layers(color, 1.0, 2.0, 0.0, 2.0, 6.0, 2.0),
-        3 => material_elevation_layers(color, 1.0, 3.0, 0.0, 4.0, 8.0, 3.0),
-        4 => material_elevation_layers(color, 2.0, 3.0, 0.0, 6.0, 10.0, 4.0),
-        _ => material_elevation_layers(color, 4.0, 4.0, 0.0, 8.0, 12.0, 6.0),
+        1 => single_shadow(color, 0.0, 4.0, 10.0, 0.0, 58),
+        2 => single_shadow(color, 0.0, 8.0, 18.0, 0.0, 66),
+        3 => single_shadow(color, 0.0, 12.0, 28.0, 0.0, 74),
+        4 => single_shadow(color, 0.0, 16.0, 36.0, 0.0, 82),
+        _ => single_shadow(color, 0.0, 20.0, 44.0, 0.0, 90),
     }
 }
 
-fn material_elevation_layers(
-    color: Color,
-    key_y: f32,
-    key_blur: f32,
-    key_spread: f32,
-    ambient_y: f32,
-    ambient_blur: f32,
-    ambient_spread: f32,
-) -> Vec<Shadow> {
-    vec![
-        Shadow {
-            offset: Point::new(0.0, key_y),
-            blur: key_blur,
-            spread: key_spread,
-            color: with_alpha(color, 77),
-        },
-        Shadow {
-            offset: Point::new(0.0, ambient_y),
-            blur: ambient_blur,
-            spread: ambient_spread,
-            color: with_alpha(color, 38),
-        },
-    ]
+fn drag_rest_shadow() -> Vec<Shadow> {
+    tuned_card_shadow(SHADOW_COLOR, 0.55)
+}
+
+fn drag_hover_shadow() -> Vec<Shadow> {
+    tuned_hover_shadow(SHADOW_COLOR, 0.55)
+}
+
+fn tuned_card_shadow(color: Color, scale: f32) -> Vec<Shadow> {
+    single_shadow(color, 0.0, 0.0, 7.0 * scale, -7.0 * scale, 80)
+}
+
+fn tuned_hover_shadow(color: Color, scale: f32) -> Vec<Shadow> {
+    single_shadow(color, 0.0, 5.0 * scale, 20.0 * scale, -15.0 * scale, 80)
+}
+
+fn single_shadow(color: Color, x: f32, y: f32, blur: f32, spread: f32, alpha: u8) -> Vec<Shadow> {
+    vec![Shadow {
+        offset: Point::new(x, y),
+        blur,
+        spread,
+        color: with_alpha(color, alpha),
+    }]
 }
 
 fn with_alpha(color: Color, alpha: u8) -> Color {

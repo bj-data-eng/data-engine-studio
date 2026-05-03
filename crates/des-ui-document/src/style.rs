@@ -218,10 +218,13 @@ pub struct Style {
     pub height: Option<Length>,
     pub min_size: Option<Size>,
     pub max_size: Option<Size>,
+    pub animate_size: Option<bool>,
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: EdgeStyle,
     pub shadows: Option<Vec<Shadow>>,
+    pub animate_paint: Option<bool>,
+    pub animate_shadows: Option<bool>,
     pub text_color: Option<Color>,
     pub text_selection_background: Option<Color>,
     pub text_selection_color: Option<Color>,
@@ -415,6 +418,11 @@ impl Style {
         self
     }
 
+    pub fn animate_size(mut self, animate: bool) -> Self {
+        self.animate_size = Some(animate);
+        self
+    }
+
     pub fn background(mut self, color: Color) -> Self {
         self.background = Some(color);
         self
@@ -445,6 +453,16 @@ impl Style {
 
     pub fn shadows(mut self, shadows: impl IntoIterator<Item = Shadow>) -> Self {
         self.shadows = Some(shadows.into_iter().collect());
+        self
+    }
+
+    pub fn animate_paint(mut self, animate: bool) -> Self {
+        self.animate_paint = Some(animate);
+        self
+    }
+
+    pub fn animate_shadows(mut self, animate: bool) -> Self {
+        self.animate_shadows = Some(animate);
         self
     }
 
@@ -717,10 +735,13 @@ pub struct ComputedStyle {
     pub height: Length,
     pub min_size: Size,
     pub max_size: Size,
+    pub animate_size: bool,
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: Insets,
     pub shadows: Vec<Shadow>,
+    pub animate_paint: bool,
+    pub animate_shadows: bool,
     pub text_color: Color,
     pub text_selection_background: Color,
     pub text_selection_color: Color,
@@ -767,10 +788,13 @@ impl Default for ComputedStyle {
             height: Length::Auto,
             min_size: Size::new(0.0, 0.0),
             max_size: Size::new(f32::INFINITY, f32::INFINITY),
+            animate_size: true,
             background: None,
             border: None,
             border_width: Insets::ZERO,
             shadows: Vec::new(),
+            animate_paint: true,
+            animate_shadows: true,
             text_color: Color::rgb(218, 226, 234),
             text_selection_background: Color::rgba(234, 221, 255, 190),
             text_selection_color: Color::rgb(29, 27, 32),
@@ -840,6 +864,9 @@ impl ComputedStyle {
         if let Some(value) = style.max_size {
             self.max_size = value;
         }
+        if let Some(value) = style.animate_size {
+            self.animate_size = value;
+        }
         if let Some(value) = style.background {
             self.background = Some(value);
         }
@@ -857,6 +884,12 @@ impl ComputedStyle {
                     color: value.color,
                 })
                 .collect();
+        }
+        if let Some(value) = style.animate_shadows {
+            self.animate_shadows = value;
+        }
+        if let Some(value) = style.animate_paint {
+            self.animate_paint = value;
         }
         if let Some(value) = style.border_width.top {
             self.border_width.top = value.max(0.0);

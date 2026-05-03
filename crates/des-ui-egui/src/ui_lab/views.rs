@@ -100,6 +100,8 @@ pub(super) fn render_stage(
     drag_pointer: Option<des_ui_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    shadow_tune: ShadowTuneState,
+    shadow_hover_tune: ShadowTuneState,
 ) {
     ui.element(
         "stage",
@@ -123,7 +125,7 @@ pub(super) fn render_stage(
                 drag_drop_preview,
                 scroll_list_drop_preview,
             ),
-            LabView::Styling => render_styling_view(ui, dense_mode),
+            LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
             LabView::Animation => render_animation_view(
                 ui,
                 scroll_list_item_order,
@@ -1121,9 +1123,7 @@ fn drag_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
         "drag-overlay",
         ElementSpec::new(ElementRole::Card)
             .class("drag-item")
-            .class("drag-item-active")
             .class("drag-overlay")
-            .selected(true)
             .value(label),
         |ui| {
             ui.text_element(
@@ -1131,6 +1131,7 @@ fn drag_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
                 ElementSpec::new(ElementRole::Text).class("control-label"),
                 label,
             );
+            overlay_drag_handle(ui, format!("drag-item-{item}"));
         },
     );
 }
@@ -1153,16 +1154,33 @@ fn drag_scroll_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
         ElementSpec::new(ElementRole::Card)
             .class("drag-item")
             .class("drag-scroll-item")
-            .class("drag-item-active")
             .class("drag-overlay")
             .class("drag-scroll-overlay")
-            .selected(true)
             .value(label.clone()),
         |ui| {
             ui.text_element(
                 "drag-overlay-label",
                 ElementSpec::new(ElementRole::Text).class("control-label"),
                 label,
+            );
+            overlay_drag_handle(ui, format!("drag-scroll-item-{item}"));
+        },
+    );
+}
+
+fn overlay_drag_handle(ui: &mut des_ui_document::DocumentBuilder, source_id: String) {
+    ui.element(
+        "drag-overlay-handle",
+        ElementSpec::new(ElementRole::Control)
+            .class("drag-handle")
+            .value(source_id),
+        |ui| {
+            ui.element(
+                "drag-overlay-handle-glyph",
+                ElementSpec::new(ElementRole::Icon)
+                    .class("drag-handle-glyph")
+                    .glyph(Glyph::DragHandle),
+                |_| {},
             );
         },
     );
@@ -1361,7 +1379,12 @@ fn control_text_inputs(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn render_styling_view(ui: &mut des_ui_document::DocumentBuilder, dense_mode: bool) {
+fn render_styling_view(
+    ui: &mut des_ui_document::DocumentBuilder,
+    dense_mode: bool,
+    shadow_tune: ShadowTuneState,
+    shadow_hover_tune: ShadowTuneState,
+) {
     ui.text_element(
         "styling-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -1407,6 +1430,7 @@ fn render_styling_view(ui: &mut des_ui_document::DocumentBuilder, dense_mode: bo
         },
     );
     render_shadow_specimens(ui);
+    render_shadow_tuner(ui, shadow_tune, shadow_hover_tune);
     render_structural_selector_specimens(ui);
 }
 
@@ -1419,7 +1443,7 @@ fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "shadow-specimen-copy",
         ElementSpec::new(ElementRole::Text).class("muted"),
-        "Layered shadows are paint-only; spread can contract or expand the source shape.",
+        "Single soft shadows are paint-only; spread can contract or expand the source shape.",
     );
     ui.element(
         "shadow-specimen-grid",
@@ -1429,7 +1453,7 @@ fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
                 ui,
                 "shadow-single",
                 "Elevation level 2",
-                "key + ambient layers",
+                "single soft layer",
             );
             shadow_item(
                 ui,
@@ -1453,6 +1477,257 @@ fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
             light_shadow_card(ui, "shadow-light-bottom", "30", false);
         },
     );
+    ui.element(
+        "shadow-web-stage",
+        ElementSpec::new(ElementRole::Panel).class("shadow-web-stage"),
+        |ui| {
+            web_shadow_card(ui, "shadow-web-top", "46", true);
+            web_shadow_card(ui, "shadow-web-bottom", "48", false);
+        },
+    );
+}
+
+fn render_shadow_tuner(
+    ui: &mut des_ui_document::DocumentBuilder,
+    shadow_tune: ShadowTuneState,
+    shadow_hover_tune: ShadowTuneState,
+) {
+    ui.text_element(
+        "shadow-tune-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Shadow Tuner",
+    );
+    ui.text_element(
+        "shadow-tune-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Tune base and hover shadows by eye, then copy the numbers into the elevation recipe.",
+    );
+    ui.element(
+        "shadow-tune-panel",
+        ElementSpec::new(ElementRole::Panel).class("shadow-tune-panel"),
+        |ui| {
+            ui.element(
+                "shadow-tune-preview",
+                ElementSpec::new(ElementRole::Panel).class("shadow-tune-preview"),
+                |ui| {
+                    shadow_tune_preview_card(ui, "shadow-tune-preview-card-1", "base row 01");
+                    shadow_tune_preview_card(ui, "shadow-tune-preview-card-2", "hover row 02");
+                    shadow_tune_preview_card(ui, "shadow-tune-preview-card-3", "hover row 03");
+                },
+            );
+            ui.element(
+                "shadow-tune-controls",
+                ElementSpec::new(ElementRole::Panel).class("shadow-tune-controls"),
+                |ui| {
+                    shadow_tune_group(ui, ShadowTuneTarget::Base, shadow_tune);
+                    shadow_tune_group(ui, ShadowTuneTarget::Hover, shadow_hover_tune);
+                    ui.text_element(
+                        "shadow-tune-output",
+                        ElementSpec::new(ElementRole::Text)
+                            .class("shadow-tune-output")
+                            .selectable_text(),
+                        shadow_tune_output(shadow_tune, shadow_hover_tune),
+                    );
+                },
+            );
+        },
+    );
+}
+
+fn shadow_tune_preview_card(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Card)
+            .class("shadow-tune-preview-card")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(ElementRole::Text).class("shadow-web-label"),
+                label,
+            );
+            ui.element(
+                format!("{id}-handle"),
+                ElementSpec::new(ElementRole::Icon)
+                    .class("shadow-web-handle")
+                    .glyph(Glyph::DragHandle),
+                |_| {},
+            );
+        },
+    );
+}
+
+fn shadow_tune_group(
+    ui: &mut des_ui_document::DocumentBuilder,
+    target: ShadowTuneTarget,
+    state: ShadowTuneState,
+) {
+    ui.element(
+        format!("shadow-tune-{}-group", target.id_prefix()),
+        ElementSpec::new(ElementRole::Panel).class("shadow-tune-group"),
+        |ui| {
+            ui.text_element(
+                format!("shadow-tune-{}-group-title", target.id_prefix()),
+                ElementSpec::new(ElementRole::Text).class("section-title"),
+                format!("{} shadow", target.label()),
+            );
+            shadow_tune_layer(ui, target, 0, state.layers[0]);
+            shadow_tune_layer(ui, target, 1, state.layers[1]);
+        },
+    );
+}
+
+fn shadow_tune_layer(
+    ui: &mut des_ui_document::DocumentBuilder,
+    target: ShadowTuneTarget,
+    layer_index: usize,
+    layer: ShadowTuneLayer,
+) {
+    let target_id = target.id_prefix();
+    let layer_id = format!("shadow-tune-{target_id}-layer-{layer_index}");
+    ui.element(
+        layer_id,
+        ElementSpec::new(ElementRole::Panel).class("shadow-tune-layer"),
+        |ui| {
+            ui.element(
+                format!("shadow-tune-{target_id}-layer-{layer_index}-header"),
+                ElementSpec::new(ElementRole::Panel).class("shadow-tune-header"),
+                |ui| {
+                    ui.text_element(
+                        format!("shadow-tune-{target_id}-layer-{layer_index}-title"),
+                        ElementSpec::new(ElementRole::Text).class("card-title"),
+                        format!(
+                            "Layer {} ({})",
+                            layer_index + 1,
+                            if layer.enabled { "on" } else { "off" }
+                        ),
+                    );
+                    ui.element(
+                        format!("shadow-tune-{target_id}-layer-{layer_index}-toggle"),
+                        ElementSpec::new(ElementRole::Control)
+                            .class("shadow-tune-toggle")
+                            .interactive(),
+                        |ui| {
+                            ui.text_element(
+                                format!("shadow-tune-{target_id}-layer-{layer_index}-toggle-label"),
+                                ElementSpec::new(ElementRole::Text).class("button-label"),
+                                if layer.enabled { "Disable" } else { "Enable" },
+                            );
+                        },
+                    );
+                },
+            );
+            shadow_tune_control(ui, target, layer_index, "x", "x", format!("{:.0}", layer.x));
+            shadow_tune_control(ui, target, layer_index, "y", "y", format!("{:.0}", layer.y));
+            shadow_tune_control(
+                ui,
+                target,
+                layer_index,
+                "blur",
+                "blur",
+                format!("{:.0}", layer.blur),
+            );
+            shadow_tune_control(
+                ui,
+                target,
+                layer_index,
+                "spread",
+                "spread",
+                format!("{:.0}", layer.spread),
+            );
+            shadow_tune_control(
+                ui,
+                target,
+                layer_index,
+                "alpha",
+                "alpha",
+                layer.alpha.to_string(),
+            );
+        },
+    );
+}
+
+fn shadow_tune_control(
+    ui: &mut des_ui_document::DocumentBuilder,
+    target: ShadowTuneTarget,
+    layer_index: usize,
+    field: &'static str,
+    label: &'static str,
+    value: String,
+) {
+    let target_id = target.id_prefix();
+    let row_id = format!("shadow-tune-{target_id}-l{layer_index}-{field}-row");
+    ui.element(
+        row_id,
+        ElementSpec::new(ElementRole::Panel).class("shadow-tune-row"),
+        |ui| {
+            ui.text_element(
+                format!("shadow-tune-{target_id}-l{layer_index}-{field}-label"),
+                ElementSpec::new(ElementRole::Text).class("shadow-tune-label"),
+                label,
+            );
+            shadow_tune_button(ui, target, layer_index, field, "dec", "-");
+            ui.text_element(
+                format!("shadow-tune-{target_id}-l{layer_index}-{field}-value"),
+                ElementSpec::new(ElementRole::Text).class("shadow-tune-value"),
+                value,
+            );
+            shadow_tune_button(ui, target, layer_index, field, "inc", "+");
+        },
+    );
+}
+
+fn shadow_tune_button(
+    ui: &mut des_ui_document::DocumentBuilder,
+    target: ShadowTuneTarget,
+    layer_index: usize,
+    field: &'static str,
+    direction: &'static str,
+    label: &'static str,
+) {
+    let button_id = format!(
+        "shadow-tune-{}-l{layer_index}-{field}-{direction}",
+        target.id_prefix()
+    );
+    ui.element(
+        button_id.clone(),
+        ElementSpec::new(ElementRole::Control)
+            .class("shadow-tune-button")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{button_id}-label"),
+                ElementSpec::new(ElementRole::Text).class("button-label"),
+                label,
+            );
+        },
+    );
+}
+
+fn shadow_tune_output(base: ShadowTuneState, hover: ShadowTuneState) -> String {
+    let layer = |state: ShadowTuneState, index: usize| {
+        let layer = state.layers[index];
+        format!(
+            "{}: x {:.0}, y {:.0}, blur {:.0}, spread {:.0}, alpha {}",
+            if layer.enabled { "on" } else { "off" },
+            layer.x,
+            layer.y,
+            layer.blur,
+            layer.spread,
+            layer.alpha
+        )
+    };
+    format!(
+        "base L1 {}; base L2 {}; hover L1 {}; hover L2 {}",
+        layer(base, 0),
+        layer(base, 1),
+        layer(hover, 0),
+        layer(hover, 1)
+    )
 }
 
 fn shadow_item(
@@ -1504,6 +1779,35 @@ fn light_shadow_card(
             format!("{id}-handle"),
             ElementSpec::new(ElementRole::Icon)
                 .class("shadow-light-handle")
+                .glyph(Glyph::DragHandle),
+            |_| {},
+        );
+    });
+}
+
+fn web_shadow_card(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+    raised: bool,
+) {
+    let card_spec = if raised {
+        ElementSpec::new(ElementRole::Card)
+            .class("shadow-web-card")
+            .class("shadow-web-card-raised")
+    } else {
+        ElementSpec::new(ElementRole::Card).class("shadow-web-card")
+    };
+    ui.element(id, card_spec, |ui| {
+        ui.text_element(
+            format!("{id}-label"),
+            ElementSpec::new(ElementRole::Text).class("shadow-web-label"),
+            label,
+        );
+        ui.element(
+            format!("{id}-handle"),
+            ElementSpec::new(ElementRole::Icon)
+                .class("shadow-web-handle")
                 .glyph(Glyph::DragHandle),
             |_| {},
         );
