@@ -132,6 +132,7 @@ pub struct ElementSpec {
     pub selected: bool,
     pub disabled: bool,
     pub focused: bool,
+    pub selectable_text: bool,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub table: Option<TableSpec>,
@@ -147,6 +148,7 @@ impl ElementSpec {
             selected: false,
             disabled: false,
             focused: false,
+            selectable_text: false,
             value: None,
             glyph: None,
             table: None,
@@ -176,6 +178,11 @@ impl ElementSpec {
 
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+
+    pub fn selectable_text(mut self) -> Self {
+        self.selectable_text = true;
         self
     }
 

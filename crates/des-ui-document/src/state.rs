@@ -36,6 +36,7 @@ pub struct ResolvedElement {
     pub style: ComputedStyle,
     pub text: Option<String>,
     pub text_layout: Option<TextLayoutResult>,
+    pub selectable_text: bool,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub interactive: bool,
@@ -58,6 +59,7 @@ pub struct DocumentOutput {
     pub hit_id: Option<ElementId>,
     pub active_drag: Option<DocumentDrag>,
     pub completed_drag: Option<DocumentDrag>,
+    pub text_selection: Option<DocumentTextSelection>,
     pub events: Vec<DocumentEvent>,
     pub scroll_chrome: Vec<ScrollChrome>,
     pub animating: bool,
@@ -141,6 +143,14 @@ pub struct DocumentDrag {
     pub current: Point,
     pub delta: Point,
     pub pointer_offset: Point,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentTextSelection {
+    pub target: ElementId,
+    pub anchor: Point,
+    pub focus: Point,
+    pub active: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

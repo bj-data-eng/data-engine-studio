@@ -1111,6 +1111,30 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
 }
 
 #[test]
+fn text_view_allows_pointer_selection_on_selectable_text() {
+    let mut harness = lab_harness("text");
+    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
+    let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(end);
+    harness.run();
+
+    let selection = harness
+        .state()
+        .document_engine
+        .text_selection()
+        .expect("dragging selectable text should create document text selection");
+    assert_eq!(selection.target, ElementId::new("text-wrap-body"));
+    assert!(selection.active);
+    assert!(rect.contains(selection.anchor));
+    assert!(rect.contains(selection.focus));
+    assert_ne!(selection.anchor, selection.focus);
+}
+
+#[test]
 fn animation_view_renders_state_driven_specimens() {
     let output = lab_output("animation");
 

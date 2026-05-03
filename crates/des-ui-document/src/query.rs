@@ -96,6 +96,10 @@ impl<'a> ElementSnapshot<'a> {
         self.element.text_layout
     }
 
+    pub fn selectable_text(&self) -> bool {
+        self.element.selectable_text
+    }
+
     pub fn value(&self) -> Option<&str> {
         self.element.value.as_deref()
     }

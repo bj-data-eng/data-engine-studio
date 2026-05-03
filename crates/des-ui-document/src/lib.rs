@@ -30,7 +30,8 @@ pub use geometry::{
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
-    DocumentOutput, ElementState, PointerInput, ResolvedElement, ScrollChrome,
+    DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,
+    ScrollChrome,
 };
 pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,

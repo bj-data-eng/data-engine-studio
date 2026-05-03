@@ -1797,7 +1797,8 @@ fn text_specimen(
                 format!("{id}-body"),
                 ElementSpec::new(ElementRole::Text)
                     .class("text-box")
-                    .class(text_class),
+                    .class(text_class)
+                    .selectable_text(),
                 body,
             );
         },

@@ -1,7 +1,7 @@
 use des_ui_document::{
-    Color, CornerRadii, DocumentInput, Glyph, Insets, Overflow, Point, PointerInput, Rect,
-    ResolvedElement, ScrollChrome, Size, TextLayoutRequest, TextLayoutResult, TextMeasurer,
-    TextMeasurerKey, TextWrapMode,
+    Color, CornerRadii, DocumentInput, DocumentTextSelection, Glyph, Insets, Overflow, Point,
+    PointerInput, Rect, ResolvedElement, ScrollChrome, Size, TextLayoutRequest, TextLayoutResult,
+    TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 
@@ -45,8 +45,13 @@ pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput
     })
 }
 
-pub(super) fn paint_frame(ui: &mut egui::Ui, origin: egui::Pos2, frame: &ResolvedElement) {
-    paint_frame_clipped(ui, origin, frame, ui.clip_rect());
+pub(super) fn paint_frame(
+    ui: &mut egui::Ui,
+    origin: egui::Pos2,
+    frame: &ResolvedElement,
+    text_selection: Option<&DocumentTextSelection>,
+) {
+    paint_frame_clipped(ui, origin, frame, ui.clip_rect(), text_selection);
 }
 
 fn paint_frame_clipped(
@@ -54,6 +59,7 @@ fn paint_frame_clipped(
     origin: egui::Pos2,
     frame: &ResolvedElement,
     clip_rect: egui::Rect,
+    text_selection: Option<&DocumentTextSelection>,
 ) {
     let painter = ui.painter().with_clip_rect(clip_rect);
     if frame.id.as_str() != "root" {
@@ -91,7 +97,30 @@ fn paint_frame_clipped(
                 line_height: frame.style.line_height,
             };
             let color = to_egui_color(frame.style.text_color);
-            let galley = painter.layout_job(layout_job(request, color));
+            let mut galley = painter.layout_job(layout_job(request, color));
+            if frame.selectable_text
+                && let Some(selection) = text_selection
+                && selection.target == frame.id
+            {
+                let anchor = egui::vec2(
+                    selection.anchor.x - (text_rect.min.x - origin.x),
+                    selection.anchor.y - (text_rect.min.y - origin.y),
+                );
+                let focus = egui::vec2(
+                    selection.focus.x - (text_rect.min.x - origin.x),
+                    selection.focus.y - (text_rect.min.y - origin.y),
+                );
+                let cursor_range = egui::text_selection::CCursorRange::two(
+                    galley.cursor_from_pos(anchor),
+                    galley.cursor_from_pos(focus),
+                );
+                egui::text_selection::visuals::paint_text_selection(
+                    &mut galley,
+                    ui.visuals(),
+                    &cursor_range,
+                    None,
+                );
+            }
             painter.galley(text_rect.min, galley, color);
         }
 
@@ -142,7 +171,7 @@ fn paint_frame_clipped(
         clip_rect
     };
     for child in children {
-        paint_frame_clipped(ui, origin, child, next_clip);
+        paint_frame_clipped(ui, origin, child, next_clip, text_selection);
     }
 }
 

@@ -1006,6 +1006,75 @@ fn text_measurer_cache_key_invalidates_cached_layout() {
 }
 
 #[test]
+fn selectable_text_tracks_pointer_selection_points() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(160.0))
+            .text_wrap(TextWrapMode::Wrap),
+    );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "Customer analytics pipeline preview",
+        );
+    });
+
+    let start = Point::new(4.0, 4.0);
+    let end = Point::new(86.0, 24.0);
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: start,
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let dragging = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: end,
+                primary_delta: Point::new(end.x - start.x, end.y - start.y),
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    let selection = dragging.text_selection.unwrap();
+    assert_eq!(selection.target, ElementId::new("label"));
+    assert_eq!(selection.anchor, start);
+    assert_eq!(selection.focus, end);
+    assert!(selection.active);
+
+    let released = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: end,
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(!released.text_selection.unwrap().active);
+}
+
+#[test]
 fn row_layout_applies_main_and_cross_axis_alignment() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

@@ -5,7 +5,7 @@ use crate::layout::{hit_path, layout_element};
 use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
-    ElementState, PointerInput, ResolvedElement, ScrollChrome,
+    DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
 };
 use crate::style::{
     ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change,
@@ -83,6 +83,7 @@ pub struct DocumentEngine {
     scroll_limits: HashMap<ElementId, Size>,
     active_scroll_drag: Option<ScrollDrag>,
     active_pointer_drag: Option<PointerDrag>,
+    text_selection: Option<DocumentTextSelection>,
     cached_layout: Option<ResolvedElement>,
     cached_document_root: Option<Element>,
     cached_text_measurer_key: Option<TextMeasurerKey>,
@@ -192,6 +193,7 @@ impl DocumentEngine {
             hit_id: input_update.hit_id,
             active_drag: input_update.active_drag,
             completed_drag: input_update.completed_drag,
+            text_selection: self.text_selection.clone(),
             events: input_update.events,
             scroll_chrome,
             animating: animation_update.animating || scrollbar_animation_update.animating,
@@ -220,6 +222,10 @@ impl DocumentEngine {
     pub fn element_state_mut(&mut self, id: &str) -> Option<&mut ElementState> {
         self.cached_layout = None;
         self.states.get_mut(&ElementId::new(id))
+    }
+
+    pub fn text_selection(&self) -> Option<&DocumentTextSelection> {
+        self.text_selection.as_ref()
     }
 
     pub fn snap_element_animation(&mut self, id: &str) -> bool {
@@ -308,6 +314,7 @@ impl DocumentEngine {
                 update.completed_drag = Some(drag.document_drag());
                 update.changed = true;
             }
+            update.changed |= self.finish_text_selection();
             return finalize_input_update(update, &self.states, &previous);
         };
         if self
@@ -350,6 +357,19 @@ impl DocumentEngine {
                     state.click_count += 1;
                 }
             }
+            return finalize_input_update(update, &self.states, &previous);
+        }
+
+        if self
+            .text_selection
+            .as_ref()
+            .is_some_and(|selection| selection.active)
+        {
+            update.changed |= self.update_active_text_selection(pointer);
+            update.hit_id = self
+                .text_selection
+                .as_ref()
+                .map(|selection| selection.target.clone());
             return finalize_input_update(update, &self.states, &previous);
         }
 
@@ -408,6 +428,20 @@ impl DocumentEngine {
             if let Some(state) = self.states.get_mut(&frame.id) {
                 state.hovered = true;
             }
+        }
+
+        let selectable_text_frame = path
+            .iter()
+            .rev()
+            .find(|frame| frame.selectable_text && frame.text.is_some());
+        if let Some(frame) = selectable_text_frame {
+            update.hit_id = Some(frame.id.clone());
+            if pointer.primary_down {
+                update.changed |= self.start_text_selection(frame, pointer.position);
+                return finalize_input_update(update, &self.states, &previous);
+            }
+        } else if pointer.primary_down {
+            update.changed |= self.clear_text_selection();
         }
 
         update.hit_id = Some(
@@ -500,6 +534,45 @@ impl DocumentEngine {
             active_drag: None,
             completed_drag: None,
         }
+    }
+
+    fn start_text_selection(&mut self, frame: &ResolvedElement, point: Point) -> bool {
+        let next = DocumentTextSelection {
+            target: frame.id.clone(),
+            anchor: point,
+            focus: point,
+            active: true,
+        };
+        let changed = self.text_selection.as_ref() != Some(&next);
+        self.text_selection = Some(next);
+        self.active_pointer_drag = None;
+        changed
+    }
+
+    fn update_active_text_selection(&mut self, pointer: PointerInput) -> bool {
+        let Some(selection) = self.text_selection.as_mut() else {
+            return false;
+        };
+        if pointer.primary_down {
+            let mut changed = false;
+            changed |= set_point(&mut selection.focus, pointer.position);
+            changed |= set_bool(&mut selection.active, true);
+            changed
+        } else {
+            self.finish_text_selection()
+        }
+    }
+
+    fn finish_text_selection(&mut self) -> bool {
+        self.text_selection
+            .as_mut()
+            .is_some_and(|selection| set_bool(&mut selection.active, false))
+    }
+
+    fn clear_text_selection(&mut self) -> bool {
+        let changed = self.text_selection.is_some();
+        self.text_selection = None;
+        changed
     }
 
     fn apply_scrollbar_input(
@@ -744,6 +817,18 @@ fn count_resolved_elements(frame: &ResolvedElement) -> usize {
 
 fn set_f32(target: &mut f32, value: f32) -> bool {
     let changed = (*target - value).abs() > f32::EPSILON;
+    *target = value;
+    changed
+}
+
+fn set_bool(target: &mut bool, value: bool) -> bool {
+    let changed = *target != value;
+    *target = value;
+    changed
+}
+
+fn set_point(target: &mut Point, value: Point) -> bool {
+    let changed = *target != value;
     *target = value;
     changed
 }

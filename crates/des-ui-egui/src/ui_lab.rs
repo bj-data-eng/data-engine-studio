@@ -175,7 +175,7 @@ impl UiLabState {
         let engine_time = engine_start.elapsed();
 
         let paint_start = Instant::now();
-        paint_frame(ui, origin, &output.layout);
+        paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
         let paint_time = paint_start.elapsed();
         self.last_perf = UiLabPerf {
