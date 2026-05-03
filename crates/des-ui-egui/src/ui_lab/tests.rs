@@ -213,6 +213,46 @@ fn clicked_nav_view_matches_directly_seeded_view() {
 }
 
 #[test]
+fn styling_view_renders_structural_selector_specimens() {
+    let output = lab_output("styling");
+
+    assert_eq!(
+        frame(&output, "structural-main-one").style.background,
+        Some(Color::rgb(24, 53, 42))
+    );
+    assert_eq!(
+        frame(&output, "structural-main-two").style.background,
+        Some(Color::rgb(29, 55, 80))
+    );
+    assert_close(
+        frame(&output, "structural-main-three")
+            .style
+            .border_width
+            .left,
+        5.0,
+    );
+    assert_eq!(
+        frame(&output, "structural-main-four").style.border,
+        Some(PURPLE)
+    );
+    assert_eq!(
+        frame(&output, "structural-nested-a-one").style.background,
+        Some(Color::rgb(24, 53, 42)),
+        "first-child should resolve within each nested parent"
+    );
+    assert_eq!(
+        frame(&output, "structural-nested-b-one").style.background,
+        Some(Color::rgb(24, 53, 42)),
+        "first-child should reset for sibling lists"
+    );
+    assert_eq!(
+        frame(&output, "structural-nested-a-two").style.border,
+        Some(PURPLE),
+        "last-child should resolve within each nested parent"
+    );
+}
+
+#[test]
 fn interaction_view_renders_common_control_roles() {
     let output = lab_output("interaction");
 

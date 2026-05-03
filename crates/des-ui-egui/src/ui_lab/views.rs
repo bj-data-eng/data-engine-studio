@@ -1107,6 +1107,130 @@ fn render_styling_view(ui: &mut des_ui_document::DocumentBuilder, dense_mode: bo
             );
         },
     );
+    render_structural_selector_specimens(ui);
+}
+
+fn render_structural_selector_specimens(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.text_element(
+        "structural-selector-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Structural Selectors",
+    );
+    ui.text_element(
+        "structural-selector-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "first-child, last-child, and nth-child are resolved from document nesting.",
+    );
+    ui.element(
+        "structural-selector-grid",
+        ElementSpec::new(ElementRole::Panel).class("structural-grid"),
+        |ui| {
+            ui.element(
+                "structural-main-list",
+                ElementSpec::new(ElementRole::Panel).class("structural-list"),
+                |ui| {
+                    structural_item(
+                        ui,
+                        "structural-main-one",
+                        "first-child",
+                        ".structural-item:first-child -> green surface",
+                    );
+                    structural_item(
+                        ui,
+                        "structural-main-two",
+                        "nth-child(2)",
+                        ".structural-item:nth-child(2) -> accent surface",
+                    );
+                    structural_item(
+                        ui,
+                        "structural-main-three",
+                        "nth-child(3)",
+                        ".structural-item:nth-child(3) -> purple left rail",
+                    );
+                    structural_item(
+                        ui,
+                        "structural-main-four",
+                        "last-child",
+                        ".structural-item:last-child -> purple border",
+                    );
+                },
+            );
+            ui.element(
+                "structural-nested-shell",
+                ElementSpec::new(ElementRole::Panel).class("structural-nested-shell"),
+                |ui| {
+                    for (list, label) in [("a", "Project A"), ("b", "Project B")] {
+                        ui.element(
+                            format!("structural-nested-list-{list}"),
+                            ElementSpec::new(ElementRole::Panel).class("structural-list"),
+                            |ui| {
+                                structural_nested_item(
+                                    ui,
+                                    format!("structural-nested-{list}-one"),
+                                    label,
+                                    "first child",
+                                );
+                                structural_nested_item(
+                                    ui,
+                                    format!("structural-nested-{list}-two"),
+                                    "Pipeline",
+                                    "last child",
+                                );
+                            },
+                        );
+                    }
+                },
+            );
+        },
+    );
+}
+
+fn structural_item(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+    body: &'static str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Card).class("structural-item"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                label,
+            );
+            ui.text_element(
+                format!("{id}-body"),
+                ElementSpec::new(ElementRole::Text).class("muted"),
+                body,
+            );
+        },
+    );
+}
+
+fn structural_nested_item(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: String,
+    label: &'static str,
+    body: &'static str,
+) {
+    ui.element(
+        id.clone(),
+        ElementSpec::new(ElementRole::Card).class("structural-item"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                label,
+            );
+            ui.text_element(
+                format!("{id}-body"),
+                ElementSpec::new(ElementRole::Text).class("muted"),
+                body,
+            );
+        },
+    );
 }
 
 fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {

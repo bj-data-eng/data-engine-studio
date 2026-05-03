@@ -984,6 +984,84 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border(TEXT_ACCENT),
         )
         .rule(
+            StyleSelector::class("structural-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width_fill()
+                .height(Length::Auto)
+                .gap(12.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("structural-list"),
+            Style::default()
+                .width(Length::Px(380.0))
+                .height(Length::Auto)
+                .padding(Insets::all(8.0))
+                .gap(6.0)
+                .background(Color::rgb(17, 21, 25))
+                .border(Color::rgb(43, 52, 60))
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("structural-nested-shell"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(false)
+                .width(Length::Px(790.0))
+                .height(Length::Auto)
+                .gap(10.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("structural-item"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(58.0))
+                .padding(Insets::symmetric(10.0, 7.0))
+                .background(Color::rgb(25, 30, 34))
+                .border(STROKE)
+                .radius(5.0),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("structural-item")
+                .first_child()
+                .selector(),
+            Style::default()
+                .background(Color::rgb(24, 53, 42))
+                .border(GREEN),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("structural-item")
+                .nth_child(2)
+                .selector(),
+            Style::default()
+                .background(Color::rgb(29, 55, 80))
+                .border(TEXT_ACCENT),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("structural-item")
+                .nth_child(3)
+                .selector(),
+            Style::default().border_widths(Insets {
+                top: 1.0,
+                right: 1.0,
+                bottom: 1.0,
+                left: 5.0,
+            }),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("structural-item")
+                .last_child()
+                .selector(),
+            Style::default().border(PURPLE).radius(8.0),
+        )
+        .rule(
             StyleSelector::class("animation-grid"),
             Style::default()
                 .direction(Direction::Row)
