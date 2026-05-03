@@ -305,6 +305,13 @@ fn styling_view_renders_structural_selector_specimens() {
         Some(PURPLE),
         "last-child should resolve within each nested parent"
     );
+    assert_eq!(frame(&output, "shadow-single").style.shadows.len(), 2);
+    assert_eq!(frame(&output, "shadow-layered").style.shadows.len(), 2);
+    assert_eq!(frame(&output, "shadow-light-top").style.shadows.len(), 2);
+    assert_close(
+        frame(&output, "shadow-negative-spread").style.shadows[1].spread,
+        6.0,
+    );
 }
 
 #[test]

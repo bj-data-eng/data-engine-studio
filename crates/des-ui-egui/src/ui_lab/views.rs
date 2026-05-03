@@ -1260,7 +1260,108 @@ fn render_styling_view(ui: &mut des_ui_document::DocumentBuilder, dense_mode: bo
             );
         },
     );
+    render_shadow_specimens(ui);
     render_structural_selector_specimens(ui);
+}
+
+fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.text_element(
+        "shadow-specimen-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Shadow Styling",
+    );
+    ui.text_element(
+        "shadow-specimen-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Layered shadows are paint-only; spread can contract or expand the source shape.",
+    );
+    ui.element(
+        "shadow-specimen-grid",
+        ElementSpec::new(ElementRole::Panel).class("shadow-grid"),
+        |ui| {
+            shadow_item(
+                ui,
+                "shadow-single",
+                "Elevation level 2",
+                "key + ambient layers",
+            );
+            shadow_item(
+                ui,
+                "shadow-layered",
+                "Elevation level 3",
+                "menu/card emphasis",
+            );
+            shadow_item(
+                ui,
+                "shadow-negative-spread",
+                "Elevation level 5",
+                "dragged surface",
+            );
+        },
+    );
+    ui.element(
+        "shadow-light-stage",
+        ElementSpec::new(ElementRole::Panel).class("shadow-light-stage"),
+        |ui| {
+            light_shadow_card(ui, "shadow-light-top", "48", true);
+            light_shadow_card(ui, "shadow-light-bottom", "30", false);
+        },
+    );
+}
+
+fn shadow_item(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+    body: &'static str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Card)
+            .class("shadow-card")
+            .class(id),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                label,
+            );
+            ui.text_element(
+                format!("{id}-body"),
+                ElementSpec::new(ElementRole::Text).class("muted"),
+                body,
+            );
+        },
+    );
+}
+
+fn light_shadow_card(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+    raised: bool,
+) {
+    let card_spec = if raised {
+        ElementSpec::new(ElementRole::Card)
+            .class("shadow-light-card")
+            .class("shadow-light-card-raised")
+    } else {
+        ElementSpec::new(ElementRole::Card).class("shadow-light-card")
+    };
+    ui.element(id, card_spec, |ui| {
+        ui.text_element(
+            format!("{id}-label"),
+            ElementSpec::new(ElementRole::Text).class("shadow-light-label"),
+            label,
+        );
+        ui.element(
+            format!("{id}-handle"),
+            ElementSpec::new(ElementRole::Icon)
+                .class("shadow-light-handle")
+                .glyph(Glyph::DragHandle),
+            |_| {},
+        );
+    });
 }
 
 fn render_structural_selector_specimens(ui: &mut des_ui_document::DocumentBuilder) {

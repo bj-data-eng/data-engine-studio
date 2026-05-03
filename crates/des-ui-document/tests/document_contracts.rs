@@ -1452,12 +1452,20 @@ fn style_rules_resolve_shadow_as_paint_only_property() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("card"),
-        Style::default().size(100.0, 40.0).shadow(Shadow {
-            offset: Point::new(0.0, 8.0),
-            blur: 18.0,
-            spread: 1.0,
-            color: Color::rgba(0, 0, 0, 122),
-        }),
+        Style::default().size(100.0, 40.0).shadows([
+            Shadow {
+                offset: Point::new(0.0, 2.0),
+                blur: 7.0,
+                spread: -1.0,
+                color: Color::rgba(0, 0, 0, 110),
+            },
+            Shadow {
+                offset: Point::new(0.0, 14.0),
+                blur: 28.0,
+                spread: -5.0,
+                color: Color::rgba(0, 0, 0, 78),
+            },
+        ]),
     );
     let document = Document::build(Size::new(180.0, 100.0), |ui| {
         ui.element("card", ElementSpec::new(ElementRole::Card), |_| {});
@@ -1467,7 +1475,9 @@ fn style_rules_resolve_shadow_as_paint_only_property() {
     let card = output.snapshot().find("card").unwrap();
 
     assert_eq!(card.rect().size, Size::new(100.0, 40.0));
-    assert_eq!(card.style().shadow.unwrap().blur, 18.0);
+    assert_eq!(card.style().shadows.len(), 2);
+    assert_eq!(card.style().shadows[0].blur, 7.0);
+    assert_eq!(card.style().shadows[1].spread, -5.0);
 }
 
 #[test]

@@ -221,7 +221,7 @@ pub struct Style {
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: EdgeStyle,
-    pub shadow: Option<Shadow>,
+    pub shadows: Option<Vec<Shadow>>,
     pub text_color: Option<Color>,
     pub font_size: Option<f32>,
     pub text_wrap: Option<TextWrapMode>,
@@ -437,7 +437,12 @@ impl Style {
     }
 
     pub fn shadow(mut self, shadow: Shadow) -> Self {
-        self.shadow = Some(shadow);
+        self.shadows = Some(vec![shadow]);
+        self
+    }
+
+    pub fn shadows(mut self, shadows: impl IntoIterator<Item = Shadow>) -> Self {
+        self.shadows = Some(shadows.into_iter().collect());
         self
     }
 
@@ -703,7 +708,7 @@ pub struct ComputedStyle {
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: Insets,
-    pub shadow: Option<Shadow>,
+    pub shadows: Vec<Shadow>,
     pub text_color: Color,
     pub font_size: f32,
     pub text_wrap: TextWrapMode,
@@ -751,7 +756,7 @@ impl Default for ComputedStyle {
             background: None,
             border: None,
             border_width: Insets::ZERO,
-            shadow: None,
+            shadows: Vec::new(),
             text_color: Color::rgb(218, 226, 234),
             font_size: 13.0,
             text_wrap: TextWrapMode::Extend,
@@ -825,13 +830,17 @@ impl ComputedStyle {
         if let Some(value) = style.border {
             self.border = Some(value);
         }
-        if let Some(value) = style.shadow {
-            self.shadow = Some(Shadow {
-                offset: value.offset,
-                blur: value.blur.max(0.0),
-                spread: value.spread.max(0.0),
-                color: value.color,
-            });
+        if let Some(values) = &style.shadows {
+            self.shadows = values
+                .iter()
+                .copied()
+                .map(|value| Shadow {
+                    offset: value.offset,
+                    blur: value.blur.max(0.0),
+                    spread: value.spread,
+                    color: value.color,
+                })
+                .collect();
         }
         if let Some(value) = style.border_width.top {
             self.border_width.top = value.max(0.0);

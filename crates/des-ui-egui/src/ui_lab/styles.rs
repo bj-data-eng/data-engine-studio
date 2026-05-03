@@ -4,7 +4,7 @@ use super::{
 };
 use des_ui_document::{
     AlignItems, Color, Direction, ElementRole, ElementStateSelector, Insets, JustifyContent,
-    Length, Overflow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition,
+    Length, Overflow, Point, Shadow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition,
 };
 
 pub(super) fn stylesheet() -> StyleSheet {
@@ -1146,6 +1146,84 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border(TEXT_ACCENT),
         )
         .rule(
+            StyleSelector::class("shadow-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width_fill()
+                .height(Length::Auto)
+                .padding(Insets::all(18.0))
+                .gap(18.0)
+                .background(PANEL_ALT)
+                .border(STROKE)
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-card"),
+            Style::default()
+                .size(220.0, 88.0)
+                .padding(Insets::all(12.0))
+                .gap(5.0)
+                .background(CARD)
+                .border(Color::rgb(55, 66, 76))
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-single"),
+            Style::default().shadows(material_elevation(2, Color::rgba(0, 0, 0, 255))),
+        )
+        .rule(
+            StyleSelector::class("shadow-layered"),
+            Style::default().shadows(material_elevation(3, Color::rgba(0, 0, 0, 255))),
+        )
+        .rule(
+            StyleSelector::class("shadow-negative-spread"),
+            Style::default().shadows(material_elevation(5, Color::rgba(0, 0, 0, 255))),
+        )
+        .rule(
+            StyleSelector::class("shadow-light-stage"),
+            Style::default()
+                .width(Length::Px(740.0))
+                .height(Length::Auto)
+                .padding(Insets::symmetric(18.0, 16.0))
+                .gap(18.0)
+                .background(Color::rgb(241, 230, 244))
+                .radius(7.0),
+        )
+        .rule(
+            StyleSelector::class("shadow-light-card"),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::SpaceBetween)
+                .width(Length::Px(360.0))
+                .height(Length::Px(64.0))
+                .padding(Insets::symmetric(24.0, 0.0))
+                .background(Color::rgb(250, 250, 252))
+                .border(Color::rgba(198, 188, 205, 145))
+                .radius(6.0)
+                .shadows(material_elevation(1, Color::rgb(76, 55, 112))),
+        )
+        .rule(
+            StyleSelector::class("shadow-light-card-raised"),
+            Style::default().shadows(material_elevation(3, Color::rgb(76, 55, 112))),
+        )
+        .rule(
+            StyleSelector::class("shadow-light-label"),
+            Style::default()
+                .font_size(15.0)
+                .text_color(Color::rgb(137, 132, 146)),
+        )
+        .rule(
+            StyleSelector::class("shadow-light-handle"),
+            Style::default()
+                .size(36.0, 48.0)
+                .font_size(14.0)
+                .text_color(Color::rgb(120, 137, 153))
+                .background(Color::rgba(232, 231, 236, 190))
+                .radius(6.0),
+        )
+        .rule(
             StyleSelector::class("structural-grid"),
             Style::default()
                 .direction(Direction::Row)
@@ -1609,4 +1687,44 @@ fn styled_scrollbar_style() -> Style {
         .scrollbar_pressed_handle_border_width(1.0)
         .scrollbar_radius(6.0)
         .transition(Transition::ease_out(0.14))
+}
+
+fn material_elevation(level: u8, color: Color) -> Vec<Shadow> {
+    match level.min(5) {
+        0 => Vec::new(),
+        1 => material_elevation_layers(color, 1.0, 2.0, 0.0, 1.0, 3.0, 1.0),
+        2 => material_elevation_layers(color, 1.0, 2.0, 0.0, 2.0, 6.0, 2.0),
+        3 => material_elevation_layers(color, 1.0, 3.0, 0.0, 4.0, 8.0, 3.0),
+        4 => material_elevation_layers(color, 2.0, 3.0, 0.0, 6.0, 10.0, 4.0),
+        _ => material_elevation_layers(color, 4.0, 4.0, 0.0, 8.0, 12.0, 6.0),
+    }
+}
+
+fn material_elevation_layers(
+    color: Color,
+    key_y: f32,
+    key_blur: f32,
+    key_spread: f32,
+    ambient_y: f32,
+    ambient_blur: f32,
+    ambient_spread: f32,
+) -> Vec<Shadow> {
+    vec![
+        Shadow {
+            offset: Point::new(0.0, key_y),
+            blur: key_blur,
+            spread: key_spread,
+            color: with_alpha(color, 77),
+        },
+        Shadow {
+            offset: Point::new(0.0, ambient_y),
+            blur: ambient_blur,
+            spread: ambient_spread,
+            color: with_alpha(color, 38),
+        },
+    ]
+}
+
+fn with_alpha(color: Color, alpha: u8) -> Color {
+    Color { a: alpha, ..color }
 }

@@ -106,8 +106,8 @@ fn eased_style(
     next.border = ease_optional_color(current.border, target.border, amount, snap_epsilon);
     animating |= next.border != target.border;
 
-    next.shadow = ease_optional_shadow(current.shadow, target.shadow, amount, snap_epsilon);
-    animating |= next.shadow != target.shadow;
+    next.shadows = ease_shadows(&current.shadows, &target.shadows, amount, snap_epsilon);
+    animating |= next.shadows != target.shadows;
 
     next.text_color = ease_color(current.text_color, target.text_color, amount, snap_epsilon);
     animating |= next.text_color != target.text_color;
@@ -312,43 +312,50 @@ fn ease_optional_color(
     }
 }
 
-fn ease_optional_shadow(
-    current: Option<Shadow>,
-    target: Option<Shadow>,
+fn ease_shadows(
+    current: &[Shadow],
+    target: &[Shadow],
     amount: f32,
     snap_epsilon: f32,
-) -> Option<Shadow> {
-    match (current, target) {
-        (Some(current), Some(target)) => Some(ease_shadow(current, target, amount, snap_epsilon)),
-        (None, Some(target)) => Some(ease_shadow(
-            Shadow {
-                color: Color {
-                    a: 0,
-                    ..target.color
-                },
-                ..target
-            },
-            target,
-            amount,
-            snap_epsilon,
-        )),
-        (Some(current), None) => {
-            let transparent = Shadow {
-                color: Color {
-                    a: 0,
-                    ..current.color
-                },
-                ..current
-            };
-            let next = ease_shadow(current, transparent, amount, snap_epsilon);
-            if next == transparent {
-                None
-            } else {
-                Some(next)
+) -> Vec<Shadow> {
+    let count = current.len().max(target.len());
+    let mut shadows = Vec::with_capacity(count);
+    for index in 0..count {
+        match (current.get(index).copied(), target.get(index).copied()) {
+            (Some(current), Some(target)) => {
+                shadows.push(ease_shadow(current, target, amount, snap_epsilon));
             }
+            (None, Some(target)) => {
+                shadows.push(ease_shadow(
+                    Shadow {
+                        color: Color {
+                            a: 0,
+                            ..target.color
+                        },
+                        ..target
+                    },
+                    target,
+                    amount,
+                    snap_epsilon,
+                ));
+            }
+            (Some(current), None) => {
+                let transparent = Shadow {
+                    color: Color {
+                        a: 0,
+                        ..current.color
+                    },
+                    ..current
+                };
+                let next = ease_shadow(current, transparent, amount, snap_epsilon);
+                if next != transparent {
+                    shadows.push(next);
+                }
+            }
+            (None, None) => {}
         }
-        (None, None) => None,
     }
+    shadows
 }
 
 fn ease_shadow(current: Shadow, target: Shadow, amount: f32, snap_epsilon: f32) -> Shadow {

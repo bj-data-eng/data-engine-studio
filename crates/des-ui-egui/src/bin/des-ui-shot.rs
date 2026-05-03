@@ -12,6 +12,7 @@ fn main() {
         inner_size: [width, height],
         debug_overlay: env_bool("DES_UI_DEBUG_OVERLAY"),
         initial_lab_view: std::env::var("DES_UI_LAB_VIEW").ok(),
+        initial_lab_scroll: env_scroll_position(),
         startup_commands: startup_commands(),
     };
 
@@ -29,6 +30,12 @@ fn env_bool(name: &str) -> bool {
     std::env::var(name)
         .ok()
         .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+}
+
+fn env_scroll_position() -> Option<[f32; 2]> {
+    let x = env_f32("DES_UI_LAB_SCROLL_X").unwrap_or(0.0);
+    let y = env_f32("DES_UI_LAB_SCROLL_Y").unwrap_or(0.0);
+    (x != 0.0 || y != 0.0).then_some([x, y])
 }
 
 fn startup_commands() -> Vec<AppCommand> {

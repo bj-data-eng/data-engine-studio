@@ -120,9 +120,7 @@ fn paint_frame_clipped(
     if frame.id.as_str() != "root" {
         let rect = frame_rect(origin, frame);
 
-        if let Some(shadow) = frame.style.shadow {
-            paint_shadow(&painter, rect, frame.style.radius, shadow);
-        }
+        paint_shadows(&painter, rect, frame.style.radius, &frame.style.shadows);
 
         if let Some(color) = frame.style.background {
             painter.rect_filled(
@@ -267,15 +265,13 @@ pub(super) fn paint_surface(
     ui: &mut egui::Ui,
     rect: egui::Rect,
     radius: CornerRadii,
-    shadow: Option<Shadow>,
+    shadows: &[Shadow],
     background: Color,
     border: Option<Color>,
     border_width: Insets,
 ) {
     let painter = ui.painter();
-    if let Some(shadow) = shadow {
-        paint_shadow(painter, rect, radius, shadow);
-    }
+    paint_shadows(painter, rect, radius, shadows);
     painter.rect_filled(rect, to_egui_radius(radius), to_egui_color(background));
     if let Some(border) = border {
         paint_border(painter, rect, radius, border_width, border);
@@ -400,27 +396,61 @@ fn paint_border(
     }
 }
 
+fn paint_shadows(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    radius: CornerRadii,
+    shadows: &[Shadow],
+) {
+    for shadow in shadows.iter().rev().copied() {
+        paint_shadow(painter, rect, radius, shadow);
+    }
+}
+
 fn paint_shadow(painter: &egui::Painter, rect: egui::Rect, radius: CornerRadii, shadow: Shadow) {
     if shadow.color.a == 0 {
         return;
     }
 
-    let steps = (shadow.blur / 3.0).ceil().clamp(1.0, 8.0) as usize;
-    let base_rect = rect
-        .translate(egui::vec2(shadow.offset.x, shadow.offset.y))
-        .expand(shadow.spread.max(0.0));
+    let base_rect = expand_rect_safely(
+        rect.translate(egui::vec2(shadow.offset.x, shadow.offset.y)),
+        shadow.spread,
+    );
+    if shadow.blur <= 0.0 {
+        painter.rect_filled(
+            base_rect,
+            to_egui_radius(expand_radius(radius, shadow.spread)),
+            to_egui_color(shadow.color),
+        );
+        return;
+    }
+
+    let sigma = shadow.blur * 0.5;
+    let max_blur_extent = sigma * 3.0;
+    let steps = max_blur_extent.ceil().clamp(10.0, 36.0) as usize;
     for step in (0..steps).rev() {
-        let amount = (step + 1) as f32 / steps as f32;
-        let alpha = (shadow.color.a as f32 * amount * amount / steps as f32)
+        let outer_distance = max_blur_extent * (step + 1) as f32 / steps as f32;
+        let inner_distance = max_blur_extent * step as f32 / steps as f32;
+        let outer_alpha = gaussian_alpha(outer_distance, sigma);
+        let inner_alpha = gaussian_alpha(inner_distance, sigma);
+        let alpha_portion = (inner_alpha - outer_alpha).max(0.0);
+        let alpha = (shadow.color.a as f32 * alpha_portion * 0.86)
             .round()
             .clamp(0.0, 255.0) as u8;
+        if alpha == 0 {
+            continue;
+        }
         let color = Color {
             a: alpha,
             ..shadow.color
         };
+        let expansion = shadow.spread + outer_distance;
         painter.rect_filled(
-            base_rect.expand(shadow.blur * amount),
-            to_egui_radius(expand_radius(radius, shadow.blur * amount)),
+            expand_rect_safely(
+                rect.translate(egui::vec2(shadow.offset.x, shadow.offset.y)),
+                expansion,
+            ),
+            to_egui_radius(expand_radius(radius, expansion)),
             to_egui_color(color),
         );
     }
@@ -428,11 +458,26 @@ fn paint_shadow(painter: &egui::Painter, rect: egui::Rect, radius: CornerRadii, 
 
 fn expand_radius(radius: CornerRadii, amount: f32) -> CornerRadii {
     CornerRadii {
-        top_left: radius.top_left + amount,
-        top_right: radius.top_right + amount,
-        bottom_right: radius.bottom_right + amount,
-        bottom_left: radius.bottom_left + amount,
+        top_left: (radius.top_left + amount).max(0.0),
+        top_right: (radius.top_right + amount).max(0.0),
+        bottom_right: (radius.bottom_right + amount).max(0.0),
+        bottom_left: (radius.bottom_left + amount).max(0.0),
     }
+}
+
+fn expand_rect_safely(rect: egui::Rect, amount: f32) -> egui::Rect {
+    if amount >= 0.0 {
+        return rect.expand(amount);
+    }
+    let inset = (-amount).min(rect.width() * 0.5).min(rect.height() * 0.5);
+    rect.shrink(inset)
+}
+
+fn gaussian_alpha(distance: f32, sigma: f32) -> f32 {
+    if sigma <= 0.0 {
+        return 1.0;
+    }
+    (-0.5 * (distance / sigma).powi(2)).exp()
 }
 
 pub(super) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {

@@ -19,6 +19,7 @@ pub struct NativeLaunchOptions {
     pub inner_size: [f32; 2],
     pub debug_overlay: bool,
     pub initial_lab_view: Option<String>,
+    pub initial_lab_scroll: Option<[f32; 2]>,
     pub startup_commands: Vec<AppCommand>,
 }
 
@@ -29,6 +30,7 @@ impl Default for NativeLaunchOptions {
             inner_size: [DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT],
             debug_overlay: false,
             initial_lab_view: None,
+            initial_lab_scroll: None,
             startup_commands: Vec::new(),
         }
     }
@@ -38,6 +40,7 @@ pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
     let app_options = app::StudioEguiAppOptions {
         debug_overlay: options.debug_overlay,
         initial_lab_view: options.initial_lab_view.clone(),
+        initial_lab_scroll: options.initial_lab_scroll,
         startup_commands: options.startup_commands.clone(),
     };
     let native_options = native_options(options);

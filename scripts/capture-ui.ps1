@@ -8,7 +8,9 @@ param(
     [string]$ProjectId = "",
     [string]$GroupId = "",
     [string]$FlowId = "",
-    [string]$LabView = ""
+    [string]$LabView = "",
+    [double]$ScrollX = 0,
+    [double]$ScrollY = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,6 +53,12 @@ if ($FlowId) {
 if ($LabView) {
     $env:DES_UI_LAB_VIEW = $LabView
 }
+if ($ScrollX -ne 0) {
+    $env:DES_UI_LAB_SCROLL_X = [string]$ScrollX
+}
+if ($ScrollY -ne 0) {
+    $env:DES_UI_LAB_SCROLL_Y = [string]$ScrollY
+}
 
 try {
     cargo run -p des-ui-egui --features ui-screenshot --bin des-ui-shot
@@ -67,6 +75,8 @@ finally {
     Remove-Item Env:\DES_UI_SELECTED_GROUP -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_SELECTED_FLOW -ErrorAction SilentlyContinue
     Remove-Item Env:\DES_UI_LAB_VIEW -ErrorAction SilentlyContinue
+    Remove-Item Env:\DES_UI_LAB_SCROLL_X -ErrorAction SilentlyContinue
+    Remove-Item Env:\DES_UI_LAB_SCROLL_Y -ErrorAction SilentlyContinue
 }
 
 if (-not (Test-Path $outputPath)) {

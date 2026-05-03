@@ -11,6 +11,7 @@ pub(crate) struct StudioEguiApp {
 pub(crate) struct StudioEguiAppOptions {
     pub(crate) debug_overlay: bool,
     pub(crate) initial_lab_view: Option<String>,
+    pub(crate) initial_lab_scroll: Option<[f32; 2]>,
     pub(crate) startup_commands: Vec<AppCommand>,
 }
 
@@ -23,7 +24,13 @@ impl StudioEguiApp {
 
         Self {
             _state: state,
-            ui_lab: UiLabState::new(options.initial_lab_view.as_deref()),
+            ui_lab: match options.initial_lab_scroll {
+                Some(scroll) => UiLabState::new_with_stage_scroll(
+                    options.initial_lab_view.as_deref(),
+                    Some(des_ui_document::Point::new(scroll[0], scroll[1])),
+                ),
+                None => UiLabState::new(options.initial_lab_view.as_deref()),
+            },
             debug_overlay: options.debug_overlay,
         }
     }

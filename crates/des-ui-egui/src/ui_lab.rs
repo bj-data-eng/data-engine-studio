@@ -127,6 +127,7 @@ pub(crate) struct UiLabState {
     drag_drop_preview: Option<SortableDropPreview>,
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
+    pending_stage_scroll: Option<Point>,
     last_perf: UiLabPerf,
 }
 
@@ -159,6 +160,7 @@ impl Default for UiLabState {
             drag_drop_preview: None,
             scroll_list_drop_preview: None,
             text_context_menu: None,
+            pending_stage_scroll: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -166,10 +168,18 @@ impl Default for UiLabState {
 
 impl UiLabState {
     pub(crate) fn new(initial_view: Option<&str>) -> Self {
+        Self::new_with_stage_scroll(initial_view, None)
+    }
+
+    pub(crate) fn new_with_stage_scroll(
+        initial_view: Option<&str>,
+        stage_scroll: Option<Point>,
+    ) -> Self {
         let mut state = Self::default();
         if let Some(view) = initial_view.and_then(LabView::from_id) {
             state.view = view;
         }
+        state.pending_stage_scroll = stage_scroll;
         state
     }
 
@@ -181,6 +191,13 @@ impl UiLabState {
         let document = self.document(Size::new(viewport.x, viewport.y), debug_overlay);
         let stylesheet = self.active_stylesheet();
         let document_time = document_start.elapsed();
+        if let Some(scroll) = self.pending_stage_scroll.take() {
+            self.document_engine.update(&document, &stylesheet);
+            if let Some(stage) = self.document_engine.element_state_mut("stage") {
+                stage.scroll_x = scroll.x.max(0.0);
+                stage.scroll_y = scroll.y.max(0.0);
+            }
+        }
         let input = document_input(ui, origin);
         let pointer = input.pointer;
         let engine_start = Instant::now();
@@ -347,12 +364,20 @@ impl UiLabState {
                     ui,
                     menu_rect,
                     TEXT_MENU_RADIUS,
-                    Some(Shadow {
-                        offset: Point::new(0.0, 8.0),
-                        blur: 18.0,
-                        spread: 1.0,
-                        color: Color::rgba(0, 0, 0, 122),
-                    }),
+                    &[
+                        Shadow {
+                            offset: Point::new(0.0, 2.0),
+                            blur: 7.0,
+                            spread: -1.0,
+                            color: Color::rgba(0, 0, 0, 110),
+                        },
+                        Shadow {
+                            offset: Point::new(0.0, 14.0),
+                            blur: 28.0,
+                            spread: -5.0,
+                            color: Color::rgba(0, 0, 0, 78),
+                        },
+                    ],
                     PANEL,
                     Some(STROKE),
                     Insets::all(1.0),
