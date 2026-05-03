@@ -11,7 +11,7 @@ use crate::style::{
     ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change,
     resolve_style_with_position,
 };
-use crate::text::{FallbackTextMeasurer, TextMeasurer};
+use crate::text::{FallbackTextMeasurer, TextMeasurer, TextMeasurerKey};
 use std::collections::{BTreeSet, HashMap};
 
 const POINTER_DRAG_ACTIVATION_DISTANCE: f32 = 5.0;
@@ -85,6 +85,7 @@ pub struct DocumentEngine {
     active_pointer_drag: Option<PointerDrag>,
     cached_layout: Option<ResolvedElement>,
     cached_document_root: Option<Element>,
+    cached_text_measurer_key: Option<TextMeasurerKey>,
 }
 
 impl DocumentEngine {
@@ -111,8 +112,10 @@ impl DocumentEngine {
     ) -> DocumentOutput {
         let changes = self.sync_element_states(document);
         let viewport_rect = Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height);
+        let text_measurer_key = text_measurer.cache_key();
         let reused_cached_layout = changes.created.is_empty()
             && changes.removed.is_empty()
+            && self.cached_text_measurer_key == Some(text_measurer_key)
             && self.cached_layout_matches(viewport_rect, &document.root);
         let input_layout = if reused_cached_layout {
             self.cached_layout
@@ -179,6 +182,7 @@ impl DocumentEngine {
         };
         self.cached_layout = Some(layout.clone());
         self.cached_document_root = Some(document.root.clone());
+        self.cached_text_measurer_key = Some(text_measurer_key);
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
 

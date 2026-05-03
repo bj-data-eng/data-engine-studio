@@ -1,7 +1,7 @@
 use des_ui_document::{
     Color, CornerRadii, DocumentInput, Glyph, Insets, Overflow, Point, PointerInput, Rect,
     ResolvedElement, ScrollChrome, Size, TextLayoutRequest, TextLayoutResult, TextMeasurer,
-    TextWrapMode,
+    TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 
@@ -16,6 +16,10 @@ impl EguiTextMeasurer {
 }
 
 impl TextMeasurer for EguiTextMeasurer {
+    fn cache_key(&self) -> TextMeasurerKey {
+        TextMeasurerKey::new("egui")
+    }
+
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
         let galley = self
             .ctx
@@ -53,13 +57,7 @@ fn paint_frame_clipped(
 ) {
     let painter = ui.painter().with_clip_rect(clip_rect);
     if frame.id.as_str() != "root" {
-        let rect = egui::Rect::from_min_size(
-            egui::pos2(
-                origin.x + frame.rect.origin.x,
-                origin.y + frame.rect.origin.y,
-            ),
-            egui::vec2(frame.rect.size.width, frame.rect.size.height),
-        );
+        let rect = frame_rect(origin, frame);
 
         if let Some(color) = frame.style.background {
             painter.rect_filled(
@@ -80,12 +78,13 @@ fn paint_frame_clipped(
         }
 
         if let Some(text) = &frame.text {
+            let text_rect = frame_content_rect(rect, frame);
             let request = TextLayoutRequest {
                 text,
                 font_size: frame.style.font_size,
                 wrap_width: match frame.style.text_wrap {
                     TextWrapMode::Extend => f32::INFINITY,
-                    TextWrapMode::Wrap | TextWrapMode::Truncate => rect.width(),
+                    TextWrapMode::Wrap | TextWrapMode::Truncate => text_rect.width(),
                 },
                 wrap_mode: frame.style.text_wrap,
                 max_lines: frame.style.max_lines,
@@ -93,7 +92,7 @@ fn paint_frame_clipped(
             };
             let color = to_egui_color(frame.style.text_color);
             let galley = painter.layout_job(layout_job(request, color));
-            painter.galley(rect.min, galley, color);
+            painter.galley(text_rect.min, galley, color);
         }
 
         if let Some(glyph) = frame.glyph {
@@ -112,23 +111,8 @@ fn paint_frame_clipped(
     let next_clip = if frame.style.overflow_x == Overflow::Scroll
         || frame.style.overflow_y == Overflow::Scroll
     {
-        let rect = egui::Rect::from_min_size(
-            egui::pos2(
-                origin.x + frame.rect.origin.x,
-                origin.y + frame.rect.origin.y,
-            ),
-            egui::vec2(frame.rect.size.width, frame.rect.size.height),
-        );
-        let content_rect = egui::Rect::from_min_max(
-            egui::pos2(
-                rect.left() + frame.style.border_width.left + frame.style.padding.left,
-                rect.top() + frame.style.border_width.top + frame.style.padding.top,
-            ),
-            egui::pos2(
-                rect.right() - frame.style.border_width.right - frame.style.padding.right,
-                rect.bottom() - frame.style.border_width.bottom - frame.style.padding.bottom,
-            ),
-        );
+        let rect = frame_rect(origin, frame);
+        let content_rect = frame_content_rect(rect, frame);
         let min = egui::pos2(
             if frame.style.overflow_x == Overflow::Scroll {
                 content_rect.left()
@@ -179,7 +163,9 @@ fn layout_job(request: TextLayoutRequest<'_>, color: egui::Color32) -> egui::tex
         job.wrap.max_rows = 1;
         job.wrap.break_anywhere = true;
     }
-    if let Some(max_lines) = request.max_lines {
+    if request.wrap_mode != TextWrapMode::Truncate
+        && let Some(max_lines) = request.max_lines
+    {
         job.wrap.max_rows = max_lines.max(1);
         if job.wrap.max_rows == 1 {
             job.wrap.break_anywhere = true;
@@ -191,6 +177,22 @@ fn layout_job(request: TextLayoutRequest<'_>, color: egui::Color32) -> egui::tex
         }
     }
     job
+}
+
+fn frame_rect(origin: egui::Pos2, frame: &ResolvedElement) -> egui::Rect {
+    document_rect_to_egui(origin, frame.rect)
+}
+
+fn frame_content_rect(rect: egui::Rect, frame: &ResolvedElement) -> egui::Rect {
+    let min = egui::pos2(
+        rect.left() + frame.style.border_width.left + frame.style.padding.left,
+        rect.top() + frame.style.border_width.top + frame.style.padding.top,
+    );
+    let max = egui::pos2(
+        (rect.right() - frame.style.border_width.right - frame.style.padding.right).max(min.x),
+        (rect.bottom() - frame.style.border_width.bottom - frame.style.padding.bottom).max(min.y),
+    );
+    egui::Rect::from_min_max(min, max)
 }
 
 fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, glyph: Glyph, color: Color, size: f32) {

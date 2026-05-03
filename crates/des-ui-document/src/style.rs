@@ -457,7 +457,7 @@ impl Style {
     }
 
     pub fn line_height(mut self, line_height: f32) -> Self {
-        self.line_height = Some(line_height.max(0.0));
+        self.line_height = Some(line_height.max(1.0));
         self
     }
 
@@ -823,7 +823,7 @@ impl ComputedStyle {
             self.max_lines = Some(value.max(1));
         }
         if let Some(value) = style.line_height {
-            self.line_height = Some(value.max(0.0));
+            self.line_height = Some(value.max(1.0));
         }
         if let Some(value) = style.radius.top_left {
             self.radius.top_left = value.max(0.0);

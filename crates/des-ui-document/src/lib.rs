@@ -38,6 +38,7 @@ pub use style::{
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{
-    FallbackTextMeasurer, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextWrapMode,
+    FallbackTextMeasurer, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    TextWrapMode,
 };
 pub use update::{DocumentUpdate, DocumentUpdateReport};

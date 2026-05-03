@@ -607,13 +607,13 @@ fn measure_element(
     let auto_size = match element.spec.role {
         ElementRole::Text => {
             let content_parent_size = measurement_content_size(style, parent_size);
-            measure_text(
+            let text = measure_text(
                 element.text.as_deref().unwrap_or_default(),
                 style,
                 content_parent_size,
                 text_measurer,
-            )
-            .size
+            );
+            text_border_box_size(text.size, style)
         }
         ElementRole::Icon => Size::new(
             style.font_size.max(style.min_size.width),
@@ -675,13 +675,13 @@ fn measure_intrinsic_element(
     let auto_size = match element.spec.role {
         ElementRole::Text => {
             let content_parent_size = measurement_content_size(style, parent_size);
-            measure_text(
+            let text = measure_text(
                 element.text.as_deref().unwrap_or_default(),
                 style,
                 content_parent_size,
                 text_measurer,
-            )
-            .size
+            );
+            text_border_box_size(text.size, style)
         }
         ElementRole::Icon => Size::new(
             style.font_size.max(style.min_size.width),
@@ -760,6 +760,13 @@ fn measurement_content_size(style: &ComputedStyle, parent_size: Size) -> Size {
     Size::new(
         (width - style.padding.horizontal() - style.border_width.horizontal()).max(0.0),
         (height - style.padding.vertical() - style.border_width.vertical()).max(0.0),
+    )
+}
+
+fn text_border_box_size(text_size: Size, style: &ComputedStyle) -> Size {
+    Size::new(
+        text_size.width + style.padding.horizontal() + style.border_width.horizontal(),
+        text_size.height + style.padding.vertical() + style.border_width.vertical(),
     )
 }
 

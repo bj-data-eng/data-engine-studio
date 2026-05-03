@@ -24,7 +24,20 @@ pub struct TextLayoutResult {
     pub elided: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TextMeasurerKey(&'static str);
+
+impl TextMeasurerKey {
+    pub const FALLBACK: Self = Self("fallback");
+
+    pub const fn new(name: &'static str) -> Self {
+        Self(name)
+    }
+}
+
 pub trait TextMeasurer {
+    fn cache_key(&self) -> TextMeasurerKey;
+
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult;
 }
 
@@ -32,6 +45,10 @@ pub trait TextMeasurer {
 pub struct FallbackTextMeasurer;
 
 impl TextMeasurer for FallbackTextMeasurer {
+    fn cache_key(&self) -> TextMeasurerKey {
+        TextMeasurerKey::FALLBACK
+    }
+
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
         fallback_measure_text(request)
     }

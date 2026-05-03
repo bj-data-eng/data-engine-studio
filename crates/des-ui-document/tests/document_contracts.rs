@@ -2,8 +2,8 @@ use des_ui_document::{
     AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentInput,
     DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextWrapMode,
-    Transition,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
+    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode, Transition,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -930,6 +930,79 @@ fn text_layout_uses_document_wrap_and_truncation_styles() {
     );
     assert_eq!(truncated.text_layout.unwrap().line_count, 1);
     assert!(truncated.text_layout.unwrap().elided);
+}
+
+#[test]
+fn text_layout_respects_padding_and_border_box_size() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default().padding(Insets::all(4.0)).border_width(2.0),
+    );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.text_element("label", ElementSpec::new(ElementRole::Text), "Hi");
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let label = output.layout.find("label").unwrap();
+
+    assert_close(label.text_layout.unwrap().size.width, 15.0);
+    assert_close(label.text_layout.unwrap().size.height, 18.0);
+    assert_close(label.rect.size.width, 27.0);
+    assert_close(label.rect.size.height, 30.0);
+}
+
+#[test]
+fn text_measurer_cache_key_invalidates_cached_layout() {
+    struct FixedTextMeasurer {
+        key: TextMeasurerKey,
+        width: f32,
+    }
+
+    impl TextMeasurer for FixedTextMeasurer {
+        fn cache_key(&self) -> TextMeasurerKey {
+            self.key
+        }
+
+        fn measure_text(&mut self, _request: TextLayoutRequest<'_>) -> TextLayoutResult {
+            TextLayoutResult {
+                size: Size::new(self.width, 18.0),
+                line_count: 1,
+                elided: false,
+            }
+        }
+    }
+
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new();
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.text_element("label", ElementSpec::new(ElementRole::Text), "Text");
+    });
+    let mut narrow = FixedTextMeasurer {
+        key: TextMeasurerKey::new("narrow"),
+        width: 24.0,
+    };
+    let mut wide = FixedTextMeasurer {
+        key: TextMeasurerKey::new("wide"),
+        width: 96.0,
+    };
+
+    let first = engine.update_with_input_and_text_measurer(
+        &document,
+        &stylesheet,
+        DocumentInput::default(),
+        &mut narrow,
+    );
+    let second = engine.update_with_input_and_text_measurer(
+        &document,
+        &stylesheet,
+        DocumentInput::default(),
+        &mut wide,
+    );
+
+    assert_close(first.layout.find("label").unwrap().rect.size.width, 24.0);
+    assert_close(second.layout.find("label").unwrap().rect.size.width, 96.0);
+    assert!(!second.metrics.reused_cached_layout);
 }
 
 #[test]
