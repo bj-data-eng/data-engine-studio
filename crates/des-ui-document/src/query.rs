@@ -104,6 +104,10 @@ impl<'a> ElementSnapshot<'a> {
         self.element.copyable_text
     }
 
+    pub fn style(&self) -> &crate::ComputedStyle {
+        &self.element.style
+    }
+
     pub fn value(&self) -> Option<&str> {
         self.element.value.as_deref()
     }

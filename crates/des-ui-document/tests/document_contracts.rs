@@ -1,7 +1,7 @@
 use des_ui_document::{
     AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentEventKind,
     DocumentInput, DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector,
-    Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style,
+    Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextSelectionGranularity,
     TextWrapMode, Transition,
@@ -1445,6 +1445,29 @@ fn selectable_text_secondary_click_requests_context() {
     assert!(output.events.iter().any(|event| {
         event.target == ElementId::new("label") && event.kind == DocumentEventKind::ContextRequested
     }));
+}
+
+#[test]
+fn style_rules_resolve_shadow_as_paint_only_property() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("card"),
+        Style::default().size(100.0, 40.0).shadow(Shadow {
+            offset: Point::new(0.0, 8.0),
+            blur: 18.0,
+            spread: 1.0,
+            color: Color::rgba(0, 0, 0, 122),
+        }),
+    );
+    let document = Document::build(Size::new(180.0, 100.0), |ui| {
+        ui.element("card", ElementSpec::new(ElementRole::Card), |_| {});
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let card = output.snapshot().find("card").unwrap();
+
+    assert_eq!(card.rect().size, Size::new(100.0, 40.0));
+    assert_eq!(card.style().shadow.unwrap().blur, 18.0);
 }
 
 #[test]

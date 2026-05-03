@@ -6,15 +6,15 @@ mod views;
 
 use egui_adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
-    document_input, paint_frame, paint_scroll_chrome,
+    document_input, paint_frame, paint_scroll_chrome, paint_surface,
 };
 use styles::stylesheet;
 use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
-    Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentMetrics,
-    DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Length, Point,
-    PointerInput, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
+    Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentMetrics,
+    DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Insets, Length, Point,
+    PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
     TableSpec, TableTrackSize,
 };
 use des_ui_widgets::{
@@ -42,6 +42,12 @@ const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
 const DRAG_ITEM_COUNT: usize = 3;
 const DROP_ZONE_COUNT: usize = 6;
 const SCROLL_LIST_ITEM_COUNT: usize = 14;
+const TEXT_MENU_RADIUS: CornerRadii = CornerRadii {
+    top_left: 6.0,
+    top_right: 6.0,
+    bottom_right: 6.0,
+    bottom_left: 6.0,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LabView {
@@ -335,19 +341,39 @@ impl UiLabState {
             .order(egui::Order::Foreground)
             .fixed_pos(menu_pos)
             .show(ui.ctx(), |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_min_width(140.0);
-                    let copy_enabled = selected_text.as_ref().is_some_and(|text| !text.is_empty());
-                    if ui
-                        .add_enabled(copy_enabled, egui::Button::new("Copy"))
-                        .clicked()
-                    {
-                        if let Some(text) = selected_text.clone() {
-                            ui.ctx().copy_text(text);
+                let menu_rect =
+                    egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(142.0, 42.0));
+                paint_surface(
+                    ui,
+                    menu_rect,
+                    TEXT_MENU_RADIUS,
+                    Some(Shadow {
+                        offset: Point::new(0.0, 8.0),
+                        blur: 18.0,
+                        spread: 1.0,
+                        color: Color::rgba(0, 0, 0, 122),
+                    }),
+                    PANEL,
+                    Some(STROKE),
+                    Insets::all(1.0),
+                );
+                ui.scope_builder(
+                    egui::UiBuilder::new().max_rect(menu_rect.shrink2(egui::vec2(6.0, 5.0))),
+                    |ui| {
+                        let copy_enabled =
+                            selected_text.as_ref().is_some_and(|text| !text.is_empty());
+                        let copy_response = ui.add_sized(
+                            egui::vec2(130.0, 30.0),
+                            egui::Button::new("Copy").frame(false),
+                        );
+                        if copy_response.clicked() && copy_enabled {
+                            if let Some(text) = selected_text.clone() {
+                                ui.ctx().copy_text(text);
+                            }
+                            self.text_context_menu = None;
                         }
-                        self.text_context_menu = None;
-                    }
-                });
+                    },
+                );
             });
         let menu_rect = area_response.response.rect;
         let clicked_away = ui.input(|input| {

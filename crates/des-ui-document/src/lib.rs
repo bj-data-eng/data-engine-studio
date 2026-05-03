@@ -35,7 +35,7 @@ pub use state::{
 };
 pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,
-    Style, StyleRule, StyleSelector, StyleSheet, Transition,
+    Shadow, Style, StyleRule, StyleSelector, StyleSheet, Transition,
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{

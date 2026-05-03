@@ -221,6 +221,7 @@ pub struct Style {
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: EdgeStyle,
+    pub shadow: Option<Shadow>,
     pub text_color: Option<Color>,
     pub font_size: Option<f32>,
     pub text_wrap: Option<TextWrapMode>,
@@ -307,6 +308,25 @@ impl CornerStyle {
             top_right: Some(radii.top_right),
             bottom_right: Some(radii.bottom_right),
             bottom_left: Some(radii.bottom_left),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Shadow {
+    pub offset: Point,
+    pub blur: f32,
+    pub spread: f32,
+    pub color: Color,
+}
+
+impl Default for Shadow {
+    fn default() -> Self {
+        Self {
+            offset: Point::ZERO,
+            blur: 0.0,
+            spread: 0.0,
+            color: Color::rgba(0, 0, 0, 0),
         }
     }
 }
@@ -413,6 +433,11 @@ impl Style {
 
     pub fn border_widths(mut self, widths: Insets) -> Self {
         self.border_width = EdgeStyle::from_insets(widths);
+        self
+    }
+
+    pub fn shadow(mut self, shadow: Shadow) -> Self {
+        self.shadow = Some(shadow);
         self
     }
 
@@ -678,6 +703,7 @@ pub struct ComputedStyle {
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: Insets,
+    pub shadow: Option<Shadow>,
     pub text_color: Color,
     pub font_size: f32,
     pub text_wrap: TextWrapMode,
@@ -725,6 +751,7 @@ impl Default for ComputedStyle {
             background: None,
             border: None,
             border_width: Insets::ZERO,
+            shadow: None,
             text_color: Color::rgb(218, 226, 234),
             font_size: 13.0,
             text_wrap: TextWrapMode::Extend,
@@ -797,6 +824,14 @@ impl ComputedStyle {
         }
         if let Some(value) = style.border {
             self.border = Some(value);
+        }
+        if let Some(value) = style.shadow {
+            self.shadow = Some(Shadow {
+                offset: value.offset,
+                blur: value.blur.max(0.0),
+                spread: value.spread.max(0.0),
+                color: value.color,
+            });
         }
         if let Some(value) = style.border_width.top {
             self.border_width.top = value.max(0.0);

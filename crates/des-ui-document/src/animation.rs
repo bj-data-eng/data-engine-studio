@@ -1,8 +1,8 @@
 use crate::element::{Color, Element, ElementId};
-use crate::geometry::{CornerRadii, Insets, Length, Size};
+use crate::geometry::{CornerRadii, Insets, Length, Point, Size};
 use crate::state::ElementState;
 use crate::style::{
-    ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, Transition,
+    ChildPosition, ComputedStyle, Shadow, StyleInvalidation, StyleSheet, Transition,
     classify_computed_style_change, resolve_style_with_position,
 };
 use std::collections::HashMap;
@@ -105,6 +105,9 @@ fn eased_style(
 
     next.border = ease_optional_color(current.border, target.border, amount, snap_epsilon);
     animating |= next.border != target.border;
+
+    next.shadow = ease_optional_shadow(current.shadow, target.shadow, amount, snap_epsilon);
+    animating |= next.shadow != target.shadow;
 
     next.text_color = ease_color(current.text_color, target.text_color, amount, snap_epsilon);
     animating |= next.text_color != target.text_color;
@@ -306,6 +309,57 @@ fn ease_optional_color(
             }
         }
         (None, None) => None,
+    }
+}
+
+fn ease_optional_shadow(
+    current: Option<Shadow>,
+    target: Option<Shadow>,
+    amount: f32,
+    snap_epsilon: f32,
+) -> Option<Shadow> {
+    match (current, target) {
+        (Some(current), Some(target)) => Some(ease_shadow(current, target, amount, snap_epsilon)),
+        (None, Some(target)) => Some(ease_shadow(
+            Shadow {
+                color: Color {
+                    a: 0,
+                    ..target.color
+                },
+                ..target
+            },
+            target,
+            amount,
+            snap_epsilon,
+        )),
+        (Some(current), None) => {
+            let transparent = Shadow {
+                color: Color {
+                    a: 0,
+                    ..current.color
+                },
+                ..current
+            };
+            let next = ease_shadow(current, transparent, amount, snap_epsilon);
+            if next == transparent {
+                None
+            } else {
+                Some(next)
+            }
+        }
+        (None, None) => None,
+    }
+}
+
+fn ease_shadow(current: Shadow, target: Shadow, amount: f32, snap_epsilon: f32) -> Shadow {
+    Shadow {
+        offset: Point::new(
+            ease_f32(current.offset.x, target.offset.x, amount, snap_epsilon),
+            ease_f32(current.offset.y, target.offset.y, amount, snap_epsilon),
+        ),
+        blur: ease_f32(current.blur, target.blur, amount, snap_epsilon),
+        spread: ease_f32(current.spread, target.spread, amount, snap_epsilon),
+        color: ease_color(current.color, target.color, amount, snap_epsilon),
     }
 }
 

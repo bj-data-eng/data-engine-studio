@@ -1,7 +1,7 @@
 use des_ui_document::{
     Color, CornerRadii, DocumentInput, DocumentOutput, DocumentTextSelection, Glyph, Insets,
-    Overflow, Point, PointerInput, Rect, ResolvedElement, ScrollChrome, Size, TextLayoutRequest,
-    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
+    Overflow, Point, PointerInput, Rect, ResolvedElement, ScrollChrome, Shadow, Size,
+    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 use std::time::Duration;
@@ -119,6 +119,10 @@ fn paint_frame_clipped(
     let painter = ui.painter().with_clip_rect(clip_rect);
     if frame.id.as_str() != "root" {
         let rect = frame_rect(origin, frame);
+
+        if let Some(shadow) = frame.style.shadow {
+            paint_shadow(&painter, rect, frame.style.radius, shadow);
+        }
 
         if let Some(color) = frame.style.background {
             painter.rect_filled(
@@ -259,6 +263,25 @@ fn frame_rect(origin: egui::Pos2, frame: &ResolvedElement) -> egui::Rect {
     document_rect_to_egui(origin, frame.rect)
 }
 
+pub(super) fn paint_surface(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    radius: CornerRadii,
+    shadow: Option<Shadow>,
+    background: Color,
+    border: Option<Color>,
+    border_width: Insets,
+) {
+    let painter = ui.painter();
+    if let Some(shadow) = shadow {
+        paint_shadow(painter, rect, radius, shadow);
+    }
+    painter.rect_filled(rect, to_egui_radius(radius), to_egui_color(background));
+    if let Some(border) = border {
+        paint_border(painter, rect, radius, border_width, border);
+    }
+}
+
 fn frame_content_rect(rect: egui::Rect, frame: &ResolvedElement) -> egui::Rect {
     let min = egui::pos2(
         rect.left() + frame.style.border_width.left + frame.style.padding.left,
@@ -374,6 +397,41 @@ fn paint_border(
             0.0,
             color,
         );
+    }
+}
+
+fn paint_shadow(painter: &egui::Painter, rect: egui::Rect, radius: CornerRadii, shadow: Shadow) {
+    if shadow.color.a == 0 {
+        return;
+    }
+
+    let steps = (shadow.blur / 3.0).ceil().clamp(1.0, 8.0) as usize;
+    let base_rect = rect
+        .translate(egui::vec2(shadow.offset.x, shadow.offset.y))
+        .expand(shadow.spread.max(0.0));
+    for step in (0..steps).rev() {
+        let amount = (step + 1) as f32 / steps as f32;
+        let alpha = (shadow.color.a as f32 * amount * amount / steps as f32)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        let color = Color {
+            a: alpha,
+            ..shadow.color
+        };
+        painter.rect_filled(
+            base_rect.expand(shadow.blur * amount),
+            to_egui_radius(expand_radius(radius, shadow.blur * amount)),
+            to_egui_color(color),
+        );
+    }
+}
+
+fn expand_radius(radius: CornerRadii, amount: f32) -> CornerRadii {
+    CornerRadii {
+        top_left: radius.top_left + amount,
+        top_right: radius.top_right + amount,
+        bottom_right: radius.bottom_right + amount,
+        bottom_left: radius.bottom_left + amount,
     }
 }
 
