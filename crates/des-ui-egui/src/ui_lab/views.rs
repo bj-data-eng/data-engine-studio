@@ -90,9 +90,9 @@ pub(super) fn render_stage(
     dropdown_choice: usize,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
-    active_drag_item: Option<usize>,
+    active_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
-    drag_drop_preview: Option<super::DragDropPreview>,
+    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.element(
         "stage",
@@ -566,9 +566,9 @@ fn render_interaction_view(
     dropdown_choice: usize,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
-    active_drag_item: Option<usize>,
+    active_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
-    drag_drop_preview: Option<super::DragDropPreview>,
+    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.text_element(
         "interaction-heading",
@@ -750,9 +750,9 @@ fn render_drag_drop_lab(
     ui: &mut des_ui_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
-    active_drag_item: Option<usize>,
+    active_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
-    drag_drop_preview: Option<super::DragDropPreview>,
+    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.text_element(
         "drag-title",
@@ -782,7 +782,7 @@ fn render_drag_drop_lab(
                             .collect();
                         cell_items.sort_by_key(|item| drag_item_order[*item]);
                         for item in cell_items {
-                            if active_drag_item == Some(item) {
+                            if active_drag_item == Some(des_ui_widgets::SortableItemId(item)) {
                                 drag_item(ui, item, drag_drop_preview, true);
                             } else {
                                 drag_item(ui, item, drag_drop_preview, false);
@@ -796,14 +796,14 @@ fn render_drag_drop_lab(
     if let Some(item) = active_drag_item
         && drag_pointer.is_some()
     {
-        drag_overlay(ui, item);
+        drag_overlay(ui, item.0);
     }
 }
 
 fn drag_item(
     ui: &mut des_ui_document::DocumentBuilder,
     item: usize,
-    drag_drop_preview: Option<super::DragDropPreview>,
+    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
 ) {
     let label = ["Customers", "Orders", "Rates"][item];
@@ -817,11 +817,11 @@ fn drag_item(
         }
     }
     if let Some(preview) = drag_drop_preview
-        && preview.nearest_item == Some(item)
+        && preview.nearest_item == Some(des_ui_widgets::SortableItemId(item))
     {
         spec = spec.class(match preview.edge {
-            super::DropEdge::Before => "drag-gap-before",
-            super::DropEdge::After => "drag-gap-after",
+            des_ui_widgets::DropEdge::Before => "drag-gap-before",
+            des_ui_widgets::DropEdge::After => "drag-gap-after",
         });
     }
     ui.element(format!("drag-item-{item}"), spec, |ui| {

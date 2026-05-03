@@ -6,6 +6,7 @@ members = [
     "crates/des-python",
     "crates/des-ui-document",
     "crates/des-ui-egui",
+    "crates/des-ui-widgets",
 ]
 resolver = "3"
 
@@ -21,6 +22,7 @@ des-core = { path = "crates/des-core" }
 des-graph-egui = { path = "crates/des-graph-egui" }
 des-ui-document = { path = "crates/des-ui-document" }
 des-ui-egui = { path = "crates/des-ui-egui" }
+des-ui-widgets = { path = "crates/des-ui-widgets" }
 eframe = { version = "0.34", default-features = true }
 egui = "0.34"
 iconflow = { version = "1.0", default-features = false }

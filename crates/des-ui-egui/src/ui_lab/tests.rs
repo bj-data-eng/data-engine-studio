@@ -491,7 +491,7 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
 
     harness.hover_at(destination);
     harness.run();
-    assert_eq!(harness.state().active_drag_item(), Some(0));
+    assert_eq!(harness.state().active_drag_item(), Some(SortableItemId(0)));
     assert!(harness.state().active_drag.is_some());
     let output = state_output(harness.state());
     let overlay = frame(&output, "drag-overlay");

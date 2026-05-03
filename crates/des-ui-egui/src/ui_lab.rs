@@ -13,6 +13,9 @@ use des_ui_document::{
     DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Length, Point,
     PointerInput, Size, Style, StyleSelector, StyleSheet,
 };
+use des_ui_widgets::{
+    DropZoneId, SortableDocumentConfig, SortableDropPreview, SortableItemId, SortableModel,
+};
 use eframe::egui;
 use std::time::{Duration, Instant};
 
@@ -31,6 +34,8 @@ const TEXT_ACCENT: Color = Color::rgb(113, 196, 255);
 const GREEN: Color = Color::rgb(95, 204, 140);
 const PURPLE: Color = Color::rgb(151, 93, 219);
 const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
+const DRAG_ITEM_COUNT: usize = 3;
+const DROP_ZONE_COUNT: usize = 6;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LabView {
@@ -97,7 +102,7 @@ pub(crate) struct UiLabState {
     drag_item_order: [usize; 3],
     active_drag: Option<DocumentDrag>,
     drag_parent_offset: Option<Point>,
-    drag_drop_preview: Option<DragDropPreview>,
+    drag_drop_preview: Option<SortableDropPreview>,
     last_perf: UiLabPerf,
 }
 
@@ -184,7 +189,7 @@ impl UiLabState {
             && let Some(item) = drag_item_for_id(drag.target.as_str())
             && let Some(rect) = output
                 .snapshot()
-                .find(format!("drag-item-{item}").as_str())
+                .find(format!("drag-item-{}", item.0).as_str())
                 .map(|element| element.rect())
         {
             self.drag_parent_offset = Some(Point::new(
@@ -194,8 +199,9 @@ impl UiLabState {
         }
         self.drag_drop_preview = self.active_drag.as_ref().and_then(|drag| {
             let active_item = self.active_drag_item()?;
-            let preview = drag_drop_preview_at(output, drag.current, Some(active_item))?;
-            self.drag_preview_changes_position(active_item, preview)
+            let preview = sortable_config().preview_at(output, drag.current, Some(active_item))?;
+            self.sortable_model()
+                .preview_changes_position(active_item, preview)
                 .then_some(preview)
         });
         if self.active_drag != previous_drag {
@@ -234,11 +240,16 @@ impl UiLabState {
 
     fn finish_drag(&mut self, output: &DocumentOutput, drag: &DocumentDrag) {
         if let Some(item) = drag_item_for_id(drag.target.as_str()) {
-            let preview = drag_drop_preview_at(output, drag.current, Some(item))
-                .filter(|preview| self.drag_preview_changes_position(item, *preview));
+            let preview = sortable_config()
+                .preview_at(output, drag.current, Some(item))
+                .filter(|preview| {
+                    self.sortable_model()
+                        .preview_changes_position(item, *preview)
+                });
             if let Some(preview) = preview {
-                self.drag_item_cells[item] = preview.cell;
-                self.apply_drag_order(item, preview);
+                let mut model = self.sortable_model();
+                model.apply_drop(item, preview);
+                self.apply_sortable_model(&model);
             }
             self.snap_drag_drop_animation(item, preview);
         }
@@ -247,76 +258,28 @@ impl UiLabState {
         self.drag_drop_preview = None;
     }
 
-    fn snap_drag_drop_animation(&mut self, item: usize, preview: Option<DragDropPreview>) {
-        self.document_engine
-            .snap_element_animation(format!("drag-item-{item}").as_str());
-        if let Some(nearest_item) = preview.and_then(|preview| preview.nearest_item) {
-            self.document_engine
-                .snap_element_animation(format!("drag-item-{nearest_item}").as_str());
-        }
+    fn snap_drag_drop_animation(
+        &mut self,
+        item: SortableItemId,
+        preview: Option<SortableDropPreview>,
+    ) {
+        sortable_config().snap_drop_animation(&mut self.document_engine, item, preview);
     }
 
-    fn apply_drag_order(&mut self, item: usize, preview: DragDropPreview) {
-        let mut ordered_items: Vec<_> = (0..self.drag_item_cells.len()).collect();
-        ordered_items.sort_by_key(|candidate| self.drag_item_order[*candidate]);
-        ordered_items.retain(|candidate| *candidate != item);
-
-        let insert_index = preview
-            .nearest_item
-            .and_then(|nearest| {
-                ordered_items
-                    .iter()
-                    .position(|candidate| *candidate == nearest)
-                    .map(|index| {
-                        if preview.edge == DropEdge::After {
-                            index + 1
-                        } else {
-                            index
-                        }
-                    })
-            })
-            .unwrap_or(ordered_items.len());
-        ordered_items.insert(insert_index.min(ordered_items.len()), item);
-
-        for (order, ordered_item) in ordered_items.into_iter().enumerate() {
-            self.drag_item_order[ordered_item] = order;
-        }
+    fn sortable_model(&self) -> SortableModel {
+        SortableModel::new(
+            self.drag_item_cells.map(DropZoneId).to_vec(),
+            self.drag_item_order.to_vec(),
+        )
     }
 
-    fn drag_preview_changes_position(&self, item: usize, preview: DragDropPreview) -> bool {
-        if self.drag_item_cells[item] != preview.cell {
-            return true;
+    fn apply_sortable_model(&mut self, model: &SortableModel) {
+        for (index, zone) in model.item_zones().iter().enumerate() {
+            self.drag_item_cells[index] = zone.0;
         }
-
-        let mut cell_items: Vec<_> = (0..self.drag_item_cells.len())
-            .filter(|candidate| self.drag_item_cells[*candidate] == preview.cell)
-            .collect();
-        cell_items.sort_by_key(|candidate| self.drag_item_order[*candidate]);
-
-        let Some(current_index) = cell_items.iter().position(|candidate| *candidate == item) else {
-            return true;
-        };
-
-        let mut target_items = cell_items;
-        target_items.retain(|candidate| *candidate != item);
-        let target_index = preview
-            .nearest_item
-            .and_then(|nearest| {
-                target_items
-                    .iter()
-                    .position(|candidate| *candidate == nearest)
-                    .map(|index| {
-                        if preview.edge == DropEdge::After {
-                            index + 1
-                        } else {
-                            index
-                        }
-                    })
-            })
-            .unwrap_or(target_items.len())
-            .min(target_items.len());
-
-        target_index != current_index
+        for (index, order) in model.item_order_values().iter().enumerate() {
+            self.drag_item_order[index] = *order;
+        }
     }
 
     #[cfg(test)]
@@ -378,7 +341,7 @@ impl UiLabState {
         document
     }
 
-    fn active_drag_item(&self) -> Option<usize> {
+    fn active_drag_item(&self) -> Option<SortableItemId> {
         self.active_drag
             .as_ref()
             .and_then(|drag| drag_item_for_id(drag.target.as_str()))
@@ -542,97 +505,27 @@ impl UiLabState {
     }
 }
 
-fn drag_item_for_id(id: &str) -> Option<usize> {
-    id.strip_prefix("drag-item-")
-        .or_else(|| id.strip_prefix("drag-handle-"))
-        .and_then(|suffix| suffix.parse::<usize>().ok())
-        .filter(|index| *index < 3)
+fn sortable_config() -> SortableDocumentConfig {
+    SortableDocumentConfig::new(
+        "drag-item",
+        "drag-cell",
+        "drag-item-",
+        "drag-handle-",
+        "drag-cell-",
+        DRAG_ITEM_COUNT,
+        DROP_ZONE_COUNT,
+    )
 }
 
-fn drag_drop_preview_at(
-    output: &DocumentOutput,
-    point: Point,
-    active_item: Option<usize>,
-) -> Option<DragDropPreview> {
-    let cell = drop_cell_at(output, point)?;
-    let nearest = output
-        .snapshot()
-        .elements_with_class("drag-item")
-        .into_iter()
-        .filter_map(|element| {
-            let item = drag_item_for_id(element.id().as_str())?;
-            if active_item == Some(item) {
-                return None;
-            }
-            if drag_item_cell_for_id(output, item) != Some(cell) {
-                return None;
-            }
-            let rect = element.rect();
-            let center_y = rect.origin.y + rect.size.height / 2.0;
-            Some((item, center_y, (point.y - center_y).abs()))
-        })
-        .min_by(|left, right| left.2.total_cmp(&right.2));
-
-    let (nearest_item, edge) = nearest
-        .map(|(item, center_y, _)| {
-            (
-                Some(item),
-                if point.y > center_y {
-                    DropEdge::After
-                } else {
-                    DropEdge::Before
-                },
-            )
-        })
-        .unwrap_or((None, DropEdge::After));
-
-    Some(DragDropPreview {
-        cell,
-        nearest_item,
-        edge,
-    })
+fn drag_item_for_id(id: &str) -> Option<SortableItemId> {
+    sortable_config().item_for_element_id(id)
 }
 
-fn drag_item_cell_for_id(output: &DocumentOutput, item: usize) -> Option<usize> {
-    let point = output
-        .snapshot()
-        .find(format!("drag-item-{item}").as_str())?
-        .rect()
-        .origin;
-    output
-        .snapshot()
-        .elements_with_class("drag-cell")
-        .into_iter()
-        .filter(|element| element.rect().contains(point))
-        .find_map(|element| drop_cell_for_id(element.id().as_str()))
-}
-
+#[cfg(test)]
 fn drop_cell_at(output: &DocumentOutput, point: Point) -> Option<usize> {
-    output
-        .snapshot()
-        .elements_with_class("drag-cell")
-        .into_iter()
-        .filter(|element| element.rect().contains(point))
-        .find_map(|element| drop_cell_for_id(element.id().as_str()))
-}
-
-fn drop_cell_for_id(id: &str) -> Option<usize> {
-    id.strip_prefix("drag-cell-")
-        .and_then(|suffix| suffix.parse::<usize>().ok())
-        .filter(|index| *index < 6)
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct DragDropPreview {
-    cell: usize,
-    nearest_item: Option<usize>,
-    edge: DropEdge,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum DropEdge {
-    Before,
-    After,
+    sortable_config()
+        .drop_zone_at(output, point)
+        .map(|zone| zone.0)
 }
 
 fn lab_action_for_id(id: &str) -> Option<LabAction> {

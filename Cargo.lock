@@ -755,11 +755,19 @@ dependencies = [
  "des-core",
  "des-graph-egui",
  "des-ui-document",
+ "des-ui-widgets",
  "eframe",
  "egui",
  "egui_kittest",
  "iconflow",
  "image",
+]
+
+[[package]]
+name = "des-ui-widgets"
+version = "0.1.0"
+dependencies = [
+ "des-ui-document",
 ]
 
 [[package]]

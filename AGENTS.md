@@ -11,6 +11,7 @@ Current workspace:
 - `crates/des-core`: shared primitives such as app info, diagnostics, errors, and small stable types.
 - `crates/des-app`: app state, command handling, snapshots, and orchestration. This is the composition layer.
 - `crates/des-ui-document`: standalone-style UI document and style model with deterministic style resolution, resolved layout output, retained element state, and input routing. This crate must not depend on egui.
+- `crates/des-ui-widgets`: reusable document-backed widget behavior built on the document model, such as sortable drag/drop policies. This crate must not depend on egui or Python.
 - `crates/des-graph-egui`: vendored graph interaction crate kept while graph UX is still being explored.
 - `crates/des-ui-egui`: egui host adapter and current UI lab. UI renders app snapshots/document output and sends commands.
 - `crates/des-python`: PyO3 extension module exposed to Python as `data_engine_studio._native`.
@@ -35,6 +36,7 @@ Keep app identity centralized.
 - Prefer typed commands, events, snapshots, reports, and change sets over shared mutable state.
 - Keep graph, project, validation, query, and execution logic independent from `egui` and Python.
 - Keep `des-ui-document` independent from `egui` and Python. It should expose product-neutral UI document contracts: element trees, style sheets, resolved elements, input events, and retained interaction state.
+- Keep `des-ui-widgets` independent from `egui` and Python. It should expose reusable widget behavior and policies that operate through `des-ui-document` contracts.
 - Keep `des-ui-egui` out of business logic. UI should render state and dispatch commands.
 - Treat `des-ui-egui` as an adapter/host for the document engine where possible: translate egui input into document input and paint resolved document output through egui/epaint.
 - Keep `des-python` thin. It should expose native launch/runtime diagnostics, not own app behavior.
@@ -48,6 +50,7 @@ python package
   -> des-python
     -> des-app
       -> des-ui-egui
+        -> des-ui-widgets
         -> des-ui-document
       -> domain/service crates
         -> des-core
@@ -65,6 +68,10 @@ Preferred pattern:
 des-ui-document
   owns the document tree + style model
   resolves layout, z-order, hit testing, and retained UI state
+
+des-ui-widgets
+  provides reusable document-backed widget behavior
+  emits typed widget changes through document snapshots and events
 
 des-ui-egui
   adapts egui input/output to the document engine

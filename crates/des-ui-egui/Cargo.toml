@@ -13,6 +13,7 @@ des-app.workspace = true
 des-core.workspace = true
 des-graph-egui.workspace = true
 des-ui-document.workspace = true
+des-ui-widgets.workspace = true
 eframe.workspace = true
 egui.workspace = true
 iconflow = { workspace = true, features = ["pack-lucide"] }

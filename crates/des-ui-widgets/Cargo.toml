@@ -1,0 +1,9 @@
+[package]
+name = "des-ui-widgets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+des-ui-document.workspace = true
