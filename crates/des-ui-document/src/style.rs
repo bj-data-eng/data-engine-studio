@@ -1044,6 +1044,10 @@ impl StyleSheet {
     pub fn push_rule(&mut self, selector: StyleSelector, style: Style) {
         self.rules.push(StyleRule::new(selector, style));
     }
+
+    pub fn extend(&mut self, stylesheet: StyleSheet) {
+        self.rules.extend(stylesheet.rules);
+    }
 }
 
 pub(crate) fn resolve_style_with_position(
