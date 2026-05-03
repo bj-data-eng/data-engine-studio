@@ -1,4 +1,5 @@
 use super::*;
+use crate::adapter::EguiTextMeasurer;
 use crate::graphics_testing::{
     TEST_HEIGHT, TEST_WIDTH, assert_exact_image_match, compare_images, image_stats, render_harness,
     test_harness,
@@ -82,7 +83,7 @@ fn state_output(state: &UiLabState) -> DocumentOutput {
 
 fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> DocumentOutput {
     let mut engine = DocumentEngine::default();
-    let mut text_measurer = super::egui_adapter::EguiTextMeasurer::new(ctx);
+    let mut text_measurer = EguiTextMeasurer::new(ctx);
     let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
     engine.update_with_input_and_text_measurer(
         &document,

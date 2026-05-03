@@ -1,3 +1,4 @@
+mod adapter;
 mod app;
 #[cfg(test)]
 mod graphics_testing;

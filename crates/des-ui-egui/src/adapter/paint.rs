@@ -1,106 +1,10 @@
+use super::text::{layout_job, paint_document_text_selection};
 use des_ui_document::{
-    Color, CornerRadii, DocumentInput, DocumentOutput, DocumentTextSelection, Glyph, Insets,
-    Overflow, Point, PointerInput, Rect, ResolvedElement, ScrollChrome, Shadow, Size,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
+    Color, CornerRadii, DocumentTextSelection, Glyph, Insets, Overflow, Rect, ResolvedElement,
+    ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
 };
 use eframe::egui;
-use std::{sync::Arc, time::Duration};
-
-pub(super) const TEXT_SELECTION_CLICK_INTERVAL: Duration = Duration::from_millis(800);
-pub(super) const TEXT_SELECTION_CLICK_DISTANCE: f32 = 6.0;
-
-pub(super) struct EguiTextMeasurer {
-    ctx: egui::Context,
-}
-
-impl EguiTextMeasurer {
-    pub(super) fn new(ctx: &egui::Context) -> Self {
-        Self { ctx: ctx.clone() }
-    }
-}
-
-impl TextMeasurer for EguiTextMeasurer {
-    fn cache_key(&self) -> TextMeasurerKey {
-        TextMeasurerKey::new("egui")
-    }
-
-    fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
-        let galley = self
-            .ctx
-            .fonts_mut(|fonts| fonts.layout_job(layout_job(request, egui::Color32::WHITE)));
-        let size = galley.size();
-        TextLayoutResult {
-            size: Size::new(size.x, size.y),
-            line_count: galley.rows.len(),
-            elided: galley.elided,
-        }
-    }
-
-    fn text_index_at(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
-        let galley = self
-            .ctx
-            .fonts_mut(|fonts| fonts.layout_job(layout_job(request, egui::Color32::WHITE)));
-        galley.cursor_from_pos(egui::vec2(point.x, point.y)).index
-    }
-}
-
-pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
-    ui.input(|input| DocumentInput {
-        pointer: input.pointer.hover_pos().map(|position| PointerInput {
-            position: Point::new(position.x - origin.x, position.y - origin.y),
-            primary_delta: Point::new(input.pointer.delta().x, input.pointer.delta().y),
-            primary_down: input.pointer.primary_down(),
-            primary_pressed: input.pointer.primary_pressed(),
-            primary_clicked: input.pointer.primary_clicked(),
-            primary_click_count: if input
-                .pointer
-                .button_triple_clicked(egui::PointerButton::Primary)
-            {
-                3
-            } else if input
-                .pointer
-                .button_double_clicked(egui::PointerButton::Primary)
-            {
-                2
-            } else if input.pointer.primary_clicked() {
-                1
-            } else {
-                0
-            },
-            secondary_clicked: input.pointer.secondary_clicked(),
-            time_seconds: input.time,
-        }),
-        scroll_delta: Point::new(input.smooth_scroll_delta.x, input.smooth_scroll_delta.y),
-    })
-}
-
-pub(super) fn configure_text_selection_input(context: &egui::Context) {
-    context.options_mut(|options| {
-        options.input_options.max_click_duration = TEXT_SELECTION_CLICK_INTERVAL.as_secs_f64();
-        options.input_options.max_click_dist = TEXT_SELECTION_CLICK_DISTANCE;
-    });
-}
-
-pub(super) fn copy_selected_text_on_command(ui: &egui::Ui, output: &DocumentOutput) {
-    if copy_requested(ui)
-        && let Some(text) = output.selected_text()
-        && !text.is_empty()
-    {
-        ui.ctx().copy_text(text);
-    }
-}
-
-fn copy_requested(ui: &egui::Ui) -> bool {
-    ui.ctx().input_mut(|input| {
-        input
-            .events
-            .iter()
-            .any(|event| matches!(event, egui::Event::Copy))
-            || input.consume_key(egui::Modifiers::COMMAND, egui::Key::C)
-    })
-}
-
-pub(super) fn paint_frame(
+pub(crate) fn paint_frame(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
     frame: &ResolvedElement,
@@ -224,126 +128,11 @@ fn paint_frame_clipped(
     }
 }
 
-fn paint_document_text_selection(
-    galley: &mut Arc<egui::Galley>,
-    cursor_range: &egui::text_selection::CCursorRange,
-    background_color: Color,
-    text_color: Color,
-) {
-    if cursor_range.is_empty() {
-        return;
-    }
-
-    let background_color = to_egui_color(background_color);
-    let text_color = to_egui_color(text_color);
-    let galley = Arc::make_mut(galley);
-    let [min, max] = cursor_range.sorted_cursors();
-    let min = galley.layout_from_cursor(min);
-    let max = galley.layout_from_cursor(max);
-
-    for row_index in min.row..=max.row {
-        let placed_row = &mut galley.rows[row_index];
-        let row = Arc::make_mut(&mut placed_row.row);
-        let left = if row_index == min.row {
-            row.x_offset(min.column)
-        } else {
-            0.0
-        };
-        let right = if row_index == max.row {
-            row.x_offset(max.column)
-        } else {
-            let newline_size = if placed_row.ends_with_newline {
-                row.height() / 2.0
-            } else {
-                0.0
-            };
-            row.size.x + newline_size
-        };
-        let rect = egui::Rect::from_min_max(egui::pos2(left, 0.0), egui::pos2(right, row.size.y));
-
-        if !row.glyphs.is_empty() {
-            let first_glyph_index = if row_index == min.row { min.column } else { 0 };
-            let last_glyph_index = if row_index == max.row {
-                max.column
-            } else {
-                row.glyphs.len() - 1
-            };
-            let first_vertex_index = row
-                .glyphs
-                .get(first_glyph_index)
-                .map_or(row.visuals.glyph_vertex_range.end, |glyph| {
-                    glyph.first_vertex as _
-                });
-            let last_vertex_index = row
-                .glyphs
-                .get(last_glyph_index)
-                .map_or(row.visuals.glyph_vertex_range.end, |glyph| {
-                    glyph.first_vertex as _
-                });
-            for vertex_index in first_vertex_index..last_vertex_index {
-                row.visuals.mesh.vertices[vertex_index].color = text_color;
-            }
-        }
-
-        let mesh = &mut row.visuals.mesh;
-        let glyph_index_start = row.visuals.glyph_index_start;
-        let num_indices_before = mesh.indices.len();
-        mesh.add_colored_rect(rect, background_color);
-        let selection_triangles = [
-            mesh.indices[num_indices_before],
-            mesh.indices[num_indices_before + 1],
-            mesh.indices[num_indices_before + 2],
-            mesh.indices[num_indices_before + 3],
-            mesh.indices[num_indices_before + 4],
-            mesh.indices[num_indices_before + 5],
-        ];
-        for index in (glyph_index_start..num_indices_before).rev() {
-            mesh.indices.swap(index, index + 6);
-        }
-        mesh.indices[glyph_index_start..glyph_index_start + 6]
-            .clone_from_slice(&selection_triangles);
-        row.visuals.mesh_bounds = mesh.calc_bounds();
-    }
-}
-
-fn layout_job(request: TextLayoutRequest<'_>, color: egui::Color32) -> egui::text::LayoutJob {
-    let wrap_width = if request.wrap_mode == TextWrapMode::Extend {
-        f32::INFINITY
-    } else {
-        request.wrap_width.max(1.0)
-    };
-    let mut job = egui::text::LayoutJob::simple(
-        request.text.to_owned(),
-        egui::FontId::proportional(request.font_size),
-        color,
-        wrap_width,
-    );
-    job.wrap.max_width = wrap_width;
-    if request.wrap_mode == TextWrapMode::Truncate {
-        job.wrap.max_rows = 1;
-        job.wrap.break_anywhere = true;
-    }
-    if request.wrap_mode != TextWrapMode::Truncate
-        && let Some(max_lines) = request.max_lines
-    {
-        job.wrap.max_rows = max_lines.max(1);
-        if job.wrap.max_rows == 1 {
-            job.wrap.break_anywhere = true;
-        }
-    }
-    if let Some(line_height) = request.line_height {
-        if let Some(section) = job.sections.first_mut() {
-            section.format.line_height = Some(line_height.max(1.0));
-        }
-    }
-    job
-}
-
 fn frame_rect(origin: egui::Pos2, frame: &ResolvedElement) -> egui::Rect {
     document_rect_to_egui(origin, frame.rect)
 }
 
-pub(super) fn paint_surface(
+pub(crate) fn paint_surface(
     ui: &mut egui::Ui,
     rect: egui::Rect,
     radius: CornerRadii,
@@ -562,7 +351,7 @@ fn gaussian_alpha(distance: f32, sigma: f32) -> f32 {
     (-0.5 * (distance / sigma).powi(2)).exp()
 }
 
-pub(super) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {
+pub(crate) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {
     let painter = ui.painter();
     for chrome in chromes {
         if !chrome.visible {

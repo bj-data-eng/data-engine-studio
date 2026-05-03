@@ -1,10 +1,9 @@
-mod egui_adapter;
 mod styles;
 #[cfg(test)]
 mod tests;
 mod views;
 
-use egui_adapter::{
+use crate::adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
     document_input, paint_frame, paint_scroll_chrome, paint_surface,
 };
