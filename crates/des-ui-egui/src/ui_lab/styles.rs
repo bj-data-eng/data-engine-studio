@@ -781,6 +781,13 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default().background(Color::rgb(38, 32, 48)),
         )
         .rule(
+            StyleSelector::class("drag-workbench"),
+            Style::default()
+                .direction(Direction::Row)
+                .align_items(AlignItems::Start)
+                .gap(14.0),
+        )
+        .rule(
             StyleSelector::class("drag-grid"),
             Style::default()
                 .direction(Direction::Row)
@@ -925,6 +932,45 @@ pub(super) fn stylesheet() -> StyleSheet {
                 bottom: 39.0,
                 left: 0.0,
             }),
+        )
+        .rule(
+            StyleSelector::class("drag-scroll-list-card"),
+            Style::default()
+                .width(Length::Px(450.0))
+                .padding(Insets::all(10.0))
+                .gap(8.0)
+                .background(PANEL_ALT)
+                .border(STROKE)
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("drag-scroll-list"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(126.0))
+                .padding(Insets::all(6.0))
+                .gap(5.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
+                .scrollbar_radius(5.0)
+                .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
+                .scrollbar_track_color(Color::rgba(0, 0, 0, 48))
+                .scrollbar_hover_handle_color(Color::rgba(232, 236, 240, 118))
+                .scrollbar_hover_track_color(Color::rgba(0, 0, 0, 48))
+                .scrollbar_pressed_handle_color(Color::rgba(232, 236, 240, 170))
+                .scrollbar_pressed_handle_border_color(STROKE_SELECTED)
+                .scrollbar_pressed_handle_border_width(1.0)
+                .transition(Transition::ease_out(0.12)),
+        )
+        .rule(
+            StyleSelector::class("drag-scroll-row"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(34.0))
+                .background(CARD_SELECTED)
+                .border(STROKE_SELECTED)
+                .radius(5.0),
         )
         .rule(
             StyleSelector::class("feature-card"),

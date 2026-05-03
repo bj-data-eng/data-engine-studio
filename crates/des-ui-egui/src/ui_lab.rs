@@ -14,7 +14,8 @@ use des_ui_document::{
     PointerInput, Size, Style, StyleSelector, StyleSheet,
 };
 use des_ui_widgets::{
-    DropZoneId, SortableDocumentConfig, SortableDropPreview, SortableItemId, SortableModel,
+    AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
+    SortableItemId, SortableModel,
 };
 use eframe::egui;
 use std::time::{Duration, Instant};
@@ -36,6 +37,7 @@ const PURPLE: Color = Color::rgb(151, 93, 219);
 const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
 const DRAG_ITEM_COUNT: usize = 3;
 const DROP_ZONE_COUNT: usize = 6;
+const SCROLL_LIST_ITEM_COUNT: usize = 14;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LabView {
@@ -100,9 +102,12 @@ pub(crate) struct UiLabState {
     loop_action_count: usize,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
+    scroll_list_item_order: [usize; SCROLL_LIST_ITEM_COUNT],
     active_drag: Option<DocumentDrag>,
     drag_parent_offset: Option<Point>,
+    drag_source_size: Option<Size>,
     drag_drop_preview: Option<SortableDropPreview>,
+    scroll_list_drop_preview: Option<SortableDropPreview>,
     last_perf: UiLabPerf,
 }
 
@@ -121,9 +126,12 @@ impl Default for UiLabState {
             loop_action_count: 0,
             drag_item_cells: [0, 2, 4],
             drag_item_order: [0, 1, 2],
+            scroll_list_item_order: core::array::from_fn(|index| index),
             active_drag: None,
             drag_parent_offset: None,
+            drag_source_size: None,
             drag_drop_preview: None,
+            scroll_list_drop_preview: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -186,24 +194,51 @@ impl UiLabState {
         self.active_drag = output.active_drag.clone();
         if previous_drag.is_none()
             && let Some(drag) = &self.active_drag
-            && let Some(item) = drag_item_for_id(drag.target.as_str())
+            && let Some(item_id) = source_item_element_id(drag.target.as_str())
             && let Some(rect) = output
                 .snapshot()
-                .find(format!("drag-item-{}", item.0).as_str())
+                .find(item_id.as_str())
                 .map(|element| element.rect())
         {
             self.drag_parent_offset = Some(Point::new(
                 drag.origin.x - rect.origin.x,
                 drag.origin.y - rect.origin.y,
             ));
+            self.drag_source_size = Some(rect.size);
         }
-        self.drag_drop_preview = self.active_drag.as_ref().and_then(|drag| {
-            let active_item = self.active_drag_item()?;
-            let preview = sortable_config().preview_at(output, drag.current, Some(active_item))?;
-            self.sortable_model()
-                .preview_changes_position(active_item, preview)
-                .then_some(preview)
-        });
+        self.drag_drop_preview = None;
+        self.scroll_list_drop_preview = None;
+        if let Some(drag) = &self.active_drag {
+            if let Some(active_item) = active_grid_drag_item(drag.target.as_str()) {
+                self.drag_drop_preview = sortable_config()
+                    .preview_at(output, drag.current, Some(active_item))
+                    .filter(|preview| {
+                        self.sortable_model()
+                            .preview_changes_position(active_item, *preview)
+                    });
+            } else if let Some(active_item) = active_scroll_list_drag_item(drag.target.as_str()) {
+                self.scroll_list_drop_preview = scroll_list_config()
+                    .preview_at(output, drag.current, Some(active_item))
+                    .filter(|preview| {
+                        self.scroll_list_model()
+                            .preview_changes_position(active_item, *preview)
+                    });
+            }
+        }
+        if let Some(drag) = &self.active_drag
+            && AutoScroller::new(AutoScrollOptions {
+                threshold_x: 0.0,
+                threshold_y: 0.24,
+                acceleration: 10.0,
+                ..AutoScrollOptions::default()
+            })
+            .scroll_drag_with_filter(&mut self.document_engine, output, drag.current, |id| {
+                id.as_str().starts_with("drag-scroll-list-")
+            })
+            .is_some()
+        {
+            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
+        }
         if self.active_drag != previous_drag {
             ui.ctx().request_repaint();
         }
@@ -220,7 +255,7 @@ impl UiLabState {
                     }
                 }
                 DocumentEventKind::Pressed => {
-                    if drag_item_for_id(event.target.as_str()).is_some() {
+                    if source_item_element_id(event.target.as_str()).is_some() {
                         ui.ctx().request_repaint();
                     }
                 }
@@ -239,7 +274,7 @@ impl UiLabState {
     }
 
     fn finish_drag(&mut self, output: &DocumentOutput, drag: &DocumentDrag) {
-        if let Some(item) = drag_item_for_id(drag.target.as_str()) {
+        if let Some(item) = active_grid_drag_item(drag.target.as_str()) {
             let preview = sortable_config()
                 .preview_at(output, drag.current, Some(item))
                 .filter(|preview| {
@@ -252,10 +287,25 @@ impl UiLabState {
                 self.apply_sortable_model(&model);
             }
             self.snap_drag_drop_animation(item, preview);
+        } else if let Some(item) = active_scroll_list_drag_item(drag.target.as_str()) {
+            let preview = scroll_list_config()
+                .preview_at(output, drag.current, Some(item))
+                .filter(|preview| {
+                    self.scroll_list_model()
+                        .preview_changes_position(item, *preview)
+                });
+            if let Some(preview) = preview {
+                let mut model = self.scroll_list_model();
+                model.apply_drop(item, preview);
+                self.apply_scroll_list_model(&model);
+            }
+            scroll_list_config().snap_drop_animation(&mut self.document_engine, item, preview);
         }
         self.active_drag = None;
         self.drag_parent_offset = None;
+        self.drag_source_size = None;
         self.drag_drop_preview = None;
+        self.scroll_list_drop_preview = None;
     }
 
     fn snap_drag_drop_animation(
@@ -279,6 +329,19 @@ impl UiLabState {
         }
         for (index, order) in model.item_order_values().iter().enumerate() {
             self.drag_item_order[index] = *order;
+        }
+    }
+
+    fn scroll_list_model(&self) -> SortableModel {
+        SortableModel::new(
+            vec![DropZoneId(0); SCROLL_LIST_ITEM_COUNT],
+            self.scroll_list_item_order.to_vec(),
+        )
+    }
+
+    fn apply_scroll_list_model(&mut self, model: &SortableModel) {
+        for (index, order) in model.item_order_values().iter().enumerate() {
+            self.scroll_list_item_order[index] = *order;
         }
     }
 
@@ -326,9 +389,12 @@ impl UiLabState {
                                 self.dropdown_choice,
                                 self.drag_item_cells,
                                 self.drag_item_order,
+                                self.scroll_list_item_order,
                                 self.active_drag_item(),
+                                self.active_scroll_list_drag_item(),
                                 self.active_drag.as_ref().map(|drag| drag.current),
                                 self.drag_drop_preview,
+                                self.scroll_list_drop_preview,
                             );
                         },
                     );
@@ -344,21 +410,28 @@ impl UiLabState {
     fn active_drag_item(&self) -> Option<SortableItemId> {
         self.active_drag
             .as_ref()
-            .and_then(|drag| drag_item_for_id(drag.target.as_str()))
+            .and_then(|drag| active_grid_drag_item(drag.target.as_str()))
+    }
+
+    fn active_scroll_list_drag_item(&self) -> Option<SortableItemId> {
+        self.active_drag
+            .as_ref()
+            .and_then(|drag| active_scroll_list_drag_item(drag.target.as_str()))
     }
 
     fn active_stylesheet(&self) -> StyleSheet {
         let mut stylesheet = self.stylesheet.clone();
         if let Some(drag) = &self.active_drag {
             let offset = self.drag_parent_offset.unwrap_or(drag.pointer_offset);
-            stylesheet.push_rule(
-                StyleSelector::id("drag-overlay"),
-                Style::default()
-                    .absolute_viewport()
-                    .left(Length::Px(drag.current.x - offset.x))
-                    .top(Length::Px(drag.current.y - offset.y))
-                    .z_index(100),
-            );
+            let mut overlay_style = Style::default()
+                .absolute_viewport()
+                .left(Length::Px(drag.current.x - offset.x))
+                .top(Length::Px(drag.current.y - offset.y))
+                .z_index(100);
+            if let Some(size) = self.drag_source_size {
+                overlay_style = overlay_style.size(size.width, size.height);
+            }
+            stylesheet.push_rule(StyleSelector::id("drag-overlay"), overlay_style);
         }
         stylesheet
     }
@@ -517,8 +590,32 @@ fn sortable_config() -> SortableDocumentConfig {
     )
 }
 
-fn drag_item_for_id(id: &str) -> Option<SortableItemId> {
+fn scroll_list_config() -> SortableDocumentConfig {
+    SortableDocumentConfig::new(
+        "drag-scroll-item",
+        "drag-scroll-list",
+        "drag-scroll-item-",
+        "drag-scroll-handle-",
+        "drag-scroll-list-",
+        SCROLL_LIST_ITEM_COUNT,
+        1,
+    )
+}
+
+fn active_grid_drag_item(id: &str) -> Option<SortableItemId> {
     sortable_config().item_for_element_id(id)
+}
+
+fn active_scroll_list_drag_item(id: &str) -> Option<SortableItemId> {
+    scroll_list_config().item_for_element_id(id)
+}
+
+fn source_item_element_id(id: &str) -> Option<String> {
+    active_grid_drag_item(id)
+        .map(|item| format!("drag-item-{}", item.0))
+        .or_else(|| {
+            active_scroll_list_drag_item(id).map(|item| format!("drag-scroll-item-{}", item.0))
+        })
 }
 
 #[cfg(test)]

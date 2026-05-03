@@ -1,6 +1,6 @@
 use crate::animation::{AnimationUpdate, update_element_style_animation};
 use crate::element::{Document, Element, ElementId};
-use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
+use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, layout_element};
 use crate::scroll::scroll_chrome;
 use crate::state::{
@@ -215,6 +215,24 @@ impl DocumentEngine {
             self.cached_layout = None;
         }
         had_animation
+    }
+
+    pub fn scroll_element_by(&mut self, id: &str, delta: Point) -> bool {
+        let id = ElementId::new(id);
+        let max_scroll = self.scroll_limits.get(&id).copied().unwrap_or_default();
+        let Some(state) = self.states.get_mut(&id) else {
+            return false;
+        };
+
+        let scroll_x = (state.scroll_x + delta.x).clamp(0.0, max_scroll.width);
+        let scroll_y = (state.scroll_y + delta.y).clamp(0.0, max_scroll.height);
+        let mut changed = false;
+        changed |= set_f32(&mut state.scroll_x, scroll_x);
+        changed |= set_f32(&mut state.scroll_y, scroll_y);
+        if changed {
+            self.cached_layout = None;
+        }
+        changed
     }
 
     fn cached_layout_matches(&self, viewport_rect: Rect, document_root: &Element) -> bool {

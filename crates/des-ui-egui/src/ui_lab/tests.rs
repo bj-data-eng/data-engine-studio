@@ -617,14 +617,16 @@ fn interaction_drag_drop_suppresses_gap_at_original_position() {
     harness.run();
 
     let start = center(state_rect(harness.state(), "drag-handle-1"));
-    let first_item = state_rect(harness.state(), "drag-item-0");
-    let original_position = egui::pos2(
-        first_item.origin.x + first_item.size.width / 2.0,
-        first_item.origin.y + first_item.size.height + 8.0,
-    );
     harness.hover_at(start);
     harness.drag_at(start);
+    harness.hover_at(egui::pos2(start.x + 8.0, start.y));
     harness.run();
+    let output = state_output(harness.state());
+    let first_item = frame(&output, "drag-item-0").rect;
+    let original_position = egui::pos2(
+        first_item.origin.x + first_item.size.width / 2.0,
+        first_item.origin.y + first_item.size.height + 2.0,
+    );
     harness.hover_at(original_position);
     harness.run();
 
@@ -684,6 +686,34 @@ fn interaction_drag_drop_styles_are_animated() {
     assert!(
         frame(&output, "drag-overlay").style.transition.is_some(),
         "drag overlay should define a transition for drag/drop styling"
+    );
+}
+
+#[test]
+fn interaction_drag_drop_auto_scrolls_opted_in_list_pane() {
+    let mut harness = lab_harness("interaction");
+    let start = center(state_rect(harness.state(), "drag-scroll-handle-0"));
+    let list = state_rect(harness.state(), "drag-scroll-list-0");
+    let near_bottom = egui::pos2(
+        list.origin.x + list.size.width / 2.0,
+        list.origin.y + list.size.height - 4.0,
+    );
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(near_bottom);
+    harness.run_steps(4);
+
+    assert!(harness.state().active_drag.is_some());
+    assert!(
+        harness
+            .state()
+            .document_engine
+            .element_state("drag-scroll-list-0")
+            .unwrap()
+            .scroll_y
+            > 0.0,
+        "dragging near the bottom of an opted-in list pane should auto-scroll it"
     );
 }
 

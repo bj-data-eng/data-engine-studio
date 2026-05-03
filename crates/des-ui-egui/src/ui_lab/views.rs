@@ -90,9 +90,12 @@ pub(super) fn render_stage(
     dropdown_choice: usize,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
+    scroll_list_item_order: [usize; 14],
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.element(
         "stage",
@@ -109,9 +112,12 @@ pub(super) fn render_stage(
                 dropdown_choice,
                 drag_item_cells,
                 drag_item_order,
+                scroll_list_item_order,
                 active_drag_item,
+                active_scroll_list_drag_item,
                 drag_pointer,
                 drag_drop_preview,
+                scroll_list_drop_preview,
             ),
             LabView::Styling => render_styling_view(ui, dense_mode),
             LabView::Animation => render_animation_view(ui),
@@ -566,9 +572,12 @@ fn render_interaction_view(
     dropdown_choice: usize,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
+    scroll_list_item_order: [usize; 14],
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.text_element(
         "interaction-heading",
@@ -641,9 +650,12 @@ fn render_interaction_view(
         ui,
         drag_item_cells,
         drag_item_order,
+        scroll_list_item_order,
         active_drag_item,
+        active_scroll_list_drag_item,
         drag_pointer,
         drag_drop_preview,
+        scroll_list_drop_preview,
     );
     render_document_update_loop(ui);
 }
@@ -750,9 +762,12 @@ fn render_drag_drop_lab(
     ui: &mut des_ui_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
+    scroll_list_item_order: [usize; 14],
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     drag_pointer: Option<des_ui_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
     ui.text_element(
         "drag-title",
@@ -760,37 +775,76 @@ fn render_drag_drop_lab(
         "Drag and drop grid",
     );
     ui.element(
-        "drag-grid",
-        ElementSpec::new(ElementRole::Panel).class("drag-grid"),
+        "drag-workbench",
+        ElementSpec::new(ElementRole::Panel).class("drag-workbench"),
         |ui| {
-            for cell in 0..6 {
-                let column = if cell % 2 == 0 { "Left" } else { "Right" };
-                let row = cell / 2 + 1;
-                ui.element(
-                    format!("drag-cell-{cell}"),
-                    ElementSpec::new(ElementRole::Panel).class("drag-cell"),
-                    |ui| {
-                        ui.text_element(
-                            format!("drag-cell-{cell}-label"),
-                            ElementSpec::new(ElementRole::Text).class("muted"),
-                            format!("{column} row {row}"),
-                        );
-                        let mut cell_items: Vec<_> = drag_item_cells
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(item, item_cell)| (*item_cell == cell).then_some(item))
-                            .collect();
-                        cell_items.sort_by_key(|item| drag_item_order[*item]);
-                        for item in cell_items {
-                            if active_drag_item == Some(des_ui_widgets::SortableItemId(item)) {
-                                drag_item(ui, item, drag_drop_preview, true);
-                            } else {
-                                drag_item(ui, item, drag_drop_preview, false);
+            ui.element(
+                "drag-scroll-list-card",
+                ElementSpec::new(ElementRole::Panel).class("drag-scroll-list-card"),
+                |ui| {
+                    ui.text_element(
+                        "drag-scroll-list-title",
+                        ElementSpec::new(ElementRole::Text).class("section-subtitle"),
+                        "Scrollable list target",
+                    );
+                    ui.element(
+                        "drag-scroll-list-0",
+                        ElementSpec::new(ElementRole::Panel).class("drag-scroll-list"),
+                        |ui| {
+                            let mut list_items: Vec<_> =
+                                (0..scroll_list_item_order.len()).collect();
+                            list_items.sort_by_key(|item| scroll_list_item_order[*item]);
+                            for item in list_items {
+                                drag_scroll_item(
+                                    ui,
+                                    item,
+                                    scroll_list_drop_preview,
+                                    active_scroll_list_drag_item
+                                        == Some(des_ui_widgets::SortableItemId(item)),
+                                );
                             }
-                        }
-                    },
-                );
-            }
+                        },
+                    );
+                },
+            );
+            ui.element(
+                "drag-grid",
+                ElementSpec::new(ElementRole::Panel).class("drag-grid"),
+                |ui| {
+                    for cell in 0..6 {
+                        let column = if cell % 2 == 0 { "Left" } else { "Right" };
+                        let row = cell / 2 + 1;
+                        ui.element(
+                            format!("drag-cell-{cell}"),
+                            ElementSpec::new(ElementRole::Panel).class("drag-cell"),
+                            |ui| {
+                                ui.text_element(
+                                    format!("drag-cell-{cell}-label"),
+                                    ElementSpec::new(ElementRole::Text).class("muted"),
+                                    format!("{column} row {row}"),
+                                );
+                                let mut cell_items: Vec<_> = drag_item_cells
+                                    .iter()
+                                    .enumerate()
+                                    .filter_map(|(item, item_cell)| {
+                                        (*item_cell == cell).then_some(item)
+                                    })
+                                    .collect();
+                                cell_items.sort_by_key(|item| drag_item_order[*item]);
+                                for item in cell_items {
+                                    if active_drag_item
+                                        == Some(des_ui_widgets::SortableItemId(item))
+                                    {
+                                        drag_item(ui, item, drag_drop_preview, true);
+                                    } else {
+                                        drag_item(ui, item, drag_drop_preview, false);
+                                    }
+                                }
+                            },
+                        );
+                    }
+                },
+            );
         },
     );
     if let Some(item) = active_drag_item
@@ -798,6 +852,62 @@ fn render_drag_drop_lab(
     {
         drag_overlay(ui, item.0);
     }
+    if let Some(item) = active_scroll_list_drag_item
+        && drag_pointer.is_some()
+    {
+        drag_scroll_overlay(ui, item.0);
+    }
+}
+
+fn drag_scroll_item(
+    ui: &mut des_ui_document::DocumentBuilder,
+    item: usize,
+    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    origin_space: bool,
+) {
+    let label = format!("auto-scroll row {:02}", item + 1);
+    let mut spec = ElementSpec::new(ElementRole::Card)
+        .class("drag-item")
+        .class("drag-scroll-item")
+        .value(label.clone());
+    if origin_space {
+        spec = spec.class("drag-origin-space");
+        if drag_drop_preview.is_some() {
+            spec = spec.class("drag-origin-collapsed");
+        }
+    }
+    if let Some(preview) = drag_drop_preview
+        && preview.nearest_item == Some(des_ui_widgets::SortableItemId(item))
+    {
+        spec = spec.class(match preview.edge {
+            des_ui_widgets::DropEdge::Before => "drag-gap-before",
+            des_ui_widgets::DropEdge::After => "drag-gap-after",
+        });
+    }
+    ui.element(format!("drag-scroll-item-{item}"), spec, |ui| {
+        let mut label_spec = ElementSpec::new(ElementRole::Text).class("control-label");
+        if origin_space {
+            label_spec = label_spec.class("drag-origin-content");
+        }
+        ui.text_element(format!("drag-scroll-item-{item}-label"), label_spec, label);
+        drag_scroll_handle(ui, item, origin_space);
+    });
+}
+
+fn drag_scroll_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_space: bool) {
+    let mut handle_spec = ElementSpec::new(ElementRole::Control)
+        .class("drag-handle")
+        .class("drag-scroll-handle")
+        .interactive()
+        .value(format!("drag-scroll-item-{item}"));
+    let mut glyph_spec = ElementSpec::new(ElementRole::Text).class("drag-handle-glyph");
+    if origin_space {
+        handle_spec = handle_spec.class("drag-origin-content");
+        glyph_spec = glyph_spec.class("drag-origin-content");
+    }
+    ui.element(format!("drag-scroll-handle-{item}"), handle_spec, |ui| {
+        ui.text_element(format!("drag-scroll-handle-{item}-glyph"), glyph_spec, "::");
+    });
 }
 
 fn drag_item(
@@ -859,6 +969,28 @@ fn drag_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
             .class("drag-overlay")
             .selected(true)
             .value(label),
+        |ui| {
+            ui.text_element(
+                "drag-overlay-label",
+                ElementSpec::new(ElementRole::Text).class("control-label"),
+                label,
+            );
+        },
+    );
+}
+
+fn drag_scroll_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
+    let label = format!("auto-scroll row {:02}", item + 1);
+    ui.element(
+        "drag-overlay",
+        ElementSpec::new(ElementRole::Card)
+            .class("drag-item")
+            .class("drag-scroll-item")
+            .class("drag-item-active")
+            .class("drag-overlay")
+            .class("drag-scroll-overlay")
+            .selected(true)
+            .value(label.clone()),
         |ui| {
             ui.text_element(
                 "drag-overlay-label",
