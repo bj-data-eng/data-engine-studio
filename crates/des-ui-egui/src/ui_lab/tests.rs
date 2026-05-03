@@ -213,6 +213,22 @@ fn clicked_nav_view_matches_directly_seeded_view() {
 }
 
 #[test]
+fn clicked_table_nav_view_matches_directly_seeded_view() {
+    let mut clicked = lab_harness("layout");
+    let table_nav_item = center(lab_rect("view-table"));
+
+    clicked.hover_at(table_nav_item);
+    clicked.drag_at(table_nav_item);
+    clicked.drop_at(table_nav_item);
+    clicked.run();
+
+    let clicked_image = render_harness(&mut clicked);
+    let direct_image = lab_image("table");
+
+    assert_exact_image_match(&clicked_image, &direct_image);
+}
+
+#[test]
 fn styling_view_renders_structural_selector_specimens() {
     let output = lab_output("styling");
 
@@ -1000,6 +1016,25 @@ fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
         "scroll-nested-two-axis-list",
         ScrollAxis::Vertical,
     );
+}
+
+#[test]
+fn table_view_renders_document_table_roles_and_shared_tracks() {
+    let output = lab_output("table");
+    let table = frame(&output, "customer-preview-table");
+    let header_customer = frame(&output, "customer-preview-header-customer");
+    let row_customer = frame(&output, "customer-preview-row-0-customer");
+    let header_revenue = frame(&output, "customer-preview-header-revenue");
+    let row_revenue = frame(&output, "customer-preview-row-0-revenue");
+
+    assert_eq!(table.role, ElementRole::Table);
+    assert_eq!(header_customer.role, ElementRole::TableCell);
+    assert_close(
+        header_customer.rect.size.width,
+        row_customer.rect.size.width,
+    );
+    assert_close(header_revenue.rect.origin.x, row_revenue.rect.origin.x);
+    assert_scroll_chrome(&output, "customer-preview-table", ScrollAxis::Horizontal);
 }
 
 #[test]

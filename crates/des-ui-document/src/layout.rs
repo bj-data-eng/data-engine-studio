@@ -6,6 +6,7 @@ use crate::state::{ElementState, ResolvedElement};
 use crate::style::{
     AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position,
 };
+use crate::table::{TableSpec, TableTrackSize};
 use std::collections::HashMap;
 
 pub(crate) fn layout_element(
@@ -156,6 +157,21 @@ fn layout_children(
     scroll_limits: &mut HashMap<ElementId, Size>,
     anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
+    if element.spec.role == ElementRole::Table {
+        if let Some(table) = &element.spec.table {
+            return layout_table_children(
+                element,
+                table,
+                content_rect,
+                viewport_rect,
+                stylesheet,
+                states,
+                scroll_limits,
+                anchors,
+            );
+        }
+    }
+
     if style.direction == Direction::Row && style.wrap {
         return layout_wrapped_children(
             element,
@@ -549,6 +565,19 @@ fn measure_element(
             style.font_size.max(style.min_size.width),
             style.font_size.max(style.min_size.height),
         ),
+        ElementRole::Table => {
+            let content_parent_size = measurement_content_size(style, parent_size);
+            let content = element
+                .spec
+                .table
+                .as_ref()
+                .map(|table| measure_table_content(element, table, content_parent_size))
+                .unwrap_or_default();
+            Size::new(
+                content.width + style.padding.horizontal() + style.border_width.horizontal(),
+                content.height + style.padding.vertical() + style.border_width.vertical(),
+            )
+        }
         _ => {
             let content_parent_size = measurement_content_size(style, parent_size);
             let content = measure_children(element, style, content_parent_size, stylesheet, states);
@@ -594,6 +623,19 @@ fn measure_intrinsic_element(
             style.font_size.max(style.min_size.width),
             style.font_size.max(style.min_size.height),
         ),
+        ElementRole::Table => {
+            let content_parent_size = measurement_content_size(style, parent_size);
+            let content = element
+                .spec
+                .table
+                .as_ref()
+                .map(|table| measure_table_content(element, table, content_parent_size))
+                .unwrap_or_default();
+            Size::new(
+                content.width + style.padding.horizontal() + style.border_width.horizontal(),
+                content.height + style.padding.vertical() + style.border_width.vertical(),
+            )
+        }
         _ => {
             let content_parent_size = measurement_content_size(style, parent_size);
             let content = measure_children(element, style, content_parent_size, stylesheet, states);
@@ -657,6 +699,12 @@ fn measure_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
 ) -> Size {
+    if element.spec.role == ElementRole::Table {
+        if let Some(table) = &element.spec.table {
+            return measure_table_content(element, table, parent_size);
+        }
+    }
+
     if style.direction == Direction::Row && style.wrap {
         return measure_wrapped_children(element, style, parent_size, stylesheet, states);
     }
@@ -706,6 +754,184 @@ fn measure_children(
     }
 
     Size::new(width, height)
+}
+
+fn layout_table_children(
+    element: &Element,
+    table: &TableSpec,
+    content_rect: Rect,
+    viewport_rect: Rect,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+    scroll_limits: &mut HashMap<ElementId, Size>,
+    anchors: &HashMap<ElementId, Rect>,
+) -> Vec<ResolvedElement> {
+    let widths = resolve_table_column_widths(table, content_rect.size.width);
+    let table_width = widths.iter().sum::<f32>();
+    let mut y = content_rect.origin.y;
+    let mut frames = Vec::with_capacity(element.children.len());
+
+    for (row_index, row) in element.children.iter().enumerate() {
+        let row_style = computed_style_for(
+            row,
+            stylesheet,
+            states,
+            child_position(row_index, element.children.len()),
+        );
+        let row_height = if row.spec.role == ElementRole::TableHeader {
+            table.header_height
+        } else {
+            table.row_height
+        };
+        let row_rect = Rect::new(content_rect.origin.x, y, table_width, row_height);
+        let inner_rect = row_rect.inset(row_style.border_width);
+        let row_content_rect = inner_rect.inset(row_style.padding);
+        let children = layout_table_cells(
+            row,
+            table,
+            &widths,
+            row_content_rect,
+            viewport_rect,
+            stylesheet,
+            states,
+            scroll_limits,
+            anchors,
+        );
+        frames.push(ResolvedElement {
+            id: row.id.clone(),
+            role: row.spec.role,
+            classes: row.spec.classes.clone(),
+            rect: row_rect,
+            style: row_style,
+            text: row.text.clone(),
+            value: row.spec.value.clone(),
+            glyph: row.spec.glyph,
+            interactive: row.spec.interactive && !row.spec.disabled,
+            children,
+        });
+        y += row_height;
+    }
+
+    frames
+}
+
+fn layout_table_cells(
+    row: &Element,
+    table: &TableSpec,
+    column_widths: &[f32],
+    content_rect: Rect,
+    viewport_rect: Rect,
+    stylesheet: &StyleSheet,
+    states: &HashMap<ElementId, ElementState>,
+    scroll_limits: &mut HashMap<ElementId, Size>,
+    anchors: &HashMap<ElementId, Rect>,
+) -> Vec<ResolvedElement> {
+    let mut x = content_rect.origin.x;
+    let mut frames = Vec::with_capacity(row.children.len());
+
+    for (column_index, column) in table.columns.iter().enumerate() {
+        let Some((cell_index, cell)) = row.children.iter().enumerate().find(|(_, cell)| {
+            cell.spec
+                .table_cell
+                .as_ref()
+                .is_some_and(|cell| cell.column_id == column.id)
+        }) else {
+            x += column_widths[column_index];
+            continue;
+        };
+        let cell_style = computed_style_for(
+            cell,
+            stylesheet,
+            states,
+            child_position(cell_index, row.children.len()),
+        );
+        let cell_rect = Rect::new(
+            x,
+            content_rect.origin.y,
+            column_widths[column_index],
+            content_rect.size.height,
+        );
+        let inner_rect = cell_rect.inset(cell_style.border_width);
+        let cell_content_rect = inner_rect.inset(cell_style.padding);
+        let children = layout_children(
+            cell,
+            &cell_style,
+            cell_content_rect,
+            viewport_rect,
+            stylesheet,
+            states,
+            scroll_limits,
+            anchors,
+        );
+        frames.push(ResolvedElement {
+            id: cell.id.clone(),
+            role: cell.spec.role,
+            classes: cell.spec.classes.clone(),
+            rect: cell_rect,
+            style: cell_style,
+            text: cell.text.clone(),
+            value: cell.spec.value.clone(),
+            glyph: cell.spec.glyph,
+            interactive: cell.spec.interactive && !cell.spec.disabled,
+            children,
+        });
+        x += column_widths[column_index];
+    }
+
+    frames
+}
+
+fn measure_table_content(element: &Element, table: &TableSpec, parent_size: Size) -> Size {
+    let columns = resolve_table_column_widths(table, parent_size.width);
+    let header_count = element
+        .children
+        .iter()
+        .filter(|child| child.spec.role == ElementRole::TableHeader)
+        .count();
+    let body_count = element.children.len().saturating_sub(header_count);
+    Size::new(
+        columns.iter().sum(),
+        table.header_height * header_count as f32 + table.row_height * body_count as f32,
+    )
+}
+
+fn resolve_table_column_widths(table: &TableSpec, available_width: f32) -> Vec<f32> {
+    let mut widths = Vec::with_capacity(table.columns.len());
+    let mut fixed = 0.0;
+    let mut flex_weight = 0.0;
+
+    for column in &table.columns {
+        match column.width {
+            TableTrackSize::Px(width) => {
+                let width = clamp_table_column_width(width, column.min_width, column.max_width);
+                widths.push(width);
+                fixed += width;
+            }
+            TableTrackSize::Flex(weight) => {
+                widths.push(0.0);
+                flex_weight += weight;
+            }
+        }
+    }
+
+    let remaining = (available_width - fixed).max(0.0);
+    for (index, column) in table.columns.iter().enumerate() {
+        if let TableTrackSize::Flex(weight) = column.width {
+            let width = if flex_weight <= f32::EPSILON {
+                column.min_width
+            } else {
+                remaining * (weight / flex_weight)
+            };
+            widths[index] = clamp_table_column_width(width, column.min_width, column.max_width);
+        }
+    }
+
+    widths
+}
+
+fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) -> f32 {
+    let width = width.max(min_width);
+    max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
 }
 
 fn measure_wrapped_children(

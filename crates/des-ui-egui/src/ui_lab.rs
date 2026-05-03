@@ -11,7 +11,8 @@ use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
 use des_ui_document::{
     Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentMetrics,
     DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Length, Point,
-    PointerInput, Size, Style, StyleSelector, StyleSheet,
+    PointerInput, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
+    TableSpec, TableTrackSize,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -46,6 +47,7 @@ enum LabView {
     Styling,
     Animation,
     Scrolling,
+    Table,
     Nesting,
     Graph,
 }
@@ -58,6 +60,7 @@ impl LabView {
             "styling" | "view-styling" => Some(Self::Styling),
             "animation" | "view-animation" => Some(Self::Animation),
             "scrolling" | "view-scrolling" => Some(Self::Scrolling),
+            "table" | "view-table" => Some(Self::Table),
             "nesting" | "view-nesting" => Some(Self::Nesting),
             "graph" | "view-graph" => Some(Self::Graph),
             _ => None,
@@ -71,6 +74,7 @@ impl LabView {
             Self::Styling => "view-styling",
             Self::Animation => "view-animation",
             Self::Scrolling => "view-scrolling",
+            Self::Table => "view-table",
             Self::Nesting => "view-nesting",
             Self::Graph => "view-graph",
         }
@@ -83,6 +87,7 @@ impl LabView {
             Self::Styling => "Styling",
             Self::Animation => "Animation",
             Self::Scrolling => "Scrolling",
+            Self::Table => "Table",
             Self::Nesting => "Nesting",
             Self::Graph => "Graph",
         }
@@ -638,6 +643,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
         "view-styling" => Some(LabAction::SelectView(LabView::Styling)),
         "view-animation" => Some(LabAction::SelectView(LabView::Animation)),
         "view-scrolling" => Some(LabAction::SelectView(LabView::Scrolling)),
+        "view-table" => Some(LabAction::SelectView(LabView::Table)),
         "view-nesting" => Some(LabAction::SelectView(LabView::Nesting)),
         "view-graph" => Some(LabAction::SelectView(LabView::Graph)),
         "toggle-optional-card" => Some(LabAction::ToggleOptionalCard),

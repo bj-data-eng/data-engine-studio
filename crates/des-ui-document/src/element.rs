@@ -1,4 +1,5 @@
 use crate::geometry::Size;
+use crate::table::{TableCellSpec, TableSpec};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -14,6 +15,10 @@ pub enum ElementRole {
     Dropdown,
     TextInput,
     Icon,
+    Table,
+    TableHeader,
+    TableRow,
+    TableCell,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -129,6 +134,8 @@ pub struct ElementSpec {
     pub focused: bool,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
+    pub table: Option<TableSpec>,
+    pub table_cell: Option<TableCellSpec>,
 }
 
 impl ElementSpec {
@@ -142,6 +149,8 @@ impl ElementSpec {
             focused: false,
             value: None,
             glyph: None,
+            table: None,
+            table_cell: None,
         }
     }
 
@@ -177,6 +186,16 @@ impl ElementSpec {
 
     pub fn glyph(mut self, glyph: Glyph) -> Self {
         self.glyph = Some(glyph);
+        self
+    }
+
+    pub fn table(mut self, table: TableSpec) -> Self {
+        self.table = Some(table);
+        self
+    }
+
+    pub fn table_cell(mut self, table_cell: TableCellSpec) -> Self {
+        self.table_cell = Some(table_cell);
         self
     }
 }

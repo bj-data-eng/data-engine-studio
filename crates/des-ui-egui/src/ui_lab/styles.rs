@@ -973,6 +973,62 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
+            StyleSelector::class("specimen-card"),
+            Style::default()
+                .width(Length::Px(600.0))
+                .height(Length::Auto)
+                .padding(Insets::all(12.0))
+                .gap(10.0)
+                .background(PANEL)
+                .border(STROKE)
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("data-table"),
+            Style::default()
+                .width(Length::Px(520.0))
+                .height(Length::Auto)
+                .background(Color::rgb(18, 22, 26))
+                .border(STROKE)
+                .radius(5.0)
+                .overflow_x(Overflow::Scroll)
+                .scrollbar_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("table-header-row"),
+            Style::default().background(Color::rgb(25, 32, 38)),
+        )
+        .rule(
+            StyleSelector::class("table-row"),
+            Style::default().background(Color::rgb(20, 25, 30)),
+        )
+        .rule(
+            StyleSelector::class("table-header-cell"),
+            Style::default()
+                .font_size(12.0)
+                .text_color(TEXT_ACCENT)
+                .border(Color::rgb(43, 52, 60))
+                .border_widths(Insets {
+                    top: 0.0,
+                    right: 1.0,
+                    bottom: 1.0,
+                    left: 0.0,
+                }),
+        )
+        .rule(
+            StyleSelector::class("table-cell"),
+            Style::default()
+                .font_size(12.0)
+                .text_color(TEXT)
+                .border(Color::rgb(37, 45, 52))
+                .border_widths(Insets {
+                    top: 0.0,
+                    right: 1.0,
+                    bottom: 1.0,
+                    left: 0.0,
+                }),
+        )
+        .rule(
             StyleSelector::class("feature-card"),
             Style::default()
                 .size(250.0, 98.0)

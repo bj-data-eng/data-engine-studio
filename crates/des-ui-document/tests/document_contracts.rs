@@ -2,8 +2,15 @@ use des_ui_document::{
     AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentInput,
     DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, Transition,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, Transition,
 };
+
+fn assert_close(actual: f32, expected: f32) {
+    assert!(
+        (actual - expected).abs() < 0.01,
+        "expected {actual} to be close to {expected}"
+    );
+}
 
 #[test]
 fn update_reports_created_retained_and_removed_elements() {
@@ -838,6 +845,49 @@ fn wrapped_row_layout_rearranges_children_and_expands_container_height() {
     assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
     assert_eq!(item_1.rect.origin, Point::new(60.0, 0.0));
     assert_eq!(item_2.rect.origin, Point::new(0.0, 30.0));
+}
+
+#[test]
+fn table_layout_resolves_shared_column_tracks_for_header_and_body_cells() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("customers"),
+            Style::default()
+                .width(Length::Px(240.0))
+                .overflow_x(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::Role(ElementRole::TableCell),
+            Style::default().border_width(1.0),
+        );
+    let document = table_fixture_document();
+    let output = engine.update(&document, &stylesheet);
+
+    let header_customer = output.layout.find("customers-header-customer").unwrap();
+    let row_customer = output.layout.find("customers-row-0-customer").unwrap();
+    let header_orders = output.layout.find("customers-header-orders").unwrap();
+    let row_orders = output.layout.find("customers-row-0-orders").unwrap();
+
+    assert_eq!(header_customer.role, ElementRole::TableCell);
+    assert_close(
+        header_customer.rect.size.width,
+        row_customer.rect.size.width,
+    );
+    assert_close(header_orders.rect.origin.x, row_orders.rect.origin.x);
+    assert_close(header_orders.rect.size.width, 80.0);
+    assert!(
+        row_customer.rect.origin.y > header_customer.rect.origin.y,
+        "body rows should be laid out below the header row"
+    );
+    assert!(
+        output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id == ElementId::new("customers")
+                && chrome.axis == ScrollAxis::Horizontal
+                && chrome.max_scroll > 0.0
+        }),
+        "table content wider than the styled table frame should expose horizontal overflow"
+    );
 }
 
 #[test]
@@ -2177,4 +2227,54 @@ fn overflowing_scroll_document() -> Document {
             }
         });
     })
+}
+
+fn table_fixture_document() -> Document {
+    let table = TableSpec::new(vec![
+        TableColumnSpec::new("customer", "Customer").width(TableTrackSize::px(120.0)),
+        TableColumnSpec::new("country", "Country").width(TableTrackSize::px(100.0)),
+        TableColumnSpec::new("orders", "Orders").width(TableTrackSize::px(80.0)),
+    ])
+    .header_height(28.0)
+    .row_height(26.0);
+
+    Document::build(Size::new(320.0, 220.0), |ui| {
+        ui.element(
+            "customers",
+            ElementSpec::new(ElementRole::Table).table(table),
+            |ui| {
+                ui.element(
+                    "customers-header",
+                    ElementSpec::new(ElementRole::TableHeader),
+                    |ui| {
+                        table_cell(ui, "customers-header-customer", "customer", "Customer");
+                        table_cell(ui, "customers-header-country", "country", "Country");
+                        table_cell(ui, "customers-header-orders", "orders", "Orders");
+                    },
+                );
+                ui.element(
+                    "customers-row-0",
+                    ElementSpec::new(ElementRole::TableRow),
+                    |ui| {
+                        table_cell(ui, "customers-row-0-customer", "customer", "Acme");
+                        table_cell(ui, "customers-row-0-country", "country", "US");
+                        table_cell(ui, "customers-row-0-orders", "orders", "42");
+                    },
+                );
+            },
+        );
+    })
+}
+
+fn table_cell(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    column_id: &'static str,
+    text: &'static str,
+) {
+    ui.text_element(
+        id,
+        ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new(column_id)),
+        text,
+    );
 }

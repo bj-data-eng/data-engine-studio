@@ -14,6 +14,7 @@ mod query;
 mod scroll;
 mod state;
 mod style;
+mod table;
 mod update;
 
 pub use element::{
@@ -34,4 +35,5 @@ pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,
     Style, StyleRule, StyleSelector, StyleSheet, Transition,
 };
+pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use update::{DocumentUpdate, DocumentUpdateReport};
