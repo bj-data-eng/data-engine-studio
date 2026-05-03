@@ -2,6 +2,7 @@ use crate::element::{ClassName, Color, ElementId, ElementRole, Glyph};
 use crate::geometry::{Point, Rect, ScrollAxis};
 use crate::query::DocumentSnapshot;
 use crate::style::{ComputedStyle, Transition};
+use crate::text::TextLayoutResult;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ElementState {
@@ -34,6 +35,7 @@ pub struct ResolvedElement {
     pub rect: Rect,
     pub style: ComputedStyle,
     pub text: Option<String>,
+    pub text_layout: Option<TextLayoutResult>,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub interactive: bool,

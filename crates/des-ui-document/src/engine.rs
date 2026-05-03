@@ -11,6 +11,7 @@ use crate::style::{
     ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change,
     resolve_style_with_position,
 };
+use crate::text::{FallbackTextMeasurer, TextMeasurer};
 use std::collections::{BTreeSet, HashMap};
 
 const POINTER_DRAG_ACTIVATION_DISTANCE: f32 = 5.0;
@@ -97,6 +98,17 @@ impl DocumentEngine {
         stylesheet: &StyleSheet,
         input: DocumentInput,
     ) -> DocumentOutput {
+        let mut text_measurer = FallbackTextMeasurer;
+        self.update_with_input_and_text_measurer(document, stylesheet, input, &mut text_measurer)
+    }
+
+    pub fn update_with_input_and_text_measurer(
+        &mut self,
+        document: &Document,
+        stylesheet: &StyleSheet,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> DocumentOutput {
         let changes = self.sync_element_states(document);
         let viewport_rect = Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height);
         let reused_cached_layout = changes.created.is_empty()
@@ -114,6 +126,7 @@ impl DocumentEngine {
                 stylesheet,
                 &self.states,
                 &mut scroll_limits,
+                text_measurer,
             );
             self.scroll_limits = scroll_limits;
             layout
@@ -142,6 +155,7 @@ impl DocumentEngine {
                 stylesheet,
                 &self.states,
                 &mut scroll_limits,
+                text_measurer,
             );
             self.scroll_limits = scroll_limits;
             self.clamp_scroll_states();

@@ -15,6 +15,7 @@ mod scroll;
 mod state;
 mod style;
 mod table;
+mod text;
 mod update;
 
 pub use element::{
@@ -36,4 +37,7 @@ pub use style::{
     Style, StyleRule, StyleSelector, StyleSheet, Transition,
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
+pub use text::{
+    FallbackTextMeasurer, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextWrapMode,
+};
 pub use update::{DocumentUpdate, DocumentUpdateReport};

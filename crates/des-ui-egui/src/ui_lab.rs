@@ -4,7 +4,7 @@ mod styles;
 mod tests;
 mod views;
 
-use egui_adapter::{document_input, paint_frame, paint_scroll_chrome};
+use egui_adapter::{EguiTextMeasurer, document_input, paint_frame, paint_scroll_chrome};
 use styles::stylesheet;
 use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
 
@@ -48,6 +48,7 @@ enum LabView {
     Animation,
     Scrolling,
     Table,
+    Text,
     Nesting,
     Graph,
 }
@@ -61,6 +62,7 @@ impl LabView {
             "animation" | "view-animation" => Some(Self::Animation),
             "scrolling" | "view-scrolling" => Some(Self::Scrolling),
             "table" | "view-table" => Some(Self::Table),
+            "text" | "view-text" => Some(Self::Text),
             "nesting" | "view-nesting" => Some(Self::Nesting),
             "graph" | "view-graph" => Some(Self::Graph),
             _ => None,
@@ -75,6 +77,7 @@ impl LabView {
             Self::Animation => "view-animation",
             Self::Scrolling => "view-scrolling",
             Self::Table => "view-table",
+            Self::Text => "view-text",
             Self::Nesting => "view-nesting",
             Self::Graph => "view-graph",
         }
@@ -88,6 +91,7 @@ impl LabView {
             Self::Animation => "Animation",
             Self::Scrolling => "Scrolling",
             Self::Table => "Table",
+            Self::Text => "Text",
             Self::Nesting => "Nesting",
             Self::Graph => "Graph",
         }
@@ -161,9 +165,13 @@ impl UiLabState {
         let input = document_input(ui, origin);
         let pointer = input.pointer;
         let engine_start = Instant::now();
-        let output = self
-            .document_engine
-            .update_with_input(&document, &stylesheet, input);
+        let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+        let output = self.document_engine.update_with_input_and_text_measurer(
+            &document,
+            &stylesheet,
+            input,
+            &mut text_measurer,
+        );
         let engine_time = engine_start.elapsed();
 
         let paint_start = Instant::now();
@@ -644,6 +652,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
         "view-animation" => Some(LabAction::SelectView(LabView::Animation)),
         "view-scrolling" => Some(LabAction::SelectView(LabView::Scrolling)),
         "view-table" => Some(LabAction::SelectView(LabView::Table)),
+        "view-text" => Some(LabAction::SelectView(LabView::Text)),
         "view-nesting" => Some(LabAction::SelectView(LabView::Nesting)),
         "view-graph" => Some(LabAction::SelectView(LabView::Graph)),
         "toggle-optional-card" => Some(LabAction::ToggleOptionalCard),

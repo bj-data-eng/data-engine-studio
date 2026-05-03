@@ -4,6 +4,7 @@ use crate::geometry::{
     PositionInsets, Size,
 };
 use crate::state::ElementState;
+use crate::text::TextWrapMode;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StyleSelector {
@@ -222,6 +223,9 @@ pub struct Style {
     pub border_width: EdgeStyle,
     pub text_color: Option<Color>,
     pub font_size: Option<f32>,
+    pub text_wrap: Option<TextWrapMode>,
+    pub max_lines: Option<usize>,
+    pub line_height: Option<f32>,
     pub radius: CornerStyle,
     pub overflow_x: Option<Overflow>,
     pub overflow_y: Option<Overflow>,
@@ -439,6 +443,21 @@ impl Style {
 
     pub fn font_size(mut self, font_size: f32) -> Self {
         self.font_size = Some(font_size);
+        self
+    }
+
+    pub fn text_wrap(mut self, wrap_mode: TextWrapMode) -> Self {
+        self.text_wrap = Some(wrap_mode);
+        self
+    }
+
+    pub fn max_lines(mut self, max_lines: usize) -> Self {
+        self.max_lines = Some(max_lines.max(1));
+        self
+    }
+
+    pub fn line_height(mut self, line_height: f32) -> Self {
+        self.line_height = Some(line_height.max(0.0));
         self
     }
 
@@ -661,6 +680,9 @@ pub struct ComputedStyle {
     pub border_width: Insets,
     pub text_color: Color,
     pub font_size: f32,
+    pub text_wrap: TextWrapMode,
+    pub max_lines: Option<usize>,
+    pub line_height: Option<f32>,
     pub radius: CornerRadii,
     pub overflow_x: Overflow,
     pub overflow_y: Overflow,
@@ -705,6 +727,9 @@ impl Default for ComputedStyle {
             border_width: Insets::ZERO,
             text_color: Color::rgb(218, 226, 234),
             font_size: 13.0,
+            text_wrap: TextWrapMode::Extend,
+            max_lines: None,
+            line_height: None,
             radius: CornerRadii::ZERO,
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
@@ -790,6 +815,15 @@ impl ComputedStyle {
         }
         if let Some(value) = style.font_size {
             self.font_size = value;
+        }
+        if let Some(value) = style.text_wrap {
+            self.text_wrap = value;
+        }
+        if let Some(value) = style.max_lines {
+            self.max_lines = Some(value.max(1));
+        }
+        if let Some(value) = style.line_height {
+            self.line_height = Some(value.max(0.0));
         }
         if let Some(value) = style.radius.top_left {
             self.radius.top_left = value.max(0.0);
@@ -985,6 +1019,9 @@ fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle)
         || previous.max_size != next.max_size
         || previous.border_width != next.border_width
         || previous.font_size != next.font_size
+        || previous.text_wrap != next.text_wrap
+        || previous.max_lines != next.max_lines
+        || previous.line_height != next.line_height
         || previous.overflow_x != next.overflow_x
         || previous.overflow_y != next.overflow_y
         || previous.position != next.position

@@ -41,6 +41,7 @@ pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: La
                 LabView::Animation,
                 LabView::Scrolling,
                 LabView::Table,
+                LabView::Text,
                 LabView::Nesting,
                 LabView::Graph,
             ] {
@@ -76,6 +77,7 @@ fn view_hint(view: LabView) -> &'static str {
         LabView::Animation => "state transitions and easing",
         LabView::Scrolling => "document scroll ownership",
         LabView::Table => "columns, rows, headers, cells",
+        LabView::Text => "wrap, truncate, and measured lines",
         LabView::Nesting => "relative nested boxes",
         LabView::Graph => "canvas and bezier planning",
     }
@@ -125,6 +127,7 @@ pub(super) fn render_stage(
             LabView::Animation => render_animation_view(ui),
             LabView::Scrolling => render_scrolling_view(ui),
             LabView::Table => render_table_view(ui),
+            LabView::Text => render_text_view(ui),
             LabView::Nesting => render_nesting_view(ui),
             LabView::Graph => render_graph_view(ui),
         },
@@ -1708,6 +1711,94 @@ fn render_table_view(ui: &mut des_ui_document::DocumentBuilder) {
                         table_row(ui, index, row);
                     }
                 },
+            );
+        },
+    );
+}
+
+fn render_text_view(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.text_element(
+        "text-heading",
+        ElementSpec::new(ElementRole::Text).class("heading"),
+        "Text Measurement",
+    );
+    ui.text_element(
+        "text-copy",
+        ElementSpec::new(ElementRole::Text)
+            .class("muted")
+            .class("text-copy"),
+        "These specimens use the document text contract with egui/epaint providing the real measurement and galley painting.",
+    );
+    ui.element(
+        "text-specimen-grid",
+        ElementSpec::new(ElementRole::Panel).class("text-specimen-grid"),
+        |ui| {
+            text_specimen(
+                ui,
+                "text-extend",
+                "Extend",
+                "width: Px(220); text-wrap: Extend",
+                "Long labels stay on one measured line and can extend past a narrow box.",
+                "text-box-extend",
+            );
+            text_specimen(
+                ui,
+                "text-wrap",
+                "Wrap",
+                "width: Px(220); text-wrap: Wrap",
+                "Long labels wrap naturally inside the fixed content width using epaint line breaking.",
+                "text-box-wrap",
+            );
+            text_specimen(
+                ui,
+                "text-truncate",
+                "Truncate",
+                "width: Px(220); text-wrap: Truncate",
+                "A compact field title should elide when the value is too wide for its container.",
+                "text-box-truncate",
+            );
+            text_specimen(
+                ui,
+                "text-max-lines",
+                "Max lines",
+                "width: Px(220); text-wrap: Wrap; max-lines: 2",
+                "Preview descriptions can wrap for two lines and then stop cleanly when they still have more content.",
+                "text-box-max-lines",
+            );
+        },
+    );
+}
+
+fn text_specimen(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &str,
+    title: &str,
+    rule: &str,
+    body: &str,
+    text_class: &str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Card).class("text-specimen-card"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-title"),
+                ElementSpec::new(ElementRole::Text).class("card-title"),
+                title,
+            );
+            ui.text_element(
+                format!("{id}-rule"),
+                ElementSpec::new(ElementRole::Text)
+                    .class("muted")
+                    .class("text-rule"),
+                rule,
+            );
+            ui.text_element(
+                format!("{id}-body"),
+                ElementSpec::new(ElementRole::Text)
+                    .class("text-box")
+                    .class(text_class),
+                body,
             );
         },
     );

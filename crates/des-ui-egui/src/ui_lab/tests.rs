@@ -6,7 +6,7 @@ use crate::graphics_testing::{
 use des_ui_document::{
     Color, Document, DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec,
     Insets, Length, Point, PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet,
+    StyleSheet, TextWrapMode,
 };
 use egui_kittest::Harness;
 
@@ -78,6 +78,29 @@ fn state_output(state: &UiLabState) -> DocumentOutput {
     let mut engine = DocumentEngine::default();
     let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
     engine.update(&document, &state.active_stylesheet())
+}
+
+fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> DocumentOutput {
+    let mut engine = DocumentEngine::default();
+    let mut text_measurer = super::egui_adapter::EguiTextMeasurer::new(ctx);
+    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    engine.update_with_input_and_text_measurer(
+        &document,
+        &state.active_stylesheet(),
+        DocumentInput::default(),
+        &mut text_measurer,
+    )
+}
+
+fn state_rect_with_egui_text(
+    state: &UiLabState,
+    ctx: &egui::Context,
+    id: &str,
+) -> des_ui_document::Rect {
+    let output = state_output_with_egui_text(state, ctx);
+    find_frame(&output.layout, id)
+        .unwrap_or_else(|| panic!("expected layout frame for {id}"))
+        .rect
 }
 
 fn state_output_with_scroll(state: &UiLabState, scroll_y: f32) -> DocumentOutput {
@@ -224,6 +247,22 @@ fn clicked_table_nav_view_matches_directly_seeded_view() {
 
     let clicked_image = render_harness(&mut clicked);
     let direct_image = lab_image("table");
+
+    assert_exact_image_match(&clicked_image, &direct_image);
+}
+
+#[test]
+fn clicked_text_nav_view_matches_directly_seeded_view() {
+    let mut clicked = lab_harness("layout");
+    let text_nav_item = center(lab_rect("view-text"));
+
+    clicked.hover_at(text_nav_item);
+    clicked.drag_at(text_nav_item);
+    clicked.drop_at(text_nav_item);
+    clicked.run();
+
+    let clicked_image = render_harness(&mut clicked);
+    let direct_image = lab_image("text");
 
     assert_exact_image_match(&clicked_image, &direct_image);
 }
@@ -494,8 +533,16 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
 
     assert_eq!(harness.state().drag_item_cells, [0, 2, 4]);
 
-    let start = center(state_rect(harness.state(), "drag-handle-0"));
-    let destination = center(state_rect(harness.state(), "drag-cell-3"));
+    let start = center(state_rect_with_egui_text(
+        harness.state(),
+        &harness.ctx,
+        "drag-handle-0",
+    ));
+    let destination = center(state_rect_with_egui_text(
+        harness.state(),
+        &harness.ctx,
+        "drag-cell-3",
+    ));
     harness.hover_at(start);
     harness.drag_at(start);
     harness.run();
@@ -509,7 +556,7 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
     harness.run();
     assert_eq!(harness.state().active_drag_item(), Some(SortableItemId(0)));
     assert!(harness.state().active_drag.is_some());
-    let output = state_output(harness.state());
+    let output = state_output_with_egui_text(harness.state(), &harness.ctx);
     let overlay = frame(&output, "drag-overlay");
     assert_eq!(overlay.text.as_deref(), None);
     assert!(has_class(overlay, "drag-overlay"));
@@ -536,7 +583,7 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
     assert!(harness.state().active_drag.is_none());
     assert_eq!(harness.state().drag_item_cells[0], 3);
 
-    let output = state_output(harness.state());
+    let output = state_output_with_egui_text(harness.state(), &harness.ctx);
     let item = frame(&output, "drag-item-0");
     let cell = frame(&output, "drag-cell-3");
     assert_eq!(item.value.as_deref(), Some("Customers"));
@@ -708,8 +755,12 @@ fn interaction_drag_drop_styles_are_animated() {
 #[test]
 fn interaction_drag_drop_auto_scrolls_opted_in_list_pane() {
     let mut harness = lab_harness("interaction");
-    let start = center(state_rect(harness.state(), "drag-scroll-handle-0"));
-    let list = state_rect(harness.state(), "drag-scroll-list-0");
+    let start = center(state_rect_with_egui_text(
+        harness.state(),
+        &harness.ctx,
+        "drag-scroll-handle-0",
+    ));
+    let list = state_rect_with_egui_text(harness.state(), &harness.ctx, "drag-scroll-list-0");
     let near_bottom = egui::pos2(
         list.origin.x + list.size.width / 2.0,
         list.origin.y + list.size.height - 4.0,
@@ -1035,6 +1086,24 @@ fn table_view_renders_document_table_roles_and_shared_tracks() {
     );
     assert_close(header_revenue.rect.origin.x, row_revenue.rect.origin.x);
     assert_scroll_chrome(&output, "customer-preview-table", ScrollAxis::Horizontal);
+}
+
+#[test]
+fn text_view_renders_wrapped_and_truncated_specimens() {
+    let output = lab_output("text");
+    let wrapped = frame(&output, "text-wrap-body");
+    let truncated = frame(&output, "text-truncate-body");
+    let max_lines = frame(&output, "text-max-lines-body");
+
+    assert_eq!(wrapped.style.text_wrap, TextWrapMode::Wrap);
+    assert!(
+        wrapped.text_layout.unwrap().line_count > 1,
+        "text wrap specimen should be measured as multiple lines"
+    );
+    assert_eq!(truncated.style.text_wrap, TextWrapMode::Truncate);
+    assert!(truncated.text_layout.unwrap().elided);
+    assert_eq!(max_lines.style.max_lines, Some(2));
+    assert!(max_lines.text_layout.unwrap().line_count <= 2);
 }
 
 #[test]

@@ -92,6 +92,10 @@ impl<'a> ElementSnapshot<'a> {
         self.element.text.as_deref()
     }
 
+    pub fn text_layout(&self) -> Option<crate::TextLayoutResult> {
+        self.element.text_layout
+    }
+
     pub fn value(&self) -> Option<&str> {
         self.element.value.as_deref()
     }

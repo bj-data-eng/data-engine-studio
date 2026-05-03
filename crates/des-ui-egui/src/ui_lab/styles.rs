@@ -4,7 +4,7 @@ use super::{
 };
 use des_ui_document::{
     AlignItems, Color, Direction, ElementRole, ElementStateSelector, Insets, JustifyContent,
-    Length, Overflow, Style, StyleSelector, StyleSheet, Transition,
+    Length, Overflow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition,
 };
 
 pub(super) fn stylesheet() -> StyleSheet {
@@ -982,6 +982,66 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(PANEL)
                 .border(STROKE)
                 .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("text-copy"),
+            Style::default().text_wrap(TextWrapMode::Wrap),
+        )
+        .rule(
+            StyleSelector::class("text-specimen-grid"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width_fill()
+                .height(Length::Auto)
+                .gap(12.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("text-specimen-card"),
+            Style::default()
+                .width(Length::Px(280.0))
+                .height(Length::Auto)
+                .padding(Insets::all(12.0))
+                .gap(8.0)
+                .background(PANEL)
+                .border(STROKE)
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("text-rule"),
+            Style::default()
+                .font_size(11.0)
+                .text_color(TEXT_ACCENT)
+                .text_wrap(TextWrapMode::Wrap),
+        )
+        .rule(
+            StyleSelector::class("text-box"),
+            Style::default()
+                .width(Length::Px(220.0))
+                .height(Length::Auto)
+                .padding(Insets::all(8.0))
+                .font_size(13.0)
+                .line_height(18.0)
+                .background(Color::rgb(19, 24, 28))
+                .border(Color::rgb(43, 52, 60))
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::class("text-box-extend"),
+            Style::default().text_wrap(TextWrapMode::Extend),
+        )
+        .rule(
+            StyleSelector::class("text-box-wrap"),
+            Style::default().text_wrap(TextWrapMode::Wrap),
+        )
+        .rule(
+            StyleSelector::class("text-box-truncate"),
+            Style::default().text_wrap(TextWrapMode::Truncate),
+        )
+        .rule(
+            StyleSelector::class("text-box-max-lines"),
+            Style::default().text_wrap(TextWrapMode::Wrap).max_lines(2),
         )
         .rule(
             StyleSelector::class("data-table"),

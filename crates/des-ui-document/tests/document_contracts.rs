@@ -2,7 +2,8 @@ use des_ui_document::{
     AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentInput,
     DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, Transition,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextWrapMode,
+    Transition,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -888,6 +889,47 @@ fn table_layout_resolves_shared_column_tracks_for_header_and_body_cells() {
         }),
         "table content wider than the styled table frame should expose horizontal overflow"
     );
+}
+
+#[test]
+fn text_layout_uses_document_wrap_and_truncation_styles() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("wrapped"),
+            Style::default()
+                .width(Length::Px(90.0))
+                .text_wrap(TextWrapMode::Wrap),
+        )
+        .rule(
+            StyleSelector::id("truncated"),
+            Style::default()
+                .width(Length::Px(90.0))
+                .text_wrap(TextWrapMode::Truncate),
+        );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.text_element(
+            "wrapped",
+            ElementSpec::new(ElementRole::Text),
+            "Customer analytics pipeline preview",
+        );
+        ui.text_element(
+            "truncated",
+            ElementSpec::new(ElementRole::Text),
+            "Customer analytics pipeline preview",
+        );
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let wrapped = output.layout.find("wrapped").unwrap();
+    let truncated = output.layout.find("truncated").unwrap();
+
+    assert!(
+        wrapped.text_layout.unwrap().line_count > 1,
+        "wrapped text should report multiple measured lines"
+    );
+    assert_eq!(truncated.text_layout.unwrap().line_count, 1);
+    assert!(truncated.text_layout.unwrap().elided);
 }
 
 #[test]

@@ -1,8 +1,33 @@
 use des_ui_document::{
     Color, CornerRadii, DocumentInput, Glyph, Insets, Overflow, Point, PointerInput, Rect,
-    ResolvedElement, ScrollChrome,
+    ResolvedElement, ScrollChrome, Size, TextLayoutRequest, TextLayoutResult, TextMeasurer,
+    TextWrapMode,
 };
 use eframe::egui;
+
+pub(super) struct EguiTextMeasurer {
+    ctx: egui::Context,
+}
+
+impl EguiTextMeasurer {
+    pub(super) fn new(ctx: &egui::Context) -> Self {
+        Self { ctx: ctx.clone() }
+    }
+}
+
+impl TextMeasurer for EguiTextMeasurer {
+    fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
+        let galley = self
+            .ctx
+            .fonts_mut(|fonts| fonts.layout_job(layout_job(request, egui::Color32::WHITE)));
+        let size = galley.size();
+        TextLayoutResult {
+            size: Size::new(size.x, size.y),
+            line_count: galley.rows.len(),
+            elided: galley.elided,
+        }
+    }
+}
 
 pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
     ui.input(|input| DocumentInput {
@@ -55,13 +80,20 @@ fn paint_frame_clipped(
         }
 
         if let Some(text) = &frame.text {
-            painter.text(
-                rect.min,
-                egui::Align2::LEFT_TOP,
+            let request = TextLayoutRequest {
                 text,
-                egui::FontId::proportional(frame.style.font_size),
-                to_egui_color(frame.style.text_color),
-            );
+                font_size: frame.style.font_size,
+                wrap_width: match frame.style.text_wrap {
+                    TextWrapMode::Extend => f32::INFINITY,
+                    TextWrapMode::Wrap | TextWrapMode::Truncate => rect.width(),
+                },
+                wrap_mode: frame.style.text_wrap,
+                max_lines: frame.style.max_lines,
+                line_height: frame.style.line_height,
+            };
+            let color = to_egui_color(frame.style.text_color);
+            let galley = painter.layout_job(layout_job(request, color));
+            painter.galley(rect.min, galley, color);
         }
 
         if let Some(glyph) = frame.glyph {
@@ -128,6 +160,37 @@ fn paint_frame_clipped(
     for child in children {
         paint_frame_clipped(ui, origin, child, next_clip);
     }
+}
+
+fn layout_job(request: TextLayoutRequest<'_>, color: egui::Color32) -> egui::text::LayoutJob {
+    let wrap_width = if request.wrap_mode == TextWrapMode::Extend {
+        f32::INFINITY
+    } else {
+        request.wrap_width.max(1.0)
+    };
+    let mut job = egui::text::LayoutJob::simple(
+        request.text.to_owned(),
+        egui::FontId::proportional(request.font_size),
+        color,
+        wrap_width,
+    );
+    job.wrap.max_width = wrap_width;
+    if request.wrap_mode == TextWrapMode::Truncate {
+        job.wrap.max_rows = 1;
+        job.wrap.break_anywhere = true;
+    }
+    if let Some(max_lines) = request.max_lines {
+        job.wrap.max_rows = max_lines.max(1);
+        if job.wrap.max_rows == 1 {
+            job.wrap.break_anywhere = true;
+        }
+    }
+    if let Some(line_height) = request.line_height {
+        if let Some(section) = job.sections.first_mut() {
+            section.format.line_height = Some(line_height.max(1.0));
+        }
+    }
+    job
 }
 
 fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, glyph: Glyph, color: Color, size: f32) {

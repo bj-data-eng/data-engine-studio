@@ -7,6 +7,7 @@ use crate::style::{
     AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position,
 };
 use crate::table::{TableSpec, TableTrackSize};
+use crate::text::{TextLayoutRequest, TextLayoutResult, TextMeasurer};
 use std::collections::HashMap;
 
 pub(crate) fn layout_element(
@@ -15,6 +16,7 @@ pub(crate) fn layout_element(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> ResolvedElement {
     let anchors = HashMap::new();
     layout_element_in_viewport(
@@ -24,6 +26,7 @@ pub(crate) fn layout_element(
         stylesheet,
         states,
         scroll_limits,
+        text_measurer,
         &anchors,
         None,
     )
@@ -36,6 +39,7 @@ fn layout_element_in_viewport(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    text_measurer: &mut dyn TextMeasurer,
     anchors: &HashMap<ElementId, Rect>,
     position: Option<ChildPosition>,
 ) -> ResolvedElement {
@@ -48,10 +52,18 @@ fn layout_element_in_viewport(
         stylesheet,
         states,
         anchors,
+        text_measurer,
     );
     let inner_rect = rect.inset(style.border_width);
     let mut content_rect = inner_rect.inset(style.padding);
-    let content_size = measure_children(element, &style, content_rect.size, stylesheet, states);
+    let content_size = measure_children(
+        element,
+        &style,
+        content_rect.size,
+        stylesheet,
+        states,
+        text_measurer,
+    );
     if style.overflow_x == Overflow::Scroll || style.overflow_y == Overflow::Scroll {
         scroll_limits.insert(
             element.id.clone(),
@@ -77,8 +89,14 @@ fn layout_element_in_viewport(
         stylesheet,
         states,
         scroll_limits,
+        text_measurer,
         anchors,
     );
+
+    let text_layout = element
+        .text
+        .as_deref()
+        .map(|text| measure_text(text, &style, content_rect.size, text_measurer));
 
     ResolvedElement {
         id: element.id.clone(),
@@ -87,6 +105,7 @@ fn layout_element_in_viewport(
         rect,
         style,
         text: element.text.clone(),
+        text_layout,
         value: element.spec.value.clone(),
         glyph: element.spec.glyph,
         interactive: element.spec.interactive && !element.spec.disabled,
@@ -119,12 +138,20 @@ fn element_rect(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     anchors: &HashMap<ElementId, Rect>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> Rect {
     if element.spec.role == ElementRole::Root {
         return parent_rect;
     }
 
-    let measured = measure_element(element, style, parent_rect.size, stylesheet, states);
+    let measured = measure_element(
+        element,
+        style,
+        parent_rect.size,
+        stylesheet,
+        states,
+        text_measurer,
+    );
     if style.position != Position::Flow {
         if let Some(anchor) = &style.anchor {
             if let Some(anchor_rect) = anchors.get(&anchor.target) {
@@ -155,6 +182,7 @@ fn layout_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    text_measurer: &mut dyn TextMeasurer,
     anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
     if element.spec.role == ElementRole::Table {
@@ -167,6 +195,7 @@ fn layout_children(
                 stylesheet,
                 states,
                 scroll_limits,
+                text_measurer,
                 anchors,
             );
         }
@@ -181,6 +210,7 @@ fn layout_children(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             anchors,
         );
     }
@@ -205,6 +235,7 @@ fn layout_children(
                 content_rect.size,
                 stylesheet,
                 states,
+                text_measurer,
             ))
         })
         .collect();
@@ -254,6 +285,7 @@ fn layout_children(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             &child_anchors,
             child_position(index, element.children.len()),
         );
@@ -274,6 +306,7 @@ fn layout_children(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             &child_anchors,
             child_position(index, element.children.len()),
         );
@@ -292,6 +325,7 @@ fn layout_wrapped_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    text_measurer: &mut dyn TextMeasurer,
     anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
     let mut cursor = content_rect.origin;
@@ -310,7 +344,14 @@ fn layout_wrapped_children(
             continue;
         }
 
-        let metrics = measure_flow_child(child, child_style, content_rect.size, stylesheet, states);
+        let metrics = measure_flow_child(
+            child,
+            child_style,
+            content_rect.size,
+            stylesheet,
+            states,
+            text_measurer,
+        );
 
         if cursor.x > content_rect.origin.x && cursor.x + metrics.outer.width > content_rect.right()
         {
@@ -332,6 +373,7 @@ fn layout_wrapped_children(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             &child_anchors,
             child_position(index, element.children.len()),
         );
@@ -353,6 +395,7 @@ fn layout_wrapped_children(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             &child_anchors,
             child_position(index, element.children.len()),
         );
@@ -382,9 +425,17 @@ fn measure_flow_child(
     parent_size: Size,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> FlowChildMetrics {
     let available = child_available_size(parent_size, &child_style);
-    let measured = measure_intrinsic_element(child, &child_style, available, stylesheet, states);
+    let measured = measure_intrinsic_element(
+        child,
+        &child_style,
+        available,
+        stylesheet,
+        states,
+        text_measurer,
+    );
     FlowChildMetrics {
         available,
         outer: Size::new(
@@ -551,15 +602,18 @@ fn measure_element(
     parent_size: Size,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> Size {
     let auto_size = match element.spec.role {
         ElementRole::Text => {
-            let width = element
-                .text
-                .as_ref()
-                .map(|text| text.chars().count() as f32 * 7.5)
-                .unwrap_or_default();
-            Size::new(width.max(style.min_size.width), 18.0)
+            let content_parent_size = measurement_content_size(style, parent_size);
+            measure_text(
+                element.text.as_deref().unwrap_or_default(),
+                style,
+                content_parent_size,
+                text_measurer,
+            )
+            .size
         }
         ElementRole::Icon => Size::new(
             style.font_size.max(style.min_size.width),
@@ -580,7 +634,14 @@ fn measure_element(
         }
         _ => {
             let content_parent_size = measurement_content_size(style, parent_size);
-            let content = measure_children(element, style, content_parent_size, stylesheet, states);
+            let content = measure_children(
+                element,
+                style,
+                content_parent_size,
+                stylesheet,
+                states,
+                text_measurer,
+            );
             Size::new(
                 content.width + style.padding.horizontal() + style.border_width.horizontal(),
                 content.height + style.padding.vertical() + style.border_width.vertical(),
@@ -609,15 +670,18 @@ fn measure_intrinsic_element(
     parent_size: Size,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> Size {
     let auto_size = match element.spec.role {
         ElementRole::Text => {
-            let width = element
-                .text
-                .as_ref()
-                .map(|text| text.chars().count() as f32 * 7.5)
-                .unwrap_or_default();
-            Size::new(width.max(style.min_size.width), 18.0)
+            let content_parent_size = measurement_content_size(style, parent_size);
+            measure_text(
+                element.text.as_deref().unwrap_or_default(),
+                style,
+                content_parent_size,
+                text_measurer,
+            )
+            .size
         }
         ElementRole::Icon => Size::new(
             style.font_size.max(style.min_size.width),
@@ -638,7 +702,14 @@ fn measure_intrinsic_element(
         }
         _ => {
             let content_parent_size = measurement_content_size(style, parent_size);
-            let content = measure_children(element, style, content_parent_size, stylesheet, states);
+            let content = measure_children(
+                element,
+                style,
+                content_parent_size,
+                stylesheet,
+                states,
+                text_measurer,
+            );
             Size::new(
                 content.width + style.padding.horizontal() + style.border_width.horizontal(),
                 content.height + style.padding.vertical() + style.border_width.vertical(),
@@ -698,6 +769,7 @@ fn measure_children(
     parent_size: Size,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> Size {
     if element.spec.role == ElementRole::Table {
         if let Some(table) = &element.spec.table {
@@ -706,7 +778,14 @@ fn measure_children(
     }
 
     if style.direction == Direction::Row && style.wrap {
-        return measure_wrapped_children(element, style, parent_size, stylesheet, states);
+        return measure_wrapped_children(
+            element,
+            style,
+            parent_size,
+            stylesheet,
+            states,
+            text_measurer,
+        );
     }
 
     let mut width: f32 = 0.0;
@@ -729,8 +808,14 @@ fn measure_children(
             (parent_size.width - child_style.margin.horizontal()).max(0.0),
             (parent_size.height - child_style.margin.vertical()).max(0.0),
         );
-        let child_size =
-            measure_intrinsic_element(child, &child_style, child_available, stylesheet, states);
+        let child_size = measure_intrinsic_element(
+            child,
+            &child_style,
+            child_available,
+            stylesheet,
+            states,
+            text_measurer,
+        );
         let outer_width = child_size.width + child_style.margin.horizontal();
         let outer_height = child_size.height + child_style.margin.vertical();
         match style.direction {
@@ -764,6 +849,7 @@ fn layout_table_children(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    text_measurer: &mut dyn TextMeasurer,
     anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
     let widths = resolve_table_column_widths(table, content_rect.size.width);
@@ -795,8 +881,13 @@ fn layout_table_children(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             anchors,
         );
+        let text_layout = row
+            .text
+            .as_deref()
+            .map(|text| measure_text(text, &row_style, row_content_rect.size, text_measurer));
         frames.push(ResolvedElement {
             id: row.id.clone(),
             role: row.spec.role,
@@ -804,6 +895,7 @@ fn layout_table_children(
             rect: row_rect,
             style: row_style,
             text: row.text.clone(),
+            text_layout,
             value: row.spec.value.clone(),
             glyph: row.spec.glyph,
             interactive: row.spec.interactive && !row.spec.disabled,
@@ -824,6 +916,7 @@ fn layout_table_cells(
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &mut HashMap<ElementId, Size>,
+    text_measurer: &mut dyn TextMeasurer,
     anchors: &HashMap<ElementId, Rect>,
 ) -> Vec<ResolvedElement> {
     let mut x = content_rect.origin.x;
@@ -861,8 +954,13 @@ fn layout_table_cells(
             stylesheet,
             states,
             scroll_limits,
+            text_measurer,
             anchors,
         );
+        let text_layout = cell
+            .text
+            .as_deref()
+            .map(|text| measure_text(text, &cell_style, cell_content_rect.size, text_measurer));
         frames.push(ResolvedElement {
             id: cell.id.clone(),
             role: cell.spec.role,
@@ -870,6 +968,7 @@ fn layout_table_cells(
             rect: cell_rect,
             style: cell_style,
             text: cell.text.clone(),
+            text_layout,
             value: cell.spec.value.clone(),
             glyph: cell.spec.glyph,
             interactive: cell.spec.interactive && !cell.spec.disabled,
@@ -940,6 +1039,7 @@ fn measure_wrapped_children(
     parent_size: Size,
     stylesheet: &StyleSheet,
     states: &HashMap<ElementId, ElementState>,
+    text_measurer: &mut dyn TextMeasurer,
 ) -> Size {
     let mut width: f32 = 0.0;
     let mut height: f32 = 0.0;
@@ -962,8 +1062,14 @@ fn measure_wrapped_children(
             (parent_size.width - child_style.margin.horizontal()).max(0.0),
             (parent_size.height - child_style.margin.vertical()).max(0.0),
         );
-        let child_size =
-            measure_intrinsic_element(child, &child_style, child_available, stylesheet, states);
+        let child_size = measure_intrinsic_element(
+            child,
+            &child_style,
+            child_available,
+            stylesheet,
+            states,
+            text_measurer,
+        );
         let outer_width = child_size.width + child_style.margin.horizontal();
         let outer_height = child_size.height + child_style.margin.vertical();
         let next_width = if line_has_child {
@@ -990,6 +1096,26 @@ fn measure_wrapped_children(
     }
 
     Size::new(width, height)
+}
+
+fn measure_text(
+    text: &str,
+    style: &ComputedStyle,
+    available_size: Size,
+    text_measurer: &mut dyn TextMeasurer,
+) -> TextLayoutResult {
+    let wrap_width = match style.text_wrap {
+        crate::TextWrapMode::Extend => f32::INFINITY,
+        crate::TextWrapMode::Wrap | crate::TextWrapMode::Truncate => available_size.width,
+    };
+    text_measurer.measure_text(TextLayoutRequest {
+        text,
+        font_size: style.font_size,
+        wrap_width,
+        wrap_mode: style.text_wrap,
+        max_lines: style.max_lines,
+        line_height: style.line_height,
+    })
 }
 
 pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {
