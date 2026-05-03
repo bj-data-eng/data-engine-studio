@@ -1173,6 +1173,57 @@ fn text_view_copy_event_sends_selected_text_to_clipboard() {
 }
 
 #[test]
+fn text_context_menu_copy_uses_opened_selection_snapshot() {
+    let mut harness = lab_harness("text");
+    harness.state_mut().text_context_menu = Some(TextContextMenu {
+        target: ElementId::new("text-wrap-body"),
+        position: Point::new(300.0, 300.0),
+        selected_text: Some("Customer analytics".to_owned()),
+    });
+    harness.run();
+
+    harness.input_mut().events.push(egui::Event::PointerButton {
+        pos: egui::pos2(320.0, 315.0),
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.step();
+    harness.input_mut().events.push(egui::Event::PointerButton {
+        pos: egui::pos2(320.0, 315.0),
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.step();
+
+    assert!(
+        harness.output().platform_output.commands.iter().any(
+            |command| matches!(command, egui::OutputCommand::CopyText(text) if text == "Customer analytics")
+        ),
+        "context menu copy should use the selection captured when the menu opened"
+    );
+    assert!(harness.state().text_context_menu.is_none());
+}
+
+#[test]
+fn text_context_menu_closes_on_click_away() {
+    let mut harness = lab_harness("text");
+    harness.state_mut().text_context_menu = Some(TextContextMenu {
+        target: ElementId::new("text-wrap-body"),
+        position: Point::new(300.0, 300.0),
+        selected_text: Some("Customer analytics".to_owned()),
+    });
+    harness.run();
+
+    harness.drag_at(egui::pos2(20.0, 20.0));
+    harness.drop_at(egui::pos2(20.0, 20.0));
+    harness.run();
+
+    assert!(harness.state().text_context_menu.is_none());
+}
+
+#[test]
 fn animation_view_renders_state_driven_specimens() {
     let output = lab_output("animation");
 
@@ -1230,7 +1281,11 @@ fn animation_margin_specimen_expands_layout_on_hover() {
                 position: pointer,
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1274,7 +1329,11 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                 position: hover_pointer,
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1291,7 +1350,11 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                     position: hover_pointer,
                     primary_delta: Point::ZERO,
                     primary_down: false,
+                    primary_pressed: false,
                     primary_clicked: false,
+                    primary_click_count: 0,
+                    secondary_clicked: false,
+                    time_seconds: 0.0,
                 }),
                 scroll_delta: Point::ZERO,
             },
@@ -1309,7 +1372,11 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                 position: exit_pointer,
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1329,7 +1396,11 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                     position: exit_pointer,
                     primary_delta: Point::ZERO,
                     primary_down: false,
+                    primary_pressed: false,
                     primary_clicked: false,
+                    primary_click_count: 0,
+                    secondary_clicked: false,
+                    time_seconds: 0.0,
                 }),
                 scroll_delta: Point::ZERO,
             },

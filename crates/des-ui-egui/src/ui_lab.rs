@@ -5,8 +5,8 @@ mod tests;
 mod views;
 
 use egui_adapter::{
-    EguiTextMeasurer, copy_selected_text_on_command, document_input, paint_frame,
-    paint_scroll_chrome,
+    EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
+    document_input, paint_frame, paint_scroll_chrome,
 };
 use styles::stylesheet;
 use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
@@ -120,7 +120,15 @@ pub(crate) struct UiLabState {
     drag_source_size: Option<Size>,
     drag_drop_preview: Option<SortableDropPreview>,
     scroll_list_drop_preview: Option<SortableDropPreview>,
+    text_context_menu: Option<TextContextMenu>,
     last_perf: UiLabPerf,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct TextContextMenu {
+    target: ElementId,
+    position: Point,
+    selected_text: Option<String>,
 }
 
 impl Default for UiLabState {
@@ -144,6 +152,7 @@ impl Default for UiLabState {
             drag_source_size: None,
             drag_drop_preview: None,
             scroll_list_drop_preview: None,
+            text_context_menu: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -159,6 +168,7 @@ impl UiLabState {
     }
 
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
+        configure_text_selection_input(ui.ctx());
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
         let document_start = Instant::now();
@@ -189,6 +199,7 @@ impl UiLabState {
             metrics: output.metrics,
         };
         self.apply_document_events(ui, &output, pointer);
+        self.paint_text_context_menu(ui, origin, &output);
         if debug_overlay {
             self.paint_debug_overlay(ui);
         }
@@ -276,6 +287,16 @@ impl UiLabState {
                         ui.ctx().request_repaint();
                     }
                 }
+                DocumentEventKind::ContextRequested => {
+                    if let Some(pointer) = pointer {
+                        self.text_context_menu = Some(TextContextMenu {
+                            target: event.target.clone(),
+                            position: pointer.position,
+                            selected_text: output.selected_text(),
+                        });
+                        ui.ctx().request_repaint();
+                    }
+                }
                 _ => {}
             }
         }
@@ -287,6 +308,57 @@ impl UiLabState {
         {
             self.dropdown_open = false;
             ui.ctx().request_repaint();
+        }
+    }
+
+    fn paint_text_context_menu(
+        &mut self,
+        ui: &mut egui::Ui,
+        origin: egui::Pos2,
+        output: &DocumentOutput,
+    ) {
+        let Some(menu) = self.text_context_menu.clone() else {
+            return;
+        };
+        if output
+            .snapshot()
+            .find(menu.target.as_str())
+            .is_none_or(|frame| !frame.selectable_text())
+        {
+            self.text_context_menu = None;
+            return;
+        }
+
+        let selected_text = menu.selected_text.clone();
+        let menu_pos = egui::pos2(origin.x + menu.position.x, origin.y + menu.position.y);
+        let area_response = egui::Area::new(egui::Id::new("text-selection-context-menu"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(menu_pos)
+            .show(ui.ctx(), |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.set_min_width(140.0);
+                    let copy_enabled = selected_text.as_ref().is_some_and(|text| !text.is_empty());
+                    if ui
+                        .add_enabled(copy_enabled, egui::Button::new("Copy"))
+                        .clicked()
+                    {
+                        if let Some(text) = selected_text.clone() {
+                            ui.ctx().copy_text(text);
+                        }
+                        self.text_context_menu = None;
+                    }
+                });
+            });
+        let menu_rect = area_response.response.rect;
+        let clicked_away = ui.input(|input| {
+            input.pointer.primary_clicked()
+                && input
+                    .pointer
+                    .interact_pos()
+                    .is_some_and(|position| !menu_rect.contains(position))
+        });
+        if clicked_away {
+            self.text_context_menu = None;
         }
     }
 

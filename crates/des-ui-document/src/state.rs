@@ -117,6 +117,10 @@ impl DocumentEvent {
         Self::new(target, DocumentEventKind::Clicked)
     }
 
+    pub fn context_requested(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::ContextRequested)
+    }
+
     pub fn scrolled(target: impl Into<ElementId>, axis: ScrollAxis) -> Self {
         Self::new(target, DocumentEventKind::Scrolled(axis))
     }
@@ -141,6 +145,7 @@ pub enum DocumentEventKind {
     Pressed,
     Released,
     Clicked,
+    ContextRequested,
     DragStarted,
     DragMoved,
     DragEnded,
@@ -163,6 +168,9 @@ pub struct DocumentTextSelection {
     pub focus: Point,
     pub anchor_index: usize,
     pub focus_index: usize,
+    pub anchor_range_start: usize,
+    pub anchor_range_end: usize,
+    pub granularity: TextSelectionGranularity,
     pub active: bool,
 }
 
@@ -184,6 +192,14 @@ impl DocumentTextSelection {
         }
         Some(slice_char_range(text, range))
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextSelectionGranularity {
+    #[default]
+    Character,
+    Word,
+    Paragraph,
 }
 
 fn slice_char_range(text: &str, range: std::ops::Range<usize>) -> String {
@@ -216,7 +232,11 @@ pub struct PointerInput {
     pub position: Point,
     pub primary_delta: Point,
     pub primary_down: bool,
+    pub primary_pressed: bool,
     pub primary_clicked: bool,
+    pub primary_click_count: u8,
+    pub secondary_clicked: bool,
+    pub time_seconds: f64,
 }
 
 #[derive(Clone, Debug, PartialEq)]

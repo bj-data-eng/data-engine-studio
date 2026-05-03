@@ -31,7 +31,7 @@ pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
     DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,
-    ScrollChrome,
+    ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,

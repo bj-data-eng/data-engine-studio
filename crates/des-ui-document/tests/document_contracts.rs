@@ -1,9 +1,10 @@
 use des_ui_document::{
-    AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentInput,
-    DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
-    JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
-    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode, Transition,
+    AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentEventKind,
+    DocumentInput, DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector,
+    Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Size, Style,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextSelectionGranularity,
+    TextWrapMode, Transition,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -11,6 +12,28 @@ fn assert_close(actual: f32, expected: f32) {
         (actual - expected).abs() < 0.01,
         "expected {actual} to be close to {expected}"
     );
+}
+
+fn pointer_input(
+    position: Point,
+    primary_down: bool,
+    primary_pressed: bool,
+    primary_clicked: bool,
+    time_seconds: f64,
+) -> DocumentInput {
+    DocumentInput {
+        pointer: Some(PointerInput {
+            position,
+            primary_delta: Point::ZERO,
+            primary_down,
+            primary_pressed,
+            primary_clicked,
+            primary_click_count: u8::from(primary_clicked),
+            secondary_clicked: false,
+            time_seconds,
+        }),
+        scroll_delta: Point::ZERO,
+    }
 }
 
 #[test]
@@ -85,7 +108,11 @@ fn style_rules_resolve_role_class_state_and_id_in_order() {
                 position: Point::new(2.0, 2.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -488,7 +515,11 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                 position: Point::new(2.0, 2.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -506,7 +537,11 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                 position: Point::new(2.0, 2.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -529,7 +564,11 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                         position: Point::new(2.0, 2.0),
                         primary_delta: Point::ZERO,
                         primary_down: false,
+                        primary_pressed: false,
                         primary_clicked: false,
+                        primary_click_count: 0,
+                        secondary_clicked: false,
+                        time_seconds: 0.0,
                     }),
                     scroll_delta: Point::ZERO,
                 },
@@ -551,7 +590,11 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                 position: Point::new(2.0, 2.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -592,7 +635,11 @@ fn untransitioned_hover_color_reuses_layout_and_updates_paint() {
                 position: Point::new(2.0, 2.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -636,7 +683,11 @@ fn untransitioned_hover_layout_change_rebuilds_layout() {
                 position: Point::new(2.0, 2.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -698,7 +749,11 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
                 position: Point::new(4.0, 4.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -727,7 +782,11 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
                 position: Point::new(4.0, 4.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1032,7 +1091,11 @@ fn selectable_text_tracks_pointer_selection_points() {
                 position: start,
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1045,7 +1108,11 @@ fn selectable_text_tracks_pointer_selection_points() {
                 position: end,
                 primary_delta: Point::new(end.x - start.x, end.y - start.y),
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1071,7 +1138,11 @@ fn selectable_text_tracks_pointer_selection_points() {
                 position: end,
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1107,7 +1178,11 @@ fn selectable_text_exposes_selected_text_for_copy() {
                 position: start,
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1120,7 +1195,11 @@ fn selectable_text_exposes_selected_text_for_copy() {
                 position: end,
                 primary_delta: Point::new(end.x - start.x, end.y - start.y),
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1161,7 +1240,11 @@ fn selectable_text_can_disable_copy_without_disabling_selection() {
                 position: start,
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1174,7 +1257,11 @@ fn selectable_text_can_disable_copy_without_disabling_selection() {
                 position: end,
                 primary_delta: Point::new(end.x - start.x, end.y - start.y),
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1184,6 +1271,180 @@ fn selectable_text_can_disable_copy_without_disabling_selection() {
     assert!(output.snapshot().find("label").unwrap().selectable_text());
     assert!(!output.snapshot().find("label").unwrap().copyable_text());
     assert_eq!(output.selected_text(), None);
+}
+
+#[test]
+fn selectable_text_double_click_selects_word_and_word_drags() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(320.0))
+            .text_wrap(TextWrapMode::Extend),
+    );
+    let document = Document::build(Size::new(360.0, 120.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "alpha beta gamma",
+        );
+    });
+    let beta = Point::new(56.0, 4.0);
+    let gamma = Point::new(100.0, 4.0);
+
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(beta, true, true, false, 0.0),
+    );
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(beta, false, false, true, 0.05),
+    );
+    let word = engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(beta, true, true, false, 0.20),
+    );
+
+    assert_eq!(word.text_selection.as_ref().unwrap().char_range(), 6..10);
+    assert_eq!(word.selected_text().as_deref(), Some("beta"));
+
+    let multi_word = engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(gamma, true, false, false, 0.24),
+    );
+
+    assert_eq!(
+        multi_word.text_selection.as_ref().unwrap().granularity,
+        TextSelectionGranularity::Word
+    );
+    assert_eq!(multi_word.selected_text().as_deref(), Some("beta gamma"));
+}
+
+#[test]
+fn selectable_text_double_click_drag_left_keeps_original_word() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(320.0))
+            .text_wrap(TextWrapMode::Extend),
+    );
+    let document = Document::build(Size::new(360.0, 120.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "alpha beta gamma",
+        );
+    });
+    let beta = Point::new(56.0, 4.0);
+    let alpha = Point::new(12.0, 4.0);
+
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(beta, true, true, false, 0.0),
+    );
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(beta, false, false, true, 0.05),
+    );
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(beta, true, true, false, 0.20),
+    );
+    let multi_word = engine.update_with_input(
+        &document,
+        &stylesheet,
+        pointer_input(alpha, true, false, false, 0.24),
+    );
+
+    assert_eq!(
+        multi_word.text_selection.as_ref().unwrap().granularity,
+        TextSelectionGranularity::Word
+    );
+    assert_eq!(multi_word.selected_text().as_deref(), Some("alpha beta"));
+}
+
+#[test]
+fn selectable_text_triple_click_selects_paragraph() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(320.0))
+            .text_wrap(TextWrapMode::Wrap),
+    );
+    let document = Document::build(Size::new(360.0, 160.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "first paragraph\nsecond paragraph",
+        );
+    });
+    let second = Point::new(8.0, 24.0);
+
+    for (index, time_seconds) in [0.0, 0.2, 0.4].into_iter().enumerate() {
+        engine.update_with_input(
+            &document,
+            &stylesheet,
+            pointer_input(second, true, true, false, time_seconds),
+        );
+        if index < 2 {
+            engine.update_with_input(
+                &document,
+                &stylesheet,
+                pointer_input(second, false, false, true, time_seconds + 0.05),
+            );
+        }
+    }
+    let output = engine.update(&document, &stylesheet);
+
+    assert_eq!(
+        output.text_selection.as_ref().unwrap().granularity,
+        TextSelectionGranularity::Paragraph
+    );
+    assert_eq!(output.selected_text().as_deref(), Some("second paragraph"));
+}
+
+#[test]
+fn selectable_text_secondary_click_requests_context() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new();
+    let document = Document::build(Size::new(240.0, 120.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "copy me",
+        );
+    });
+
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(8.0, 4.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: true,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(output.events.iter().any(|event| {
+        event.target == ElementId::new("label") && event.kind == DocumentEventKind::ContextRequested
+    }));
 }
 
 #[test]
@@ -1518,7 +1779,11 @@ fn pointer_input_can_target_absolute_child_outside_parent_box() {
                 position: Point::new(150.0, 90.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1553,7 +1818,11 @@ fn pointer_input_targets_interactive_owner_instead_of_inner_text() {
                 position: Point::new(4.0, 4.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1594,7 +1863,11 @@ fn pointer_input_emits_document_interaction_events() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1617,7 +1890,11 @@ fn pointer_input_emits_document_interaction_events() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1633,7 +1910,11 @@ fn pointer_input_emits_document_interaction_events() {
                 position: Point::new(180.0, 120.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1669,7 +1950,11 @@ fn document_engine_captures_primary_pointer_drag() {
                 position: Point::new(12.0, 10.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1691,7 +1976,11 @@ fn document_engine_captures_primary_pointer_drag() {
                 position: Point::new(180.0, 120.0),
                 primary_delta: Point::new(168.0, 110.0),
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1717,7 +2006,11 @@ fn document_engine_captures_primary_pointer_drag() {
                 position: Point::new(180.0, 120.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1761,7 +2054,11 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -24.0),
         },
@@ -1811,7 +2108,11 @@ fn horizontal_overflow_scrolls_child_content_on_x_axis() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::new(-30.0, 0.0),
         },
@@ -1866,7 +2167,11 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::new(-16.0, -24.0),
         },
@@ -1902,7 +2207,11 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
                 position: Point::new(64.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1936,7 +2245,11 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
                 position: Point::new(64.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -1999,7 +2312,11 @@ fn scrollbar_hover_transition_reuses_layout() {
                 position: Point::new(64.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2028,7 +2345,11 @@ fn scrollbar_hover_transition_reuses_layout() {
                 position: Point::new(64.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2192,7 +2513,11 @@ fn clipped_scroll_chrome_does_not_drive_animation_work() {
                 position: pointer,
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2228,7 +2553,11 @@ fn scroll_delta_is_clamped_when_content_does_not_overflow() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -240.0),
         },
@@ -2267,7 +2596,11 @@ fn overflow_scroll_container_emits_draggable_scroll_chrome() {
                 position: grab,
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2280,7 +2613,11 @@ fn overflow_scroll_container_emits_draggable_scroll_chrome() {
                 position: Point::new(grab.x, grab.y + 24.0),
                 primary_delta: Point::new(0.0, 24.0),
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2332,7 +2669,11 @@ fn active_document_drag_is_not_stolen_by_scrollbar_hitbox() {
                 position: Point::new(20.0, 16.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2345,7 +2686,11 @@ fn active_document_drag_is_not_stolen_by_scrollbar_hitbox() {
                 position: scrollbar_point,
                 primary_delta: Point::new(scrollbar_point.x - 20.0, scrollbar_point.y - 16.0),
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2378,7 +2723,11 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
                 position: Point::new(20.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2403,7 +2752,11 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
                 position: Point::new(170.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: false,
+                primary_pressed: false,
                 primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },
@@ -2430,7 +2783,11 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
                 position: Point::new(170.0, 20.0),
                 primary_delta: Point::ZERO,
                 primary_down: true,
+                primary_pressed: false,
                 primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
         },

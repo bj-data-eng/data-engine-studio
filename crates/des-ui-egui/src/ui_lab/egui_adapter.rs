@@ -4,6 +4,10 @@ use des_ui_document::{
     TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
+use std::time::Duration;
+
+pub(super) const TEXT_SELECTION_CLICK_INTERVAL: Duration = Duration::from_millis(800);
+pub(super) const TEXT_SELECTION_CLICK_DISTANCE: f32 = 6.0;
 
 pub(super) struct EguiTextMeasurer {
     ctx: egui::Context,
@@ -46,10 +50,35 @@ pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput
             position: Point::new(position.x - origin.x, position.y - origin.y),
             primary_delta: Point::new(input.pointer.delta().x, input.pointer.delta().y),
             primary_down: input.pointer.primary_down(),
+            primary_pressed: input.pointer.primary_pressed(),
             primary_clicked: input.pointer.primary_clicked(),
+            primary_click_count: if input
+                .pointer
+                .button_triple_clicked(egui::PointerButton::Primary)
+            {
+                3
+            } else if input
+                .pointer
+                .button_double_clicked(egui::PointerButton::Primary)
+            {
+                2
+            } else if input.pointer.primary_clicked() {
+                1
+            } else {
+                0
+            },
+            secondary_clicked: input.pointer.secondary_clicked(),
+            time_seconds: input.time,
         }),
         scroll_delta: Point::new(input.smooth_scroll_delta.x, input.smooth_scroll_delta.y),
     })
+}
+
+pub(super) fn configure_text_selection_input(context: &egui::Context) {
+    context.options_mut(|options| {
+        options.input_options.max_click_duration = TEXT_SELECTION_CLICK_INTERVAL.as_secs_f64();
+        options.input_options.max_click_dist = TEXT_SELECTION_CLICK_DISTANCE;
+    });
 }
 
 pub(super) fn copy_selected_text_on_command(ui: &egui::Ui, output: &DocumentOutput) {

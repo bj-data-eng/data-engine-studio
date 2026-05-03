@@ -6,6 +6,7 @@ use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
     DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
+    TextSelectionGranularity,
 };
 use crate::style::{
     ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change,
@@ -15,6 +16,8 @@ use crate::text::{FallbackTextMeasurer, TextMeasurer, TextMeasurerKey};
 use std::collections::{BTreeSet, HashMap};
 
 const POINTER_DRAG_ACTIVATION_DISTANCE: f32 = 5.0;
+const TEXT_CLICK_INTERVAL_SECONDS: f64 = 0.8;
+const TEXT_CLICK_DISTANCE: f32 = 6.0;
 
 struct ScrollDrag {
     element_id: ElementId,
@@ -77,6 +80,14 @@ struct PointerDragUpdate {
     completed_drag: Option<DocumentDrag>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct TextClickSequence {
+    target: ElementId,
+    position: Point,
+    time_seconds: f64,
+    count: u8,
+}
+
 #[derive(Default)]
 pub struct DocumentEngine {
     states: HashMap<ElementId, ElementState>,
@@ -84,6 +95,7 @@ pub struct DocumentEngine {
     active_scroll_drag: Option<ScrollDrag>,
     active_pointer_drag: Option<PointerDrag>,
     text_selection: Option<DocumentTextSelection>,
+    last_text_click: Option<TextClickSequence>,
     cached_layout: Option<ResolvedElement>,
     cached_document_root: Option<Element>,
     cached_text_measurer_key: Option<TextMeasurerKey>,
@@ -438,8 +450,14 @@ impl DocumentEngine {
             .find(|frame| frame.selectable_text && frame.text.is_some());
         if let Some(frame) = selectable_text_frame {
             update.hit_id = Some(frame.id.clone());
+            if pointer.secondary_clicked {
+                update
+                    .events
+                    .push(DocumentEvent::context_requested(frame.id.clone()));
+                return finalize_input_update(update, &self.states, &previous);
+            }
             if pointer.primary_down {
-                update.changed |= self.start_text_selection(frame, pointer.position, text_measurer);
+                update.changed |= self.start_text_selection(frame, pointer, text_measurer);
                 return finalize_input_update(update, &self.states, &previous);
             }
         } else if pointer.primary_down {
@@ -541,22 +559,60 @@ impl DocumentEngine {
     fn start_text_selection(
         &mut self,
         frame: &ResolvedElement,
-        point: Point,
+        pointer: PointerInput,
         text_measurer: &mut dyn TextMeasurer,
     ) -> bool {
-        let text_index = text_index_at_point(frame, point, text_measurer);
+        let text_index = text_index_at_point(frame, pointer.position, text_measurer);
+        let click_count = self.text_click_count(frame, pointer);
+        let granularity = match click_count {
+            3..=u8::MAX => TextSelectionGranularity::Paragraph,
+            2 => TextSelectionGranularity::Word,
+            _ => TextSelectionGranularity::Character,
+        };
+        let (anchor_index, focus_index) = selection_range_for_granularity(
+            frame.text.as_deref().unwrap_or_default(),
+            text_index,
+            granularity,
+        );
         let next = DocumentTextSelection {
             target: frame.id.clone(),
-            anchor: point,
-            focus: point,
-            anchor_index: text_index,
-            focus_index: text_index,
+            anchor: pointer.position,
+            focus: pointer.position,
+            anchor_index,
+            focus_index,
+            anchor_range_start: anchor_index.min(focus_index),
+            anchor_range_end: anchor_index.max(focus_index),
+            granularity,
             active: true,
         };
         let changed = self.text_selection.as_ref() != Some(&next);
         self.text_selection = Some(next);
         self.active_pointer_drag = None;
         changed
+    }
+
+    fn text_click_count(&mut self, frame: &ResolvedElement, pointer: PointerInput) -> u8 {
+        if !pointer.primary_pressed {
+            return pointer.primary_click_count.max(1);
+        }
+
+        let count = self
+            .last_text_click
+            .as_ref()
+            .filter(|click| click.target == frame.id)
+            .filter(|click| {
+                pointer.time_seconds - click.time_seconds <= TEXT_CLICK_INTERVAL_SECONDS
+            })
+            .filter(|click| point_distance(click.position, pointer.position) <= TEXT_CLICK_DISTANCE)
+            .map(|click| click.count.saturating_add(1).min(3))
+            .unwrap_or(1);
+        self.last_text_click = Some(TextClickSequence {
+            target: frame.id.clone(),
+            position: pointer.position,
+            time_seconds: pointer.time_seconds,
+            count,
+        });
+        count
     }
 
     fn update_active_text_selection(
@@ -572,7 +628,18 @@ impl DocumentEngine {
             let mut changed = false;
             let focus_index = layout
                 .find(selection.target.as_str())
-                .map(|frame| text_index_at_point(frame, pointer.position, text_measurer))
+                .map(|frame| {
+                    let text_index = text_index_at_point(frame, pointer.position, text_measurer);
+                    let (anchor_index, focus_index) = selection_indices_for_granularity(
+                        frame.text.as_deref().unwrap_or_default(),
+                        selection.anchor_range_start,
+                        selection.anchor_range_end,
+                        text_index,
+                        selection.granularity,
+                    );
+                    selection.anchor_index = anchor_index;
+                    focus_index
+                })
                 .unwrap_or(selection.focus_index);
             changed |= set_point(&mut selection.focus, pointer.position);
             changed |= set_usize(&mut selection.focus_index, focus_index);
@@ -859,6 +926,12 @@ fn set_point(target: &mut Point, value: Point) -> bool {
     changed
 }
 
+fn point_distance(left: Point, right: Point) -> f32 {
+    let dx = left.x - right.x;
+    let dy = left.y - right.y;
+    (dx * dx + dy * dy).sqrt()
+}
+
 fn text_index_at_point(
     frame: &ResolvedElement,
     point: Point,
@@ -898,6 +971,95 @@ fn text_request_for_frame<'a>(
         max_lines: frame.style.max_lines,
         line_height: frame.style.line_height,
     }
+}
+
+fn selection_range_for_granularity(
+    text: &str,
+    index: usize,
+    granularity: TextSelectionGranularity,
+) -> (usize, usize) {
+    match granularity {
+        TextSelectionGranularity::Character => (index, index),
+        TextSelectionGranularity::Word => word_range_at(text, index),
+        TextSelectionGranularity::Paragraph => paragraph_range_at(text, index),
+    }
+}
+
+fn selection_indices_for_granularity(
+    text: &str,
+    anchor_start: usize,
+    anchor_end: usize,
+    focus_index: usize,
+    granularity: TextSelectionGranularity,
+) -> (usize, usize) {
+    match granularity {
+        TextSelectionGranularity::Character => (anchor_start, focus_index),
+        TextSelectionGranularity::Word => {
+            let (start, end) = word_range_at(text, focus_index);
+            if focus_index < anchor_start {
+                (anchor_end, start)
+            } else if focus_index > anchor_end {
+                (anchor_start, end)
+            } else {
+                (anchor_start, anchor_end)
+            }
+        }
+        TextSelectionGranularity::Paragraph => {
+            let (start, end) = paragraph_range_at(text, focus_index);
+            if focus_index < anchor_start {
+                (anchor_end, start)
+            } else if focus_index > anchor_end {
+                (anchor_start, end)
+            } else {
+                (anchor_start, anchor_end)
+            }
+        }
+    }
+}
+
+fn word_range_at(text: &str, index: usize) -> (usize, usize) {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return (0, 0);
+    }
+    let mut cursor = index.min(chars.len().saturating_sub(1));
+    if cursor > 0 && !is_word_char(chars[cursor]) && is_word_char(chars[cursor - 1]) {
+        cursor -= 1;
+    }
+    if !is_word_char(chars[cursor]) {
+        return (index.min(chars.len()), index.min(chars.len()));
+    }
+
+    let mut start = cursor;
+    while start > 0 && is_word_char(chars[start - 1]) {
+        start -= 1;
+    }
+    let mut end = cursor + 1;
+    while end < chars.len() && is_word_char(chars[end]) {
+        end += 1;
+    }
+    (start, end)
+}
+
+fn paragraph_range_at(text: &str, index: usize) -> (usize, usize) {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return (0, 0);
+    }
+    let cursor = index.min(chars.len());
+    let mut start = cursor;
+    while start > 0 && chars[start - 1] != '\n' {
+        start -= 1;
+    }
+    let mut end = cursor;
+    while end < chars.len() && chars[end] != '\n' {
+        end += 1;
+    }
+    (start, end)
+}
+
+fn is_word_char(value: char) -> bool {
+    value.is_alphanumeric() || value == '_'
 }
 
 fn drag_delta_is_click(drag: &DocumentDrag) -> bool {
