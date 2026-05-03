@@ -1132,6 +1132,44 @@ fn text_view_allows_pointer_selection_on_selectable_text() {
     assert!(rect.contains(selection.anchor));
     assert!(rect.contains(selection.focus));
     assert_ne!(selection.anchor, selection.focus);
+    assert_ne!(selection.anchor_index, selection.focus_index);
+}
+
+#[test]
+fn text_view_copy_event_sends_selected_text_to_clipboard() {
+    let mut harness = lab_harness("text");
+    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
+    let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(end);
+    harness.run();
+    assert!(
+        harness
+            .state()
+            .document_engine
+            .text_selection()
+            .is_some_and(|selection| !selection.is_empty()),
+        "drag should leave a non-empty document text selection before copy"
+    );
+    harness.input_mut().modifiers = egui::Modifiers::COMMAND;
+    harness.input_mut().events.push(egui::Event::Key {
+        key: egui::Key::C,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    harness.step();
+
+    assert!(
+        harness.output().platform_output.commands.iter().any(
+            |command| matches!(command, egui::OutputCommand::CopyText(text) if !text.is_empty())
+        ),
+        "copy event should send the document selection to the platform clipboard"
+    );
 }
 
 #[test]

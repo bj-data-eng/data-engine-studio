@@ -100,6 +100,10 @@ impl<'a> ElementSnapshot<'a> {
         self.element.selectable_text
     }
 
+    pub fn copyable_text(&self) -> bool {
+        self.element.copyable_text
+    }
+
     pub fn value(&self) -> Option<&str> {
         self.element.value.as_deref()
     }

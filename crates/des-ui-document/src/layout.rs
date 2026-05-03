@@ -107,6 +107,9 @@ fn layout_element_in_viewport(
         text: element.text.clone(),
         text_layout,
         selectable_text: element.spec.selectable_text && element.text.is_some(),
+        copyable_text: element.spec.selectable_text
+            && element.spec.copyable_text
+            && element.text.is_some(),
         value: element.spec.value.clone(),
         glyph: element.spec.glyph,
         interactive: element.spec.interactive && !element.spec.disabled,
@@ -905,6 +908,7 @@ fn layout_table_children(
             text: row.text.clone(),
             text_layout,
             selectable_text: row.spec.selectable_text && row.text.is_some(),
+            copyable_text: row.spec.selectable_text && row.spec.copyable_text && row.text.is_some(),
             value: row.spec.value.clone(),
             glyph: row.spec.glyph,
             interactive: row.spec.interactive && !row.spec.disabled,
@@ -979,6 +983,9 @@ fn layout_table_cells(
             text: cell.text.clone(),
             text_layout,
             selectable_text: cell.spec.selectable_text && cell.text.is_some(),
+            copyable_text: cell.spec.selectable_text
+                && cell.spec.copyable_text
+                && cell.text.is_some(),
             value: cell.spec.value.clone(),
             glyph: cell.spec.glyph,
             interactive: cell.spec.interactive && !cell.spec.disabled,

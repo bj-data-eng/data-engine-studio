@@ -1055,6 +1055,12 @@ fn selectable_text_tracks_pointer_selection_points() {
     assert_eq!(selection.target, ElementId::new("label"));
     assert_eq!(selection.anchor, start);
     assert_eq!(selection.focus, end);
+    assert!(selection.focus_index > selection.anchor_index);
+    assert!(
+        selection
+            .selected_text_from("Customer analytics pipeline preview")
+            .is_some()
+    );
     assert!(selection.active);
 
     let released = engine.update_with_input(
@@ -1072,6 +1078,112 @@ fn selectable_text_tracks_pointer_selection_points() {
     );
 
     assert!(!released.text_selection.unwrap().active);
+}
+
+#[test]
+fn selectable_text_exposes_selected_text_for_copy() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(320.0))
+            .text_wrap(TextWrapMode::Extend),
+    );
+    let document = Document::build(Size::new(360.0, 120.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "Customer analytics",
+        );
+    });
+
+    let start = Point::new(0.0, 4.0);
+    let end = Point::new(60.0, 4.0);
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: start,
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: end,
+                primary_delta: Point::new(end.x - start.x, end.y - start.y),
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.text_selection.as_ref().unwrap().char_range(), 0..8);
+    assert_eq!(output.selected_text().as_deref(), Some("Customer"));
+    assert!(output.snapshot().find("label").unwrap().selectable_text());
+    assert!(output.snapshot().find("label").unwrap().copyable_text());
+}
+
+#[test]
+fn selectable_text_can_disable_copy_without_disabling_selection() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(320.0))
+            .text_wrap(TextWrapMode::Extend),
+    );
+    let document = Document::build(Size::new(360.0, 120.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(ElementRole::Text)
+                .selectable_text()
+                .copyable_text(false),
+            "Customer analytics",
+        );
+    });
+
+    let start = Point::new(0.0, 4.0);
+    let end = Point::new(60.0, 4.0);
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: start,
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: end,
+                primary_delta: Point::new(end.x - start.x, end.y - start.y),
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(output.text_selection.is_some());
+    assert!(output.snapshot().find("label").unwrap().selectable_text());
+    assert!(!output.snapshot().find("label").unwrap().copyable_text());
+    assert_eq!(output.selected_text(), None);
 }
 
 #[test]

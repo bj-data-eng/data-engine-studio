@@ -4,7 +4,10 @@ mod styles;
 mod tests;
 mod views;
 
-use egui_adapter::{EguiTextMeasurer, document_input, paint_frame, paint_scroll_chrome};
+use egui_adapter::{
+    EguiTextMeasurer, copy_selected_text_on_command, document_input, paint_frame,
+    paint_scroll_chrome,
+};
 use styles::stylesheet;
 use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
 
@@ -173,6 +176,7 @@ impl UiLabState {
             &mut text_measurer,
         );
         let engine_time = engine_start.elapsed();
+        copy_selected_text_on_command(ui, &output);
 
         let paint_start = Instant::now();
         paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());

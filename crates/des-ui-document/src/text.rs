@@ -1,4 +1,4 @@
-use crate::geometry::Size;
+use crate::geometry::{Point, Size};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextWrapMode {
@@ -39,6 +39,10 @@ pub trait TextMeasurer {
     fn cache_key(&self) -> TextMeasurerKey;
 
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult;
+
+    fn text_index_at(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
+        fallback_text_index_at(request, point)
+    }
 }
 
 #[derive(Default)]
@@ -138,4 +142,28 @@ fn wrap_paragraph(text: &str, font_size: f32, max_width: f32) -> Vec<f32> {
 
 fn fallback_text_width(text: &str, font_size: f32) -> f32 {
     text.chars().count() as f32 * font_size * (7.5 / 13.0)
+}
+
+fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize {
+    let char_width = (request.font_size * (7.5 / 13.0)).max(1.0);
+    let line_height = request
+        .line_height
+        .unwrap_or_else(|| (request.font_size * 1.25).max(18.0))
+        .max(1.0);
+    let target_line = (point.y / line_height).floor().max(0.0) as usize;
+    let target_column = (point.x / char_width).round().max(0.0) as usize;
+    let mut line = 0usize;
+    let mut char_index = 0usize;
+
+    for segment in request.text.split_inclusive('\n') {
+        let line_text = segment.strip_suffix('\n').unwrap_or(segment);
+        let line_len = line_text.chars().count();
+        if line == target_line {
+            return char_index + target_column.min(line_len);
+        }
+        char_index += segment.chars().count();
+        line += 1;
+    }
+
+    request.text.chars().count()
 }

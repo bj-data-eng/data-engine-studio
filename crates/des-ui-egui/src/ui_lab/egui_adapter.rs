@@ -1,7 +1,7 @@
 use des_ui_document::{
-    Color, CornerRadii, DocumentInput, DocumentTextSelection, Glyph, Insets, Overflow, Point,
-    PointerInput, Rect, ResolvedElement, ScrollChrome, Size, TextLayoutRequest, TextLayoutResult,
-    TextMeasurer, TextMeasurerKey, TextWrapMode,
+    Color, CornerRadii, DocumentInput, DocumentOutput, DocumentTextSelection, Glyph, Insets,
+    Overflow, Point, PointerInput, Rect, ResolvedElement, ScrollChrome, Size, TextLayoutRequest,
+    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 
@@ -31,6 +31,13 @@ impl TextMeasurer for EguiTextMeasurer {
             elided: galley.elided,
         }
     }
+
+    fn text_index_at(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
+        let galley = self
+            .ctx
+            .fonts_mut(|fonts| fonts.layout_job(layout_job(request, egui::Color32::WHITE)));
+        galley.cursor_from_pos(egui::vec2(point.x, point.y)).index
+    }
 }
 
 pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
@@ -42,6 +49,25 @@ pub(super) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput
             primary_clicked: input.pointer.primary_clicked(),
         }),
         scroll_delta: Point::new(input.smooth_scroll_delta.x, input.smooth_scroll_delta.y),
+    })
+}
+
+pub(super) fn copy_selected_text_on_command(ui: &egui::Ui, output: &DocumentOutput) {
+    if copy_requested(ui)
+        && let Some(text) = output.selected_text()
+        && !text.is_empty()
+    {
+        ui.ctx().copy_text(text);
+    }
+}
+
+fn copy_requested(ui: &egui::Ui) -> bool {
+    ui.ctx().input_mut(|input| {
+        input
+            .events
+            .iter()
+            .any(|event| matches!(event, egui::Event::Copy))
+            || input.consume_key(egui::Modifiers::COMMAND, egui::Key::C)
     })
 }
 
@@ -102,17 +128,9 @@ fn paint_frame_clipped(
                 && let Some(selection) = text_selection
                 && selection.target == frame.id
             {
-                let anchor = egui::vec2(
-                    selection.anchor.x - (text_rect.min.x - origin.x),
-                    selection.anchor.y - (text_rect.min.y - origin.y),
-                );
-                let focus = egui::vec2(
-                    selection.focus.x - (text_rect.min.x - origin.x),
-                    selection.focus.y - (text_rect.min.y - origin.y),
-                );
                 let cursor_range = egui::text_selection::CCursorRange::two(
-                    galley.cursor_from_pos(anchor),
-                    galley.cursor_from_pos(focus),
+                    egui::text::CCursor::new(selection.anchor_index),
+                    egui::text::CCursor::new(selection.focus_index),
                 );
                 egui::text_selection::visuals::paint_text_selection(
                     &mut galley,

@@ -37,6 +37,7 @@ pub struct ResolvedElement {
     pub text: Option<String>,
     pub text_layout: Option<TextLayoutResult>,
     pub selectable_text: bool,
+    pub copyable_text: bool,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub interactive: bool,
@@ -69,6 +70,16 @@ pub struct DocumentOutput {
 impl DocumentOutput {
     pub fn snapshot(&self) -> DocumentSnapshot<'_> {
         DocumentSnapshot::new(&self.layout)
+    }
+
+    pub fn selected_text(&self) -> Option<String> {
+        let selection = self.text_selection.as_ref()?;
+        let frame = self.layout.find(selection.target.as_str())?;
+        if !frame.copyable_text {
+            return None;
+        }
+        let text = frame.text.as_ref()?;
+        selection.selected_text_from(text)
     }
 }
 
@@ -150,7 +161,36 @@ pub struct DocumentTextSelection {
     pub target: ElementId,
     pub anchor: Point,
     pub focus: Point,
+    pub anchor_index: usize,
+    pub focus_index: usize,
     pub active: bool,
+}
+
+impl DocumentTextSelection {
+    pub fn char_range(&self) -> std::ops::Range<usize> {
+        let start = self.anchor_index.min(self.focus_index);
+        let end = self.anchor_index.max(self.focus_index);
+        start..end
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.anchor_index == self.focus_index
+    }
+
+    pub fn selected_text_from(&self, text: &str) -> Option<String> {
+        let range = self.char_range();
+        if range.is_empty() {
+            return None;
+        }
+        Some(slice_char_range(text, range))
+    }
+}
+
+fn slice_char_range(text: &str, range: std::ops::Range<usize>) -> String {
+    text.chars()
+        .skip(range.start)
+        .take(range.end.saturating_sub(range.start))
+        .collect()
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

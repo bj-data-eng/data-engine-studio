@@ -133,6 +133,7 @@ pub struct ElementSpec {
     pub disabled: bool,
     pub focused: bool,
     pub selectable_text: bool,
+    pub copyable_text: bool,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub table: Option<TableSpec>,
@@ -149,6 +150,7 @@ impl ElementSpec {
             disabled: false,
             focused: false,
             selectable_text: false,
+            copyable_text: false,
             value: None,
             glyph: None,
             table: None,
@@ -183,6 +185,12 @@ impl ElementSpec {
 
     pub fn selectable_text(mut self) -> Self {
         self.selectable_text = true;
+        self.copyable_text = true;
+        self
+    }
+
+    pub fn copyable_text(mut self, copyable_text: bool) -> Self {
+        self.copyable_text = copyable_text;
         self
     }
 

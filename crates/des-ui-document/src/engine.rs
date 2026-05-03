@@ -136,7 +136,8 @@ impl DocumentEngine {
             layout
         };
         let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
-        let input_update = self.apply_input(&input_layout, &input_scroll_chrome, input);
+        let input_update =
+            self.apply_input(&input_layout, &input_scroll_chrome, input, text_measurer);
         let input_style_invalidation = classify_resolved_style_invalidation(
             &input_layout,
             &document.root,
@@ -298,6 +299,7 @@ impl DocumentEngine {
         layout: &ResolvedElement,
         scroll_chrome: &[ScrollChrome],
         input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
     ) -> InputUpdate {
         let mut update = InputUpdate::default();
         let previous = interaction_snapshot(&self.states);
@@ -365,7 +367,7 @@ impl DocumentEngine {
             .as_ref()
             .is_some_and(|selection| selection.active)
         {
-            update.changed |= self.update_active_text_selection(pointer);
+            update.changed |= self.update_active_text_selection(pointer, layout, text_measurer);
             update.hit_id = self
                 .text_selection
                 .as_ref()
@@ -437,7 +439,7 @@ impl DocumentEngine {
         if let Some(frame) = selectable_text_frame {
             update.hit_id = Some(frame.id.clone());
             if pointer.primary_down {
-                update.changed |= self.start_text_selection(frame, pointer.position);
+                update.changed |= self.start_text_selection(frame, pointer.position, text_measurer);
                 return finalize_input_update(update, &self.states, &previous);
             }
         } else if pointer.primary_down {
@@ -536,11 +538,19 @@ impl DocumentEngine {
         }
     }
 
-    fn start_text_selection(&mut self, frame: &ResolvedElement, point: Point) -> bool {
+    fn start_text_selection(
+        &mut self,
+        frame: &ResolvedElement,
+        point: Point,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> bool {
+        let text_index = text_index_at_point(frame, point, text_measurer);
         let next = DocumentTextSelection {
             target: frame.id.clone(),
             anchor: point,
             focus: point,
+            anchor_index: text_index,
+            focus_index: text_index,
             active: true,
         };
         let changed = self.text_selection.as_ref() != Some(&next);
@@ -549,13 +559,23 @@ impl DocumentEngine {
         changed
     }
 
-    fn update_active_text_selection(&mut self, pointer: PointerInput) -> bool {
+    fn update_active_text_selection(
+        &mut self,
+        pointer: PointerInput,
+        layout: &ResolvedElement,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> bool {
         let Some(selection) = self.text_selection.as_mut() else {
             return false;
         };
         if pointer.primary_down {
             let mut changed = false;
+            let focus_index = layout
+                .find(selection.target.as_str())
+                .map(|frame| text_index_at_point(frame, pointer.position, text_measurer))
+                .unwrap_or(selection.focus_index);
             changed |= set_point(&mut selection.focus, pointer.position);
+            changed |= set_usize(&mut selection.focus_index, focus_index);
             changed |= set_bool(&mut selection.active, true);
             changed
         } else {
@@ -827,10 +847,57 @@ fn set_bool(target: &mut bool, value: bool) -> bool {
     changed
 }
 
+fn set_usize(target: &mut usize, value: usize) -> bool {
+    let changed = *target != value;
+    *target = value;
+    changed
+}
+
 fn set_point(target: &mut Point, value: Point) -> bool {
     let changed = *target != value;
     *target = value;
     changed
+}
+
+fn text_index_at_point(
+    frame: &ResolvedElement,
+    point: Point,
+    text_measurer: &mut dyn TextMeasurer,
+) -> usize {
+    let Some(text) = frame.text.as_deref() else {
+        return 0;
+    };
+    let text_rect = text_content_rect(frame);
+    let local_point = Point::new(point.x - text_rect.origin.x, point.y - text_rect.origin.y);
+    text_measurer.text_index_at(
+        text_request_for_frame(frame, text, text_rect.size.width),
+        local_point,
+    )
+}
+
+fn text_content_rect(frame: &ResolvedElement) -> Rect {
+    frame
+        .rect
+        .inset(frame.style.border_width)
+        .inset(frame.style.padding)
+}
+
+fn text_request_for_frame<'a>(
+    frame: &ResolvedElement,
+    text: &'a str,
+    wrap_width: f32,
+) -> crate::text::TextLayoutRequest<'a> {
+    crate::text::TextLayoutRequest {
+        text,
+        font_size: frame.style.font_size,
+        wrap_width: match frame.style.text_wrap {
+            crate::text::TextWrapMode::Extend => f32::INFINITY,
+            crate::text::TextWrapMode::Wrap | crate::text::TextWrapMode::Truncate => wrap_width,
+        },
+        wrap_mode: frame.style.text_wrap,
+        max_lines: frame.style.max_lines,
+        line_height: frame.style.line_height,
+    }
 }
 
 fn drag_delta_is_click(drag: &DocumentDrag) -> bool {
