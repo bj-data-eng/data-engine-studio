@@ -4,8 +4,8 @@ use crate::graphics_testing::{
     test_harness,
 };
 use des_ui_document::{
-    Color, Document, DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec,
-    Insets, Length, Point, PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
+    Document, DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec, Insets,
+    Length, Point, PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
     StyleSheet, TextWrapMode,
 };
 use egui_kittest::Harness;
@@ -273,11 +273,11 @@ fn styling_view_renders_structural_selector_specimens() {
 
     assert_eq!(
         frame(&output, "structural-main-one").style.background,
-        Some(Color::rgb(24, 53, 42))
+        Some(SUCCESS_CONTAINER)
     );
     assert_eq!(
         frame(&output, "structural-main-two").style.background,
-        Some(Color::rgb(29, 55, 80))
+        Some(PRIMARY_CONTAINER)
     );
     assert_close(
         frame(&output, "structural-main-three")
@@ -292,12 +292,12 @@ fn styling_view_renders_structural_selector_specimens() {
     );
     assert_eq!(
         frame(&output, "structural-nested-a-one").style.background,
-        Some(Color::rgb(24, 53, 42)),
+        Some(SUCCESS_CONTAINER),
         "first-child should resolve within each nested parent"
     );
     assert_eq!(
         frame(&output, "structural-nested-b-one").style.background,
-        Some(Color::rgb(24, 53, 42)),
+        Some(SUCCESS_CONTAINER),
         "first-child should reset for sibling lists"
     );
     assert_eq!(
@@ -475,7 +475,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
         !frame(&output, "loop-checkbox-result-box")
             .style
             .background
-            .is_some_and(|color| color == Color::rgb(31, 52, 43))
+            .is_some_and(|color| color == SUCCESS_CONTAINER)
     );
     assert_eq!(
         frame(&output, "loop-radio-result").text.as_deref(),
@@ -756,6 +756,16 @@ fn interaction_drag_drop_styles_are_animated() {
     assert!(
         frame(&output, "drag-overlay").style.transition.is_some(),
         "drag overlay should define a transition for drag/drop styling"
+    );
+    assert_eq!(
+        frame(&output, "drag-overlay").style.shadows.len(),
+        2,
+        "drag overlay should use material elevation layers"
+    );
+    assert_eq!(
+        frame(&output, "drag-scroll-list-card").style.shadows.len(),
+        2,
+        "scrollable drag list should use resting elevation"
     );
 }
 
@@ -1244,7 +1254,7 @@ fn animation_view_renders_state_driven_specimens() {
     assert_close(selected.style.padding.top, 16.0);
     assert_close(selected.style.margin.top, 10.0);
     assert_close(selected.style.gap, 18.0);
-    assert_eq!(selected.style.background, Some(Color::rgb(43, 76, 82)));
+    assert_eq!(selected.style.background, Some(SUCCESS_CONTAINER));
     assert_close(
         frame(&output, "animation-selected-spacing-box-label")
             .style
@@ -1254,7 +1264,7 @@ fn animation_view_renders_state_driven_specimens() {
 
     let disabled = frame(&output, "animation-disabled-color-box");
     assert!(!disabled.interactive);
-    assert_eq!(disabled.style.background, Some(Color::rgb(28, 31, 34)));
+    assert_eq!(disabled.style.background, Some(SURFACE_CONTAINER));
 
     let focused = frame(&output, "animation-focused-min-size-box");
     assert_eq!(focused.style.width, Length::Px(226.0));
@@ -1262,7 +1272,17 @@ fn animation_view_renders_state_driven_specimens() {
     assert_close(focused.style.min_size.width, 210.0);
     assert_close(focused.style.min_size.height, 78.0);
     assert_close(focused.style.border_width.top, 6.0);
-    assert_eq!(focused.style.background, Some(Color::rgb(48, 38, 79)));
+    assert_eq!(focused.style.background, Some(SECONDARY_CONTAINER));
+
+    assert_eq!(
+        frame(&output, "drag-scroll-list-card").style.shadows.len(),
+        2,
+        "animation view should include the elevated drag list specimen"
+    );
+    assert!(
+        frame(&output, "drag-scroll-handle-0").interactive,
+        "animation drag specimen should preserve the real handle interaction"
+    );
 }
 
 #[test]

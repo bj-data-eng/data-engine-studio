@@ -9,13 +9,15 @@ use egui_adapter::{
     document_input, paint_frame, paint_scroll_chrome, paint_surface,
 };
 use styles::stylesheet;
-use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
+use views::{
+    render_debug_overlay_layer, render_drag_overlay_layer, render_nav, render_stage, render_topbar,
+};
 
 use des_ui_document::{
-    Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentMetrics,
-    DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Insets, Length, Point,
-    PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
-    TableSpec, TableTrackSize,
+    Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
+    DocumentMetrics, DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec, Insets,
+    Length, Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
+    TableColumnSpec, TableSpec, TableTrackSize,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -24,20 +26,27 @@ use des_ui_widgets::{
 use eframe::egui;
 use std::time::{Duration, Instant};
 
-const BACKGROUND: Color = Color::rgb(17, 20, 23);
-const PANEL: Color = Color::rgb(27, 31, 35);
-const PANEL_ALT: Color = Color::rgb(22, 26, 30);
-const CARD: Color = Color::rgb(31, 37, 42);
-const CARD_HOVER: Color = Color::rgb(38, 47, 54);
-const CARD_SELECTED: Color = Color::rgb(35, 56, 78);
-const CARD_PRESSED: Color = Color::rgb(45, 72, 98);
-const STROKE: Color = Color::rgb(61, 68, 76);
-const STROKE_SELECTED: Color = Color::rgb(88, 157, 230);
-const TEXT: Color = Color::rgb(228, 234, 240);
-const TEXT_MUTED: Color = Color::rgb(156, 166, 176);
-const TEXT_ACCENT: Color = Color::rgb(113, 196, 255);
-const GREEN: Color = Color::rgb(95, 204, 140);
-const PURPLE: Color = Color::rgb(151, 93, 219);
+const BACKGROUND: Color = Color::rgb(247, 239, 250);
+const PANEL: Color = Color::rgb(255, 251, 254);
+const PANEL_ALT: Color = Color::rgb(250, 244, 252);
+const CARD: Color = Color::rgb(255, 251, 254);
+const CARD_HOVER: Color = Color::rgb(243, 237, 247);
+const CARD_SELECTED: Color = Color::rgb(234, 221, 255);
+const CARD_PRESSED: Color = Color::rgb(224, 210, 245);
+const STROKE: Color = Color::rgb(202, 196, 208);
+const STROKE_SELECTED: Color = Color::rgb(103, 80, 164);
+const TEXT: Color = Color::rgb(29, 27, 32);
+const TEXT_MUTED: Color = Color::rgb(98, 91, 113);
+const TEXT_ACCENT: Color = Color::rgb(103, 80, 164);
+const GREEN: Color = Color::rgb(0, 106, 80);
+const PURPLE: Color = Color::rgb(103, 80, 164);
+const SURFACE_CONTAINER: Color = Color::rgb(243, 237, 247);
+const SURFACE_CONTAINER_HIGH: Color = Color::rgb(236, 230, 240);
+const PRIMARY_CONTAINER: Color = Color::rgb(234, 221, 255);
+const SECONDARY_CONTAINER: Color = Color::rgb(232, 222, 248);
+const TERTIARY_CONTAINER: Color = Color::rgb(255, 216, 228);
+const SUCCESS_CONTAINER: Color = Color::rgb(205, 239, 221);
+const WARNING_CONTAINER: Color = Color::rgb(255, 241, 204);
 const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
 const DRAG_ITEM_COUNT: usize = 3;
 const DROP_ZONE_COUNT: usize = 6;
@@ -223,11 +232,11 @@ impl UiLabState {
         };
         self.apply_document_events(ui, &output, pointer);
         self.paint_text_context_menu(ui, origin, &output);
-        if debug_overlay {
-            self.paint_debug_overlay(ui);
-        }
         if output.animating {
             ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
+        }
+        if debug_overlay {
+            self.paint_debug_overlay_document(ui, origin, viewport);
         }
     }
 
@@ -582,6 +591,32 @@ impl UiLabState {
         stylesheet
     }
 
+    fn paint_debug_overlay_document(
+        &self,
+        ui: &mut egui::Ui,
+        origin: egui::Pos2,
+        viewport: egui::Vec2,
+    ) {
+        let document = Document::build(Size::new(viewport.x, viewport.y), |ui| {
+            ui.element(
+                "debug-overlay-root",
+                ElementSpec::new(ElementRole::Panel).class("debug-overlay-root"),
+                |ui| {
+                    render_debug_overlay_layer(ui, self.last_perf);
+                },
+            );
+        });
+        let mut engine = DocumentEngine::default();
+        let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+        let output = engine.update_with_input_and_text_measurer(
+            &document,
+            &self.active_stylesheet(),
+            DocumentInput::default(),
+            &mut text_measurer,
+        );
+        paint_frame(ui, origin, &output.layout, None);
+    }
+
     fn interaction_document_update(&self) -> DocumentUpdate {
         let mut update = DocumentUpdate::new()
             .set_text(
@@ -663,64 +698,6 @@ impl UiLabState {
         }
 
         update
-    }
-
-    fn paint_debug_overlay(&self, ui: &egui::Ui) {
-        egui::Area::new("ui-lab-debug-overlay".into())
-            .order(egui::Order::Foreground)
-            .fixed_pos(ui.max_rect().right_top() + egui::vec2(-274.0, 12.0))
-            .show(ui.ctx(), |ui| {
-                egui::Frame::new()
-                    .fill(egui::Color32::from_rgba_unmultiplied(13, 16, 19, 230))
-                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(61, 68, 76)))
-                    .corner_radius(egui::CornerRadius::same(6))
-                    .inner_margin(egui::Margin::symmetric(10, 8))
-                    .show(ui, |ui| {
-                        ui.set_width(250.0);
-                        ui.label(
-                            egui::RichText::new("UI Lab Runtime")
-                                .color(egui::Color32::from_rgb(228, 234, 240))
-                                .strong(),
-                        );
-                        ui.separator();
-                        debug_row(ui, "document", self.last_perf.document_time);
-                        debug_row(ui, "engine", self.last_perf.engine_time);
-                        debug_row(ui, "paint", self.last_perf.paint_time);
-                        ui.separator();
-                        ui.label(format!(
-                            "elements: {}",
-                            self.last_perf.metrics.element_count
-                        ));
-                        ui.label(format!(
-                            "scrollbars: {}",
-                            self.last_perf.metrics.scroll_chrome_count
-                        ));
-                        ui.label(format!(
-                            "input cache hit: {}",
-                            self.last_perf.metrics.reused_cached_layout
-                        ));
-                        ui.label(format!(
-                            "final relayout skipped: {}",
-                            self.last_perf.metrics.reused_input_layout
-                        ));
-                        ui.label(format!(
-                            "input changed: {}",
-                            self.last_perf.metrics.input_changed_state
-                        ));
-                        ui.label(format!(
-                            "style changed: {}",
-                            self.last_perf.metrics.animation_changed_style
-                        ));
-                        ui.label(format!(
-                            "layout changed: {}",
-                            self.last_perf.metrics.animation_changed_layout
-                        ));
-                        ui.label(format!(
-                            "paint changed: {}",
-                            self.last_perf.metrics.animation_changed_paint
-                        ));
-                    });
-            });
     }
 }
 
@@ -825,13 +802,4 @@ struct UiLabPerf {
     engine_time: Duration,
     paint_time: Duration,
     metrics: DocumentMetrics,
-}
-
-fn debug_row(ui: &mut egui::Ui, label: &str, duration: Duration) {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(format!("{:.2} ms", duration.as_secs_f64() * 1000.0));
-        });
-    });
 }

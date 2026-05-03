@@ -4,7 +4,7 @@ use des_ui_document::{
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub(super) const TEXT_SELECTION_CLICK_INTERVAL: Duration = Duration::from_millis(800);
 pub(super) const TEXT_SELECTION_CLICK_DISTANCE: f32 = 6.0;
@@ -163,11 +163,11 @@ fn paint_frame_clipped(
                     egui::text::CCursor::new(selection.anchor_index),
                     egui::text::CCursor::new(selection.focus_index),
                 );
-                egui::text_selection::visuals::paint_text_selection(
+                paint_document_text_selection(
                     &mut galley,
-                    ui.visuals(),
                     &cursor_range,
-                    None,
+                    frame.style.text_selection_background,
+                    frame.style.text_selection_color,
                 );
             }
             painter.galley(text_rect.min, galley, color);
@@ -221,6 +221,88 @@ fn paint_frame_clipped(
     };
     for child in children {
         paint_frame_clipped(ui, origin, child, next_clip, text_selection);
+    }
+}
+
+fn paint_document_text_selection(
+    galley: &mut Arc<egui::Galley>,
+    cursor_range: &egui::text_selection::CCursorRange,
+    background_color: Color,
+    text_color: Color,
+) {
+    if cursor_range.is_empty() {
+        return;
+    }
+
+    let background_color = to_egui_color(background_color);
+    let text_color = to_egui_color(text_color);
+    let galley = Arc::make_mut(galley);
+    let [min, max] = cursor_range.sorted_cursors();
+    let min = galley.layout_from_cursor(min);
+    let max = galley.layout_from_cursor(max);
+
+    for row_index in min.row..=max.row {
+        let placed_row = &mut galley.rows[row_index];
+        let row = Arc::make_mut(&mut placed_row.row);
+        let left = if row_index == min.row {
+            row.x_offset(min.column)
+        } else {
+            0.0
+        };
+        let right = if row_index == max.row {
+            row.x_offset(max.column)
+        } else {
+            let newline_size = if placed_row.ends_with_newline {
+                row.height() / 2.0
+            } else {
+                0.0
+            };
+            row.size.x + newline_size
+        };
+        let rect = egui::Rect::from_min_max(egui::pos2(left, 0.0), egui::pos2(right, row.size.y));
+
+        if !row.glyphs.is_empty() {
+            let first_glyph_index = if row_index == min.row { min.column } else { 0 };
+            let last_glyph_index = if row_index == max.row {
+                max.column
+            } else {
+                row.glyphs.len() - 1
+            };
+            let first_vertex_index = row
+                .glyphs
+                .get(first_glyph_index)
+                .map_or(row.visuals.glyph_vertex_range.end, |glyph| {
+                    glyph.first_vertex as _
+                });
+            let last_vertex_index = row
+                .glyphs
+                .get(last_glyph_index)
+                .map_or(row.visuals.glyph_vertex_range.end, |glyph| {
+                    glyph.first_vertex as _
+                });
+            for vertex_index in first_vertex_index..last_vertex_index {
+                row.visuals.mesh.vertices[vertex_index].color = text_color;
+            }
+        }
+
+        let mesh = &mut row.visuals.mesh;
+        let glyph_index_start = row.visuals.glyph_index_start;
+        let num_indices_before = mesh.indices.len();
+        mesh.add_colored_rect(rect, background_color);
+        let selection_triangles = [
+            mesh.indices[num_indices_before],
+            mesh.indices[num_indices_before + 1],
+            mesh.indices[num_indices_before + 2],
+            mesh.indices[num_indices_before + 3],
+            mesh.indices[num_indices_before + 4],
+            mesh.indices[num_indices_before + 5],
+        ];
+        for index in (glyph_index_start..num_indices_before).rev() {
+            mesh.indices.swap(index, index + 6);
+        }
+        mesh.indices[glyph_index_start..glyph_index_start + 6]
+            .clone_from_slice(&selection_triangles);
+        row.visuals.mesh_bounds = mesh.calc_bounds();
     }
 }
 

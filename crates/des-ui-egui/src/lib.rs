@@ -1,7 +1,7 @@
 mod app;
 #[cfg(test)]
 mod graphics_testing;
-mod theme;
+mod host_config;
 mod ui_lab;
 
 use des_app::AppCommand;
@@ -49,15 +49,15 @@ pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
         &native_options.title,
         native_options.options,
         Box::new(|creation_context| {
-            theme::apply_theme(&creation_context.egui_ctx);
+            host_config::apply_host_configuration(&creation_context.egui_ctx);
             Ok(Box::new(app::StudioEguiApp::new(app_options)))
         }),
     )
     .map_err(|error| des_core::StudioError::new(error.to_string()))
 }
 
-pub fn apply_default_theme(context: &egui::Context) {
-    theme::apply_theme(context);
+pub fn apply_default_host_configuration(context: &egui::Context) {
+    host_config::apply_host_configuration(context);
 }
 
 struct BuiltNativeOptions {

@@ -124,7 +124,12 @@ pub(super) fn render_stage(
                 scroll_list_drop_preview,
             ),
             LabView::Styling => render_styling_view(ui, dense_mode),
-            LabView::Animation => render_animation_view(ui),
+            LabView::Animation => render_animation_view(
+                ui,
+                scroll_list_item_order,
+                active_scroll_list_drag_item,
+                scroll_list_drop_preview,
+            ),
             LabView::Scrolling => render_scrolling_view(ui),
             LabView::Table => render_table_view(ui),
             LabView::Text => render_text_view(ui),
@@ -784,34 +789,12 @@ fn render_drag_drop_lab(
         "drag-workbench",
         ElementSpec::new(ElementRole::Panel).class("drag-workbench"),
         |ui| {
-            ui.element(
-                "drag-scroll-list-card",
-                ElementSpec::new(ElementRole::Panel).class("drag-scroll-list-card"),
-                |ui| {
-                    ui.text_element(
-                        "drag-scroll-list-title",
-                        ElementSpec::new(ElementRole::Text).class("section-subtitle"),
-                        "Scrollable list target",
-                    );
-                    ui.element(
-                        "drag-scroll-list-0",
-                        ElementSpec::new(ElementRole::Panel).class("drag-scroll-list"),
-                        |ui| {
-                            let mut list_items: Vec<_> =
-                                (0..scroll_list_item_order.len()).collect();
-                            list_items.sort_by_key(|item| scroll_list_item_order[*item]);
-                            for item in list_items {
-                                drag_scroll_item(
-                                    ui,
-                                    item,
-                                    scroll_list_drop_preview,
-                                    active_scroll_list_drag_item
-                                        == Some(des_ui_widgets::SortableItemId(item)),
-                                );
-                            }
-                        },
-                    );
-                },
+            render_elevated_scrollable_drag_list(
+                ui,
+                "Scrollable list target",
+                scroll_list_item_order,
+                active_scroll_list_drag_item,
+                scroll_list_drop_preview,
             );
             ui.element(
                 "drag-grid",
@@ -855,6 +838,43 @@ fn render_drag_drop_lab(
     );
 }
 
+fn render_elevated_scrollable_drag_list(
+    ui: &mut des_ui_document::DocumentBuilder,
+    title: &'static str,
+    scroll_list_item_order: [usize; 14],
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+) {
+    ui.element(
+        "drag-scroll-list-card",
+        ElementSpec::new(ElementRole::Panel).class("drag-scroll-list-card"),
+        |ui| {
+            ui.text_element(
+                "drag-scroll-list-title",
+                ElementSpec::new(ElementRole::Text).class("section-subtitle"),
+                title,
+            );
+            ui.element(
+                "drag-scroll-list-0",
+                ElementSpec::new(ElementRole::Panel).class("drag-scroll-list"),
+                |ui| {
+                    let mut list_items: Vec<_> = (0..scroll_list_item_order.len()).collect();
+                    list_items.sort_by_key(|item| scroll_list_item_order[*item]);
+                    for item in list_items {
+                        drag_scroll_item(
+                            ui,
+                            item,
+                            scroll_list_drop_preview,
+                            active_scroll_list_drag_item
+                                == Some(des_ui_widgets::SortableItemId(item)),
+                        );
+                    }
+                },
+            );
+        },
+    );
+}
+
 pub(super) fn render_drag_overlay_layer(
     ui: &mut des_ui_document::DocumentBuilder,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
@@ -862,6 +882,7 @@ pub(super) fn render_drag_overlay_layer(
     drag_pointer: Option<des_ui_document::Point>,
 ) {
     if drag_pointer.is_none() {
+        drag_overlay_placeholder(ui);
         return;
     }
     if let Some(item) = active_drag_item {
@@ -870,6 +891,120 @@ pub(super) fn render_drag_overlay_layer(
     if let Some(item) = active_scroll_list_drag_item {
         drag_scroll_overlay(ui, item.0);
     }
+    if active_drag_item.is_none() && active_scroll_list_drag_item.is_none() {
+        drag_overlay_placeholder(ui);
+    }
+}
+
+pub(super) fn render_debug_overlay_layer(
+    ui: &mut des_ui_document::DocumentBuilder,
+    perf: UiLabPerf,
+) {
+    ui.element(
+        "debug-overlay",
+        ElementSpec::new(ElementRole::Panel).class("debug-overlay"),
+        |ui| {
+            ui.text_element(
+                "debug-overlay-title",
+                ElementSpec::new(ElementRole::Text).class("debug-overlay-title"),
+                "UI Lab Runtime",
+            );
+            debug_metric_row(
+                ui,
+                "debug-document-time",
+                "document",
+                format_duration(perf.document_time),
+            );
+            debug_metric_row(
+                ui,
+                "debug-engine-time",
+                "engine",
+                format_duration(perf.engine_time),
+            );
+            debug_metric_row(
+                ui,
+                "debug-paint-time",
+                "paint",
+                format_duration(perf.paint_time),
+            );
+            debug_metric_row(
+                ui,
+                "debug-elements",
+                "elements",
+                perf.metrics.element_count.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-scrollbars",
+                "scrollbars",
+                perf.metrics.scroll_chrome_count.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-input-cache",
+                "input cache hit",
+                perf.metrics.reused_cached_layout.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-final-layout",
+                "final relayout skipped",
+                perf.metrics.reused_input_layout.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-input-changed",
+                "input changed",
+                perf.metrics.input_changed_state.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-style-changed",
+                "style changed",
+                perf.metrics.animation_changed_style.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-layout-changed",
+                "layout changed",
+                perf.metrics.animation_changed_layout.to_string(),
+            );
+            debug_metric_row(
+                ui,
+                "debug-paint-changed",
+                "paint changed",
+                perf.metrics.animation_changed_paint.to_string(),
+            );
+        },
+    );
+}
+
+fn debug_metric_row(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &'static str,
+    label: &'static str,
+    value: String,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(ElementRole::Panel).class("debug-row"),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(ElementRole::Text).class("debug-label"),
+                label,
+            );
+            ui.text_element(
+                format!("{id}-value"),
+                ElementSpec::new(ElementRole::Text).class("debug-value"),
+                value,
+            );
+        },
+    );
+}
+
+fn format_duration(duration: std::time::Duration) -> String {
+    format!("{:.2} ms", duration.as_secs_f64() * 1000.0)
 }
 
 fn drag_scroll_item(
@@ -997,6 +1132,17 @@ fn drag_overlay(ui: &mut des_ui_document::DocumentBuilder, item: usize) {
                 label,
             );
         },
+    );
+}
+
+fn drag_overlay_placeholder(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "drag-overlay",
+        ElementSpec::new(ElementRole::Card)
+            .class("drag-overlay")
+            .class("drag-overlay-idle")
+            .value(""),
+        |_| {},
     );
 }
 
@@ -1487,7 +1633,12 @@ fn structural_nested_item(
     );
 }
 
-fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_animation_view(
+    ui: &mut des_ui_document::DocumentBuilder,
+    scroll_list_item_order: [usize; 14],
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+) {
     ui.text_element(
         "animation-heading",
         ElementSpec::new(ElementRole::Text).class("heading"),
@@ -1559,6 +1710,23 @@ fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
                 true,
             );
         },
+    );
+    ui.text_element(
+        "animation-drag-title",
+        ElementSpec::new(ElementRole::Text).class("section-title"),
+        "Elevation drag layer",
+    );
+    ui.text_element(
+        "animation-drag-copy",
+        ElementSpec::new(ElementRole::Text).class("muted"),
+        "Drag a list row by its handle. Resting, pressed, and floating states use animated elevation.",
+    );
+    render_elevated_scrollable_drag_list(
+        ui,
+        "Animated elevation list",
+        scroll_list_item_order,
+        active_scroll_list_drag_item,
+        scroll_list_drop_preview,
     );
 }
 

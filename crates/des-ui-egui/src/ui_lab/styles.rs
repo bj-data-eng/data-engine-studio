@@ -1,6 +1,8 @@
 use super::{
-    BACKGROUND, CARD, CARD_HOVER, CARD_PRESSED, CARD_SELECTED, GREEN, PANEL, PANEL_ALT, PURPLE,
-    STROKE, STROKE_SELECTED, TEXT, TEXT_ACCENT, TEXT_MUTED,
+    BACKGROUND, CARD, CARD_HOVER, CARD_PRESSED, CARD_SELECTED, GREEN, PANEL, PANEL_ALT,
+    PRIMARY_CONTAINER, PURPLE, SECONDARY_CONTAINER, STROKE, STROKE_SELECTED, SUCCESS_CONTAINER,
+    SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TERTIARY_CONTAINER, TEXT, TEXT_ACCENT, TEXT_MUTED,
+    WARNING_CONTAINER,
 };
 use des_ui_document::{
     AlignItems, Color, Direction, ElementRole, ElementStateSelector, Insets, JustifyContent,
@@ -77,7 +79,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::Role(ElementRole::TextInput),
             Style::default()
                 .padding(Insets::symmetric(10.0, 7.0))
-                .background(Color::rgb(13, 16, 19))
+                .background(PANEL)
                 .border(STROKE)
                 .radius(5.0),
         )
@@ -90,7 +92,11 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::Role(ElementRole::Text),
-            Style::default().font_size(13.0).text_color(TEXT),
+            Style::default()
+                .font_size(13.0)
+                .text_color(TEXT)
+                .text_selection_background(Color::rgba(234, 221, 255, 190))
+                .text_selection_color(TEXT),
         )
         .rule(
             StyleSelector::class("lab-root"),
@@ -105,7 +111,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(1320.0, 58.0)
                 .padding(Insets::symmetric(18.0, 10.0))
                 .gap(3.0)
-                .background(Color::rgb(22, 26, 30)),
+                .background(PANEL),
         )
         .rule(
             StyleSelector::class("lab-body"),
@@ -164,8 +170,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
                 .gap(3.0)
-                .background(Color::rgb(20, 24, 28))
-                .border(Color::rgb(45, 54, 62))
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
                 .radius(5.0),
         )
         .rule(
@@ -202,8 +208,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width_fill()
                 .height(Length::Auto)
                 .min_size(0.0, 86.0)
-                .background(Color::rgb(13, 16, 19))
-                .border(Color::rgb(39, 48, 56))
+                .background(PANEL)
+                .border(STROKE)
                 .overflow_y(Overflow::Visible),
         )
         .rule(
@@ -212,19 +218,19 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(32.0, 32.0)
                 .gap(0.0)
                 .padding(Insets::ZERO)
-                .background(Color::rgb(65, 121, 164)),
+                .background(Color::rgb(210, 228, 250)),
         )
         .rule(
             StyleSelector::class("box-chip"),
             Style::default()
                 .size(12.0, 12.0)
-                .background(Color::rgb(141, 207, 164)),
+                .background(SUCCESS_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-overflow-child"),
             Style::default()
                 .size(112.0, 112.0)
-                .background(Color::rgb(218, 151, 77)),
+                .background(Color::rgb(255, 220, 170)),
         )
         .rule(
             StyleSelector::class("box-subject-auto"),
@@ -252,7 +258,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("box-max-wide-child"),
             Style::default()
                 .size(88.0, 48.0)
-                .background(Color::rgb(141, 207, 164)),
+                .background(SUCCESS_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-subject-fill"),
@@ -374,7 +380,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .margin(Insets::all(8.0))
                 .border(PURPLE)
                 .border_width(3.0)
-                .background(Color::rgb(41, 58, 73)),
+                .background(PRIMARY_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-nested-inner"),
@@ -385,7 +391,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(4.0)
                 .border(GREEN)
                 .border_width(2.0)
-                .background(Color::rgb(52, 72, 88)),
+                .background(PRIMARY_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-nested-row"),
@@ -394,13 +400,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(4.0)
-                .background(Color::rgb(65, 121, 164)),
+                .background(Color::rgb(210, 228, 250)),
         )
         .rule(
             StyleSelector::class("box-nested-cell"),
             Style::default()
                 .size(10.0, 10.0)
-                .background(Color::rgb(141, 207, 164)),
+                .background(SUCCESS_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-subject-inset-percent"),
@@ -413,14 +419,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::all(8.0))
                 .border(PURPLE)
                 .border_width(2.0)
-                .background(Color::rgb(65, 121, 164)),
+                .background(Color::rgb(210, 228, 250)),
         )
         .rule(
             StyleSelector::class("box-inset-percent-child"),
             Style::default()
                 .width_percent(0.5)
                 .height_percent(0.5)
-                .background(Color::rgb(141, 207, 164)),
+                .background(SUCCESS_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-subject-absolute-parent"),
@@ -433,13 +439,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::all(8.0))
                 .border(PURPLE)
                 .border_width(2.0)
-                .background(Color::rgb(65, 121, 164)),
+                .background(Color::rgb(210, 228, 250)),
         )
         .rule(
             StyleSelector::class("box-absolute-flow-child"),
             Style::default()
                 .size(16.0, 16.0)
-                .background(Color::rgb(77, 136, 179)),
+                .background(Color::rgb(190, 215, 246)),
         )
         .rule(
             StyleSelector::class("box-absolute-parent-child"),
@@ -449,7 +455,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .left(Length::Px(14.0))
                 .size(26.0, 26.0)
                 .z_index(2)
-                .background(Color::rgb(141, 207, 164))
+                .background(SUCCESS_CONTAINER)
                 .border(GREEN),
         )
         .rule(
@@ -462,7 +468,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(88.0, 64.0)
                 .border(PURPLE)
                 .border_width(2.0)
-                .background(Color::rgb(45, 58, 76)),
+                .background(PRIMARY_CONTAINER),
         )
         .rule(
             StyleSelector::class("box-absolute-window-child"),
@@ -472,7 +478,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .left(Length::Px(420.0))
                 .size(26.0, 26.0)
                 .z_index(20)
-                .background(Color::rgb(155, 129, 255))
+                .background(PRIMARY_CONTAINER)
                 .border(PURPLE),
         )
         .rule(
@@ -506,7 +512,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("button"),
             Style::default()
                 .size(156.0, 36.0)
-                .background(Color::rgb(38, 43, 48))
+                .background(SURFACE_CONTAINER_HIGH)
                 .border(STROKE),
         )
         .rule(
@@ -589,7 +595,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::ZERO)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::Center)
-                .background(Color::rgb(16, 20, 24))
+                .background(PANEL)
                 .border(STROKE)
                 .radius(4.0),
         )
@@ -597,20 +603,20 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class_state("checkbox-mark", ElementStateSelector::Selected),
             Style::default()
                 .background(STROKE_SELECTED)
-                .border(Color::rgb(126, 190, 255)),
+                .border(STROKE_SELECTED),
         )
         .rule(
             StyleSelector::class("check-glyph"),
             Style::default()
                 .size(13.0, 13.0)
                 .font_size(13.0)
-                .text_color(Color::rgb(244, 248, 252)),
+                .text_color(TEXT),
         )
         .rule(
             StyleSelector::class("radio-dot"),
             Style::default()
                 .size(18.0, 18.0)
-                .background(Color::rgb(16, 20, 24))
+                .background(PANEL)
                 .border(STROKE)
                 .border_width(2.0)
                 .radius(9.0),
@@ -619,7 +625,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class_state("radio-dot", ElementStateSelector::Selected),
             Style::default()
                 .background(STROKE_SELECTED)
-                .border(Color::rgb(160, 212, 255))
+                .border(STROKE_SELECTED)
                 .border_width(5.0),
         )
         .rule(
@@ -632,7 +638,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("control-label", ElementStateSelector::Disabled),
-            Style::default().text_color(Color::rgb(96, 104, 112)),
+            Style::default().text_color(TEXT_MUTED),
         )
         .rule(
             StyleSelector::class("dropdown-control"),
@@ -661,7 +667,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .padding(Insets::all(4.0))
                 .gap(4.0)
-                .background(Color::rgb(18, 22, 26))
+                .background(PANEL)
                 .border(STROKE_SELECTED)
                 .top_left_radius(0.0)
                 .top_right_radius(0.0)
@@ -693,9 +699,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("input-field", ElementStateSelector::Disabled),
-            Style::default()
-                .background(Color::rgb(21, 24, 27))
-                .border(Color::rgb(40, 46, 52)),
+            Style::default().background(PANEL_ALT).border(STROKE),
         )
         .rule(
             StyleSelector::class("loop-grid"),
@@ -728,7 +732,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("loop-button", ElementStateSelector::Hovered),
-            Style::default().background(Color::rgb(42, 74, 102)),
+            Style::default().background(PRIMARY_CONTAINER),
         )
         .rule(
             StyleSelector::class_state("loop-button", ElementStateSelector::Pressed),
@@ -746,39 +750,37 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("loop-result-card", ElementStateSelector::Selected),
-            Style::default()
-                .background(Color::rgb(31, 52, 43))
-                .border(GREEN),
+            Style::default().background(SUCCESS_CONTAINER).border(GREEN),
         )
         .rule(
             StyleSelector::class_state("loop-result-card", ElementStateSelector::Focused),
             Style::default()
-                .background(Color::rgb(39, 35, 62))
+                .background(SECONDARY_CONTAINER)
                 .border(PURPLE),
         )
         .rule(
             StyleSelector::class("loop-runtime-local"),
-            Style::default().border(Color::rgb(88, 157, 230)),
+            Style::default().border(STROKE_SELECTED),
         )
         .rule(
             StyleSelector::class("loop-runtime-remote"),
-            Style::default().border(Color::rgb(95, 204, 140)),
+            Style::default().border(GREEN),
         )
         .rule(
             StyleSelector::class("loop-runtime-hybrid"),
-            Style::default().border(Color::rgb(151, 93, 219)),
+            Style::default().border(PURPLE),
         )
         .rule(
             StyleSelector::class("loop-source-csv"),
-            Style::default().background(Color::rgb(31, 43, 55)),
+            Style::default().background(PRIMARY_CONTAINER),
         )
         .rule(
             StyleSelector::class("loop-source-duckdb"),
-            Style::default().background(Color::rgb(42, 39, 31)),
+            Style::default().background(WARNING_CONTAINER),
         )
         .rule(
             StyleSelector::class("loop-source-python"),
-            Style::default().background(Color::rgb(38, 32, 48)),
+            Style::default().background(TERTIARY_CONTAINER),
         )
         .rule(
             StyleSelector::class("drag-workbench"),
@@ -796,8 +798,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
                 .gap(8.0)
-                .background(Color::rgb(17, 21, 25))
-                .border(Color::rgb(42, 50, 58))
+                .background(PANEL)
+                .border(STROKE)
                 .radius(6.0)
                 .transition(Transition::ease_out(0.12)),
         )
@@ -809,16 +811,16 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .min_size(0.0, 70.0)
                 .padding(Insets::all(7.0))
                 .gap(5.0)
-                .background(Color::rgb(20, 25, 30))
-                .border(Color::rgb(48, 57, 65))
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
                 .radius(5.0)
                 .transition(Transition::ease_out(0.12)),
         )
         .rule(
             StyleSelector::class_state("drag-cell", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(25, 32, 38))
-                .border(Color::rgb(88, 157, 230)),
+                .background(SURFACE_CONTAINER_HIGH)
+                .border(STROKE_SELECTED),
         )
         .rule(
             StyleSelector::class("drag-item"),
@@ -832,6 +834,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .background(CARD_SELECTED)
                 .border(STROKE_SELECTED)
                 .radius(5.0)
+                .shadows(material_elevation(1, PURPLE))
                 .transition(Transition::ease_out(0.14)),
         )
         .rule(
@@ -839,6 +842,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .background(Color::rgba(0, 0, 0, 0))
                 .border(Color::rgba(0, 0, 0, 0))
+                .shadows(material_elevation(0, PURPLE))
                 .text_color(Color::rgba(0, 0, 0, 0)),
         )
         .rule(
@@ -868,7 +872,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("drag-handle", ElementStateSelector::Hovered),
-            Style::default().background(Color::rgba(232, 236, 240, 24)),
+            Style::default().background(Color::rgba(103, 80, 164, 20)),
         )
         .rule(
             StyleSelector::class("drag-handle-glyph"),
@@ -883,29 +887,36 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Hovered),
-            Style::default().background(Color::rgb(42, 74, 102)),
+            Style::default()
+                .background(PRIMARY_CONTAINER)
+                .shadows(material_elevation(2, PURPLE)),
         )
         .rule(
             StyleSelector::class_state("drag-item", ElementStateSelector::Pressed),
-            Style::default().background(CARD_PRESSED),
+            Style::default()
+                .background(CARD_PRESSED)
+                .shadows(material_elevation(3, PURPLE)),
         )
         .rule(
             StyleSelector::class_state("drag-origin-space", ElementStateSelector::Hovered),
             Style::default()
                 .background(Color::rgba(0, 0, 0, 0))
-                .border(Color::rgba(0, 0, 0, 0)),
+                .border(Color::rgba(0, 0, 0, 0))
+                .shadows(material_elevation(0, PURPLE)),
         )
         .rule(
             StyleSelector::class_state("drag-origin-space", ElementStateSelector::Pressed),
             Style::default()
                 .background(Color::rgba(0, 0, 0, 0))
-                .border(Color::rgba(0, 0, 0, 0)),
+                .border(Color::rgba(0, 0, 0, 0))
+                .shadows(material_elevation(0, PURPLE)),
         )
         .rule(
             StyleSelector::class("drag-item-active"),
             Style::default()
-                .background(Color::rgb(45, 37, 68))
-                .border(PURPLE),
+                .background(SECONDARY_CONTAINER)
+                .border(PURPLE)
+                .shadows(material_elevation(4, PURPLE)),
         )
         .rule(
             StyleSelector::class("drag-overlay"),
@@ -913,7 +924,19 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width(Length::Px(230.0))
                 .height(Length::Px(34.0))
                 .z_index(1000)
-                .transition(Transition::ease_out(0.08)),
+                .shadows(material_elevation(5, PURPLE))
+                .transition(Transition::ease_out(0.18)),
+        )
+        .rule(
+            StyleSelector::class("drag-overlay-idle"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(-10_000.0))
+                .top(Length::Px(-10_000.0))
+                .z_index(-1)
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0))
+                .shadows(material_elevation(0, PURPLE)),
         )
         .rule(
             StyleSelector::class("drag-gap-before"),
@@ -941,7 +964,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(8.0)
                 .background(PANEL_ALT)
                 .border(STROKE)
-                .radius(6.0),
+                .radius(6.0)
+                .shadows(material_elevation(1, PURPLE)),
         )
         .rule(
             StyleSelector::class("drag-scroll-list"),
@@ -954,11 +978,11 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .scrollbar_width(2.0)
                 .scrollbar_expanded_width(10.0)
                 .scrollbar_radius(5.0)
-                .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
-                .scrollbar_track_color(Color::rgba(0, 0, 0, 48))
-                .scrollbar_hover_handle_color(Color::rgba(232, 236, 240, 118))
-                .scrollbar_hover_track_color(Color::rgba(0, 0, 0, 48))
-                .scrollbar_pressed_handle_color(Color::rgba(232, 236, 240, 170))
+                .scrollbar_handle_color(Color::rgba(103, 80, 164, 118))
+                .scrollbar_track_color(Color::rgba(103, 80, 164, 28))
+                .scrollbar_hover_handle_color(Color::rgba(103, 80, 164, 118))
+                .scrollbar_hover_track_color(Color::rgba(103, 80, 164, 28))
+                .scrollbar_pressed_handle_color(Color::rgba(103, 80, 164, 176))
                 .scrollbar_pressed_handle_border_color(STROKE_SELECTED)
                 .scrollbar_pressed_handle_border_width(1.0)
                 .transition(Transition::ease_out(0.12)),
@@ -1023,8 +1047,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::all(8.0))
                 .font_size(13.0)
                 .line_height(18.0)
-                .background(Color::rgb(19, 24, 28))
-                .border(Color::rgb(43, 52, 60))
+                .background(PANEL)
+                .border(STROKE)
                 .radius(4.0),
         )
         .rule(
@@ -1048,7 +1072,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .width(Length::Px(520.0))
                 .height(Length::Auto)
-                .background(Color::rgb(18, 22, 26))
+                .background(PANEL)
                 .border(STROKE)
                 .radius(5.0)
                 .overflow_x(Overflow::Scroll)
@@ -1056,18 +1080,18 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("table-header-row"),
-            Style::default().background(Color::rgb(25, 32, 38)),
+            Style::default().background(SURFACE_CONTAINER_HIGH),
         )
         .rule(
             StyleSelector::class("table-row"),
-            Style::default().background(Color::rgb(20, 25, 30)),
+            Style::default().background(SURFACE_CONTAINER),
         )
         .rule(
             StyleSelector::class("table-header-cell"),
             Style::default()
                 .font_size(12.0)
                 .text_color(TEXT_ACCENT)
-                .border(Color::rgb(43, 52, 60))
+                .border(STROKE)
                 .border_widths(Insets {
                     top: 0.0,
                     right: 1.0,
@@ -1080,7 +1104,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .font_size(12.0)
                 .text_color(TEXT)
-                .border(Color::rgb(37, 45, 52))
+                .border(STROKE)
                 .border_widths(Insets {
                     top: 0.0,
                     right: 1.0,
@@ -1119,20 +1143,20 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("list-row"),
             Style::default()
                 .size(600.0, 58.0)
-                .background(Color::rgb(25, 30, 34))
+                .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(5.0),
         )
         .rule(
             StyleSelector::class("specificity-proof"),
             Style::default()
-                .background(Color::rgb(30, 37, 43))
-                .border(Color::rgb(80, 91, 103)),
+                .background(SURFACE_CONTAINER_HIGH)
+                .border(STROKE),
         )
         .rule(
             StyleSelector::class_state("specificity-proof", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(38, 55, 64))
+                .background(SECONDARY_CONTAINER)
                 .border(GREEN),
         )
         .rule(
@@ -1142,7 +1166,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id_state("style-row-state", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(50, 41, 68))
+                .background(SECONDARY_CONTAINER)
                 .border(TEXT_ACCENT),
         )
         .rule(
@@ -1165,20 +1189,20 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::all(12.0))
                 .gap(5.0)
                 .background(CARD)
-                .border(Color::rgb(55, 66, 76))
+                .border(STROKE)
                 .radius(8.0),
         )
         .rule(
             StyleSelector::class("shadow-single"),
-            Style::default().shadows(material_elevation(2, Color::rgba(0, 0, 0, 255))),
+            Style::default().shadows(material_elevation(2, PURPLE)),
         )
         .rule(
             StyleSelector::class("shadow-layered"),
-            Style::default().shadows(material_elevation(3, Color::rgba(0, 0, 0, 255))),
+            Style::default().shadows(material_elevation(3, PURPLE)),
         )
         .rule(
             StyleSelector::class("shadow-negative-spread"),
-            Style::default().shadows(material_elevation(5, Color::rgba(0, 0, 0, 255))),
+            Style::default().shadows(material_elevation(5, PURPLE)),
         )
         .rule(
             StyleSelector::class("shadow-light-stage"),
@@ -1240,8 +1264,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
                 .gap(6.0)
-                .background(Color::rgb(17, 21, 25))
-                .border(Color::rgb(43, 52, 60))
+                .background(PANEL)
+                .border(STROKE)
                 .radius(6.0),
         )
         .rule(
@@ -1260,7 +1284,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width_fill()
                 .height(Length::Px(58.0))
                 .padding(Insets::symmetric(10.0, 7.0))
-                .background(Color::rgb(25, 30, 34))
+                .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(5.0),
         )
@@ -1269,9 +1293,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .class("structural-item")
                 .first_child()
                 .selector(),
-            Style::default()
-                .background(Color::rgb(24, 53, 42))
-                .border(GREEN),
+            Style::default().background(SUCCESS_CONTAINER).border(GREEN),
         )
         .rule(
             StyleSelector::compound()
@@ -1279,7 +1301,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .nth_child(2)
                 .selector(),
             Style::default()
-                .background(Color::rgb(29, 55, 80))
+                .background(PRIMARY_CONTAINER)
                 .border(TEXT_ACCENT),
         )
         .rule(
@@ -1318,8 +1340,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
                 .gap(3.0)
-                .background(Color::rgb(20, 24, 28))
-                .border(Color::rgb(45, 54, 62))
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
                 .radius(5.0),
         )
         .rule(
@@ -1328,8 +1350,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width_fill()
                 .height(Length::Px(132.0))
                 .padding(Insets::all(10.0))
-                .background(Color::rgb(13, 16, 19))
-                .border(Color::rgb(39, 48, 56)),
+                .background(PANEL)
+                .border(STROKE),
         )
         .rule(
             StyleSelector::class("animation-box"),
@@ -1338,7 +1360,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .min_size(120.0, 44.0)
                 .padding(Insets::all(8.0))
                 .gap(4.0)
-                .background(Color::rgb(35, 56, 78))
+                .background(PRIMARY_CONTAINER)
                 .border(STROKE_SELECTED)
                 .border_width(2.0)
                 .radius(4.0)
@@ -1360,23 +1382,23 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
                 .gap(0.0)
-                .background(Color::rgb(17, 21, 24))
-                .border(Color::rgb(48, 58, 66))
+                .background(PANEL)
+                .border(STROKE)
                 .radius(3.0),
         )
         .rule(
             StyleSelector::class("animation-margin-chip"),
             Style::default()
                 .size(48.0, 48.0)
-                .background(Color::rgb(39, 48, 56))
-                .border(Color::rgb(70, 82, 92))
+                .background(STROKE)
+                .border(STROKE)
                 .border_width(2.0)
                 .radius(4.0)
                 .transition(Transition::ease_out(0.18)),
         )
         .rule(
             StyleSelector::class("animation-margin-reference"),
-            Style::default().background(Color::rgb(31, 37, 43)),
+            Style::default().background(SURFACE_CONTAINER_HIGH),
         )
         .rule(
             StyleSelector::class_state("animation-box-hover-size", ElementStateSelector::Hovered),
@@ -1386,8 +1408,8 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class_state("animation-box-hover-margin", ElementStateSelector::Hovered),
             Style::default()
                 .margin(Insets::all(18.0))
-                .background(Color::rgb(66, 91, 58))
-                .border(Color::rgb(168, 224, 137)),
+                .background(SUCCESS_CONTAINER)
+                .border(GREEN),
         )
         .rule(
             StyleSelector::class_state(
@@ -1406,8 +1428,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::all(16.0))
                 .margin(Insets::all(10.0))
                 .gap(18.0)
-                .background(Color::rgb(43, 76, 82))
-                .border(Color::rgb(104, 222, 171))
+                .background(SUCCESS_CONTAINER)
+                .border(GREEN)
                 .radius(12.0),
         )
         .rule(
@@ -1420,8 +1442,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 ElementStateSelector::Disabled,
             ),
             Style::default()
-                .background(Color::rgb(28, 31, 34))
-                .border(Color::rgb(77, 83, 90))
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
                 .text_color(TEXT_MUTED),
         )
         .rule(
@@ -1430,7 +1452,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("animation-box-body", ElementStateSelector::Disabled),
-            Style::default().text_color(Color::rgb(115, 124, 132)),
+            Style::default().text_color(TEXT_MUTED),
         )
         .rule(
             StyleSelector::class_state(
@@ -1441,8 +1463,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(226.0, 88.0)
                 .min_size(210.0, 78.0)
                 .border_width(6.0)
-                .border(Color::rgb(155, 129, 255))
-                .background(Color::rgb(48, 38, 79))
+                .border(PRIMARY_CONTAINER)
+                .background(SECONDARY_CONTAINER)
                 .radius(16.0),
         )
         .rule(
@@ -1451,7 +1473,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(318.0, 300.0)
                 .padding(Insets::all(10.0))
                 .gap(7.0)
-                .background(Color::rgb(20, 24, 28))
+                .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(7.0),
         )
@@ -1497,8 +1519,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width_fill()
                 .height(des_ui_document::Length::Px(250.0))
                 .padding(Insets::all(12.0))
-                .background(Color::rgb(13, 16, 19))
-                .border(Color::rgb(39, 48, 56))
+                .background(PANEL)
+                .border(STROKE)
                 .radius(5.0),
         )
         .rule(
@@ -1515,8 +1537,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width_fill()
                 .height(des_ui_document::Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 7.0))
-                .background(Color::rgb(29, 34, 39))
-                .border(Color::rgb(48, 57, 65))
+                .background(CARD)
+                .border(STROKE)
                 .radius(4.0),
         )
         .rule(
@@ -1525,8 +1547,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(156.0, 214.0)
                 .padding(Insets::symmetric(9.0, 7.0))
                 .gap(7.0)
-                .background(Color::rgb(29, 34, 39))
-                .border(Color::rgb(48, 57, 65))
+                .background(CARD)
+                .border(STROKE)
                 .radius(4.0),
         )
         .rule(
@@ -1536,8 +1558,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(des_ui_document::Length::Px(158.0))
                 .padding(Insets::symmetric(3.0, 3.0))
                 .gap(4.0)
-                .background(Color::rgb(20, 24, 28))
-                .border(Color::rgb(43, 52, 60))
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
                 .radius(4.0)
                 .overflow_y(Overflow::Scroll)
                 .scrollbar_width(2.0),
@@ -1548,8 +1570,8 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width_fill()
                 .height(des_ui_document::Length::Px(24.0))
                 .padding(Insets::symmetric(6.0, 4.0))
-                .background(Color::rgb(24, 30, 35))
-                .border(Color::rgb(45, 54, 62))
+                .background(SURFACE_CONTAINER_HIGH)
+                .border(STROKE)
                 .radius(3.0),
         )
         .rule(
@@ -1558,32 +1580,32 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width(des_ui_document::Length::Px(430.0))
                 .height(des_ui_document::Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 7.0))
-                .background(Color::rgb(29, 34, 39))
-                .border(Color::rgb(48, 57, 65))
+                .background(CARD)
+                .border(STROKE)
                 .radius(4.0),
         )
         .rule(
             StyleSelector::class_state("scroll-row-card", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(38, 47, 54))
+                .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
         )
         .rule(
             StyleSelector::class_state("scroll-wide-row-card", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(38, 47, 54))
+                .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
         )
         .rule(
             StyleSelector::class_state("scroll-mini-row", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(36, 44, 51))
+                .background(SURFACE_CONTAINER_HIGH)
                 .border(STROKE_SELECTED),
         )
         .rule(
             StyleSelector::class_state("scroll-xy-row-card", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(38, 47, 54))
+                .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
         )
         .rule(
@@ -1592,7 +1614,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(650.0, 430.0)
                 .padding(Insets::all(28.0))
                 .gap(16.0)
-                .background(Color::rgb(20, 24, 29))
+                .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(8.0),
         )
@@ -1602,7 +1624,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(500.0, 270.0)
                 .padding(Insets::all(24.0))
                 .gap(14.0)
-                .background(Color::rgb(31, 43, 52))
+                .background(PRIMARY_CONTAINER)
                 .border(STROKE_SELECTED)
                 .radius(7.0),
         )
@@ -1612,14 +1634,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(360.0, 130.0)
                 .padding(Insets::all(18.0))
                 .gap(6.0)
-                .background(Color::rgb(42, 37, 57))
+                .background(SECONDARY_CONTAINER)
                 .border(PURPLE)
                 .radius(7.0),
         )
         .rule(
             StyleSelector::class_state("nest-inner", ElementStateSelector::Hovered),
             Style::default()
-                .background(Color::rgb(55, 50, 78))
+                .background(SECONDARY_CONTAINER)
                 .border(TEXT_ACCENT),
         )
         .rule(
@@ -1628,9 +1650,61 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .size(720.0, 360.0)
                 .padding(Insets::all(18.0))
                 .gap(8.0)
-                .background(Color::rgb(15, 18, 21))
-                .border(Color::rgb(72, 82, 92))
+                .background(PANEL)
+                .border(STROKE)
                 .radius(7.0),
+        )
+        .rule(
+            StyleSelector::class("debug-overlay-root"),
+            Style::default()
+                .size(1320.0, 780.0)
+                .background(Color::rgba(0, 0, 0, 0)),
+        )
+        .rule(
+            StyleSelector::class("debug-overlay"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(1042.0))
+                .top(Length::Px(12.0))
+                .width(Length::Px(264.0))
+                .height(Length::Auto)
+                .padding(Insets::symmetric(12.0, 10.0))
+                .gap(5.0)
+                .background(Color::rgba(255, 251, 254, 232))
+                .border(STROKE)
+                .radius(6.0)
+                .z_index(2000)
+                .shadows(material_elevation(2, PURPLE)),
+        )
+        .rule(
+            StyleSelector::class("debug-overlay-title"),
+            Style::default()
+                .font_size(14.0)
+                .text_color(TEXT)
+                .height(Length::Px(18.0)),
+        )
+        .rule(
+            StyleSelector::class("debug-row"),
+            Style::default()
+                .direction(Direction::Row)
+                .justify_content(JustifyContent::SpaceBetween)
+                .width_fill()
+                .height(Length::Px(18.0))
+                .background(Color::rgba(0, 0, 0, 0)),
+        )
+        .rule(
+            StyleSelector::class("debug-label"),
+            Style::default()
+                .font_size(12.0)
+                .text_color(TEXT_MUTED)
+                .height(Length::Px(16.0)),
+        )
+        .rule(
+            StyleSelector::class("debug-value"),
+            Style::default()
+                .font_size(12.0)
+                .text_color(TEXT)
+                .height(Length::Px(16.0)),
         )
         .rule(
             StyleSelector::class("title"),
@@ -1665,7 +1739,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id_state("interaction-card-three", ElementStateSelector::Pressed),
             Style::default()
-                .background(Color::rgb(53, 38, 70))
+                .background(SECONDARY_CONTAINER)
                 .border(PURPLE),
         )
 }
@@ -1676,14 +1750,14 @@ fn styled_scrollbar_selector() -> des_ui_document::CompoundSelector {
 
 fn styled_scrollbar_style() -> Style {
     Style::default()
-        .scrollbar_handle_color(Color::rgba(232, 236, 240, 118))
-        .scrollbar_track_color(Color::rgba(2, 8, 12, 84))
+        .scrollbar_handle_color(Color::rgba(103, 80, 164, 118))
+        .scrollbar_track_color(Color::rgba(103, 80, 164, 28))
         .scrollbar_width(2.0)
         .scrollbar_expanded_width(10.0)
-        .scrollbar_hover_track_color(Color::rgba(2, 8, 12, 84))
-        .scrollbar_pressed_track_color(Color::rgba(2, 8, 12, 84))
-        .scrollbar_pressed_handle_color(Color::rgba(190, 217, 255, 238))
-        .scrollbar_pressed_handle_border_color(Color::rgba(255, 255, 255, 120))
+        .scrollbar_hover_track_color(Color::rgba(103, 80, 164, 28))
+        .scrollbar_pressed_track_color(Color::rgba(103, 80, 164, 28))
+        .scrollbar_pressed_handle_color(Color::rgba(103, 80, 164, 176))
+        .scrollbar_pressed_handle_border_color(Color::rgba(255, 251, 254, 180))
         .scrollbar_pressed_handle_border_width(1.0)
         .scrollbar_radius(6.0)
         .transition(Transition::ease_out(0.14))

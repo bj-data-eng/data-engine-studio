@@ -112,6 +112,22 @@ fn eased_style(
     next.text_color = ease_color(current.text_color, target.text_color, amount, snap_epsilon);
     animating |= next.text_color != target.text_color;
 
+    next.text_selection_background = ease_color(
+        current.text_selection_background,
+        target.text_selection_background,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.text_selection_background != target.text_selection_background;
+
+    next.text_selection_color = ease_color(
+        current.text_selection_color,
+        target.text_selection_color,
+        amount,
+        snap_epsilon,
+    );
+    animating |= next.text_selection_color != target.text_selection_color;
+
     next.gap = ease_f32(current.gap, target.gap, amount, snap_epsilon);
     animating |= (next.gap - target.gap).abs() > snap_epsilon;
 

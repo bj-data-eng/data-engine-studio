@@ -223,6 +223,8 @@ pub struct Style {
     pub border_width: EdgeStyle,
     pub shadows: Option<Vec<Shadow>>,
     pub text_color: Option<Color>,
+    pub text_selection_background: Option<Color>,
+    pub text_selection_color: Option<Color>,
     pub font_size: Option<f32>,
     pub text_wrap: Option<TextWrapMode>,
     pub max_lines: Option<usize>,
@@ -471,6 +473,16 @@ impl Style {
         self
     }
 
+    pub fn text_selection_background(mut self, color: Color) -> Self {
+        self.text_selection_background = Some(color);
+        self
+    }
+
+    pub fn text_selection_color(mut self, color: Color) -> Self {
+        self.text_selection_color = Some(color);
+        self
+    }
+
     pub fn font_size(mut self, font_size: f32) -> Self {
         self.font_size = Some(font_size);
         self
@@ -710,6 +722,8 @@ pub struct ComputedStyle {
     pub border_width: Insets,
     pub shadows: Vec<Shadow>,
     pub text_color: Color,
+    pub text_selection_background: Color,
+    pub text_selection_color: Color,
     pub font_size: f32,
     pub text_wrap: TextWrapMode,
     pub max_lines: Option<usize>,
@@ -758,6 +772,8 @@ impl Default for ComputedStyle {
             border_width: Insets::ZERO,
             shadows: Vec::new(),
             text_color: Color::rgb(218, 226, 234),
+            text_selection_background: Color::rgba(234, 221, 255, 190),
+            text_selection_color: Color::rgb(29, 27, 32),
             font_size: 13.0,
             text_wrap: TextWrapMode::Extend,
             max_lines: None,
@@ -856,6 +872,12 @@ impl ComputedStyle {
         }
         if let Some(value) = style.text_color {
             self.text_color = value;
+        }
+        if let Some(value) = style.text_selection_background {
+            self.text_selection_background = value;
+        }
+        if let Some(value) = style.text_selection_color {
+            self.text_selection_color = value;
         }
         if let Some(value) = style.font_size {
             self.font_size = value;
