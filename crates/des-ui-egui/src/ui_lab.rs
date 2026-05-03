@@ -233,16 +233,27 @@ impl UiLabState {
     }
 
     fn finish_drag(&mut self, output: &DocumentOutput, drag: &DocumentDrag) {
-        if let Some(item) = drag_item_for_id(drag.target.as_str())
-            && let Some(preview) = drag_drop_preview_at(output, drag.current, Some(item))
-            && self.drag_preview_changes_position(item, preview)
-        {
-            self.drag_item_cells[item] = preview.cell;
-            self.apply_drag_order(item, preview);
+        if let Some(item) = drag_item_for_id(drag.target.as_str()) {
+            let preview = drag_drop_preview_at(output, drag.current, Some(item))
+                .filter(|preview| self.drag_preview_changes_position(item, *preview));
+            if let Some(preview) = preview {
+                self.drag_item_cells[item] = preview.cell;
+                self.apply_drag_order(item, preview);
+            }
+            self.snap_drag_drop_animation(item, preview);
         }
         self.active_drag = None;
         self.drag_parent_offset = None;
         self.drag_drop_preview = None;
+    }
+
+    fn snap_drag_drop_animation(&mut self, item: usize, preview: Option<DragDropPreview>) {
+        self.document_engine
+            .snap_element_animation(format!("drag-item-{item}").as_str());
+        if let Some(nearest_item) = preview.and_then(|preview| preview.nearest_item) {
+            self.document_engine
+                .snap_element_animation(format!("drag-item-{nearest_item}").as_str());
+        }
     }
 
     fn apply_drag_order(&mut self, item: usize, preview: DragDropPreview) {

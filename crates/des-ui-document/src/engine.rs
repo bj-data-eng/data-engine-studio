@@ -204,6 +204,19 @@ impl DocumentEngine {
         self.states.get_mut(&ElementId::new(id))
     }
 
+    pub fn snap_element_animation(&mut self, id: &str) -> bool {
+        let Some(state) = self.states.get_mut(&ElementId::new(id)) else {
+            return false;
+        };
+
+        let had_animation = state.rendered_style.is_some();
+        state.rendered_style = None;
+        if had_animation {
+            self.cached_layout = None;
+        }
+        had_animation
+    }
+
     fn cached_layout_matches(&self, viewport_rect: Rect, document_root: &Element) -> bool {
         self.cached_layout.as_ref().is_some_and(|layout| {
             layout.rect == viewport_rect

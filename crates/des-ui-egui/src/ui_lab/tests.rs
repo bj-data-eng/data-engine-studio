@@ -531,6 +531,26 @@ fn interaction_drag_drop_grid_moves_items_between_cells() {
         )),
         "moved item should be laid out inside the destination cell"
     );
+
+    let document = harness
+        .state()
+        .document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let stylesheet = harness.state().active_stylesheet();
+    let output = harness
+        .state_mut()
+        .document_engine
+        .update(&document, &stylesheet);
+    let item = frame(&output, "drag-item-0");
+    assert_eq!(
+        item.style.height,
+        Length::Px(34.0),
+        "dropped item should snap to its full card height instead of easing out of the collapsed placeholder"
+    );
+    assert_eq!(
+        item.style.padding,
+        Insets::symmetric(9.0, 6.0),
+        "dropped item should rematerialize with full padding on its first final-frame layout"
+    );
 }
 
 #[test]
@@ -573,6 +593,20 @@ fn interaction_drag_drop_reorders_with_nearest_item_gap() {
 
     assert_eq!(harness.state().drag_item_cells[0], 0);
     assert!(harness.state().drag_item_order[0] > harness.state().drag_item_order[1]);
+
+    let document = harness
+        .state()
+        .document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
+    let stylesheet = harness.state().active_stylesheet();
+    let output = harness
+        .state_mut()
+        .document_engine
+        .update(&document, &stylesheet);
+    assert_eq!(
+        frame(&output, "drag-item-1").style.margin,
+        Insets::ZERO,
+        "nearest item should snap out of the temporary insertion gap when the drop is committed"
+    );
 }
 
 #[test]
