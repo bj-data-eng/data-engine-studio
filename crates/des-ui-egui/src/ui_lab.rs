@@ -6,7 +6,7 @@ mod views;
 
 use egui_adapter::{document_input, paint_frame, paint_scroll_chrome};
 use styles::stylesheet;
-use views::{render_nav, render_stage, render_topbar};
+use views::{render_drag_overlay_layer, render_nav, render_stage, render_topbar};
 
 use des_ui_document::{
     Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentMetrics,
@@ -398,6 +398,12 @@ impl UiLabState {
                             );
                         },
                     );
+                    render_drag_overlay_layer(
+                        ui,
+                        self.active_drag_item(),
+                        self.active_scroll_list_drag_item(),
+                        self.active_drag.as_ref().map(|drag| drag.current),
+                    );
                 },
             );
         });
@@ -427,7 +433,7 @@ impl UiLabState {
                 .absolute_viewport()
                 .left(Length::Px(drag.current.x - offset.x))
                 .top(Length::Px(drag.current.y - offset.y))
-                .z_index(100);
+                .z_index(1000);
             if let Some(size) = self.drag_source_size {
                 overlay_style = overlay_style.size(size.width, size.height);
             }

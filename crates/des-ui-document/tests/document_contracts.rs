@@ -1944,6 +1944,81 @@ fn overflow_scroll_container_emits_draggable_scroll_chrome() {
 }
 
 #[test]
+fn active_document_drag_is_not_stolen_by_scrollbar_hitbox() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = scroll_fixture_stylesheet(80.0).rule(
+        StyleSelector::id("drag-source"),
+        Style::default().size(80.0, 32.0),
+    );
+    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.element(
+            "drag-source",
+            ElementSpec::new(ElementRole::Card).interactive(),
+            |_| {},
+        );
+        ui.element("scroll-panel", ElementSpec::new(ElementRole::Panel), |ui| {
+            for index in 0..6 {
+                ui.element(
+                    format!("row-{index}"),
+                    ElementSpec::new(ElementRole::Card),
+                    |_| {},
+                );
+            }
+        });
+    });
+
+    let output = engine.update(&document, &stylesheet);
+    let chrome = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| chrome.element_id == ElementId::new("scroll-panel"))
+        .expect("overflowing panel should emit scroll chrome");
+    let scrollbar_point = Point::new(
+        chrome.hit_rect.origin.x + chrome.hit_rect.size.width / 2.0,
+        chrome.hit_rect.origin.y + chrome.hit_rect.size.height / 2.0,
+    );
+
+    engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(20.0, 16.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let output = engine.update_with_input(
+        &document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: scrollbar_point,
+                primary_delta: Point::new(scrollbar_point.x - 20.0, scrollbar_point.y - 16.0),
+                primary_down: true,
+                primary_clicked: false,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(
+        output.hit_id.as_ref().map(|id| id.as_str()),
+        Some("drag-source")
+    );
+    assert!(
+        output
+            .active_drag
+            .as_ref()
+            .is_some_and(|drag| drag.target == ElementId::new("drag-source")),
+        "document drags should continue even while the pointer crosses scrollbar hitboxes"
+    );
+}
+
+#[test]
 fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
     let mut engine = DocumentEngine::default();
     let stylesheet = scroll_fixture_stylesheet(80.0);

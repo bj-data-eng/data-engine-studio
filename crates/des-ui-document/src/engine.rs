@@ -292,31 +292,6 @@ impl DocumentEngine {
             }
             return finalize_input_update(update, &self.states, &previous);
         };
-        let scrollbar_hit = scroll_chrome
-            .iter()
-            .rev()
-            .find(|chrome| chrome.hit_rect.contains(pointer.position));
-        update.changed |= self.apply_scrollbar_input(scroll_chrome, scrollbar_hit, pointer);
-
-        if let Some(chrome) = scrollbar_hit {
-            if let Some(state) = self.states.get_mut(&chrome.element_id) {
-                state.hovered = true;
-                state.pressed = pointer.primary_down;
-                state.scrollbar_hovered_axis = Some(chrome.axis);
-            }
-            update.hit_id = Some(chrome.element_id.clone());
-            return finalize_input_update(update, &self.states, &previous);
-        }
-        if let Some(active_drag) = &self.active_scroll_drag {
-            if let Some(state) = self.states.get_mut(&active_drag.element_id) {
-                state.hovered = true;
-                state.pressed = true;
-                state.scrollbar_dragged_axis = Some(active_drag.axis);
-            }
-            update.hit_id = Some(active_drag.element_id.clone());
-            return finalize_input_update(update, &self.states, &previous);
-        }
-
         if self
             .active_pointer_drag
             .as_ref()
@@ -357,6 +332,31 @@ impl DocumentEngine {
                     state.click_count += 1;
                 }
             }
+            return finalize_input_update(update, &self.states, &previous);
+        }
+
+        let scrollbar_hit = scroll_chrome
+            .iter()
+            .rev()
+            .find(|chrome| chrome.hit_rect.contains(pointer.position));
+        update.changed |= self.apply_scrollbar_input(scroll_chrome, scrollbar_hit, pointer);
+
+        if let Some(chrome) = scrollbar_hit {
+            if let Some(state) = self.states.get_mut(&chrome.element_id) {
+                state.hovered = true;
+                state.pressed = pointer.primary_down;
+                state.scrollbar_hovered_axis = Some(chrome.axis);
+            }
+            update.hit_id = Some(chrome.element_id.clone());
+            return finalize_input_update(update, &self.states, &previous);
+        }
+        if let Some(active_drag) = &self.active_scroll_drag {
+            if let Some(state) = self.states.get_mut(&active_drag.element_id) {
+                state.hovered = true;
+                state.pressed = true;
+                state.scrollbar_dragged_axis = Some(active_drag.axis);
+            }
+            update.hit_id = Some(active_drag.element_id.clone());
             return finalize_input_update(update, &self.states, &previous);
         }
 

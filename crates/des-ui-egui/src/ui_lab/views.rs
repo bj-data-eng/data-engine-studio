@@ -765,7 +765,7 @@ fn render_drag_drop_lab(
     scroll_list_item_order: [usize; 14],
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    drag_pointer: Option<des_ui_document::Point>,
+    _drag_pointer: Option<des_ui_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
@@ -847,14 +847,21 @@ fn render_drag_drop_lab(
             );
         },
     );
-    if let Some(item) = active_drag_item
-        && drag_pointer.is_some()
-    {
+}
+
+pub(super) fn render_drag_overlay_layer(
+    ui: &mut des_ui_document::DocumentBuilder,
+    active_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    drag_pointer: Option<des_ui_document::Point>,
+) {
+    if drag_pointer.is_none() {
+        return;
+    }
+    if let Some(item) = active_drag_item {
         drag_overlay(ui, item.0);
     }
-    if let Some(item) = active_scroll_list_drag_item
-        && drag_pointer.is_some()
-    {
+    if let Some(item) = active_scroll_list_drag_item {
         drag_scroll_overlay(ui, item.0);
     }
 }
@@ -900,13 +907,17 @@ fn drag_scroll_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, or
         .class("drag-scroll-handle")
         .interactive()
         .value(format!("drag-scroll-item-{item}"));
-    let mut glyph_spec = ElementSpec::new(ElementRole::Text).class("drag-handle-glyph");
+    let mut glyph_spec = ElementSpec::new(ElementRole::Icon).class("drag-handle-glyph");
     if origin_space {
         handle_spec = handle_spec.class("drag-origin-content");
         glyph_spec = glyph_spec.class("drag-origin-content");
     }
     ui.element(format!("drag-scroll-handle-{item}"), handle_spec, |ui| {
-        ui.text_element(format!("drag-scroll-handle-{item}-glyph"), glyph_spec, "::");
+        ui.element(
+            format!("drag-scroll-handle-{item}-glyph"),
+            glyph_spec.glyph(Glyph::DragHandle),
+            |_| {},
+        );
     });
 }
 
@@ -949,13 +960,17 @@ fn drag_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_sp
         .class("drag-handle")
         .interactive()
         .value(format!("drag-item-{item}"));
-    let mut glyph_spec = ElementSpec::new(ElementRole::Text).class("drag-handle-glyph");
+    let mut glyph_spec = ElementSpec::new(ElementRole::Icon).class("drag-handle-glyph");
     if origin_space {
         handle_spec = handle_spec.class("drag-origin-content");
         glyph_spec = glyph_spec.class("drag-origin-content");
     }
     ui.element(format!("drag-handle-{item}"), handle_spec, |ui| {
-        ui.text_element(format!("drag-handle-{item}-glyph"), glyph_spec, "::");
+        ui.element(
+            format!("drag-handle-{item}-glyph"),
+            glyph_spec.glyph(Glyph::DragHandle),
+            |_| {},
+        );
     });
 }
 

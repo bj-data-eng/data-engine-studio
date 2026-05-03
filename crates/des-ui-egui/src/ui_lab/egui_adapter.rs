@@ -157,6 +157,20 @@ fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, glyph: Glyph, color: C
             painter.line_segment([a, b], stroke);
             painter.line_segment([b, c], stroke);
         }
+        Glyph::DragHandle => {
+            let radius = (size / 18.0).clamp(1.0, 1.7);
+            let spacing_x = (size * 0.18).max(3.0);
+            let spacing_y = (size * 0.24).max(4.0);
+            for column in [-0.5_f32, 0.5] {
+                for row in [-1.0_f32, 0.0, 1.0] {
+                    painter.circle_filled(
+                        egui::pos2(center.x + spacing_x * column, center.y + spacing_y * row),
+                        radius,
+                        color,
+                    );
+                }
+            }
+        }
     }
 }
 

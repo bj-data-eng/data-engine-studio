@@ -21,6 +21,7 @@ pub enum Glyph {
     Check,
     ChevronDown,
     ChevronUp,
+    DragHandle,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -912,7 +912,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .width(Length::Px(230.0))
                 .height(Length::Px(34.0))
-                .z_index(100)
+                .z_index(1000)
                 .transition(Transition::ease_out(0.08)),
         )
         .rule(
