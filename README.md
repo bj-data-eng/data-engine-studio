@@ -4,7 +4,15 @@ Rust-first visual ETL and data exploration studio, distributed through a thin Py
 
 ## Launch The Milestone 1 Shell
 
-Install the native extension into the active Python environment:
+Install the native extension into the active Python environment on macOS or Linux:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip maturin
+.venv/bin/python -m maturin develop --manifest-path crates/des-python/Cargo.toml
+```
+
+On Windows:
 
 ```powershell
 py -3.14 -m venv .venv
@@ -13,7 +21,13 @@ py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m maturin develop --manifest-path crates\des-python\Cargo.toml
 ```
 
-Launch the app:
+Launch the app on macOS or Linux:
+
+```sh
+.venv/bin/python -m data_engine_studio
+```
+
+On Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m data_engine_studio
@@ -21,6 +35,10 @@ Launch the app:
 
 Run the initial Rust tests:
 
-```powershell
+```sh
 cargo test
 ```
+
+Use `just ui-shot-mac` or `just ui-debug-mac` for native macOS/Linux screenshot captures.
+Use `just ui-shot-windows` or `just ui-debug-windows` on Windows.
+Use `just dev-mac` or `just dev-windows` to build and run the native development shell.

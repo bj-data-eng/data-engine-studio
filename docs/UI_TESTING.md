@@ -33,16 +33,18 @@ verify that the rendered result still matches the contract.
 
 5. Screenshot harness checks
 
-   Use `scripts/capture-ui.ps1` for human-facing iteration and larger app
-   screenshots. These are exploratory unless paired with a machine assertion.
+   Use `scripts/capture-ui.sh` on macOS/Linux or `scripts/capture-ui.ps1` on
+   Windows for human-facing iteration and larger app screenshots. These are
+   exploratory unless paired with a machine assertion.
 
 ## Current Commands
 
-```powershell
+```sh
 just ui-test
 cargo test -p des-ui-document
 cargo test -p des-ui-egui
-.\scripts\capture-ui.ps1 -Out target\ui-shots\studio.png -Width 1320 -Height 780
+just ui-shot-mac
+just ui-shot-windows
 ```
 
 ## Graphical Comparison Rules

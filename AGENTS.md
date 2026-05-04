@@ -93,13 +93,17 @@ Future close behavior must route through commands so background/tray mode can su
 
 ## Commands
 
-```powershell
+```sh
 cargo test
 cargo fmt
 cargo nextest run --workspace
 just --list
-just ui-shot
-just ui-debug
+just dev-mac
+just dev-windows
+just ui-shot-mac
+just ui-debug-mac
+just ui-shot-windows
+just ui-debug-windows
 just verify
 just security
 cargo audit
@@ -107,6 +111,18 @@ cargo deny check
 ```
 
 Python packaging:
+
+macOS/Linux:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip maturin
+.venv/bin/python -m maturin develop --manifest-path crates/des-python/Cargo.toml
+.venv/bin/python -m data_engine_studio
+.venv/bin/python -c "from data_engine_studio.native import hello, runtime_info; info = runtime_info(); print(hello()); print(info.name, info.version)"
+```
+
+Windows:
 
 ```powershell
 py -3.14 -m venv .venv
@@ -118,9 +134,23 @@ py -3.14 -m venv .venv
 
 UI iteration:
 
+macOS/Linux:
+
+```sh
+cargo build -p des-ui-egui --bin des-ui-dev
+./target/debug/des-ui-dev
+just dev-mac
+./scripts/capture-ui.sh --out target/ui-shots/studio.png --width 1320 --height 780
+./scripts/capture-ui.sh --debug-overlay --lab-view graph
+just ui-test
+```
+
+Windows:
+
 ```powershell
 cargo build -p des-ui-egui --bin des-ui-dev
 .\target\debug\des-ui-dev.exe
+just dev-windows
 .\scripts\capture-ui.ps1 -Out target\ui-shots\studio.png -Width 1320 -Height 780
 .\scripts\capture-ui.ps1 -DebugOverlay
 just ui-test
