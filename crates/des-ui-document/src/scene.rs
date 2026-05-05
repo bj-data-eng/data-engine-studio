@@ -5,12 +5,13 @@ use crate::geometry::{
 };
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position};
+use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display, FlexDirection, FlexWrap,
-    JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage, LengthPercentageAuto,
-    NodeId, Position as LayoutPosition, Rect as LayoutRect, Size as LayoutSize,
-    Style as LayoutStyle, length, percent,
+    GridPlacement, GridTemplateComponent, JustifyContent as LayoutJustifyContent, LayoutTree,
+    LengthPercentage, LengthPercentageAuto, NodeId, Position as LayoutPosition, Rect as LayoutRect,
+    Size as LayoutSize, Style as LayoutStyle, fr, length, percent,
 };
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
@@ -205,6 +206,7 @@ impl DocumentScene {
                 self.apply_computed_style(id.clone(), &computed)?;
             }
         }
+        self.apply_table_grid_styles()?;
 
         Ok(())
     }
@@ -501,6 +503,59 @@ impl DocumentScene {
             })
             .collect()
     }
+
+    fn apply_table_grid_styles(&mut self) -> SceneResult<()> {
+        let ids = self.element_ids();
+        for id in ids {
+            let element = self.element(&id)?;
+            if element.spec.role != ElementRole::TableHeader
+                && element.spec.role != ElementRole::TableRow
+            {
+                continue;
+            }
+
+            let Some(parent_id) = self.parent(id.clone())? else {
+                continue;
+            };
+            let Some(table) = self.element(&parent_id)?.spec.table.clone() else {
+                continue;
+            };
+
+            let node = element.layout_node;
+            let mut style = self.layout.style(node).map_err(layout_error)?.clone();
+            style.display = Display::Grid;
+            style.grid_template_columns = table_grid_columns(&table);
+            style.size.width = length(table_grid_width(&table));
+            style.size.height = length(if element.spec.role == ElementRole::TableHeader {
+                table.header_height
+            } else {
+                table.row_height
+            });
+            self.layout.set_style(node, style).map_err(layout_error)?;
+
+            let row_children = self.children(id.clone())?;
+            for child_id in row_children {
+                let child = self.element(&child_id)?;
+                let Some(cell) = &child.spec.table_cell else {
+                    continue;
+                };
+                let Some(column_index) = table_column_index(&table, &cell.column_id) else {
+                    continue;
+                };
+                let child_node = child.layout_node;
+                let mut child_style = self.layout.style(child_node).map_err(layout_error)?.clone();
+                child_style.grid_column = layout_engine::geometry::Line {
+                    start: GridPlacement::Line((column_index + 1).into()),
+                    end: GridPlacement::Line((column_index + 2).into()),
+                };
+                self.layout
+                    .set_style(child_node, child_style)
+                    .map_err(layout_error)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 struct SceneMeasureInput {
@@ -523,6 +578,87 @@ fn root_sized_style(mut style: ComputedStyle, viewport: Size) -> ComputedStyle {
     style.width = Length::Px(viewport.width);
     style.height = Length::Px(viewport.height);
     style
+}
+
+fn table_grid_columns(table: &TableSpec) -> Vec<GridTemplateComponent<String>> {
+    table
+        .columns
+        .iter()
+        .map(|column| match column.width {
+            TableTrackSize::Px(width) => length(clamp_table_column_width(
+                width,
+                column.min_width,
+                column.max_width,
+            )),
+            TableTrackSize::Flex(weight) => fr(weight),
+        })
+        .collect()
+}
+
+fn table_grid_width(table: &TableSpec) -> f32 {
+    table_column_widths(table, table_fixed_width(table))
+        .into_iter()
+        .sum()
+}
+
+fn table_fixed_width(table: &TableSpec) -> f32 {
+    table
+        .columns
+        .iter()
+        .map(|column| match column.width {
+            TableTrackSize::Px(width) => {
+                clamp_table_column_width(width, column.min_width, column.max_width)
+            }
+            TableTrackSize::Flex(_) => column.min_width,
+        })
+        .sum()
+}
+
+fn table_column_widths(table: &TableSpec, available_width: f32) -> Vec<f32> {
+    let mut widths = Vec::with_capacity(table.columns.len());
+    let mut fixed = 0.0;
+    let mut flex_weight = 0.0;
+
+    for column in &table.columns {
+        match column.width {
+            TableTrackSize::Px(width) => {
+                let width = clamp_table_column_width(width, column.min_width, column.max_width);
+                widths.push(width);
+                fixed += width;
+            }
+            TableTrackSize::Flex(weight) => {
+                widths.push(0.0);
+                flex_weight += weight;
+            }
+        }
+    }
+
+    let remaining = (available_width - fixed).max(0.0);
+    for (index, column) in table.columns.iter().enumerate() {
+        if let TableTrackSize::Flex(weight) = column.width {
+            let width = if flex_weight <= f32::EPSILON {
+                column.min_width
+            } else {
+                remaining * (weight / flex_weight)
+            };
+            widths[index] = clamp_table_column_width(width, column.min_width, column.max_width);
+        }
+    }
+
+    widths
+}
+
+fn table_column_index(table: &TableSpec, column_id: &TableColumnId) -> Option<i16> {
+    table
+        .columns
+        .iter()
+        .position(|column| column.id == *column_id)
+        .and_then(|index| i16::try_from(index).ok())
+}
+
+fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) -> f32 {
+    let width = width.max(min_width);
+    max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
 }
 
 fn measure_text(

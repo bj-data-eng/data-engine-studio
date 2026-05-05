@@ -2,8 +2,8 @@ use des_ui_document::{
     AlignItems, ComputedStyle, Direction, DocumentEngine, DocumentEventKind, DocumentInput,
     DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis, Size, Style,
-    StyleSelector, StyleSheet, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
-    TextWrapMode,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, Dimension, FlexDirection,
@@ -565,6 +565,120 @@ fn document_engine_update_scene_uses_text_measurement_for_auto_text_size() {
         output.layout.find("label").unwrap().rect,
         Rect::new(0.0, 0.0, 64.0, 18.0)
     );
+}
+
+#[test]
+fn document_engine_update_scene_resolves_table_column_tracks() {
+    let table = TableSpec::new(vec![
+        TableColumnSpec::new("customer", "Customer").width(TableTrackSize::px(120.0)),
+        TableColumnSpec::new("country", "Country").width(TableTrackSize::px(100.0)),
+        TableColumnSpec::new("orders", "Orders").width(TableTrackSize::px(80.0)),
+    ])
+    .header_height(28.0)
+    .row_height(26.0);
+    let mut scene = DocumentScene::new(Size::new(320.0, 220.0));
+    scene
+        .append_element(
+            "root",
+            "customers",
+            ElementSpec::new(ElementRole::Table).table(table),
+        )
+        .unwrap();
+    scene
+        .append_element(
+            "customers",
+            "customers-header",
+            ElementSpec::new(ElementRole::TableHeader),
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "customers-header",
+            "customers-header-customer",
+            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("customer")),
+            "Customer",
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "customers-header",
+            "customers-header-country",
+            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("country")),
+            "Country",
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "customers-header",
+            "customers-header-orders",
+            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("orders")),
+            "Orders",
+        )
+        .unwrap();
+    scene
+        .append_element(
+            "customers",
+            "customers-row-0",
+            ElementSpec::new(ElementRole::TableRow),
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "customers-row-0",
+            "customers-row-0-customer",
+            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("customer")),
+            "Acme",
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "customers-row-0",
+            "customers-row-0-country",
+            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("country")),
+            "US",
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "customers-row-0",
+            "customers-row-0-orders",
+            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("orders")),
+            "42",
+        )
+        .unwrap();
+
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("customers"),
+            Style::default()
+                .width(Length::Px(240.0))
+                .overflow_x(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::Role(ElementRole::TableCell),
+            Style::default().border_width(1.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let header_customer = output.layout.find("customers-header-customer").unwrap();
+    let row_customer = output.layout.find("customers-row-0-customer").unwrap();
+    let header_orders = output.layout.find("customers-header-orders").unwrap();
+    let row_orders = output.layout.find("customers-row-0-orders").unwrap();
+
+    assert_eq!(header_customer.role, ElementRole::TableCell);
+    assert_eq!(
+        header_customer.rect.size.width,
+        row_customer.rect.size.width
+    );
+    assert_eq!(header_orders.rect.origin.x, row_orders.rect.origin.x);
+    assert_eq!(header_orders.rect.size.width, 80.0);
+    assert!(row_customer.rect.origin.y > header_customer.rect.origin.y);
+    assert!(output.scroll_chrome.iter().any(|chrome| {
+        chrome.element_id == ElementId::new("customers")
+            && chrome.axis == ScrollAxis::Horizontal
+            && chrome.max_scroll == 60.0
+    }));
 }
 
 #[test]
