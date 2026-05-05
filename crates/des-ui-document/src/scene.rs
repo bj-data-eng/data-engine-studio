@@ -3,7 +3,7 @@ use crate::geometry::{
     AlignItems, Direction, Insets, JustifyContent, Length, Overflow, Position,
     Rect as DocumentRect, Size,
 };
-use crate::state::ElementState;
+use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position};
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display, FlexDirection, FlexWrap,
@@ -40,6 +40,7 @@ pub struct SceneElement {
     pub id: ElementId,
     pub spec: ElementSpec,
     pub text: Option<String>,
+    pub computed_style: ComputedStyle,
     layout_node: NodeId,
 }
 
@@ -80,6 +81,7 @@ impl DocumentScene {
                 id: root.clone(),
                 spec: ElementSpec::new(ElementRole::Root),
                 text: None,
+                computed_style: root_sized_style(ComputedStyle::default(), viewport),
                 layout_node: root_node,
             },
         );
@@ -162,10 +164,13 @@ impl DocumentScene {
         id: impl Into<ElementId>,
         style: &ComputedStyle,
     ) -> SceneResult<()> {
-        let node = self.element(&id.into())?.layout_node;
+        let id = id.into();
+        let node = self.element(&id)?.layout_node;
         self.layout
             .set_style(node, layout_style_from_computed(style))
-            .map_err(layout_error)
+            .map_err(layout_error)?;
+        self.element_mut(&id)?.computed_style = style.clone();
+        Ok(())
     }
 
     pub fn apply_stylesheet(
@@ -212,6 +217,20 @@ impl DocumentScene {
             layout.size.width,
             layout.size.height,
         ))
+    }
+
+    pub fn resolved_layout(&self) -> SceneResult<ResolvedElement> {
+        self.resolved_element(&self.root)
+    }
+
+    pub fn resolve_layout(
+        &mut self,
+        stylesheet: &StyleSheet,
+        states: &HashMap<ElementId, ElementState>,
+    ) -> SceneResult<ResolvedElement> {
+        self.apply_stylesheet(stylesheet, states)?;
+        self.compute_layout()?;
+        self.resolved_layout()
     }
 
     pub fn parent(&self, id: impl Into<ElementId>) -> SceneResult<Option<ElementId>> {
@@ -269,6 +288,7 @@ impl DocumentScene {
                 id,
                 spec,
                 text,
+                computed_style: ComputedStyle::default(),
                 layout_node: node,
             },
         );
@@ -297,6 +317,39 @@ impl DocumentScene {
         self.elements
             .get(id)
             .ok_or_else(|| SceneError::MissingElement(id.clone()))
+    }
+
+    fn element_mut(&mut self, id: &ElementId) -> SceneResult<&mut SceneElement> {
+        self.elements
+            .get_mut(id)
+            .ok_or_else(|| SceneError::MissingElement(id.clone()))
+    }
+
+    fn resolved_element(&self, id: &ElementId) -> SceneResult<ResolvedElement> {
+        let element = self.element(id)?;
+        let children = self
+            .children(id.clone())?
+            .into_iter()
+            .map(|child| self.resolved_element(&child))
+            .collect::<SceneResult<Vec<_>>>()?;
+
+        Ok(ResolvedElement {
+            id: element.id.clone(),
+            role: element.spec.role,
+            classes: element.spec.classes.clone(),
+            rect: self.layout_rect(id.as_str())?,
+            style: element.computed_style.clone(),
+            text: element.text.clone(),
+            text_layout: None,
+            selectable_text: element.spec.selectable_text && element.text.is_some(),
+            copyable_text: element.spec.selectable_text
+                && element.spec.copyable_text
+                && element.text.is_some(),
+            value: element.spec.value.clone(),
+            glyph: element.spec.glyph,
+            interactive: element.spec.interactive && !element.spec.disabled,
+            children,
+        })
     }
 
     fn collect_positions(

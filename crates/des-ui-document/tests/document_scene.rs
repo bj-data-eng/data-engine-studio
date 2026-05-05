@@ -226,3 +226,76 @@ fn scene_resolves_stylesheet_over_retained_elements() {
         length::<_, Dimension>(240.0)
     );
 }
+
+#[test]
+fn scene_emits_resolved_element_tree_from_retained_layout() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(ElementRole::Panel)
+                .class("primary")
+                .interactive(),
+        )
+        .unwrap();
+    scene
+        .append_text(
+            "panel",
+            "label",
+            ElementSpec::new(ElementRole::Text).selectable_text(),
+            "Retained text",
+        )
+        .unwrap();
+
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .size(200.0, 100.0)
+                .padding(Insets::all(10.0)),
+        )
+        .rule(
+            StyleSelector::id("label"),
+            Style::default().size(80.0, 20.0),
+        );
+
+    scene
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    scene.compute_layout().unwrap();
+
+    let root = scene.resolved_layout().unwrap();
+    let panel = root.find("panel").unwrap();
+    let label = root.find("label").unwrap();
+
+    assert_eq!(root.rect, Rect::new(0.0, 0.0, 800.0, 600.0));
+    assert_eq!(panel.role, ElementRole::Panel);
+    assert_eq!(panel.classes, vec!["primary".into()]);
+    assert_eq!(panel.rect, Rect::new(0.0, 0.0, 200.0, 100.0));
+    assert_eq!(panel.style.padding, Insets::all(10.0));
+    assert!(panel.interactive);
+    assert_eq!(label.text.as_deref(), Some("Retained text"));
+    assert_eq!(label.rect, Rect::new(10.0, 10.0, 80.0, 20.0));
+    assert!(label.selectable_text);
+    assert!(label.copyable_text);
+}
+
+#[test]
+fn scene_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("panel"),
+        Style::default().size(320.0, 180.0),
+    );
+
+    let root = scene.resolve_layout(&stylesheet, &HashMap::new()).unwrap();
+
+    assert_eq!(
+        root.find("panel").unwrap().rect,
+        Rect::new(0.0, 0.0, 320.0, 180.0)
+    );
+}
