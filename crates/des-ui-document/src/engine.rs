@@ -172,11 +172,15 @@ impl DocumentEngine {
         let input_update =
             self.apply_input(&input_layout, &input_scroll_chrome, input, text_measurer);
         let clamp_changed = self.clamp_scroll_states();
-        let needs_final_layout =
-            input_update.changed || input_update.layout_changed || clamp_changed;
+        let animation_update = self.update_scene_style_animation(scene, stylesheet);
+        let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
+        let needs_final_layout = input_update.changed
+            || input_update.layout_changed
+            || clamp_changed
+            || animation_update.changed();
 
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
-            if input_update.selector_state_changed {
+            if input_update.selector_state_changed || animation_update.changed() {
                 let final_style_report = scene
                     .apply_stylesheet(stylesheet, &self.states)
                     .expect("document scene styles can be resolved");
@@ -204,7 +208,12 @@ impl DocumentEngine {
             let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
             (layout, scroll_chrome, false)
         } else {
-            (input_layout, input_scroll_chrome, true)
+            let scroll_chrome = if scrollbar_animation_update.paint_changed {
+                scroll_chrome(&input_layout, &self.states, &self.scroll_limits)
+            } else {
+                input_scroll_chrome
+            };
+            (input_layout, scroll_chrome, true)
         };
 
         self.cached_layout = Some(layout.clone());
@@ -224,7 +233,7 @@ impl DocumentEngine {
             text_selection: self.text_selection.clone(),
             events: input_update.events,
             scroll_chrome,
-            animating: false,
+            animating: animation_update.animating || scrollbar_animation_update.animating,
             metrics: DocumentMetrics {
                 element_count,
                 scroll_chrome_count,
@@ -232,9 +241,11 @@ impl DocumentEngine {
                 reused_cached_layout: false,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
-                animation_changed_style: false,
-                animation_changed_layout: false,
-                animation_changed_paint: false,
+                animation_changed_style: animation_update.changed()
+                    || scrollbar_animation_update.changed(),
+                animation_changed_layout: animation_update.layout_changed,
+                animation_changed_paint: animation_update.paint_changed
+                    || scrollbar_animation_update.paint_changed,
             },
         }
     }
@@ -935,6 +946,18 @@ impl DocumentEngine {
     ) -> AnimationUpdate {
         const SNAP_EPSILON: f32 = 0.001;
         update_element_style_animation(&document.root, stylesheet, &mut self.states, SNAP_EPSILON)
+    }
+
+    fn update_scene_style_animation(
+        &mut self,
+        scene: &DocumentScene,
+        stylesheet: &StyleSheet,
+    ) -> AnimationUpdate {
+        const SNAP_EPSILON: f32 = 0.001;
+        let root = scene
+            .element_tree()
+            .expect("document scene element tree can be resolved");
+        update_element_style_animation(&root, stylesheet, &mut self.states, SNAP_EPSILON)
     }
 
     fn update_scrollbar_animation(&mut self, scroll_chrome: &[ScrollChrome]) -> AnimationUpdate {

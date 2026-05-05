@@ -232,9 +232,20 @@ impl DocumentScene {
             } else {
                 computed
             };
+            let rendered = states
+                .get(&id)
+                .and_then(|state| state.rendered_style.clone())
+                .map(|style| {
+                    if id == self.root {
+                        root_sized_style(style, self.viewport)
+                    } else {
+                        style
+                    }
+                })
+                .unwrap_or(computed);
             let invalidation = classify_computed_style_change(
                 Some(&self.element(&id)?.computed_style),
-                Some(&computed),
+                Some(&rendered),
             );
             report.paint_changed |= invalidation.paint_changed;
             let scroll_offset = states
@@ -242,7 +253,7 @@ impl DocumentScene {
                 .map(|state| Point::new(state.scroll_x, state.scroll_y))
                 .unwrap_or(Point::ZERO);
             self.element_mut(&id)?.scroll_offset = scroll_offset;
-            report.layout_changed |= self.apply_computed_style(id.clone(), &computed)?;
+            report.layout_changed |= self.apply_computed_style(id.clone(), &rendered)?;
         }
         report.layout_changed |= self.apply_table_grid_styles()?;
 
@@ -589,6 +600,26 @@ impl DocumentScene {
             spec: element.spec.clone(),
             text: element.text.clone(),
             children: Vec::new(),
+        })
+    }
+
+    pub(crate) fn element_tree(&self) -> SceneResult<Element> {
+        self.element_subtree(&self.root)
+    }
+
+    fn element_subtree(&self, id: &ElementId) -> SceneResult<Element> {
+        let element = self.element(id)?;
+        let children = self
+            .children(id.clone())?
+            .into_iter()
+            .map(|child| self.element_subtree(&child))
+            .collect::<SceneResult<Vec<_>>>()?;
+
+        Ok(Element {
+            id: element.id.clone(),
+            spec: element.spec.clone(),
+            text: element.text.clone(),
+            children,
         })
     }
 

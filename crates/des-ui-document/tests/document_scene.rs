@@ -1,9 +1,10 @@
 use des_ui_document::{
-    AlignItems, ComputedStyle, DocumentEngine, DocumentEventKind, DocumentInput, DocumentScene,
-    ElementId, ElementRole, ElementSpec, ElementStateSelector, FlexDirection, FlexWrap, Insets,
-    JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
+    AlignItems, Color, ComputedStyle, DocumentEngine, DocumentEventKind, DocumentInput,
+    DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector, FlexDirection,
+    FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis,
+    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    TextWrapMode, Transition,
 };
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, Dimension, FlexDirection as LayoutFlexDirection,
@@ -661,6 +662,128 @@ fn document_engine_update_scene_with_input_clicks_interactive_element() {
             .any(|event| event.target == ElementId::new("button")
                 && event.kind == DocumentEventKind::Clicked)
     );
+}
+
+#[test]
+fn document_engine_update_scene_eases_transitioned_paint_styles() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20))
+                .transition(Transition::ease_out(0.24)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(40, 70, 95)),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update_scene(&mut scene, &stylesheet);
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(2.0, 2.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.style.background, Some(Color::rgb(31, 48, 62)));
+    assert!(output.animating);
+    assert!(output.metrics.animation_changed_style);
+    assert!(!output.metrics.animation_changed_layout);
+    assert!(output.metrics.animation_changed_paint);
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(2.0, 2.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert!(card.style.background.unwrap().r > 31);
+    assert!(output.animating);
+    assert!(output.metrics.animation_changed_paint);
+}
+
+#[test]
+fn document_engine_update_scene_eases_transitioned_layout_styles() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .transition(Transition::linear(0.25)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().size(140.0, 80.0),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update_scene(&mut scene, &stylesheet);
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(4.0, 4.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.rect.size, Size::new(110.0, 50.0));
+    assert!(output.animating);
+    assert!(output.metrics.animation_changed_layout);
 }
 
 #[test]
