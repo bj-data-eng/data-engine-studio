@@ -1,6 +1,7 @@
 use des_ui_document::{
     AlignItems, ComputedStyle, Direction, DocumentScene, ElementId, ElementRole, ElementSpec,
-    Insets, JustifyContent, Length, Overflow, Rect, Size,
+    ElementStateSelector, Insets, JustifyContent, Length, Overflow, Rect, Size, Style,
+    StyleSelector, StyleSheet,
 };
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, Dimension, FlexDirection,
@@ -8,6 +9,7 @@ use layout_engine::prelude::{
     percent,
 };
 use layout_engine::style::Overflow as LayoutOverflow;
+use std::collections::HashMap;
 
 #[test]
 fn scene_reparents_existing_element_without_reallocating_layout_node() {
@@ -156,5 +158,71 @@ fn scene_computes_layout_rects_from_retained_graph() {
     assert_eq!(
         scene.layout_rect("panel").unwrap(),
         Rect::new(0.0, 0.0, 200.0, 100.0)
+    );
+}
+
+#[test]
+fn scene_resolves_stylesheet_over_retained_elements() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element(
+            "root",
+            "first",
+            ElementSpec::new(ElementRole::Panel).class("primary"),
+        )
+        .unwrap();
+    scene
+        .append_element("root", "second", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let first_node = scene.layout_node("first").unwrap();
+    let second_node = scene.layout_node("second").unwrap();
+
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Root),
+            Style::default().direction(Direction::Row),
+        )
+        .rule(
+            StyleSelector::class("primary"),
+            Style::default().width(Length::Px(120.0)),
+        )
+        .rule(
+            StyleSelector::first_child(),
+            Style::default().height(Length::Px(40.0)),
+        )
+        .rule(
+            StyleSelector::id_state("second", ElementStateSelector::Hovered),
+            Style::default().width(Length::Px(240.0)),
+        );
+    let mut states = HashMap::new();
+    let mut second_state = des_ui_document::ElementState::default();
+    second_state.hovered = true;
+    states.insert(ElementId::new("second"), second_state);
+
+    scene.apply_stylesheet(&stylesheet, &states).unwrap();
+
+    assert_eq!(scene.layout_node("first"), Some(first_node));
+    assert_eq!(scene.layout_node("second"), Some(second_node));
+    assert_eq!(
+        scene.layout_style("root").unwrap().flex_direction,
+        FlexDirection::Row
+    );
+    assert_eq!(
+        scene.layout_style("root").unwrap().size,
+        LayoutSize {
+            width: length::<_, Dimension>(800.0),
+            height: length::<_, Dimension>(600.0),
+        }
+    );
+    assert_eq!(
+        scene.layout_style("first").unwrap().size,
+        LayoutSize {
+            width: length::<_, Dimension>(120.0),
+            height: length::<_, Dimension>(40.0),
+        }
+    );
+    assert_eq!(
+        scene.layout_style("second").unwrap().size.width,
+        length::<_, Dimension>(240.0)
     );
 }

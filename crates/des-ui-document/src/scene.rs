@@ -1,9 +1,10 @@
-use crate::element::{ElementId, ElementRole, ElementSpec};
+use crate::element::{Element, ElementId, ElementRole, ElementSpec};
 use crate::geometry::{
     AlignItems, Direction, Insets, JustifyContent, Length, Overflow, Position,
     Rect as DocumentRect, Size,
 };
-use crate::style::ComputedStyle;
+use crate::state::ElementState;
+use crate::style::{ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position};
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display, FlexDirection, FlexWrap,
     JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage, LengthPercentageAuto,
@@ -167,6 +168,28 @@ impl DocumentScene {
             .map_err(layout_error)
     }
 
+    pub fn apply_stylesheet(
+        &mut self,
+        stylesheet: &StyleSheet,
+        states: &HashMap<ElementId, ElementState>,
+    ) -> SceneResult<()> {
+        let mut positions = Vec::new();
+        self.collect_positions(self.root.clone(), None, &mut positions)?;
+
+        for (id, position) in positions {
+            let element = self.snapshot_element(&id)?;
+            let computed =
+                resolve_style_with_position(&element, stylesheet, states.get(&id), position);
+            if id == self.root {
+                self.apply_computed_style(id.clone(), &root_sized_style(computed, self.viewport))?;
+            } else {
+                self.apply_computed_style(id.clone(), &computed)?;
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn compute_layout(&mut self) -> SceneResult<()> {
         let root_node = self.element(&self.root)?.layout_node;
         self.layout
@@ -275,6 +298,37 @@ impl DocumentScene {
             .get(id)
             .ok_or_else(|| SceneError::MissingElement(id.clone()))
     }
+
+    fn collect_positions(
+        &self,
+        id: ElementId,
+        position: Option<ChildPosition>,
+        positions: &mut Vec<(ElementId, Option<ChildPosition>)>,
+    ) -> SceneResult<()> {
+        positions.push((id.clone(), position));
+
+        let children = self.children(id)?;
+        let sibling_count = children.len();
+        for (index, child) in children.into_iter().enumerate() {
+            self.collect_positions(
+                child,
+                Some(ChildPosition::new(index, sibling_count)),
+                positions,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn snapshot_element(&self, id: &ElementId) -> SceneResult<Element> {
+        let element = self.element(id)?;
+        Ok(Element {
+            id: element.id.clone(),
+            spec: element.spec.clone(),
+            text: element.text.clone(),
+            children: Vec::new(),
+        })
+    }
 }
 
 fn root_layout_style(viewport: Size) -> LayoutStyle {
@@ -286,6 +340,12 @@ fn root_layout_style(viewport: Size) -> LayoutStyle {
         },
         ..Default::default()
     }
+}
+
+fn root_sized_style(mut style: ComputedStyle, viewport: Size) -> ComputedStyle {
+    style.width = Length::Px(viewport.width);
+    style.height = Length::Px(viewport.height);
+    style
 }
 
 fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
