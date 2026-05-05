@@ -862,6 +862,49 @@ fn document_engine_update_scene_positions_absolute_anchor_after_target_layout() 
 }
 
 #[test]
+fn document_engine_update_scene_wraps_row_children_and_expands_height() {
+    let mut scene = DocumentScene::new(Size::new(240.0, 160.0));
+    scene
+        .append_element("root", "row", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    for index in 0..3 {
+        scene
+            .append_element(
+                "row",
+                format!("item-{index}"),
+                ElementSpec::new(ElementRole::Card).class("item"),
+            )
+            .unwrap();
+    }
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .direction(Direction::Row)
+                .wrap(true)
+                .width(Length::Px(120.0))
+                .height(Length::Auto)
+                .gap(10.0),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default().size(50.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let row = output.layout.find("row").unwrap();
+    let item_0 = output.layout.find("item-0").unwrap();
+    let item_1 = output.layout.find("item-1").unwrap();
+    let item_2 = output.layout.find("item-2").unwrap();
+
+    assert_eq!(row.rect.size, Size::new(120.0, 50.0));
+    assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
+    assert_eq!(item_1.rect.origin, Point::new(60.0, 0.0));
+    assert_eq!(item_2.rect.origin, Point::new(0.0, 30.0));
+}
+
+#[test]
 fn document_engine_update_scene_with_input_scrolls_overflow_container() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene
