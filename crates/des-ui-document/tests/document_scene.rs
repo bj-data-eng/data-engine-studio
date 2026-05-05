@@ -1,15 +1,16 @@
 use des_ui_document::{
-    AlignContent, AlignItems, Color, ComputedStyle, DocumentEngine, DocumentEventKind,
+    AlignContent, AlignItems, Color, ComputedStyle, Display, DocumentEngine, DocumentEventKind,
     DocumentInput, DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector,
-    FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, Rect,
-    ScrollAxis, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
-    TextWrapMode, Transition,
+    FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
+    GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets, JustifyContent, Length,
+    Overflow, Point, PointerInput, Rect, RepetitionCount, ScrollAxis, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
+    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode, Transition,
 };
 use layout_engine::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, Dimension,
     FlexDirection as LayoutFlexDirection, JustifyContent as LayoutJustifyContent,
-    LengthPercentageAuto, Size as LayoutSize, length, percent,
+    LengthPercentageAuto, Size as LayoutSize, fr, length, line, percent,
 };
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
@@ -134,6 +135,7 @@ fn scene_applies_document_style_to_existing_layout_node() {
     let original_layout_node = scene.layout_node("panel").unwrap();
 
     let mut style = ComputedStyle::default();
+    style.display = Display::Grid;
     style.flex_direction = FlexDirection::Row;
     style.flex_wrap = FlexWrap::Wrap;
     style.flex_basis = Length::Px(88.0);
@@ -142,10 +144,41 @@ fn scene_applies_document_style_to_existing_layout_node() {
     style.align_content = AlignContent::SpaceAround;
     style.align_items = AlignItems::FlexEnd;
     style.align_self = Some(AlignItems::Baseline);
+    style.justify_items = Some(AlignItems::Center);
+    style.justify_self = Some(AlignItems::End);
     style.justify_content = JustifyContent::SpaceEvenly;
     style.gap = 12.0;
     style.row_gap = 10.0;
     style.column_gap = 14.0;
+    style.grid_template_rows = vec![GridTemplateComponent::Repeat(GridTemplateRepetition {
+        count: RepetitionCount::Count(2),
+        tracks: vec![fr::<_, GridTrack>(1.0)],
+        line_names: vec![vec!["row".to_string()]],
+    })];
+    style.grid_template_columns = vec![
+        GridTemplateComponent::Single(length::<_, GridTrack>(96.0)),
+        GridTemplateComponent::Single(fr::<_, GridTrack>(1.0)),
+    ];
+    style.grid_auto_rows = vec![length::<_, GridTrack>(24.0)];
+    style.grid_auto_columns = vec![fr::<_, GridTrack>(2.0)];
+    style.grid_auto_flow = GridAutoFlow::ColumnDense;
+    style.grid_template_areas = vec![GridTemplateArea {
+        name: "main".to_string(),
+        row_start: 0,
+        row_end: 1,
+        column_start: 0,
+        column_end: 2,
+    }];
+    style.grid_template_column_names = vec![vec!["start".to_string()], vec!["end".to_string()]];
+    style.grid_template_row_names = vec![vec!["top".to_string()], vec!["bottom".to_string()]];
+    style.grid_row = GridPlacementLine {
+        start: line::<GridPlacement>(1),
+        end: GridPlacement::Span(2),
+    };
+    style.grid_column = GridPlacementLine {
+        start: GridPlacement::NamedLine("content".to_string(), 0),
+        end: GridPlacement::NamedSpan("content".to_string(), 2),
+    };
     style.margin = Insets::symmetric(8.0, 4.0);
     style.padding = Insets::all(6.0);
     style.width = Length::Percent(0.5);
@@ -158,6 +191,7 @@ fn scene_applies_document_style_to_existing_layout_node() {
 
     assert_eq!(scene.layout_node("panel"), Some(original_layout_node));
     let layout_style = scene.layout_style("panel").unwrap();
+    assert_eq!(layout_style.display, Display::Grid);
     assert_eq!(layout_style.flex_direction, LayoutFlexDirection::Row);
     assert_eq!(
         layout_style.flex_wrap,
@@ -172,6 +206,8 @@ fn scene_applies_document_style_to_existing_layout_node() {
     );
     assert_eq!(layout_style.align_items, Some(LayoutAlignItems::FlexEnd));
     assert_eq!(layout_style.align_self, Some(LayoutAlignItems::Baseline));
+    assert_eq!(layout_style.justify_items, Some(LayoutAlignItems::Center));
+    assert_eq!(layout_style.justify_self, Some(LayoutAlignItems::End));
     assert_eq!(
         layout_style.justify_content,
         Some(LayoutJustifyContent::SpaceEvenly)
@@ -183,6 +219,25 @@ fn scene_applies_document_style_to_existing_layout_node() {
             height: length(10.0),
         }
     );
+    assert_eq!(layout_style.grid_template_rows, style.grid_template_rows);
+    assert_eq!(
+        layout_style.grid_template_columns,
+        style.grid_template_columns
+    );
+    assert_eq!(layout_style.grid_auto_rows, style.grid_auto_rows);
+    assert_eq!(layout_style.grid_auto_columns, style.grid_auto_columns);
+    assert_eq!(layout_style.grid_auto_flow, GridAutoFlow::ColumnDense);
+    assert_eq!(layout_style.grid_template_areas, style.grid_template_areas);
+    assert_eq!(
+        layout_style.grid_template_column_names,
+        style.grid_template_column_names
+    );
+    assert_eq!(
+        layout_style.grid_template_row_names,
+        style.grid_template_row_names
+    );
+    assert_eq!(layout_style.grid_row, style.grid_row);
+    assert_eq!(layout_style.grid_column, style.grid_column);
     assert_eq!(
         layout_style.margin,
         layout_engine::prelude::Rect {
@@ -237,6 +292,64 @@ fn scene_fill_size_does_not_imply_flex_layout_style() {
     let layout_style = scene.layout_style("panel").unwrap();
     assert_eq!(layout_style.align_self, None);
     assert_eq!(layout_style.flex_grow, 0.0);
+}
+
+#[test]
+fn scene_stylesheet_applies_grid_style_surface() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element("root", "grid", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("grid", "cell", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    let columns = vec![
+        GridTemplateComponent::Single(length::<_, GridTrack>(48.0)),
+        GridTemplateComponent::Single(fr::<_, GridTrack>(1.0)),
+    ];
+    let row = GridPlacementLine {
+        start: line::<GridPlacement>(1),
+        end: GridPlacement::Span(2),
+    };
+    let column = GridPlacementLine {
+        start: line::<GridPlacement>(2),
+        end: line::<GridPlacement>(3),
+    };
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("grid"),
+            Style::default()
+                .display(Display::Grid)
+                .grid_template_columns(columns.clone())
+                .grid_auto_rows(vec![length::<_, GridTrack>(32.0)])
+                .grid_auto_flow(GridAutoFlow::RowDense)
+                .justify_items(AlignItems::Stretch),
+        )
+        .rule(
+            StyleSelector::id("cell"),
+            Style::default()
+                .grid_row_line(row.clone())
+                .grid_column_line(column.clone())
+                .justify_self(AlignItems::Center),
+        );
+
+    let states = HashMap::new();
+    scene.apply_stylesheet(&stylesheet, &states).unwrap();
+
+    let grid_style = scene.layout_style("grid").unwrap();
+    assert_eq!(grid_style.display, Display::Grid);
+    assert_eq!(grid_style.grid_template_columns, columns);
+    assert_eq!(
+        grid_style.grid_auto_rows,
+        vec![length::<_, GridTrack>(32.0)]
+    );
+    assert_eq!(grid_style.grid_auto_flow, GridAutoFlow::RowDense);
+    assert_eq!(grid_style.justify_items, Some(LayoutAlignItems::Stretch));
+
+    let cell_style = scene.layout_style("cell").unwrap();
+    assert_eq!(cell_style.grid_row, row);
+    assert_eq!(cell_style.grid_column, column);
+    assert_eq!(cell_style.justify_self, Some(LayoutAlignItems::Center));
 }
 
 #[test]

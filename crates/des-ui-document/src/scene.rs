@@ -964,7 +964,7 @@ fn measure_text_with_wrap_width(
 
 fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
     LayoutStyle {
-        display: Display::Flex,
+        display: style.display,
         overflow: layout_overflow(style.overflow_x, style.overflow_y),
         scrollbar_width: style.scrollbar_width,
         position: layout_position(style.position),
@@ -1004,6 +1004,8 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         align_items: Some(layout_align_items(style.align_items)),
         align_self: style.align_self.map(layout_align_items),
         align_content: Some(layout_align_content(style.align_content)),
+        justify_items: style.justify_items.map(layout_align_items),
+        justify_self: style.justify_self.map(layout_align_items),
         justify_content: Some(layout_justify_content(style.justify_content)),
         gap: LayoutSize {
             width: length(style.column_gap),
@@ -1014,6 +1016,16 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         flex_basis: dimension_from_document(style.flex_basis),
         flex_grow: style.flex_grow,
         flex_shrink: style.flex_shrink,
+        grid_template_rows: style.grid_template_rows.clone(),
+        grid_template_columns: style.grid_template_columns.clone(),
+        grid_auto_rows: style.grid_auto_rows.clone(),
+        grid_auto_columns: style.grid_auto_columns.clone(),
+        grid_auto_flow: style.grid_auto_flow,
+        grid_template_areas: style.grid_template_areas.clone(),
+        grid_template_column_names: style.grid_template_column_names.clone(),
+        grid_template_row_names: style.grid_template_row_names.clone(),
+        grid_row: style.grid_row.clone(),
+        grid_column: style.grid_column.clone(),
         ..Default::default()
     }
 }

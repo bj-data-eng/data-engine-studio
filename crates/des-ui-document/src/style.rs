@@ -5,6 +5,17 @@ use crate::geometry::{
 };
 use crate::state::ElementState;
 use crate::text::TextWrapMode;
+pub use layout_engine::prelude::{
+    Display, GridAutoFlow, MaxTrackSizingFunction, MinTrackSizingFunction, RepetitionCount,
+    TrackSizingFunction,
+};
+
+pub type GridPlacement = layout_engine::prelude::GridPlacement<String>;
+pub type GridPlacementLine = layout_engine::geometry::Line<GridPlacement>;
+pub type GridTemplateArea = layout_engine::style::GridTemplateArea<String>;
+pub type GridTemplateComponent = layout_engine::prelude::GridTemplateComponent<String>;
+pub type GridTemplateRepetition = layout_engine::style::GridTemplateRepetition<String>;
+pub type GridTrack = TrackSizingFunction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StyleSelector {
@@ -207,6 +218,7 @@ impl Anchor {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Style {
+    pub display: Option<Display>,
     pub flex_direction: Option<FlexDirection>,
     pub flex_wrap: Option<FlexWrap>,
     pub flex_basis: Option<Length>,
@@ -215,10 +227,22 @@ pub struct Style {
     pub align_content: Option<AlignContent>,
     pub align_items: Option<AlignItems>,
     pub align_self: Option<AlignSelf>,
+    pub justify_items: Option<AlignItems>,
+    pub justify_self: Option<AlignSelf>,
     pub justify_content: Option<JustifyContent>,
     pub gap: Option<f32>,
     pub row_gap: Option<f32>,
     pub column_gap: Option<f32>,
+    pub grid_template_rows: Option<Vec<GridTemplateComponent>>,
+    pub grid_template_columns: Option<Vec<GridTemplateComponent>>,
+    pub grid_auto_rows: Option<Vec<GridTrack>>,
+    pub grid_auto_columns: Option<Vec<GridTrack>>,
+    pub grid_auto_flow: Option<GridAutoFlow>,
+    pub grid_template_areas: Option<Vec<GridTemplateArea>>,
+    pub grid_template_column_names: Option<Vec<Vec<String>>>,
+    pub grid_template_row_names: Option<Vec<Vec<String>>>,
+    pub grid_row: Option<GridPlacementLine>,
+    pub grid_column: Option<GridPlacementLine>,
     pub margin: Option<Insets>,
     pub padding: Option<Insets>,
     pub width: Option<Length>,
@@ -344,6 +368,11 @@ impl Default for Shadow {
 }
 
 impl Style {
+    pub fn display(mut self, display: Display) -> Self {
+        self.display = Some(display);
+        self
+    }
+
     pub fn flex_direction(mut self, flex_direction: FlexDirection) -> Self {
         self.flex_direction = Some(flex_direction);
         self
@@ -384,6 +413,16 @@ impl Style {
         self
     }
 
+    pub fn justify_items(mut self, justify_items: AlignItems) -> Self {
+        self.justify_items = Some(justify_items);
+        self
+    }
+
+    pub fn justify_self(mut self, justify_self: AlignSelf) -> Self {
+        self.justify_self = Some(justify_self);
+        self
+    }
+
     pub fn justify_content(mut self, justify_content: JustifyContent) -> Self {
         self.justify_content = Some(justify_content);
         self
@@ -403,6 +442,72 @@ impl Style {
 
     pub fn column_gap(mut self, column_gap: f32) -> Self {
         self.column_gap = Some(column_gap);
+        self
+    }
+
+    pub fn grid_template_rows(mut self, grid_template_rows: Vec<GridTemplateComponent>) -> Self {
+        self.grid_template_rows = Some(grid_template_rows);
+        self
+    }
+
+    pub fn grid_template_columns(
+        mut self,
+        grid_template_columns: Vec<GridTemplateComponent>,
+    ) -> Self {
+        self.grid_template_columns = Some(grid_template_columns);
+        self
+    }
+
+    pub fn grid_auto_rows(mut self, grid_auto_rows: Vec<GridTrack>) -> Self {
+        self.grid_auto_rows = Some(grid_auto_rows);
+        self
+    }
+
+    pub fn grid_auto_columns(mut self, grid_auto_columns: Vec<GridTrack>) -> Self {
+        self.grid_auto_columns = Some(grid_auto_columns);
+        self
+    }
+
+    pub fn grid_auto_flow(mut self, grid_auto_flow: GridAutoFlow) -> Self {
+        self.grid_auto_flow = Some(grid_auto_flow);
+        self
+    }
+
+    pub fn grid_template_areas(mut self, grid_template_areas: Vec<GridTemplateArea>) -> Self {
+        self.grid_template_areas = Some(grid_template_areas);
+        self
+    }
+
+    pub fn grid_template_column_names(
+        mut self,
+        grid_template_column_names: Vec<Vec<String>>,
+    ) -> Self {
+        self.grid_template_column_names = Some(grid_template_column_names);
+        self
+    }
+
+    pub fn grid_template_row_names(mut self, grid_template_row_names: Vec<Vec<String>>) -> Self {
+        self.grid_template_row_names = Some(grid_template_row_names);
+        self
+    }
+
+    pub fn grid_row(mut self, start: GridPlacement, end: GridPlacement) -> Self {
+        self.grid_row = Some(GridPlacementLine { start, end });
+        self
+    }
+
+    pub fn grid_column(mut self, start: GridPlacement, end: GridPlacement) -> Self {
+        self.grid_column = Some(GridPlacementLine { start, end });
+        self
+    }
+
+    pub fn grid_row_line(mut self, grid_row: GridPlacementLine) -> Self {
+        self.grid_row = Some(grid_row);
+        self
+    }
+
+    pub fn grid_column_line(mut self, grid_column: GridPlacementLine) -> Self {
+        self.grid_column = Some(grid_column);
         self
     }
 
@@ -768,6 +873,7 @@ impl Style {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComputedStyle {
+    pub display: Display,
     pub flex_direction: FlexDirection,
     pub flex_wrap: FlexWrap,
     pub flex_basis: Length,
@@ -776,10 +882,22 @@ pub struct ComputedStyle {
     pub align_content: AlignContent,
     pub align_items: AlignItems,
     pub align_self: Option<AlignSelf>,
+    pub justify_items: Option<AlignItems>,
+    pub justify_self: Option<AlignSelf>,
     pub justify_content: JustifyContent,
     pub gap: f32,
     pub row_gap: f32,
     pub column_gap: f32,
+    pub grid_template_rows: Vec<GridTemplateComponent>,
+    pub grid_template_columns: Vec<GridTemplateComponent>,
+    pub grid_auto_rows: Vec<GridTrack>,
+    pub grid_auto_columns: Vec<GridTrack>,
+    pub grid_auto_flow: GridAutoFlow,
+    pub grid_template_areas: Vec<GridTemplateArea>,
+    pub grid_template_column_names: Vec<Vec<String>>,
+    pub grid_template_row_names: Vec<Vec<String>>,
+    pub grid_row: GridPlacementLine,
+    pub grid_column: GridPlacementLine,
     pub margin: Insets,
     pub padding: Insets,
     pub width: Length,
@@ -828,6 +946,7 @@ pub struct ComputedStyle {
 impl Default for ComputedStyle {
     fn default() -> Self {
         Self {
+            display: Display::Flex,
             flex_direction: FlexDirection::Column,
             flex_wrap: FlexWrap::NoWrap,
             flex_basis: Length::Auto,
@@ -836,10 +955,22 @@ impl Default for ComputedStyle {
             align_content: AlignContent::Stretch,
             align_items: AlignItems::Start,
             align_self: None,
+            justify_items: None,
+            justify_self: None,
             justify_content: JustifyContent::Start,
             gap: 0.0,
             row_gap: 0.0,
             column_gap: 0.0,
+            grid_template_rows: Vec::new(),
+            grid_template_columns: Vec::new(),
+            grid_auto_rows: Vec::new(),
+            grid_auto_columns: Vec::new(),
+            grid_auto_flow: GridAutoFlow::Row,
+            grid_template_areas: Vec::new(),
+            grid_template_column_names: Vec::new(),
+            grid_template_row_names: Vec::new(),
+            grid_row: GridPlacementLine::default(),
+            grid_column: GridPlacementLine::default(),
             margin: Insets::ZERO,
             padding: Insets::ZERO,
             width: Length::Auto,
@@ -889,6 +1020,9 @@ impl Default for ComputedStyle {
 
 impl ComputedStyle {
     pub(crate) fn apply(&mut self, style: &Style) {
+        if let Some(value) = style.display {
+            self.display = value;
+        }
         if let Some(value) = style.flex_direction {
             self.flex_direction = value;
         }
@@ -913,6 +1047,12 @@ impl ComputedStyle {
         if let Some(value) = style.align_self {
             self.align_self = Some(value);
         }
+        if let Some(value) = style.justify_items {
+            self.justify_items = Some(value);
+        }
+        if let Some(value) = style.justify_self {
+            self.justify_self = Some(value);
+        }
         if let Some(value) = style.justify_content {
             self.justify_content = value;
         }
@@ -926,6 +1066,36 @@ impl ComputedStyle {
         }
         if let Some(value) = style.column_gap {
             self.column_gap = value;
+        }
+        if let Some(value) = &style.grid_template_rows {
+            self.grid_template_rows = value.clone();
+        }
+        if let Some(value) = &style.grid_template_columns {
+            self.grid_template_columns = value.clone();
+        }
+        if let Some(value) = &style.grid_auto_rows {
+            self.grid_auto_rows = value.clone();
+        }
+        if let Some(value) = &style.grid_auto_columns {
+            self.grid_auto_columns = value.clone();
+        }
+        if let Some(value) = style.grid_auto_flow {
+            self.grid_auto_flow = value;
+        }
+        if let Some(value) = &style.grid_template_areas {
+            self.grid_template_areas = value.clone();
+        }
+        if let Some(value) = &style.grid_template_column_names {
+            self.grid_template_column_names = value.clone();
+        }
+        if let Some(value) = &style.grid_template_row_names {
+            self.grid_template_row_names = value.clone();
+        }
+        if let Some(value) = &style.grid_row {
+            self.grid_row = value.clone();
+        }
+        if let Some(value) = &style.grid_column {
+            self.grid_column = value.clone();
         }
         if let Some(value) = style.margin {
             self.margin = value;
@@ -1190,7 +1360,8 @@ pub(crate) fn classify_computed_style_change(
 }
 
 fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle) -> bool {
-    previous.flex_direction != next.flex_direction
+    previous.display != next.display
+        || previous.flex_direction != next.flex_direction
         || previous.flex_wrap != next.flex_wrap
         || previous.flex_basis != next.flex_basis
         || previous.flex_grow != next.flex_grow
@@ -1198,10 +1369,22 @@ fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle)
         || previous.align_content != next.align_content
         || previous.align_items != next.align_items
         || previous.align_self != next.align_self
+        || previous.justify_items != next.justify_items
+        || previous.justify_self != next.justify_self
         || previous.justify_content != next.justify_content
         || previous.gap != next.gap
         || previous.row_gap != next.row_gap
         || previous.column_gap != next.column_gap
+        || previous.grid_template_rows != next.grid_template_rows
+        || previous.grid_template_columns != next.grid_template_columns
+        || previous.grid_auto_rows != next.grid_auto_rows
+        || previous.grid_auto_columns != next.grid_auto_columns
+        || previous.grid_auto_flow != next.grid_auto_flow
+        || previous.grid_template_areas != next.grid_template_areas
+        || previous.grid_template_column_names != next.grid_template_column_names
+        || previous.grid_template_row_names != next.grid_template_row_names
+        || previous.grid_row != next.grid_row
+        || previous.grid_column != next.grid_column
         || previous.margin != next.margin
         || previous.padding != next.padding
         || previous.width != next.width

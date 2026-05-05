@@ -36,8 +36,11 @@ pub use state::{
     ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
-    Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Easing, EdgeStyle,
-    Shadow, Style, StyleRule, StyleSelector, StyleSheet, Transition,
+    Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Display, Easing,
+    EdgeStyle, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
+    GridTemplateComponent, GridTemplateRepetition, GridTrack, MaxTrackSizingFunction,
+    MinTrackSizingFunction, RepetitionCount, Shadow, Style, StyleRule, StyleSelector, StyleSheet,
+    TrackSizingFunction, Transition,
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{
