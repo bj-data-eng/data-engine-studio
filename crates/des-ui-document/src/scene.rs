@@ -442,13 +442,8 @@ impl DocumentScene {
             .as_deref()
             .map(|text| measure_text(text, &element.computed_style, rect, text_measurer));
         anchors.insert(element.id.clone(), rect);
-        let children = self.resolved_children(
-            id,
-            rect.origin,
-            element.scroll_offset,
-            text_measurer,
-            anchors,
-        )?;
+        let children =
+            self.resolved_children(id, rect, element.scroll_offset, text_measurer, anchors)?;
 
         Ok(ResolvedElement {
             id: element.id.clone(),
@@ -472,7 +467,7 @@ impl DocumentScene {
     fn resolved_children(
         &self,
         id: &ElementId,
-        parent_origin: Point,
+        parent_rect: DocumentRect,
         parent_scroll_offset: Point,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
@@ -486,7 +481,11 @@ impl DocumentScene {
             }
             resolved[index] = Some(self.resolved_element(
                 child,
-                parent_origin,
+                child_parent_origin(
+                    parent_rect,
+                    &self.element(id)?.computed_style,
+                    &self.element(child)?.computed_style,
+                ),
                 parent_scroll_offset,
                 text_measurer,
                 anchors,
@@ -499,7 +498,11 @@ impl DocumentScene {
             }
             resolved[index] = Some(self.resolved_element(
                 child,
-                parent_origin,
+                child_parent_origin(
+                    parent_rect,
+                    &self.element(id)?.computed_style,
+                    &self.element(child)?.computed_style,
+                ),
                 parent_scroll_offset,
                 text_measurer,
                 anchors,
@@ -712,6 +715,21 @@ fn table_column_index(table: &TableSpec, column_id: &TableColumnId) -> Option<i1
 fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) -> f32 {
     let width = width.max(min_width);
     max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
+}
+
+fn child_parent_origin(
+    parent_rect: DocumentRect,
+    parent_style: &ComputedStyle,
+    child_style: &ComputedStyle,
+) -> Point {
+    if child_style.position == Position::AbsoluteParent && child_style.anchor.is_none() {
+        return Point::new(
+            parent_rect.origin.x + parent_style.padding.left,
+            parent_rect.origin.y + parent_style.padding.top,
+        );
+    }
+
+    parent_rect.origin
 }
 
 fn resolved_document_rect(

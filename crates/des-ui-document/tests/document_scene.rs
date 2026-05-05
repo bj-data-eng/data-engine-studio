@@ -768,6 +768,55 @@ fn document_engine_update_scene_hits_absolute_viewport_child_outside_parent() {
 }
 
 #[test]
+fn document_engine_update_scene_positions_absolute_parent_without_flow_measurement() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element(
+            "panel",
+            "absolute-child",
+            ElementSpec::new(ElementRole::Card),
+        )
+        .unwrap();
+    scene
+        .append_element("panel", "flow-child", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .padding(Insets::all(10.0))
+                .border_width(2.0),
+        )
+        .rule(
+            StyleSelector::id("flow-child"),
+            Style::default().size(50.0, 20.0),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(7.0))
+                .top(Length::Px(5.0))
+                .size(40.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let panel = output.layout.find("panel").unwrap();
+    let absolute_child = output.layout.find("absolute-child").unwrap();
+    let flow_child = output.layout.find("flow-child").unwrap();
+
+    assert_eq!(panel.rect.size, Size::new(74.0, 44.0));
+    assert_eq!(flow_child.rect.origin, Point::new(12.0, 12.0));
+    assert_eq!(absolute_child.rect.origin, Point::new(19.0, 17.0));
+}
+
+#[test]
 fn document_engine_update_scene_positions_absolute_anchor_after_target_layout() {
     let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
     scene
