@@ -254,7 +254,7 @@ fn render_layout_view(
                     "box-row-gap",
                     "Row gap",
                     "3 children",
-                    "direction: Row; width: Auto; height: Auto; gap: 10",
+                    "flex_direction: Row; width: Auto; height: Auto; gap: 10",
                     "box-subject-row-gap",
                 );
                 box_model_case(
@@ -262,7 +262,7 @@ fn render_layout_view(
                     "box-column-gap",
                     "Column gap",
                     "3 children",
-                    "direction: Column; width: Auto; height: Auto; gap: 6",
+                    "flex_direction: Column; width: Auto; height: Auto; gap: 6",
                     "box-subject-column-gap",
                 );
                 box_model_case(
@@ -280,7 +280,7 @@ fn render_layout_view(
                     "box-row-align",
                     "Row alignment",
                     "children centered on main axis and end-aligned on cross axis",
-                    "direction: Row; size: 96 by 54; gap: 8; justify content: Center; align items: End",
+                    "flex_direction: Row; size: 96 by 54; gap: 8; justify content: Center; align items: End",
                     "box-subject-row-align",
                 );
                 box_model_case(
@@ -288,7 +288,7 @@ fn render_layout_view(
                     "box-column-align",
                     "Column alignment",
                     "children spaced on main axis and centered on cross axis",
-                    "direction: Column; size: 80 by 92; gap: 4; justify content: SpaceBetween; align items: Center",
+                    "flex_direction: Column; size: 80 by 92; gap: 4; justify content: SpaceBetween; align items: Center",
                     "box-subject-column-align",
                 );
             });

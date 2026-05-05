@@ -1605,7 +1605,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         .rule(
             StyleSelector::class("row"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
+                .flex_direction(des_ui_document::FlexDirection::Row)
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(4.0),

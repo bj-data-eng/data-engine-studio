@@ -1,10 +1,10 @@
 use des_ui_document::{
     AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentEventKind,
     DocumentInput, DocumentUpdate, ElementId, ElementRole, ElementSpec, ElementStateSelector,
-    Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextSelectionGranularity,
-    TextWrapMode, Transition, VisualCloneOptions,
+    FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow,
+    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    TextSelectionGranularity, TextWrapMode, Transition, VisualCloneOptions,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -937,8 +937,8 @@ fn wrapped_row_layout_rearranges_children_and_expands_container_height() {
         .rule(
             StyleSelector::id("row"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
-                .wrap(true)
+                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width(Length::Px(120.0))
                 .height(Length::Auto)
                 .gap(10.0),
@@ -1559,7 +1559,7 @@ fn row_layout_applies_main_and_cross_axis_alignment() {
         .rule(
             StyleSelector::id("row"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
+                .flex_direction(des_ui_document::FlexDirection::Row)
                 .size(160.0, 80.0)
                 .gap(10.0)
                 .justify_content(JustifyContent::Center)
@@ -1603,7 +1603,7 @@ fn column_layout_applies_main_and_cross_axis_alignment() {
         .rule(
             StyleSelector::id("column"),
             Style::default()
-                .direction(des_ui_document::Direction::Column)
+                .flex_direction(des_ui_document::FlexDirection::Column)
                 .size(120.0, 120.0)
                 .gap(5.0)
                 .justify_content(JustifyContent::SpaceBetween)
@@ -2188,7 +2188,7 @@ fn horizontal_overflow_scrolls_child_content_on_x_axis() {
         .rule(
             StyleSelector::id("scroll-panel"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
+                .flex_direction(des_ui_document::FlexDirection::Row)
                 .size(80.0, 70.0)
                 .gap(4.0)
                 .overflow_x(Overflow::Scroll),
@@ -2471,7 +2471,7 @@ fn nested_scroll_chrome_is_clipped_by_ancestor_scroll_viewport() {
         .rule(
             StyleSelector::id("horizontal-parent"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
+                .flex_direction(des_ui_document::FlexDirection::Row)
                 .size(120.0, 96.0)
                 .gap(10.0)
                 .overflow_x(Overflow::Scroll)
@@ -2549,7 +2549,7 @@ fn clipped_scroll_chrome_does_not_drive_animation_work() {
         .rule(
             StyleSelector::id("horizontal-parent"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
+                .flex_direction(des_ui_document::FlexDirection::Row)
                 .size(120.0, 96.0)
                 .gap(10.0)
                 .overflow_x(Overflow::Scroll)

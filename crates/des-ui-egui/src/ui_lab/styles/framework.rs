@@ -9,7 +9,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("drag-item"),
             Style::default()
-                .direction(des_ui_document::Direction::Row)
+                .flex_direction(des_ui_document::FlexDirection::Row)
                 .width_fill()
                 .height(Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 6.0))

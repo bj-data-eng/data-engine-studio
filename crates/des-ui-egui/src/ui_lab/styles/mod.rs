@@ -7,8 +7,9 @@ use super::{
     TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
 use des_ui_document::{
-    AlignItems, Color, Direction, ElementRole, ElementStateSelector, Insets, JustifyContent,
-    Length, Overflow, Point, Shadow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition,
+    AlignItems, Color, ElementRole, ElementStateSelector, FlexDirection, FlexWrap, Insets,
+    JustifyContent, Length, Overflow, Point, Shadow, Style, StyleSelector, StyleSheet,
+    TextWrapMode, Transition,
 };
 
 pub(super) fn stylesheet() -> StyleSheet {
@@ -16,19 +17,19 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::Role(ElementRole::Root),
             Style::default()
-                .direction(Direction::Column)
+                .flex_direction(FlexDirection::Column)
                 .background(BACKGROUND),
         )
         .rule(
             StyleSelector::Role(ElementRole::Panel),
             Style::default()
-                .direction(Direction::Column)
+                .flex_direction(FlexDirection::Column)
                 .background(PANEL),
         )
         .rule(
             StyleSelector::Role(ElementRole::Card),
             Style::default()
-                .direction(Direction::Column)
+                .flex_direction(FlexDirection::Column)
                 .padding(Insets::all(12.0))
                 .gap(5.0)
                 .background(CARD)
@@ -46,7 +47,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::Role(ElementRole::Checkbox),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .padding(Insets::symmetric(9.0, 7.0))
                 .gap(8.0)
@@ -57,7 +58,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::Role(ElementRole::Radio),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .padding(Insets::symmetric(9.0, 7.0))
                 .gap(8.0)
@@ -68,7 +69,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::Role(ElementRole::Dropdown),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::SpaceBetween)
                 .padding(Insets::symmetric(10.0, 7.0))
@@ -118,7 +119,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("lab-body"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .size(1320.0, 722.0)
                 .padding(Insets::all(14.0))
                 .gap(14.0)
@@ -158,8 +159,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("box-model-row"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .gap(10.0)
@@ -295,7 +296,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("box-subject-row-gap"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(10.0),
@@ -303,7 +304,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("box-subject-column-gap"),
             Style::default()
-                .direction(Direction::Column)
+                .flex_direction(FlexDirection::Column)
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(6.0),
@@ -311,7 +312,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("box-subject-row-align"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .size(96.0, 54.0)
                 .gap(8.0)
                 .justify_content(JustifyContent::Center)
@@ -320,7 +321,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("box-subject-column-align"),
             Style::default()
-                .direction(Direction::Column)
+                .flex_direction(FlexDirection::Column)
                 .size(80.0, 92.0)
                 .gap(4.0)
                 .justify_content(JustifyContent::SpaceBetween)
@@ -398,7 +399,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("box-nested-row"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(4.0)
@@ -506,7 +507,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("toolbar-row"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .gap(8.0)
                 .background(PANEL_ALT),
         )
@@ -540,22 +541,22 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("card-row"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .gap(12.0)
                 .background(PANEL_ALT),
         )
         .rule(
             StyleSelector::class("card-row-dense"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .gap(6.0)
                 .background(PANEL_ALT),
         )
         .rule(
             StyleSelector::class("controls-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .gap(12.0)
@@ -706,8 +707,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("loop-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .gap(10.0)
@@ -787,15 +788,15 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("drag-workbench"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Start)
                 .gap(14.0),
         )
         .rule(
             StyleSelector::class("drag-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width(Length::Px(520.0))
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
@@ -842,8 +843,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-specimen-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .gap(12.0)
@@ -1000,8 +1001,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .padding(Insets::all(18.0))
@@ -1045,7 +1046,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-light-card"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::SpaceBetween)
                 .width(Length::Px(360.0))
@@ -1088,7 +1089,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-web-card"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::SpaceBetween)
                 .width(Length::Px(306.0))
@@ -1120,7 +1121,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-tune-panel"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .width_fill()
                 .height(Length::Auto)
                 .padding(Insets::all(12.0))
@@ -1142,7 +1143,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-tune-preview-card"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::SpaceBetween)
                 .width(Length::Px(306.0))
@@ -1156,7 +1157,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-tune-controls"),
             Style::default()
-                .direction(Direction::Column)
+                .flex_direction(FlexDirection::Column)
                 .width(Length::Px(320.0))
                 .height(Length::Auto)
                 .gap(10.0)
@@ -1176,7 +1177,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-tune-header"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::SpaceBetween)
                 .width_fill()
@@ -1203,7 +1204,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("shadow-tune-row"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .width_fill()
                 .height(Length::Px(28.0))
@@ -1258,8 +1259,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("structural-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .gap(12.0)
@@ -1279,8 +1280,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("structural-nested-shell"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(false)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::NoWrap)
                 .width(Length::Px(790.0))
                 .height(Length::Auto)
                 .gap(10.0)
@@ -1334,8 +1335,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("animation-grid"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width_fill()
                 .height(Length::Auto)
                 .gap(12.0)
@@ -1385,7 +1386,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("animation-margin-row"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .width_fill()
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
@@ -1498,7 +1499,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("scroll-list-horizontal"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .width_fill()
                 .height(des_ui_document::Length::Px(250.0))
                 .padding(Insets::symmetric(4.0, 4.0))
@@ -1694,7 +1695,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("debug-row"),
             Style::default()
-                .direction(Direction::Row)
+                .flex_direction(FlexDirection::Row)
                 .justify_content(JustifyContent::SpaceBetween)
                 .width_fill()
                 .height(Length::Px(18.0))

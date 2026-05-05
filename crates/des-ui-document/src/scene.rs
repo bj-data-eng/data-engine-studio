@@ -1,6 +1,6 @@
 use crate::element::{Element, ElementId, ElementRole, ElementSpec};
 use crate::geometry::{
-    AlignItems, Direction, Insets, JustifyContent, Length, Overflow, Point, Position,
+    AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, Position,
     Rect as DocumentRect, Size,
 };
 use crate::state::{ElementState, ResolvedElement};
@@ -10,9 +10,10 @@ use crate::style::{
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
 use layout_engine::prelude::{
-    AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display, FlexDirection, FlexWrap,
-    GridPlacement, GridTemplateComponent, JustifyContent as LayoutJustifyContent, LayoutTree,
-    LengthPercentage, LengthPercentageAuto, NodeId, Position as LayoutPosition, Rect as LayoutRect,
+    AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display,
+    FlexDirection as LayoutFlexDirection, FlexWrap as LayoutFlexWrap, GridPlacement,
+    GridTemplateComponent, JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage,
+    LengthPercentageAuto, NodeId, Position as LayoutPosition, Rect as LayoutRect,
     Size as LayoutSize, Style as LayoutStyle, fr, length, percent,
 };
 use layout_engine::style::Overflow as LayoutOverflow;
@@ -917,12 +918,8 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         },
         justify_content: Some(layout_justify_content(style.justify_content)),
         gap: LayoutSize::length(style.gap),
-        flex_direction: layout_flex_direction(style.direction),
-        flex_wrap: if style.wrap {
-            FlexWrap::Wrap
-        } else {
-            FlexWrap::NoWrap
-        },
+        flex_direction: layout_flex_direction(style.flex_direction),
+        flex_wrap: layout_flex_wrap(style.flex_wrap),
         flex_grow: if style.height == Length::Fill {
             1.0
         } else {
@@ -1015,10 +1012,20 @@ fn layout_justify_content(justify_content: JustifyContent) -> LayoutJustifyConte
     }
 }
 
-fn layout_flex_direction(direction: Direction) -> FlexDirection {
-    match direction {
-        Direction::Row => FlexDirection::Row,
-        Direction::Column => FlexDirection::Column,
+fn layout_flex_direction(flex_direction: FlexDirection) -> LayoutFlexDirection {
+    match flex_direction {
+        FlexDirection::Row => LayoutFlexDirection::Row,
+        FlexDirection::Column => LayoutFlexDirection::Column,
+        FlexDirection::RowReverse => LayoutFlexDirection::RowReverse,
+        FlexDirection::ColumnReverse => LayoutFlexDirection::ColumnReverse,
+    }
+}
+
+fn layout_flex_wrap(flex_wrap: FlexWrap) -> LayoutFlexWrap {
+    match flex_wrap {
+        FlexWrap::NoWrap => LayoutFlexWrap::NoWrap,
+        FlexWrap::Wrap => LayoutFlexWrap::Wrap,
+        FlexWrap::WrapReverse => LayoutFlexWrap::WrapReverse,
     }
 }
 

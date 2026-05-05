@@ -158,9 +158,18 @@ impl CornerRadii {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Direction {
+pub enum FlexDirection {
     Row,
     Column,
+    RowReverse,
+    ColumnReverse,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FlexWrap {
+    NoWrap,
+    Wrap,
+    WrapReverse,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

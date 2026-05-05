@@ -1,7 +1,7 @@
 use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
 use crate::geometry::{
-    AlignItems, CornerRadii, Direction, Insets, JustifyContent, Length, Overflow, Point, Position,
-    PositionInsets, Size,
+    AlignItems, CornerRadii, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
+    Point, Position, PositionInsets, Size,
 };
 use crate::state::ElementState;
 use crate::text::TextWrapMode;
@@ -207,8 +207,8 @@ impl Anchor {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Style {
-    pub direction: Option<Direction>,
-    pub wrap: Option<bool>,
+    pub flex_direction: Option<FlexDirection>,
+    pub flex_wrap: Option<FlexWrap>,
     pub align_items: Option<AlignItems>,
     pub justify_content: Option<JustifyContent>,
     pub gap: Option<f32>,
@@ -337,13 +337,13 @@ impl Default for Shadow {
 }
 
 impl Style {
-    pub fn direction(mut self, direction: Direction) -> Self {
-        self.direction = Some(direction);
+    pub fn flex_direction(mut self, flex_direction: FlexDirection) -> Self {
+        self.flex_direction = Some(flex_direction);
         self
     }
 
-    pub fn wrap(mut self, wrap: bool) -> Self {
-        self.wrap = Some(wrap);
+    pub fn flex_wrap(mut self, flex_wrap: FlexWrap) -> Self {
+        self.flex_wrap = Some(flex_wrap);
         self
     }
 
@@ -724,8 +724,8 @@ impl Style {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComputedStyle {
-    pub direction: Direction,
-    pub wrap: bool,
+    pub flex_direction: FlexDirection,
+    pub flex_wrap: FlexWrap,
     pub align_items: AlignItems,
     pub justify_content: JustifyContent,
     pub gap: f32,
@@ -777,8 +777,8 @@ pub struct ComputedStyle {
 impl Default for ComputedStyle {
     fn default() -> Self {
         Self {
-            direction: Direction::Column,
-            wrap: false,
+            flex_direction: FlexDirection::Column,
+            flex_wrap: FlexWrap::NoWrap,
             align_items: AlignItems::Start,
             justify_content: JustifyContent::Start,
             gap: 0.0,
@@ -831,11 +831,11 @@ impl Default for ComputedStyle {
 
 impl ComputedStyle {
     pub(crate) fn apply(&mut self, style: &Style) {
-        if let Some(value) = style.direction {
-            self.direction = value;
+        if let Some(value) = style.flex_direction {
+            self.flex_direction = value;
         }
-        if let Some(value) = style.wrap {
-            self.wrap = value;
+        if let Some(value) = style.flex_wrap {
+            self.flex_wrap = value;
         }
         if let Some(value) = style.align_items {
             self.align_items = value;
@@ -1109,8 +1109,8 @@ pub(crate) fn classify_computed_style_change(
 }
 
 fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle) -> bool {
-    previous.direction != next.direction
-        || previous.wrap != next.wrap
+    previous.flex_direction != next.flex_direction
+        || previous.flex_wrap != next.flex_wrap
         || previous.align_items != next.align_items
         || previous.justify_content != next.justify_content
         || previous.gap != next.gap

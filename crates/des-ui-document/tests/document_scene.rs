@@ -1,12 +1,12 @@
 use des_ui_document::{
-    AlignItems, ComputedStyle, Direction, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
+    AlignItems, ComputedStyle, DocumentEngine, DocumentEventKind, DocumentInput, DocumentScene,
+    ElementId, ElementRole, ElementSpec, ElementStateSelector, FlexDirection, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use layout_engine::prelude::{
-    AlignItems as LayoutAlignItems, Dimension, FlexDirection,
+    AlignItems as LayoutAlignItems, Dimension, FlexDirection as LayoutFlexDirection,
     JustifyContent as LayoutJustifyContent, LengthPercentageAuto, Size as LayoutSize, length,
     percent,
 };
@@ -94,8 +94,8 @@ fn scene_applies_document_style_to_existing_layout_node() {
     let original_layout_node = scene.layout_node("panel").unwrap();
 
     let mut style = ComputedStyle::default();
-    style.direction = Direction::Row;
-    style.wrap = true;
+    style.flex_direction = FlexDirection::Row;
+    style.flex_wrap = FlexWrap::Wrap;
     style.align_items = AlignItems::Stretch;
     style.justify_content = JustifyContent::SpaceBetween;
     style.gap = 12.0;
@@ -111,7 +111,7 @@ fn scene_applies_document_style_to_existing_layout_node() {
 
     assert_eq!(scene.layout_node("panel"), Some(original_layout_node));
     let layout_style = scene.layout_style("panel").unwrap();
-    assert_eq!(layout_style.flex_direction, FlexDirection::Row);
+    assert_eq!(layout_style.flex_direction, LayoutFlexDirection::Row);
     assert_eq!(
         layout_style.flex_wrap,
         layout_engine::prelude::FlexWrap::Wrap
@@ -203,7 +203,7 @@ fn scene_resolves_stylesheet_over_retained_elements() {
     let stylesheet = StyleSheet::new()
         .rule(
             StyleSelector::Role(ElementRole::Root),
-            Style::default().direction(Direction::Row),
+            Style::default().flex_direction(FlexDirection::Row),
         )
         .rule(
             StyleSelector::class("primary"),
@@ -228,7 +228,7 @@ fn scene_resolves_stylesheet_over_retained_elements() {
     assert_eq!(scene.layout_node("second"), Some(second_node));
     assert_eq!(
         scene.layout_style("root").unwrap().flex_direction,
-        FlexDirection::Row
+        LayoutFlexDirection::Row
     );
     assert_eq!(
         scene.layout_style("root").unwrap().size,
@@ -880,8 +880,8 @@ fn document_engine_update_scene_wraps_row_children_and_expands_height() {
         .rule(
             StyleSelector::id("row"),
             Style::default()
-                .direction(Direction::Row)
-                .wrap(true)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .width(Length::Px(120.0))
                 .height(Length::Auto)
                 .gap(10.0),

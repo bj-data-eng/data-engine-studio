@@ -1,6 +1,7 @@
 use crate::element::{Element, ElementId, ElementRole};
 use crate::geometry::{
-    AlignItems, Direction, JustifyContent, Length, Overflow, Point, Position, Rect, Size,
+    AlignItems, FlexDirection, FlexWrap, JustifyContent, Length, Overflow, Point, Position, Rect,
+    Size,
 };
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{
@@ -205,7 +206,7 @@ fn layout_children(
         }
     }
 
-    if style.direction == Direction::Row && style.wrap {
+    if style.flex_direction == FlexDirection::Row && style.flex_wrap == FlexWrap::Wrap {
         return layout_wrapped_children(
             element,
             style,
@@ -248,7 +249,7 @@ fn layout_children(
         .filter(|metrics| metrics.is_some())
         .count();
     let total_main = total_main_size(&flow_metrics, style);
-    let available_main = main_axis_size(content_rect.size, style.direction);
+    let available_main = main_axis_size(content_rect.size, style.flex_direction);
     let free_main = (available_main - total_main).max(0.0);
     let (mut cursor_main, gap) = aligned_main_axis(
         style.justify_content,
@@ -271,13 +272,13 @@ fn layout_children(
         }
 
         let metrics = metrics.expect("flow child should have measured metrics");
-        let outer_main = main_axis_size(metrics.outer, style.direction);
-        let outer_cross = cross_axis_size(metrics.outer, style.direction);
-        let available_cross = cross_axis_size(content_rect.size, style.direction);
+        let outer_main = main_axis_size(metrics.outer, style.flex_direction);
+        let outer_cross = cross_axis_size(metrics.outer, style.flex_direction);
+        let available_cross = cross_axis_size(content_rect.size, style.flex_direction);
         let cursor_cross = aligned_cross_axis(style.align_items, available_cross, outer_cross);
         let child_rect = flow_child_parent_rect(
             content_rect,
-            style.direction,
+            style.flex_direction,
             cursor_main,
             cursor_cross,
             metrics.available,
@@ -460,7 +461,7 @@ fn total_main_size(children: &[Option<FlowChildMetrics>], style: &ComputedStyle)
     let mut total = 0.0;
     let mut count = 0;
     for metrics in children.iter().flatten() {
-        total += main_axis_size(metrics.outer, style.direction);
+        total += main_axis_size(metrics.outer, style.flex_direction);
         count += 1;
     }
     if count > 1 {
@@ -497,19 +498,19 @@ fn aligned_cross_axis(align_items: AlignItems, available: f32, outer: f32) -> f3
 
 fn flow_child_parent_rect(
     content_rect: Rect,
-    direction: Direction,
+    flex_direction: FlexDirection,
     cursor_main: f32,
     cursor_cross: f32,
     available: Size,
 ) -> Rect {
-    match direction {
-        Direction::Column => Rect::new(
+    match flex_direction {
+        FlexDirection::Column | FlexDirection::ColumnReverse => Rect::new(
             content_rect.origin.x + cursor_cross,
             content_rect.origin.y + cursor_main,
             available.width,
             available.height,
         ),
-        Direction::Row => Rect::new(
+        FlexDirection::Row | FlexDirection::RowReverse => Rect::new(
             content_rect.origin.x + cursor_main,
             content_rect.origin.y + cursor_cross,
             available.width,
@@ -518,17 +519,17 @@ fn flow_child_parent_rect(
     }
 }
 
-fn main_axis_size(size: Size, direction: Direction) -> f32 {
-    match direction {
-        Direction::Column => size.height,
-        Direction::Row => size.width,
+fn main_axis_size(size: Size, flex_direction: FlexDirection) -> f32 {
+    match flex_direction {
+        FlexDirection::Column | FlexDirection::ColumnReverse => size.height,
+        FlexDirection::Row | FlexDirection::RowReverse => size.width,
     }
 }
 
-fn cross_axis_size(size: Size, direction: Direction) -> f32 {
-    match direction {
-        Direction::Column => size.width,
-        Direction::Row => size.height,
+fn cross_axis_size(size: Size, flex_direction: FlexDirection) -> f32 {
+    match flex_direction {
+        FlexDirection::Column | FlexDirection::ColumnReverse => size.width,
+        FlexDirection::Row | FlexDirection::RowReverse => size.height,
     }
 }
 
@@ -788,7 +789,7 @@ fn measure_children(
         }
     }
 
-    if style.direction == Direction::Row && style.wrap {
+    if style.flex_direction == FlexDirection::Row && style.flex_wrap == FlexWrap::Wrap {
         return measure_wrapped_children(
             element,
             style,
@@ -829,12 +830,12 @@ fn measure_children(
         );
         let outer_width = child_size.width + child_style.margin.horizontal();
         let outer_height = child_size.height + child_style.margin.vertical();
-        match style.direction {
-            Direction::Column => {
+        match style.flex_direction {
+            FlexDirection::Column | FlexDirection::ColumnReverse => {
                 width = width.max(outer_width);
                 height += outer_height;
             }
-            Direction::Row => {
+            FlexDirection::Row | FlexDirection::RowReverse => {
                 width += outer_width;
                 height = height.max(outer_height);
             }
@@ -843,9 +844,9 @@ fn measure_children(
 
     if flow_child_count > 1 {
         let gap = style.gap * (flow_child_count - 1) as f32;
-        match style.direction {
-            Direction::Column => height += gap,
-            Direction::Row => width += gap,
+        match style.flex_direction {
+            FlexDirection::Column | FlexDirection::ColumnReverse => height += gap,
+            FlexDirection::Row | FlexDirection::RowReverse => width += gap,
         }
     }
 
