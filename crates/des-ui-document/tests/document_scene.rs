@@ -455,6 +455,131 @@ fn document_engine_update_scene_with_input_scrolls_overflow_container() {
 }
 
 #[test]
+fn document_engine_update_scene_with_input_offsets_scrolled_child_rects() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(50.0, 50.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::new(0.0, -40.0),
+        },
+    );
+
+    assert_eq!(
+        output.layout.find("content").unwrap().rect,
+        Rect::new(0.0, -40.0, 100.0, 300.0)
+    );
+}
+
+#[test]
+fn document_engine_update_scene_with_input_hit_tests_scrolled_child_position() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("content", "spacer", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element(
+            "content",
+            "target",
+            ElementSpec::new(ElementRole::Control).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        )
+        .rule(
+            StyleSelector::id("spacer"),
+            Style::default().size(100.0, 100.0),
+        )
+        .rule(
+            StyleSelector::id("target"),
+            Style::default().size(100.0, 30.0),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(50.0, 50.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::new(0.0, -40.0),
+        },
+    );
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(50.0, 70.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_pressed: true,
+                primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.1,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.hit_id, Some(ElementId::new("target")));
+    assert!(engine.element_state("target").unwrap().pressed);
+}
+
+#[test]
 fn document_engine_update_scene_with_input_rerenders_state_styles() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene

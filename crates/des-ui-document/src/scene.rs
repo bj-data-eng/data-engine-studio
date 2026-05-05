@@ -1,6 +1,6 @@
 use crate::element::{Element, ElementId, ElementRole, ElementSpec};
 use crate::geometry::{
-    AlignItems, Direction, Insets, JustifyContent, Length, Overflow, Position,
+    AlignItems, Direction, Insets, JustifyContent, Length, Overflow, Point, Position,
     Rect as DocumentRect, Size,
 };
 use crate::state::{ElementState, ResolvedElement};
@@ -41,6 +41,7 @@ pub struct SceneElement {
     pub spec: ElementSpec,
     pub text: Option<String>,
     pub computed_style: ComputedStyle,
+    scroll_offset: Point,
     layout_node: NodeId,
 }
 
@@ -82,6 +83,7 @@ impl DocumentScene {
                 spec: ElementSpec::new(ElementRole::Root),
                 text: None,
                 computed_style: root_sized_style(ComputedStyle::default(), viewport),
+                scroll_offset: Point::ZERO,
                 layout_node: root_node,
             },
         );
@@ -191,6 +193,11 @@ impl DocumentScene {
             let element = self.snapshot_element(&id)?;
             let computed =
                 resolve_style_with_position(&element, stylesheet, states.get(&id), position);
+            let scroll_offset = states
+                .get(&id)
+                .map(|state| Point::new(state.scroll_x, state.scroll_y))
+                .unwrap_or(Point::ZERO);
+            self.element_mut(&id)?.scroll_offset = scroll_offset;
             if id == self.root {
                 self.apply_computed_style(id.clone(), &root_sized_style(computed, self.viewport))?;
             } else {
@@ -226,7 +233,7 @@ impl DocumentScene {
     }
 
     pub fn resolved_layout(&self) -> SceneResult<ResolvedElement> {
-        self.resolved_element(&self.root)
+        self.resolved_element(&self.root, Point::ZERO, Point::ZERO)
     }
 
     pub(crate) fn scroll_limits(&self) -> SceneResult<HashMap<ElementId, Size>> {
@@ -319,6 +326,7 @@ impl DocumentScene {
                 spec,
                 text,
                 computed_style: ComputedStyle::default(),
+                scroll_offset: Point::ZERO,
                 layout_node: node,
             },
         );
@@ -355,19 +363,31 @@ impl DocumentScene {
             .ok_or_else(|| SceneError::MissingElement(id.clone()))
     }
 
-    fn resolved_element(&self, id: &ElementId) -> SceneResult<ResolvedElement> {
+    fn resolved_element(
+        &self,
+        id: &ElementId,
+        parent_origin: Point,
+        parent_scroll_offset: Point,
+    ) -> SceneResult<ResolvedElement> {
         let element = self.element(id)?;
+        let raw_rect = self.layout_rect(id.as_str())?;
+        let rect = DocumentRect::new(
+            parent_origin.x + raw_rect.origin.x - parent_scroll_offset.x,
+            parent_origin.y + raw_rect.origin.y - parent_scroll_offset.y,
+            raw_rect.size.width,
+            raw_rect.size.height,
+        );
         let children = self
             .children(id.clone())?
             .into_iter()
-            .map(|child| self.resolved_element(&child))
+            .map(|child| self.resolved_element(&child, rect.origin, element.scroll_offset))
             .collect::<SceneResult<Vec<_>>>()?;
 
         Ok(ResolvedElement {
             id: element.id.clone(),
             role: element.spec.role,
             classes: element.spec.classes.clone(),
-            rect: self.layout_rect(id.as_str())?,
+            rect,
             style: element.computed_style.clone(),
             text: element.text.clone(),
             text_layout: None,
