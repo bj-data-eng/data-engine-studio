@@ -967,6 +967,75 @@ fn document_engine_update_scene_fill_size_does_not_inflate_auto_parent() {
 }
 
 #[test]
+fn document_engine_update_scene_max_size_clamps_auto_explicit_and_fill_sizes() {
+    let mut scene = DocumentScene::new(Size::new(260.0, 180.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("panel", "auto-child", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element(
+            "auto-child",
+            "wide-child",
+            ElementSpec::new(ElementRole::Card).class("wide"),
+        )
+        .unwrap();
+    scene
+        .append_element("panel", "fixed-child", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    scene
+        .append_element("panel", "fill-child", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .size(200.0, 120.0)
+                .padding(Insets::all(10.0)),
+        )
+        .rule(
+            StyleSelector::id("auto-child"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .max_size(40.0, 30.0),
+        )
+        .rule(
+            StyleSelector::id("fixed-child"),
+            Style::default().size(96.0, 70.0).max_size(42.0, 28.0),
+        )
+        .rule(
+            StyleSelector::id("fill-child"),
+            Style::default()
+                .width_fill()
+                .height_fill()
+                .max_size(50.0, 34.0),
+        )
+        .rule(
+            StyleSelector::class("wide"),
+            Style::default().size(80.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+
+    assert_eq!(
+        output.layout.find("auto-child").unwrap().rect.size,
+        Size::new(40.0, 20.0)
+    );
+    assert_eq!(
+        output.layout.find("fixed-child").unwrap().rect.size,
+        Size::new(42.0, 28.0)
+    );
+    assert_eq!(
+        output.layout.find("fill-child").unwrap().rect.size,
+        Size::new(50.0, 34.0)
+    );
+}
+
+#[test]
 fn document_engine_update_scene_with_input_scrolls_overflow_container() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene

@@ -923,6 +923,11 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         } else {
             FlexWrap::NoWrap
         },
+        flex_grow: if style.height == Length::Fill {
+            1.0
+        } else {
+            0.0
+        },
         flex_shrink: 0.0,
         ..Default::default()
     }
