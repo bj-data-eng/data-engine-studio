@@ -419,11 +419,12 @@ impl DocumentScene {
     ) -> SceneResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
-        let rect = DocumentRect::new(
-            parent_origin.x + raw_rect.origin.x - parent_scroll_offset.x,
-            parent_origin.y + raw_rect.origin.y - parent_scroll_offset.y,
-            raw_rect.size.width,
-            raw_rect.size.height,
+        let rect = resolved_document_rect(
+            raw_rect,
+            &element.computed_style,
+            self.viewport,
+            parent_origin,
+            parent_scroll_offset,
         );
         let text_layout = element
             .text
@@ -659,6 +660,58 @@ fn table_column_index(table: &TableSpec, column_id: &TableColumnId) -> Option<i1
 fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) -> f32 {
     let width = width.max(min_width);
     max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
+}
+
+fn resolved_document_rect(
+    raw_rect: DocumentRect,
+    style: &ComputedStyle,
+    viewport: Size,
+    parent_origin: Point,
+    parent_scroll_offset: Point,
+) -> DocumentRect {
+    if style.position != Position::AbsoluteViewport {
+        return DocumentRect::new(
+            parent_origin.x + raw_rect.origin.x - parent_scroll_offset.x,
+            parent_origin.y + raw_rect.origin.y - parent_scroll_offset.y,
+            raw_rect.size.width,
+            raw_rect.size.height,
+        );
+    }
+
+    DocumentRect::new(
+        viewport_axis_position(
+            raw_rect.origin.x,
+            raw_rect.size.width,
+            viewport.width,
+            style.inset.left,
+            style.inset.right,
+        ),
+        viewport_axis_position(
+            raw_rect.origin.y,
+            raw_rect.size.height,
+            viewport.height,
+            style.inset.top,
+            style.inset.bottom,
+        ),
+        raw_rect.size.width,
+        raw_rect.size.height,
+    )
+}
+
+fn viewport_axis_position(
+    fallback: f32,
+    size: f32,
+    viewport_size: f32,
+    start: Option<Length>,
+    end: Option<Length>,
+) -> f32 {
+    if let Some(start) = start {
+        return start.resolve(viewport_size, fallback);
+    }
+    if let Some(end) = end {
+        return viewport_size - end.resolve(viewport_size, 0.0) - size;
+    }
+    fallback
 }
 
 fn measure_text(

@@ -682,6 +682,92 @@ fn document_engine_update_scene_resolves_table_column_tracks() {
 }
 
 #[test]
+fn document_engine_update_scene_anchors_absolute_viewport_elements_to_window() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element(
+            "panel",
+            "absolute-child",
+            ElementSpec::new(ElementRole::Card),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .size(120.0, 80.0)
+                .padding(Insets::all(10.0)),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_viewport()
+                .right(Length::Px(8.0))
+                .bottom(Length::Px(9.0))
+                .size(40.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let absolute_child = output.layout.find("absolute-child").unwrap();
+
+    assert_eq!(absolute_child.rect.origin, Point::new(272.0, 171.0));
+}
+
+#[test]
+fn document_engine_update_scene_hits_absolute_viewport_child_outside_parent() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element(
+            "panel",
+            "absolute-child",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default().size(60.0, 40.0),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(140.0))
+                .top(Length::Px(80.0))
+                .size(40.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(150.0, 90.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_pressed: false,
+                primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.hit_id, Some(ElementId::new("absolute-child")));
+    assert!(engine.element_state("absolute-child").unwrap().pressed);
+}
+
+#[test]
 fn document_engine_update_scene_with_input_scrolls_overflow_container() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene
