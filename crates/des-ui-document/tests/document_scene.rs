@@ -1292,7 +1292,7 @@ fn document_engine_update_scene_scroll_only_final_pass_skips_style_resolution() 
         },
     );
 
-    assert_eq!(output.metrics.scene_style_nodes_visited, 3);
+    assert_eq!(output.metrics.scene_style_nodes_visited, 0);
     assert!(!output.metrics.reused_input_layout);
     assert_eq!(
         output.layout.find("content").unwrap().rect.origin,

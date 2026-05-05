@@ -73,6 +73,7 @@ struct SceneLayoutNode {
 
 pub struct DocumentScene {
     viewport: Size,
+    revision: u64,
     layout: LayoutTree<SceneLayoutNode>,
     elements: HashMap<ElementId, SceneElement>,
     layout_to_element: HashMap<NodeId, ElementId>,
@@ -112,6 +113,7 @@ impl DocumentScene {
 
         Self {
             viewport,
+            revision: 0,
             layout,
             elements,
             layout_to_element,
@@ -125,6 +127,10 @@ impl DocumentScene {
 
     pub fn root(&self) -> &ElementId {
         &self.root
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn element_ids(&self) -> Vec<ElementId> {
@@ -164,6 +170,7 @@ impl DocumentScene {
         self.layout
             .add_child(parent_node, node)
             .map_err(layout_error)?;
+        self.revision = self.revision.wrapping_add(1);
         Ok(())
     }
 
@@ -426,6 +433,7 @@ impl DocumentScene {
                 layout_node: node,
             },
         );
+        self.revision = self.revision.wrapping_add(1);
 
         Ok(node)
     }
@@ -444,6 +452,7 @@ impl DocumentScene {
         self.layout
             .remove(element.layout_node)
             .map_err(layout_error)?;
+        self.revision = self.revision.wrapping_add(1);
         Ok(())
     }
 
