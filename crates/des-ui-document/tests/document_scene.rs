@@ -2,7 +2,8 @@ use des_ui_document::{
     AlignItems, ComputedStyle, Direction, DocumentEngine, DocumentEventKind, DocumentInput,
     DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis, Size, Style,
-    StyleSelector, StyleSheet,
+    StyleSelector, StyleSheet, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    TextWrapMode,
 };
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, Dimension, FlexDirection,
@@ -11,6 +12,27 @@ use layout_engine::prelude::{
 };
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
+
+#[derive(Default)]
+struct RecordingTextMeasurer {
+    requests: Vec<(String, f32)>,
+}
+
+impl TextMeasurer for RecordingTextMeasurer {
+    fn cache_key(&self) -> TextMeasurerKey {
+        TextMeasurerKey::new("recording")
+    }
+
+    fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
+        self.requests
+            .push((request.text.to_string(), request.wrap_width));
+        TextLayoutResult {
+            size: Size::new(64.0, 18.0),
+            line_count: 1,
+            elided: false,
+        }
+    }
+}
 
 #[test]
 fn scene_reparents_existing_element_without_reallocating_layout_node() {
@@ -283,6 +305,83 @@ fn scene_emits_resolved_element_tree_from_retained_layout() {
 }
 
 #[test]
+fn scene_emits_text_layout_from_retained_layout() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_text(
+            "root",
+            "label",
+            ElementSpec::new(ElementRole::Text),
+            "Retained text",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .size(120.0, 40.0)
+            .padding(Insets::all(8.0))
+            .border_width(2.0)
+            .text_wrap(TextWrapMode::Wrap),
+    );
+    let mut text_measurer = RecordingTextMeasurer::default();
+
+    scene
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    scene.compute_layout().unwrap();
+    let root = scene
+        .resolved_layout_with_text_measurer(&mut text_measurer)
+        .unwrap();
+    let label = root.find("label").unwrap();
+
+    assert_eq!(
+        label.text_layout,
+        Some(TextLayoutResult {
+            size: Size::new(64.0, 18.0),
+            line_count: 1,
+            elided: false,
+        })
+    );
+    assert_eq!(
+        text_measurer.requests,
+        vec![("Retained text".to_string(), 100.0)]
+    );
+}
+
+#[test]
+fn scene_uses_text_measurement_for_auto_sized_text_layout() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_text(
+            "root",
+            "label",
+            ElementSpec::new(ElementRole::Text),
+            "Measured",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default().padding(Insets::all(8.0)).border_width(2.0),
+    );
+    let mut text_measurer = RecordingTextMeasurer::default();
+
+    scene
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    scene
+        .compute_layout_with_text_measurer(&mut text_measurer)
+        .unwrap();
+    let label = scene
+        .resolved_layout_with_text_measurer(&mut text_measurer)
+        .unwrap()
+        .find("label")
+        .unwrap()
+        .clone();
+
+    assert_eq!(label.rect, Rect::new(0.0, 0.0, 84.0, 38.0));
+}
+
+#[test]
 fn scene_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene
@@ -400,6 +499,71 @@ fn document_engine_update_scene_with_input_clicks_interactive_element() {
             .iter()
             .any(|event| event.target == ElementId::new("button")
                 && event.kind == DocumentEventKind::Clicked)
+    );
+}
+
+#[test]
+fn document_engine_update_scene_uses_scene_text_layout() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_text(
+            "root",
+            "label",
+            ElementSpec::new(ElementRole::Text),
+            "Retained text",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default().size(120.0, 40.0),
+    );
+    let mut engine = DocumentEngine::default();
+    let mut text_measurer = RecordingTextMeasurer::default();
+
+    let output = engine.update_scene_with_input_and_text_measurer(
+        &mut scene,
+        &stylesheet,
+        DocumentInput::default(),
+        &mut text_measurer,
+    );
+
+    assert_eq!(
+        output
+            .layout
+            .find("label")
+            .unwrap()
+            .text_layout
+            .unwrap()
+            .size,
+        Size::new(64.0, 18.0)
+    );
+}
+
+#[test]
+fn document_engine_update_scene_uses_text_measurement_for_auto_text_size() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_text(
+            "root",
+            "label",
+            ElementSpec::new(ElementRole::Text),
+            "Measured",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new();
+    let mut engine = DocumentEngine::default();
+    let mut text_measurer = RecordingTextMeasurer::default();
+
+    let output = engine.update_scene_with_input_and_text_measurer(
+        &mut scene,
+        &stylesheet,
+        DocumentInput::default(),
+        &mut text_measurer,
+    );
+
+    assert_eq!(
+        output.layout.find("label").unwrap().rect,
+        Rect::new(0.0, 0.0, 64.0, 18.0)
     );
 }
 

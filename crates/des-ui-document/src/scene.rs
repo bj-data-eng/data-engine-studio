@@ -5,6 +5,7 @@ use crate::geometry::{
 };
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position};
+use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
 use layout_engine::prelude::{
     AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display, FlexDirection, FlexWrap,
     JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage, LengthPercentageAuto,
@@ -209,13 +210,39 @@ impl DocumentScene {
     }
 
     pub fn compute_layout(&mut self) -> SceneResult<()> {
+        let mut text_measurer = FallbackTextMeasurer;
+        self.compute_layout_with_text_measurer(&mut text_measurer)
+    }
+
+    pub fn compute_layout_with_text_measurer(
+        &mut self,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> SceneResult<()> {
         let root_node = self.element(&self.root)?.layout_node;
+        let measure_inputs = self.measure_inputs();
         self.layout
-            .compute_layout(
+            .compute_layout_with_measure(
                 root_node,
                 LayoutSize {
                     width: length::<_, AvailableSpace>(self.viewport.width),
                     height: length::<_, AvailableSpace>(self.viewport.height),
+                },
+                |known_dimensions, available_space, node_id, _, _| {
+                    let Some(input) = measure_inputs.get(&node_id) else {
+                        return LayoutSize::ZERO;
+                    };
+                    let measured = measure_text_content(
+                        input.text.as_str(),
+                        &input.style,
+                        known_dimensions
+                            .width
+                            .or_else(|| available_space.width.into_option()),
+                        text_measurer,
+                    );
+                    LayoutSize {
+                        width: known_dimensions.width.unwrap_or(measured.width),
+                        height: known_dimensions.height.unwrap_or(measured.height),
+                    }
                 },
             )
             .map_err(layout_error)
@@ -233,7 +260,15 @@ impl DocumentScene {
     }
 
     pub fn resolved_layout(&self) -> SceneResult<ResolvedElement> {
-        self.resolved_element(&self.root, Point::ZERO, Point::ZERO)
+        let mut text_measurer = FallbackTextMeasurer;
+        self.resolved_layout_with_text_measurer(&mut text_measurer)
+    }
+
+    pub fn resolved_layout_with_text_measurer(
+        &self,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> SceneResult<ResolvedElement> {
+        self.resolved_element(&self.root, Point::ZERO, Point::ZERO, text_measurer)
     }
 
     pub(crate) fn scroll_limits(&self) -> SceneResult<HashMap<ElementId, Size>> {
@@ -265,9 +300,19 @@ impl DocumentScene {
         stylesheet: &StyleSheet,
         states: &HashMap<ElementId, ElementState>,
     ) -> SceneResult<ResolvedElement> {
+        let mut text_measurer = FallbackTextMeasurer;
+        self.resolve_layout_with_text_measurer(stylesheet, states, &mut text_measurer)
+    }
+
+    pub fn resolve_layout_with_text_measurer(
+        &mut self,
+        stylesheet: &StyleSheet,
+        states: &HashMap<ElementId, ElementState>,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> SceneResult<ResolvedElement> {
         self.apply_stylesheet(stylesheet, states)?;
-        self.compute_layout()?;
-        self.resolved_layout()
+        self.compute_layout_with_text_measurer(text_measurer)?;
+        self.resolved_layout_with_text_measurer(text_measurer)
     }
 
     pub fn parent(&self, id: impl Into<ElementId>) -> SceneResult<Option<ElementId>> {
@@ -368,6 +413,7 @@ impl DocumentScene {
         id: &ElementId,
         parent_origin: Point,
         parent_scroll_offset: Point,
+        text_measurer: &mut dyn TextMeasurer,
     ) -> SceneResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
@@ -377,10 +423,16 @@ impl DocumentScene {
             raw_rect.size.width,
             raw_rect.size.height,
         );
+        let text_layout = element
+            .text
+            .as_deref()
+            .map(|text| measure_text(text, &element.computed_style, rect, text_measurer));
         let children = self
             .children(id.clone())?
             .into_iter()
-            .map(|child| self.resolved_element(&child, rect.origin, element.scroll_offset))
+            .map(|child| {
+                self.resolved_element(&child, rect.origin, element.scroll_offset, text_measurer)
+            })
             .collect::<SceneResult<Vec<_>>>()?;
 
         Ok(ResolvedElement {
@@ -390,7 +442,7 @@ impl DocumentScene {
             rect,
             style: element.computed_style.clone(),
             text: element.text.clone(),
-            text_layout: None,
+            text_layout,
             selectable_text: element.spec.selectable_text && element.text.is_some(),
             copyable_text: element.spec.selectable_text
                 && element.spec.copyable_text
@@ -432,6 +484,28 @@ impl DocumentScene {
             children: Vec::new(),
         })
     }
+
+    fn measure_inputs(&self) -> HashMap<NodeId, SceneMeasureInput> {
+        self.elements
+            .values()
+            .filter_map(|element| {
+                element.text.as_ref().map(|text| {
+                    (
+                        element.layout_node,
+                        SceneMeasureInput {
+                            text: text.clone(),
+                            style: element.computed_style.clone(),
+                        },
+                    )
+                })
+            })
+            .collect()
+    }
+}
+
+struct SceneMeasureInput {
+    text: String,
+    style: ComputedStyle,
 }
 
 fn root_layout_style(viewport: Size) -> LayoutStyle {
@@ -449,6 +523,51 @@ fn root_sized_style(mut style: ComputedStyle, viewport: Size) -> ComputedStyle {
     style.width = Length::Px(viewport.width);
     style.height = Length::Px(viewport.height);
     style
+}
+
+fn measure_text(
+    text: &str,
+    style: &ComputedStyle,
+    rect: DocumentRect,
+    text_measurer: &mut dyn TextMeasurer,
+) -> crate::text::TextLayoutResult {
+    let content_rect = rect.inset(style.border_width).inset(style.padding);
+    measure_text_with_wrap_width(text, style, content_rect.size.width, text_measurer)
+}
+
+fn measure_text_content(
+    text: &str,
+    style: &ComputedStyle,
+    available_width: Option<f32>,
+    text_measurer: &mut dyn TextMeasurer,
+) -> Size {
+    measure_text_with_wrap_width(
+        text,
+        style,
+        available_width.unwrap_or(f32::INFINITY),
+        text_measurer,
+    )
+    .size
+}
+
+fn measure_text_with_wrap_width(
+    text: &str,
+    style: &ComputedStyle,
+    available_width: f32,
+    text_measurer: &mut dyn TextMeasurer,
+) -> crate::text::TextLayoutResult {
+    let wrap_width = match style.text_wrap {
+        TextWrapMode::Extend => f32::INFINITY,
+        TextWrapMode::Wrap | TextWrapMode::Truncate => available_width,
+    };
+    text_measurer.measure_text(TextLayoutRequest {
+        text,
+        font_size: style.font_size,
+        wrap_width,
+        wrap_mode: style.text_wrap,
+        max_lines: style.max_lines,
+        line_height: style.line_height,
+    })
 }
 
 fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {

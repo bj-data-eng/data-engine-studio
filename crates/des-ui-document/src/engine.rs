@@ -134,7 +134,7 @@ impl DocumentEngine {
     ) -> DocumentOutput {
         let changes = self.sync_scene_states(scene);
         let input_layout = scene
-            .resolve_layout(stylesheet, &self.states)
+            .resolve_layout_with_text_measurer(stylesheet, &self.states, text_measurer)
             .expect("document scene layout can be resolved");
         self.scroll_limits = scene
             .scroll_limits()
@@ -148,7 +148,7 @@ impl DocumentEngine {
 
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
             let layout = scene
-                .resolve_layout(stylesheet, &self.states)
+                .resolve_layout_with_text_measurer(stylesheet, &self.states, text_measurer)
                 .expect("document scene layout can be resolved");
             self.scroll_limits = scene
                 .scroll_limits()
