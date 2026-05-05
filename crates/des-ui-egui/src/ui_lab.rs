@@ -146,14 +146,33 @@ pub(crate) struct UiLabState {
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
     pending_stage_scroll: Option<Point>,
-    scrolling_scene: Option<RetainedScrollingScene>,
+    scrolling_scene: Option<RetainedLabScene<ScrollingSceneKey>>,
+    draggable_scene: Option<RetainedLabScene<DraggableSceneKey>>,
     last_perf: UiLabPerf,
 }
 
-struct RetainedScrollingScene {
+struct RetainedLabScene<Key> {
     viewport: Size,
     debug_overlay: bool,
+    key: Key,
     scene: DocumentScene,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct ScrollingSceneKey;
+
+#[derive(Clone, Debug, PartialEq)]
+struct DraggableSceneKey {
+    drag_item_cells: [usize; DRAG_ITEM_COUNT],
+    drag_item_order: [usize; DRAG_ITEM_COUNT],
+    scroll_list_item_order: [usize; SCROLL_LIST_ITEM_COUNT],
+    pressed_drag_source: Option<String>,
+    active_drag_item: Option<SortableItemId>,
+    active_scroll_list_drag_item: Option<SortableItemId>,
+    drag_drop_preview: Option<SortableDropPreview>,
+    scroll_list_drop_preview: Option<SortableDropPreview>,
+    drag_overlay_active: bool,
+    drag_visual_clone: Option<VisualElementClone>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -191,6 +210,7 @@ impl Default for UiLabState {
             text_context_menu: None,
             pending_stage_scroll: None,
             scrolling_scene: None,
+            draggable_scene: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -216,6 +236,10 @@ impl UiLabState {
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
         if self.view == LabView::Scrolling {
             self.render_scrolling_scene(ui, debug_overlay);
+            return;
+        }
+        if self.view == LabView::Draggable {
+            self.render_draggable_scene(ui, debug_overlay);
             return;
         }
 
@@ -348,22 +372,142 @@ impl UiLabState {
         }
     }
 
+    fn render_draggable_scene(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
+        configure_text_selection_input(ui.ctx());
+        let origin = ui.max_rect().min;
+        let viewport = ui.max_rect().size();
+        let viewport_size = Size::new(viewport.x, viewport.y);
+        let stylesheet = self.active_stylesheet();
+        let document_start = Instant::now();
+        let mut retained = self.take_draggable_scene(viewport_size, debug_overlay);
+        let document_time = document_start.elapsed();
+
+        let input = document_input(ui, origin);
+        let pointer = input.pointer;
+        let engine_start = Instant::now();
+        let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+        let mut output = self
+            .document_engine
+            .update_scene_with_input_and_text_measurer(
+                &mut retained.scene,
+                &stylesheet,
+                input,
+                &mut text_measurer,
+            );
+        self.draggable_scene = Some(retained);
+
+        if self.sync_drag_state(ui, &output) {
+            let stylesheet = self.active_stylesheet();
+            let mut retained = self.take_draggable_scene(viewport_size, debug_overlay);
+            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+            output = self
+                .document_engine
+                .update_scene_with_input_and_text_measurer(
+                    &mut retained.scene,
+                    &stylesheet,
+                    input,
+                    &mut text_measurer,
+                );
+            self.draggable_scene = Some(retained);
+            self.sync_drag_state(ui, &output);
+        }
+        if self.sync_drag_press_state(&output, pointer) {
+            let stylesheet = self.active_stylesheet();
+            let mut retained = self.take_draggable_scene(viewport_size, debug_overlay);
+            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+            output = self
+                .document_engine
+                .update_scene_with_input_and_text_measurer(
+                    &mut retained.scene,
+                    &stylesheet,
+                    input,
+                    &mut text_measurer,
+                );
+            self.draggable_scene = Some(retained);
+            self.sync_drag_state(ui, &output);
+        }
+        let engine_time = engine_start.elapsed();
+
+        copy_selected_text_on_command(ui, &output);
+        apply_cursor_icon(ui, &output);
+
+        let paint_start = Instant::now();
+        paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
+        paint_scroll_chrome(ui, origin, &output.scroll_chrome);
+        let paint_time = paint_start.elapsed();
+        self.last_perf = UiLabPerf {
+            document_time,
+            engine_time,
+            paint_time,
+            metrics: output.metrics,
+        };
+        self.apply_document_events(ui, &output, pointer);
+        self.paint_text_context_menu(ui, origin, &output);
+        if output.animating {
+            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
+        }
+        if debug_overlay {
+            self.paint_debug_overlay_document(ui, origin, viewport);
+        }
+    }
+
     fn take_scrolling_scene(
         &mut self,
         viewport: Size,
         debug_overlay: bool,
-    ) -> RetainedScrollingScene {
+    ) -> RetainedLabScene<ScrollingSceneKey> {
+        let key = ScrollingSceneKey;
         if let Some(retained) = self.scrolling_scene.take()
             && retained.viewport == viewport
             && retained.debug_overlay == debug_overlay
+            && retained.key == key
         {
             return retained;
         }
 
-        RetainedScrollingScene {
+        RetainedLabScene {
             viewport,
             debug_overlay,
-            scene: scrolling_lab_scene(viewport, debug_overlay),
+            key,
+            scene: scene_from_document(&scrolling_lab_document(viewport, debug_overlay), viewport),
+        }
+    }
+
+    fn take_draggable_scene(
+        &mut self,
+        viewport: Size,
+        debug_overlay: bool,
+    ) -> RetainedLabScene<DraggableSceneKey> {
+        let key = self.draggable_scene_key();
+        if let Some(retained) = self.draggable_scene.take()
+            && retained.viewport == viewport
+            && retained.debug_overlay == debug_overlay
+            && retained.key == key
+        {
+            return retained;
+        }
+
+        let document = self.document(viewport, debug_overlay);
+        RetainedLabScene {
+            viewport,
+            debug_overlay,
+            key,
+            scene: scene_from_document(&document, viewport),
+        }
+    }
+
+    fn draggable_scene_key(&self) -> DraggableSceneKey {
+        DraggableSceneKey {
+            drag_item_cells: self.drag_item_cells,
+            drag_item_order: self.drag_item_order,
+            scroll_list_item_order: self.scroll_list_item_order,
+            pressed_drag_source: self.pressed_drag_source.clone(),
+            active_drag_item: self.active_drag_item(),
+            active_scroll_list_drag_item: self.active_scroll_list_drag_item(),
+            drag_drop_preview: self.drag_drop_preview,
+            scroll_list_drop_preview: self.scroll_list_drop_preview,
+            drag_overlay_active: self.active_drag.is_some(),
+            drag_visual_clone: self.drag_visual_clone.clone(),
         }
     }
 
@@ -675,6 +819,33 @@ impl UiLabState {
         self.active_drag.is_some() && self.drag_drop_preview.is_none()
     }
 
+    #[cfg(test)]
+    fn clone_for_retained_test(&self) -> Self {
+        let mut state = Self::new(Some(self.view.id()));
+        state.show_optional_card = self.show_optional_card;
+        state.dense_mode = self.dense_mode;
+        state.checkbox_enabled = self.checkbox_enabled;
+        state.radio_choice = self.radio_choice;
+        state.dropdown_open = self.dropdown_open;
+        state.dropdown_choice = self.dropdown_choice;
+        state.loop_action_count = self.loop_action_count;
+        state.shadow_tune = self.shadow_tune;
+        state.shadow_hover_tune = self.shadow_hover_tune;
+        state.drag_item_cells = self.drag_item_cells;
+        state.drag_item_order = self.drag_item_order;
+        state.scroll_list_item_order = self.scroll_list_item_order;
+        state.active_drag = self.active_drag.clone();
+        state.drag_parent_offset = self.drag_parent_offset;
+        state.drag_source_size = self.drag_source_size;
+        state.drag_visual_clone = self.drag_visual_clone.clone();
+        state.pressed_drag_source = self.pressed_drag_source.clone();
+        state.drag_drop_preview = self.drag_drop_preview;
+        state.scroll_list_drop_preview = self.scroll_list_drop_preview;
+        state.text_context_menu = self.text_context_menu.clone();
+        state.pending_stage_scroll = self.pending_stage_scroll;
+        state
+    }
+
     fn apply_lab_action(&mut self, action: LabAction) {
         match action {
             LabAction::SelectView(view) => self.view = view,
@@ -938,15 +1109,37 @@ impl UiLabState {
         self.scrolling_scene = Some(retained);
         output
     }
-}
 
-fn scrolling_lab_scene(viewport: Size, debug_overlay: bool) -> DocumentScene {
-    let document = scrolling_lab_document(viewport, debug_overlay);
-    let mut scene = DocumentScene::new(viewport);
-    for child in &document.root.children {
-        append_document_element_to_scene(&mut scene, "root", child);
+    #[cfg(test)]
+    fn draggable_scene_output_for_test(&mut self, viewport: Size) -> DocumentOutput {
+        let stylesheet = self.active_stylesheet();
+        let mut retained = self.take_draggable_scene(viewport, false);
+        let output = self
+            .document_engine
+            .update_scene(&mut retained.scene, &stylesheet);
+        self.draggable_scene = Some(retained);
+        output
     }
-    scene
+
+    #[cfg(test)]
+    fn draggable_scene_output_with_text_measurer_for_test(
+        &mut self,
+        viewport: Size,
+        text_measurer: &mut dyn des_ui_document::TextMeasurer,
+    ) -> DocumentOutput {
+        let stylesheet = self.active_stylesheet();
+        let mut retained = self.take_draggable_scene(viewport, false);
+        let output = self
+            .document_engine
+            .update_scene_with_input_and_text_measurer(
+                &mut retained.scene,
+                &stylesheet,
+                DocumentInput::default(),
+                text_measurer,
+            );
+        self.draggable_scene = Some(retained);
+        output
+    }
 }
 
 fn scrolling_lab_document(viewport: Size, debug_overlay: bool) -> Document {
@@ -987,6 +1180,14 @@ fn scrolling_lab_document(viewport: Size, debug_overlay: bool) -> Document {
             },
         );
     })
+}
+
+fn scene_from_document(document: &Document, viewport: Size) -> DocumentScene {
+    let mut scene = DocumentScene::new(viewport);
+    for child in &document.root.children {
+        append_document_element_to_scene(&mut scene, "root", child);
+    }
+    scene
 }
 
 fn append_document_element_to_scene(scene: &mut DocumentScene, parent: &str, element: &Element) {

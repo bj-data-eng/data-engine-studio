@@ -49,6 +49,9 @@ fn lab_output_with_size(initial_view: &str, size: Size) -> DocumentOutput {
     if initial_view == "scrolling" {
         return UiLabState::new(Some(initial_view)).scrolling_scene_output_for_test(size);
     }
+    if initial_view == "draggable" {
+        return UiLabState::new(Some(initial_view)).draggable_scene_output_for_test(size);
+    }
     let mut engine = DocumentEngine::default();
     let document = UiLabState::new(Some(initial_view)).document(size, false);
     engine.update(&document, &stylesheet())
@@ -86,12 +89,24 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
 }
 
 fn state_output(state: &UiLabState) -> DocumentOutput {
+    if state.view == LabView::Draggable {
+        let mut state = state.clone_for_retained_test();
+        return state.draggable_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    }
     let mut engine = DocumentEngine::default();
     let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
     engine.update(&document, &state.active_stylesheet())
 }
 
 fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> DocumentOutput {
+    if state.view == LabView::Draggable {
+        let mut state = state.clone_for_retained_test();
+        let mut text_measurer = EguiTextMeasurer::new(ctx);
+        return state.draggable_scene_output_with_text_measurer_for_test(
+            Size::new(TEST_WIDTH, TEST_HEIGHT),
+            &mut text_measurer,
+        );
+    }
     let mut engine = DocumentEngine::default();
     let mut text_measurer = EguiTextMeasurer::new(ctx);
     let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
@@ -993,6 +1008,17 @@ fn draggable_drag_drop_cells_expand_to_fit_stacked_items() {
         frame(&output, "drag-grid").rect.bottom() >= cell.rect.bottom(),
         "drag grid should expand around an expanded drop cell"
     );
+}
+
+#[test]
+fn draggable_view_reuses_retained_scene_on_warm_update() {
+    let mut state = UiLabState::new(Some("draggable"));
+    let first = state.draggable_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let warm = state.draggable_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+
+    assert!(first.metrics.scene_style_nodes_visited > 0);
+    assert_eq!(warm.metrics.scene_style_nodes_visited, 0);
+    assert!(warm.metrics.reused_input_layout);
 }
 
 #[test]
