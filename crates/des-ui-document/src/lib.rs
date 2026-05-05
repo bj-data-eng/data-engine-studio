@@ -11,6 +11,7 @@ mod engine;
 mod geometry;
 mod layout;
 mod query;
+mod scene;
 mod scroll;
 mod state;
 mod style;
@@ -28,6 +29,7 @@ pub use geometry::{
     PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
+pub use scene::{DocumentScene, SceneElement, SceneError, SceneResult};
 pub use state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
     DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,
