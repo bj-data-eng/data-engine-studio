@@ -222,6 +222,24 @@ fn scene_applies_document_style_to_existing_layout_node() {
 }
 
 #[test]
+fn scene_fill_size_does_not_imply_flex_layout_style() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+
+    let mut style = ComputedStyle::default();
+    style.width = Length::Fill;
+    style.height = Length::Fill;
+
+    scene.apply_computed_style("panel", &style).unwrap();
+
+    let layout_style = scene.layout_style("panel").unwrap();
+    assert_eq!(layout_style.align_self, None);
+    assert_eq!(layout_style.flex_grow, 0.0);
+}
+
+#[test]
 fn scene_computes_layout_rects_from_retained_graph() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene
@@ -1529,7 +1547,7 @@ fn document_engine_update_scene_fill_width_uses_parent_content_width_after_box_m
     let row = output.layout.find("row").unwrap();
 
     assert_eq!(row.rect.origin, Point::new(17.0, 10.0));
-    assert_eq!(row.rect.size, Size::new(166.0, 24.0));
+    assert_eq!(row.rect.size, Size::new(172.0, 24.0));
 }
 
 #[test]

@@ -1002,7 +1002,7 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         padding: layout_rect(style.padding),
         border: layout_rect(style.border_width),
         align_items: Some(layout_align_items(style.align_items)),
-        align_self: layout_align_self(style),
+        align_self: style.align_self.map(layout_align_items),
         align_content: Some(layout_align_content(style.align_content)),
         justify_content: Some(layout_justify_content(style.justify_content)),
         gap: LayoutSize {
@@ -1012,13 +1012,7 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         flex_direction: layout_flex_direction(style.flex_direction),
         flex_wrap: layout_flex_wrap(style.flex_wrap),
         flex_basis: dimension_from_document(style.flex_basis),
-        flex_grow: if style.flex_grow > 0.0 {
-            style.flex_grow
-        } else if style.height == Length::Fill {
-            1.0
-        } else {
-            0.0
-        },
+        flex_grow: style.flex_grow,
         flex_shrink: style.flex_shrink,
         ..Default::default()
     }
@@ -1028,7 +1022,7 @@ fn dimension_from_document(length_value: Length) -> Dimension {
     match length_value {
         Length::Auto => Dimension::auto(),
         Length::Px(value) => length(value),
-        Length::Fill => Dimension::auto(),
+        Length::Fill => percent(1.0),
         Length::Percent(value) => percent(value),
     }
 }
@@ -1098,16 +1092,6 @@ fn layout_align_items(align_items: AlignItems) -> LayoutAlignItems {
         AlignItems::Baseline => LayoutAlignItems::Baseline,
         AlignItems::Stretch => LayoutAlignItems::Stretch,
     }
-}
-
-fn layout_align_self(style: &ComputedStyle) -> Option<LayoutAlignItems> {
-    style.align_self.map(layout_align_items).or_else(|| {
-        if style.width == Length::Fill || style.height == Length::Fill {
-            Some(LayoutAlignItems::Stretch)
-        } else {
-            None
-        }
-    })
 }
 
 fn layout_align_content(align_content: AlignContent) -> LayoutAlignContent {
