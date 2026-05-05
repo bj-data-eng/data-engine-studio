@@ -213,6 +213,7 @@ fn slice_char_range(text: &str, range: std::ops::Range<usize>) -> String {
 pub struct DocumentMetrics {
     pub element_count: usize,
     pub scroll_chrome_count: usize,
+    pub scene_style_nodes_visited: usize,
     pub reused_cached_layout: bool,
     pub reused_input_layout: bool,
     pub input_changed_state: bool,

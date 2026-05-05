@@ -5,7 +5,8 @@ use crate::geometry::{
 };
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{
-    AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position,
+    AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
+    resolve_style_with_position,
 };
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
@@ -20,6 +21,19 @@ use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 
 pub type SceneResult<T> = Result<T, SceneError>;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct StyleApplicationReport {
+    pub visited: usize,
+    pub paint_changed: bool,
+    pub layout_changed: bool,
+}
+
+impl StyleApplicationReport {
+    pub fn changed(self) -> bool {
+        self.paint_changed || self.layout_changed
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SceneError {
@@ -194,28 +208,47 @@ impl DocumentScene {
         &mut self,
         stylesheet: &StyleSheet,
         states: &HashMap<ElementId, ElementState>,
-    ) -> SceneResult<()> {
+    ) -> SceneResult<StyleApplicationReport> {
         let mut positions = Vec::new();
         self.collect_positions(self.root.clone(), None, &mut positions)?;
+        let mut report = StyleApplicationReport {
+            visited: positions.len(),
+            ..Default::default()
+        };
 
         for (id, position) in positions {
             let element = self.snapshot_element(&id)?;
             let computed =
                 resolve_style_with_position(&element, stylesheet, states.get(&id), position);
+            let computed = if id == self.root {
+                root_sized_style(computed, self.viewport)
+            } else {
+                computed
+            };
+            let invalidation = classify_computed_style_change(
+                Some(&self.element(&id)?.computed_style),
+                Some(&computed),
+            );
+            report.paint_changed |= invalidation.paint_changed;
             let scroll_offset = states
                 .get(&id)
                 .map(|state| Point::new(state.scroll_x, state.scroll_y))
                 .unwrap_or(Point::ZERO);
             self.element_mut(&id)?.scroll_offset = scroll_offset;
-            if id == self.root {
-                self.apply_computed_style(id.clone(), &root_sized_style(computed, self.viewport))?;
-            } else {
-                self.apply_computed_style(id.clone(), &computed)?;
-            }
+            report.layout_changed |= self.apply_computed_style(id.clone(), &computed)?;
         }
-        self.apply_table_grid_styles()?;
+        report.layout_changed |= self.apply_table_grid_styles()?;
 
-        Ok(())
+        Ok(report)
+    }
+
+    pub fn apply_scroll_offsets(&mut self, states: &HashMap<ElementId, ElementState>) {
+        for (id, element) in &mut self.elements {
+            element.scroll_offset = states
+                .get(id)
+                .map(|state| Point::new(state.scroll_x, state.scroll_y))
+                .unwrap_or(Point::ZERO);
+        }
     }
 
     pub fn compute_layout(&mut self) -> SceneResult<()> {
@@ -326,8 +359,10 @@ impl DocumentScene {
         states: &HashMap<ElementId, ElementState>,
         text_measurer: &mut dyn TextMeasurer,
     ) -> SceneResult<ResolvedElement> {
-        self.apply_stylesheet(stylesheet, states)?;
-        self.compute_layout_with_text_measurer(text_measurer)?;
+        let report = self.apply_stylesheet(stylesheet, states)?;
+        if report.layout_changed || self.layout_dirty(self.root.clone())? {
+            self.compute_layout_with_text_measurer(text_measurer)?;
+        }
         self.resolved_layout_with_text_measurer(text_measurer)
     }
 
@@ -578,8 +613,9 @@ impl DocumentScene {
         Ok(true)
     }
 
-    fn apply_table_grid_styles(&mut self) -> SceneResult<()> {
+    fn apply_table_grid_styles(&mut self) -> SceneResult<bool> {
         let ids = self.element_ids();
+        let mut layout_changed = false;
         for id in ids {
             let element = self.element(&id)?;
             if element.spec.role != ElementRole::TableHeader
@@ -605,7 +641,7 @@ impl DocumentScene {
             } else {
                 table.row_height
             });
-            self.set_layout_style_if_changed(node, style)?;
+            layout_changed |= self.set_layout_style_if_changed(node, style)?;
 
             let row_children = self.children(id.clone())?;
             for child_id in row_children {
@@ -622,11 +658,11 @@ impl DocumentScene {
                     start: GridPlacement::Line((column_index + 1).into()),
                     end: GridPlacement::Line((column_index + 2).into()),
                 };
-                self.set_layout_style_if_changed(child_node, child_style)?;
+                layout_changed |= self.set_layout_style_if_changed(child_node, child_style)?;
             }
         }
 
-        Ok(())
+        Ok(layout_changed)
     }
 }
 

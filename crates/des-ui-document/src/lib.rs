@@ -29,7 +29,7 @@ pub use geometry::{
     Point, Position, PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
-pub use scene::{DocumentScene, SceneElement, SceneError, SceneResult};
+pub use scene::{DocumentScene, SceneElement, SceneError, SceneResult, StyleApplicationReport};
 pub use state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
     DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,

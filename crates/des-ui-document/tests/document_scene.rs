@@ -12,6 +12,7 @@ use layout_engine::prelude::{
 };
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Default)]
 struct RecordingTextMeasurer {
@@ -26,6 +27,28 @@ impl TextMeasurer for RecordingTextMeasurer {
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
         self.requests
             .push((request.text.to_string(), request.wrap_width));
+        TextLayoutResult {
+            size: Size::new(64.0, 18.0),
+            line_count: 1,
+            elided: false,
+        }
+    }
+}
+
+static COMPUTE_TEXT_MEASURE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Default)]
+struct CountingTextMeasurer;
+
+impl TextMeasurer for CountingTextMeasurer {
+    fn cache_key(&self) -> TextMeasurerKey {
+        TextMeasurerKey::new("counting")
+    }
+
+    fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
+        if request.text == "Measured" {
+            COMPUTE_TEXT_MEASURE_COUNT.fetch_add(1, Ordering::SeqCst);
+        }
         TextLayoutResult {
             size: Size::new(64.0, 18.0),
             line_count: 1,
@@ -263,17 +286,21 @@ fn scene_does_not_dirty_layout_graph_when_resolved_layout_style_is_unchanged() {
             .height(Length::Px(40.0)),
     );
 
-    scene
+    let first_report = scene
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
     scene.compute_layout().unwrap();
+    assert!(first_report.layout_changed);
+    assert_eq!(first_report.visited, 2);
     assert!(!scene.layout_dirty("root").unwrap());
     assert!(!scene.layout_dirty("panel").unwrap());
 
-    scene
+    let second_report = scene
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
 
+    assert!(!second_report.changed());
+    assert_eq!(second_report.visited, 2);
     assert!(!scene.layout_dirty("root").unwrap());
     assert!(!scene.layout_dirty("panel").unwrap());
 }
@@ -299,10 +326,12 @@ fn scene_paint_only_style_update_does_not_dirty_layout_graph() {
         StyleSelector::id("panel"),
         Style::default().background(des_ui_document::Color::rgb(16, 24, 32)),
     );
-    scene
+    let report = scene
         .apply_stylesheet(&paint_stylesheet, &HashMap::new())
         .unwrap();
 
+    assert!(report.paint_changed);
+    assert!(!report.layout_changed);
     assert!(!scene.layout_dirty("root").unwrap());
     assert!(!scene.layout_dirty("panel").unwrap());
     assert_eq!(
@@ -495,6 +524,40 @@ fn scene_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
     assert_eq!(
         root.find("panel").unwrap().rect,
         Rect::new(0.0, 0.0, 320.0, 180.0)
+    );
+}
+
+#[test]
+fn scene_resolve_layout_skips_compute_when_layout_graph_is_clean() {
+    COMPUTE_TEXT_MEASURE_COUNT.store(0, Ordering::SeqCst);
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_text(
+            "root",
+            "label",
+            ElementSpec::new(ElementRole::Text),
+            "Measured",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default().width(Length::Px(100.0)),
+    );
+    let mut text_measurer = CountingTextMeasurer;
+
+    scene
+        .resolve_layout_with_text_measurer(&stylesheet, &HashMap::new(), &mut text_measurer)
+        .unwrap();
+    let first_resolve_count = COMPUTE_TEXT_MEASURE_COUNT.load(Ordering::SeqCst);
+    assert!(first_resolve_count > 1);
+
+    scene
+        .resolve_layout_with_text_measurer(&stylesheet, &HashMap::new(), &mut text_measurer)
+        .unwrap();
+
+    assert_eq!(
+        COMPUTE_TEXT_MEASURE_COUNT.load(Ordering::SeqCst),
+        first_resolve_count + 1
     );
 }
 
@@ -1182,6 +1245,59 @@ fn document_engine_update_scene_with_input_scrolls_overflow_container() {
                 && event.kind == DocumentEventKind::Scrolled(ScrollAxis::Vertical))
     );
     assert!(output.metrics.input_changed_state);
+}
+
+#[test]
+fn document_engine_update_scene_scroll_only_final_pass_skips_style_resolution() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+    let hover_input = DocumentInput {
+        pointer: Some(PointerInput {
+            position: Point::new(50.0, 50.0),
+            primary_delta: Point::ZERO,
+            primary_down: false,
+            primary_pressed: false,
+            primary_clicked: false,
+            primary_click_count: 0,
+            secondary_clicked: false,
+            time_seconds: 0.0,
+        }),
+        scroll_delta: Point::ZERO,
+    };
+    engine.update_scene_with_input(&mut scene, &stylesheet, hover_input);
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            scroll_delta: Point::new(0.0, -40.0),
+            ..hover_input
+        },
+    );
+
+    assert_eq!(output.metrics.scene_style_nodes_visited, 3);
+    assert!(!output.metrics.reused_input_layout);
+    assert_eq!(
+        output.layout.find("content").unwrap().rect.origin,
+        Point::new(0.0, -40.0)
+    );
 }
 
 #[test]

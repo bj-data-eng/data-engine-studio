@@ -58,6 +58,7 @@ struct InputUpdate {
     events: Vec<DocumentEvent>,
     changed: bool,
     layout_changed: bool,
+    selector_state_changed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -133,8 +134,20 @@ impl DocumentEngine {
         text_measurer: &mut dyn TextMeasurer,
     ) -> DocumentOutput {
         let changes = self.sync_scene_states(scene);
+        let input_style_report = scene
+            .apply_stylesheet(stylesheet, &self.states)
+            .expect("document scene styles can be resolved");
+        if input_style_report.layout_changed
+            || scene
+                .layout_dirty(scene.root().clone())
+                .expect("document scene root dirty state can be resolved")
+        {
+            scene
+                .compute_layout_with_text_measurer(text_measurer)
+                .expect("document scene layout can be computed");
+        }
         let input_layout = scene
-            .resolve_layout_with_text_measurer(stylesheet, &self.states, text_measurer)
+            .resolved_layout_with_text_measurer(text_measurer)
             .expect("document scene layout can be resolved");
         self.scroll_limits = scene
             .scroll_limits()
@@ -146,14 +159,33 @@ impl DocumentEngine {
         let needs_final_layout =
             input_update.changed || input_update.layout_changed || clamp_changed;
 
+        let mut scene_style_nodes_visited = input_style_report.visited;
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
-            let layout = scene
-                .resolve_layout_with_text_measurer(stylesheet, &self.states, text_measurer)
-                .expect("document scene layout can be resolved");
-            self.scroll_limits = scene
-                .scroll_limits()
-                .expect("document scene scroll limits can be resolved");
+            if input_update.selector_state_changed {
+                let final_style_report = scene
+                    .apply_stylesheet(stylesheet, &self.states)
+                    .expect("document scene styles can be resolved");
+                scene_style_nodes_visited += final_style_report.visited;
+                if final_style_report.layout_changed
+                    || scene
+                        .layout_dirty(scene.root().clone())
+                        .expect("document scene root dirty state can be resolved")
+                {
+                    scene
+                        .compute_layout_with_text_measurer(text_measurer)
+                        .expect("document scene layout can be computed");
+                }
+                self.scroll_limits = scene
+                    .scroll_limits()
+                    .expect("document scene scroll limits can be resolved");
+            } else {
+                scene.apply_scroll_offsets(&self.states);
+            }
             self.clamp_scroll_states();
+            scene.apply_scroll_offsets(&self.states);
+            let layout = scene
+                .resolved_layout_with_text_measurer(text_measurer)
+                .expect("document scene layout can be resolved");
             let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
             (layout, scroll_chrome, false)
         } else {
@@ -179,6 +211,7 @@ impl DocumentEngine {
             metrics: DocumentMetrics {
                 element_count,
                 scroll_chrome_count,
+                scene_style_nodes_visited,
                 reused_cached_layout: false,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
@@ -296,6 +329,7 @@ impl DocumentEngine {
             metrics: DocumentMetrics {
                 element_count,
                 scroll_chrome_count,
+                scene_style_nodes_visited: 0,
                 reused_cached_layout,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
@@ -1227,6 +1261,7 @@ fn finalize_input_update(
     update.events = events;
     update.changed |= interaction_changed(states, previous);
     update.layout_changed |= scroll_position_changed(states, previous);
+    update.selector_state_changed |= selector_state_changed(states, previous);
     update
 }
 
@@ -1287,6 +1322,21 @@ fn scroll_position_changed(
         previous.get(id).is_some_and(|previous| {
             (state.scroll_x - previous.scroll_x).abs() > f32::EPSILON
                 || (state.scroll_y - previous.scroll_y).abs() > f32::EPSILON
+        })
+    })
+}
+
+fn selector_state_changed(
+    states: &HashMap<ElementId, ElementState>,
+    previous: &HashMap<ElementId, InteractionSnapshot>,
+) -> bool {
+    states.iter().any(|(id, state)| {
+        previous.get(id).is_some_and(|previous| {
+            state.hovered != previous.hovered
+                || state.pressed != previous.pressed
+                || state.dragging != previous.dragging
+                || state.scrollbar_hovered_axis != previous.scrollbar_hovered_axis
+                || state.scrollbar_dragged_axis != previous.scrollbar_dragged_axis
         })
     })
 }
