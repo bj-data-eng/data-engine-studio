@@ -1,6 +1,6 @@
 use des_ui_document::{
-    AlignItems, ComputedStyle, Direction, DocumentScene, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector, Insets, JustifyContent, Length, Overflow, Rect, Size, Style,
+    AlignItems, ComputedStyle, Direction, DocumentEngine, DocumentScene, ElementId, ElementRole,
+    ElementSpec, ElementStateSelector, Insets, JustifyContent, Length, Overflow, Rect, Size, Style,
     StyleSelector, StyleSheet,
 };
 use layout_engine::prelude::{
@@ -298,4 +298,60 @@ fn scene_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
         root.find("panel").unwrap().rect,
         Rect::new(0.0, 0.0, 320.0, 180.0)
     );
+}
+
+#[test]
+fn document_engine_can_update_from_retained_scene() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("panel"),
+        Style::default().size(320.0, 180.0),
+    );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+
+    assert_eq!(
+        output.layout.find("panel").unwrap().rect,
+        Rect::new(0.0, 0.0, 320.0, 180.0)
+    );
+    assert_eq!(
+        output.changes.created,
+        vec![ElementId::new("panel"), ElementId::new("root")]
+    );
+    assert_eq!(output.metrics.element_count, 2);
+    assert_eq!(engine.element_state("panel"), Some(&Default::default()));
+}
+
+#[test]
+fn document_engine_update_scene_reports_scroll_chrome_for_overflow() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+
+    assert_eq!(output.scroll_chrome.len(), 1);
+    assert_eq!(output.scroll_chrome[0].element_id, ElementId::new("scroll"));
+    assert_eq!(output.scroll_chrome[0].max_scroll, 200.0);
+    assert_eq!(output.metrics.scroll_chrome_count, 1);
 }

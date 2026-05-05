@@ -2,6 +2,7 @@ use crate::animation::{AnimationUpdate, update_element_style_animation};
 use crate::element::{Document, Element, ElementId};
 use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, layout_element};
+use crate::scene::DocumentScene;
 use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
@@ -104,6 +105,49 @@ pub struct DocumentEngine {
 impl DocumentEngine {
     pub fn update(&mut self, document: &Document, stylesheet: &StyleSheet) -> DocumentOutput {
         self.update_with_input(document, stylesheet, DocumentInput::default())
+    }
+
+    pub fn update_scene(
+        &mut self,
+        scene: &mut DocumentScene,
+        stylesheet: &StyleSheet,
+    ) -> DocumentOutput {
+        let changes = self.sync_scene_states(scene);
+        let layout = scene
+            .resolve_layout(stylesheet, &self.states)
+            .expect("document scene layout can be resolved");
+        self.scroll_limits = scene
+            .scroll_limits()
+            .expect("document scene scroll limits can be resolved");
+        self.cached_layout = Some(layout.clone());
+        self.cached_document_root = None;
+        self.cached_text_measurer_key = None;
+
+        let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
+        let element_count = count_resolved_elements(&layout);
+        let scroll_chrome_count = scroll_chrome.len();
+
+        DocumentOutput {
+            changes,
+            layout,
+            hit_id: None,
+            active_drag: None,
+            completed_drag: None,
+            text_selection: self.text_selection.clone(),
+            events: Vec::new(),
+            scroll_chrome,
+            animating: false,
+            metrics: DocumentMetrics {
+                element_count,
+                scroll_chrome_count,
+                reused_cached_layout: false,
+                reused_input_layout: false,
+                input_changed_state: false,
+                animation_changed_style: false,
+                animation_changed_layout: false,
+                animation_changed_paint: false,
+            },
+        }
     }
 
     pub fn update_with_input(
@@ -286,6 +330,28 @@ impl DocumentEngine {
         let mut next_ids = BTreeSet::new();
         document.root.collect_ids(&mut next_ids);
 
+        let existing_ids: BTreeSet<_> = self.states.keys().cloned().collect();
+        let mut changes = ChangeSet::default();
+
+        for id in &next_ids {
+            if existing_ids.contains(id) {
+                changes.retained.push(id.clone());
+            } else {
+                changes.created.push(id.clone());
+                self.states.insert(id.clone(), ElementState::default());
+            }
+        }
+
+        for id in existing_ids.difference(&next_ids) {
+            changes.removed.push(id.clone());
+            self.states.remove(id);
+        }
+
+        changes
+    }
+
+    fn sync_scene_states(&mut self, scene: &DocumentScene) -> ChangeSet {
+        let next_ids = scene.element_ids().into_iter().collect::<BTreeSet<_>>();
         let existing_ids: BTreeSet<_> = self.states.keys().cloned().collect();
         let mut changes = ChangeSet::default();
 

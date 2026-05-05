@@ -106,6 +106,12 @@ impl DocumentScene {
         &self.root
     }
 
+    pub fn element_ids(&self) -> Vec<ElementId> {
+        let mut ids = self.elements.keys().cloned().collect::<Vec<_>>();
+        ids.sort();
+        ids
+    }
+
     pub fn append_element(
         &mut self,
         parent: impl Into<ElementId>,
@@ -221,6 +227,30 @@ impl DocumentScene {
 
     pub fn resolved_layout(&self) -> SceneResult<ResolvedElement> {
         self.resolved_element(&self.root)
+    }
+
+    pub(crate) fn scroll_limits(&self) -> SceneResult<HashMap<ElementId, Size>> {
+        let mut limits = HashMap::new();
+        for id in self.element_ids() {
+            let element = self.element(&id)?;
+            let style = &element.computed_style;
+            if style.overflow_x != Overflow::Scroll && style.overflow_y != Overflow::Scroll {
+                continue;
+            }
+
+            let layout = self
+                .layout
+                .layout(element.layout_node)
+                .map_err(layout_error)?;
+            let max_scroll = Size::new(
+                (layout.content_size.width - layout.size.width).max(0.0),
+                (layout.content_size.height - layout.size.height).max(0.0),
+            );
+            if max_scroll.width > 0.0 || max_scroll.height > 0.0 {
+                limits.insert(id, max_scroll);
+            }
+        }
+        Ok(limits)
     }
 
     pub fn resolve_layout(
@@ -449,6 +479,7 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         } else {
             FlexWrap::NoWrap
         },
+        flex_shrink: 0.0,
         ..Default::default()
     }
 }
