@@ -172,18 +172,22 @@ impl DocumentScene {
         self.layout.style(node).map_err(layout_error)
     }
 
+    pub fn layout_dirty(&self, id: impl Into<ElementId>) -> SceneResult<bool> {
+        let node = self.element(&id.into())?.layout_node;
+        self.layout.dirty(node).map_err(layout_error)
+    }
+
     pub fn apply_computed_style(
         &mut self,
         id: impl Into<ElementId>,
         style: &ComputedStyle,
-    ) -> SceneResult<()> {
+    ) -> SceneResult<bool> {
         let id = id.into();
         let node = self.element(&id)?.layout_node;
-        self.layout
-            .set_style(node, layout_style_from_computed(style))
-            .map_err(layout_error)?;
+        let layout_changed =
+            self.set_layout_style_if_changed(node, layout_style_from_computed(style))?;
         self.element_mut(&id)?.computed_style = style.clone();
-        Ok(())
+        Ok(layout_changed)
     }
 
     pub fn apply_stylesheet(
@@ -561,6 +565,19 @@ impl DocumentScene {
             .collect()
     }
 
+    fn set_layout_style_if_changed(
+        &mut self,
+        node: NodeId,
+        style: LayoutStyle,
+    ) -> SceneResult<bool> {
+        if self.layout.style(node).map_err(layout_error)? == &style {
+            return Ok(false);
+        }
+
+        self.layout.set_style(node, style).map_err(layout_error)?;
+        Ok(true)
+    }
+
     fn apply_table_grid_styles(&mut self) -> SceneResult<()> {
         let ids = self.element_ids();
         for id in ids {
@@ -588,7 +605,7 @@ impl DocumentScene {
             } else {
                 table.row_height
             });
-            self.layout.set_style(node, style).map_err(layout_error)?;
+            self.set_layout_style_if_changed(node, style)?;
 
             let row_children = self.children(id.clone())?;
             for child_id in row_children {
@@ -605,9 +622,7 @@ impl DocumentScene {
                     start: GridPlacement::Line((column_index + 1).into()),
                     end: GridPlacement::Line((column_index + 2).into()),
                 };
-                self.layout
-                    .set_style(child_node, child_style)
-                    .map_err(layout_error)?;
+                self.set_layout_style_if_changed(child_node, child_style)?;
             }
         }
 

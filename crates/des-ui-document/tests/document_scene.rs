@@ -251,6 +251,104 @@ fn scene_resolves_stylesheet_over_retained_elements() {
 }
 
 #[test]
+fn scene_does_not_dirty_layout_graph_when_resolved_layout_style_is_unchanged() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("panel"),
+        Style::default()
+            .width(Length::Px(120.0))
+            .height(Length::Px(40.0)),
+    );
+
+    scene
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    scene.compute_layout().unwrap();
+    assert!(!scene.layout_dirty("root").unwrap());
+    assert!(!scene.layout_dirty("panel").unwrap());
+
+    scene
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+
+    assert!(!scene.layout_dirty("root").unwrap());
+    assert!(!scene.layout_dirty("panel").unwrap());
+}
+
+#[test]
+fn scene_paint_only_style_update_does_not_dirty_layout_graph() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let layout_stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("panel"),
+        Style::default()
+            .width(Length::Px(120.0))
+            .height(Length::Px(40.0)),
+    );
+    scene
+        .apply_stylesheet(&layout_stylesheet, &HashMap::new())
+        .unwrap();
+    scene.compute_layout().unwrap();
+
+    let paint_stylesheet = layout_stylesheet.clone().rule(
+        StyleSelector::id("panel"),
+        Style::default().background(des_ui_document::Color::rgb(16, 24, 32)),
+    );
+    scene
+        .apply_stylesheet(&paint_stylesheet, &HashMap::new())
+        .unwrap();
+
+    assert!(!scene.layout_dirty("root").unwrap());
+    assert!(!scene.layout_dirty("panel").unwrap());
+    assert_eq!(
+        scene
+            .resolved_layout()
+            .unwrap()
+            .find("panel")
+            .unwrap()
+            .style
+            .background,
+        Some(des_ui_document::Color::rgb(16, 24, 32))
+    );
+}
+
+#[test]
+fn scene_layout_style_update_dirties_changed_node_and_ancestors() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("panel"),
+        Style::default()
+            .width(Length::Px(120.0))
+            .height(Length::Px(40.0)),
+    );
+    scene
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    scene.compute_layout().unwrap();
+
+    let changed_stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("panel"),
+        Style::default()
+            .width(Length::Px(240.0))
+            .height(Length::Px(40.0)),
+    );
+    scene
+        .apply_stylesheet(&changed_stylesheet, &HashMap::new())
+        .unwrap();
+
+    assert!(scene.layout_dirty("root").unwrap());
+    assert!(scene.layout_dirty("panel").unwrap());
+}
+
+#[test]
 fn scene_emits_resolved_element_tree_from_retained_layout() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene
