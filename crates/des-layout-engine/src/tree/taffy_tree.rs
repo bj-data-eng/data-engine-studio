@@ -50,6 +50,13 @@ pub enum TaffyError {
         /// The total number of children the parent has
         child_count: usize,
     },
+    /// The parent node does not contain the specified child.
+    ChildNotFound {
+        /// The parent node whose children were searched
+        parent: NodeId,
+        /// The child node that was not found
+        child: NodeId,
+    },
     /// The parent node was not found in the [`TaffyTree`](crate::TaffyTree) instance.
     InvalidParentNode(NodeId),
     /// The child node was not found in the [`TaffyTree`](crate::TaffyTree) instance.
@@ -67,6 +74,12 @@ impl core::fmt::Display for TaffyError {
                 child_count,
             } => {
                 write!(f, "Index (is {child_index}) should be < child_count ({child_count}) for parent node {parent:?}")
+            }
+            TaffyError::ChildNotFound { parent, child } => {
+                write!(
+                    f,
+                    "Child Node {child:?} is not attached to parent node {parent:?}"
+                )
             }
             TaffyError::InvalidParentNode(parent) => {
                 write!(f, "Parent Node {parent:?} is not in the TaffyTree instance")
@@ -674,6 +687,7 @@ impl<NodeContext> TaffyTree<NodeContext> {
         let id = NodeId::from(self.nodes.insert(NodeData::new(layout)));
 
         for child in children {
+            self.detach_child(*child)?;
             self.parents[(*child).into()] = Some(id);
         }
 
@@ -763,6 +777,7 @@ impl<NodeContext> TaffyTree<NodeContext> {
     pub fn add_child(&mut self, parent: NodeId, child: NodeId) -> TaffyResult<()> {
         let parent_key = parent.into();
         let child_key = child.into();
+        self.detach_child(child)?;
         self.parents[child_key] = Some(parent);
         self.children[parent_key].push(child);
         self.mark_dirty(parent)?;
@@ -788,6 +803,7 @@ impl<NodeContext> TaffyTree<NodeContext> {
             });
         }
 
+        let child_index = self.detach_child_for_insert(parent, child_index, child)?;
         self.parents[child.into()] = Some(parent);
         self.children[parent_key].insert(child_index, child);
         self.mark_dirty(parent)?;
@@ -808,7 +824,7 @@ impl<NodeContext> TaffyTree<NodeContext> {
         for &child in children {
             // Remove child from previous parent
             if let Some(previous_parent) = self.parents[child.into()] {
-                self.remove_child(previous_parent, child).unwrap();
+                self.remove_child(previous_parent, child)?;
             }
             self.parents[child.into()] = Some(parent);
         }
@@ -831,7 +847,7 @@ impl<NodeContext> TaffyTree<NodeContext> {
         let index = self.children[parent.into()]
             .iter()
             .position(|n| *n == child)
-            .unwrap();
+            .ok_or(TaffyError::ChildNotFound { parent, child })?;
         self.remove_child_at_index(parent, index)
     }
 
@@ -899,6 +915,12 @@ impl<NodeContext> TaffyTree<NodeContext> {
             });
         }
 
+        let old_child = self.children[parent_key][child_index];
+        if old_child == new_child {
+            return Ok(old_child);
+        }
+
+        let child_index = self.detach_child_for_replace(parent, child_index, new_child)?;
         self.parents[new_child.into()] = Some(parent);
         let old_child = core::mem::replace(&mut self.children[parent_key][child_index], new_child);
         self.parents[old_child.into()] = None;
@@ -906,6 +928,59 @@ impl<NodeContext> TaffyTree<NodeContext> {
         self.mark_dirty(parent)?;
 
         Ok(old_child)
+    }
+
+    fn detach_child(&mut self, child: NodeId) -> TaffyResult<()> {
+        if let Some(previous_parent) = self.parents[child.into()] {
+            self.remove_child(previous_parent, child)?;
+        }
+
+        Ok(())
+    }
+
+    fn detach_child_for_insert(
+        &mut self,
+        parent: NodeId,
+        child_index: usize,
+        child: NodeId,
+    ) -> TaffyResult<usize> {
+        let Some(previous_parent) = self.parents[child.into()] else {
+            return Ok(child_index);
+        };
+
+        let previous_index = self.child_index(previous_parent, child)?;
+        self.remove_child_at_index(previous_parent, previous_index)?;
+        if previous_parent == parent && previous_index < child_index {
+            Ok(child_index - 1)
+        } else {
+            Ok(child_index)
+        }
+    }
+
+    fn detach_child_for_replace(
+        &mut self,
+        parent: NodeId,
+        child_index: usize,
+        child: NodeId,
+    ) -> TaffyResult<usize> {
+        let Some(previous_parent) = self.parents[child.into()] else {
+            return Ok(child_index);
+        };
+
+        let previous_index = self.child_index(previous_parent, child)?;
+        self.remove_child_at_index(previous_parent, previous_index)?;
+        if previous_parent == parent && previous_index < child_index {
+            Ok(child_index - 1)
+        } else {
+            Ok(child_index)
+        }
+    }
+
+    fn child_index(&self, parent: NodeId, child: NodeId) -> TaffyResult<usize> {
+        self.children[parent.into()]
+            .iter()
+            .position(|n| *n == child)
+            .ok_or(TaffyError::ChildNotFound { parent, child })
     }
 
     /// Returns the child node of the parent `node` at the provided `child_index`
@@ -1619,5 +1694,88 @@ mod tests {
         taffy.set_children(new_parent, &[child]).unwrap();
 
         assert!(taffy.children(old_parent).unwrap().is_empty());
+    }
+
+    #[test]
+    fn add_child_reparents_from_previous_parent() {
+        let mut taffy: TaffyTree<()> = TaffyTree::new();
+        let child = taffy.new_leaf(Style::default()).unwrap();
+        let old_parent = taffy.new_with_children(Style::default(), &[child]).unwrap();
+
+        let new_parent = taffy.new_leaf(Style::default()).unwrap();
+        taffy.add_child(new_parent, child).unwrap();
+
+        assert!(taffy.children(old_parent).unwrap().is_empty());
+        assert_eq!(taffy.children(new_parent).unwrap().as_slice(), &[child]);
+        assert_eq!(taffy.parent(child), Some(new_parent));
+    }
+
+    #[test]
+    fn new_with_children_reparents_from_previous_parent() {
+        let mut taffy: TaffyTree<()> = TaffyTree::new();
+        let child = taffy.new_leaf(Style::default()).unwrap();
+        let old_parent = taffy.new_with_children(Style::default(), &[child]).unwrap();
+
+        let new_parent = taffy.new_with_children(Style::default(), &[child]).unwrap();
+
+        assert!(taffy.children(old_parent).unwrap().is_empty());
+        assert_eq!(taffy.children(new_parent).unwrap().as_slice(), &[child]);
+        assert_eq!(taffy.parent(child), Some(new_parent));
+    }
+
+    #[test]
+    fn insert_child_reparents_from_previous_parent() {
+        let mut taffy: TaffyTree<()> = TaffyTree::new();
+        let child = taffy.new_leaf(Style::default()).unwrap();
+        let sibling = taffy.new_leaf(Style::default()).unwrap();
+        let old_parent = taffy.new_with_children(Style::default(), &[child]).unwrap();
+        let new_parent = taffy
+            .new_with_children(Style::default(), &[sibling])
+            .unwrap();
+
+        taffy.insert_child_at_index(new_parent, 0, child).unwrap();
+
+        assert!(taffy.children(old_parent).unwrap().is_empty());
+        assert_eq!(
+            taffy.children(new_parent).unwrap().as_slice(),
+            &[child, sibling]
+        );
+        assert_eq!(taffy.parent(child), Some(new_parent));
+    }
+
+    #[test]
+    fn replace_child_reparents_new_child_from_previous_parent() {
+        let mut taffy: TaffyTree<()> = TaffyTree::new();
+        let old_child = taffy.new_leaf(Style::default()).unwrap();
+        let new_child = taffy.new_leaf(Style::default()).unwrap();
+        let old_parent = taffy
+            .new_with_children(Style::default(), &[new_child])
+            .unwrap();
+        let new_parent = taffy
+            .new_with_children(Style::default(), &[old_child])
+            .unwrap();
+
+        let replaced = taffy
+            .replace_child_at_index(new_parent, 0, new_child)
+            .unwrap();
+
+        assert_eq!(replaced, old_child);
+        assert!(taffy.children(old_parent).unwrap().is_empty());
+        assert_eq!(taffy.children(new_parent).unwrap().as_slice(), &[new_child]);
+        assert_eq!(taffy.parent(old_child), None);
+        assert_eq!(taffy.parent(new_child), Some(new_parent));
+    }
+
+    #[test]
+    fn replace_child_with_itself_keeps_parent_relation() {
+        let mut taffy: TaffyTree<()> = TaffyTree::new();
+        let child = taffy.new_leaf(Style::default()).unwrap();
+        let parent = taffy.new_with_children(Style::default(), &[child]).unwrap();
+
+        let replaced = taffy.replace_child_at_index(parent, 0, child).unwrap();
+
+        assert_eq!(replaced, child);
+        assert_eq!(taffy.children(parent).unwrap().as_slice(), &[child]);
+        assert_eq!(taffy.parent(child), Some(parent));
     }
 }
