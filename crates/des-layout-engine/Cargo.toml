@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.71"
 license = "MIT"
 repository.workspace = true
-description = "Data Engine Studio layout engine seeded from Taffy"
+description = "Data Engine Studio layout engine"
 
 [dependencies]
 arrayvec = { version = "0.7", default-features = false }
@@ -17,7 +17,7 @@ slotmap = { version = "1.0.6", default-features = false, optional = true }
 [features]
 default = [
     "std",
-    "taffy_tree",
+    "layout_tree",
     "flexbox",
     "grid",
     "block_layout",
@@ -39,7 +39,7 @@ profile = ["std"]
 serde = ["dep:serde"]
 std = ["grid?/std", "serde?/std", "slotmap?/std"]
 strict_provenance = []
-taffy_tree = ["dep:slotmap"]
+layout_tree = ["dep:slotmap"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("parse"))'] }

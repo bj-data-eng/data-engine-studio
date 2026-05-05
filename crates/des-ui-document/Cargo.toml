@@ -6,4 +6,4 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-taffy = { package = "des-layout-engine", path = "../des-layout-engine", default-features = false, features = ["std", "taffy_tree", "flexbox", "content_size"] }
+layout_engine = { package = "des-layout-engine", path = "../des-layout-engine", default-features = false, features = ["std", "layout_tree", "flexbox", "content_size"] }

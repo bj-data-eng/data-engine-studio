@@ -1,4 +1,4 @@
-//! Low-level access to the layout algorithms themselves. For a higher-level API, see the [`TaffyTree`](crate::TaffyTree) struct.
+//! Low-level access to the layout algorithms themselves. For a higher-level API, see the [`LayoutTree`](crate::LayoutTree) struct.
 //!
 //! ### Layout functions
 //!
@@ -357,11 +357,11 @@ mod tests {
     use super::compute_hidden_layout;
     use crate::geometry::{Point, Size};
     use crate::style::{Display, Style};
-    use crate::TaffyTree;
+    use crate::LayoutTree;
 
     #[test]
     fn hidden_layout_should_hide_recursively() {
-        let mut taffy: TaffyTree<()> = TaffyTree::new();
+        let mut tree: LayoutTree<()> = LayoutTree::new();
 
         let style: Style = Style {
             display: Display::Flex,
@@ -369,18 +369,18 @@ mod tests {
             ..Default::default()
         };
 
-        let grandchild_00 = taffy.new_leaf(style.clone()).unwrap();
-        let grandchild_01 = taffy.new_leaf(style.clone()).unwrap();
-        let child_00 = taffy
+        let grandchild_00 = tree.new_leaf(style.clone()).unwrap();
+        let grandchild_01 = tree.new_leaf(style.clone()).unwrap();
+        let child_00 = tree
             .new_with_children(style.clone(), &[grandchild_00, grandchild_01])
             .unwrap();
 
-        let grandchild_02 = taffy.new_leaf(style.clone()).unwrap();
-        let child_01 = taffy
+        let grandchild_02 = tree.new_leaf(style.clone()).unwrap();
+        let child_01 = tree
             .new_with_children(style.clone(), &[grandchild_02])
             .unwrap();
 
-        let root = taffy
+        let root = tree
             .new_with_children(
                 Style {
                     display: Display::None,
@@ -391,7 +391,7 @@ mod tests {
             )
             .unwrap();
 
-        compute_hidden_layout(&mut taffy.as_layout_tree(), root);
+        compute_hidden_layout(&mut tree.as_layout_tree(), root);
 
         // Whatever size and display-mode the nodes had previously,
         // all layouts should resolve to ZERO due to the root's DISPLAY::NONE
@@ -404,7 +404,7 @@ mod tests {
             grandchild_01,
             grandchild_02,
         ] {
-            let layout = taffy.layout(node).unwrap();
+            let layout = tree.layout(node).unwrap();
             assert_eq!(layout.size, Size::zero());
             assert_eq!(layout.location, Point::zero());
         }

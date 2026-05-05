@@ -1,6 +1,6 @@
-use taffy::prelude::{
-    AvailableSpace, Display, FlexDirection, Size as TaffySize, Style, TaffyMaxContent, TaffyTree,
-    auto, length, percent,
+use layout_engine::prelude::{
+    AvailableSpace, Display, FlexDirection, LayoutMaxContent, LayoutTree, Size as LayoutSize,
+    Style, auto, length, percent,
 };
 
 #[derive(Debug)]
@@ -10,12 +10,12 @@ struct TextProbe {
 }
 
 #[test]
-fn taffy_can_layout_a_viewport_sized_flex_shell() {
-    let mut tree: TaffyTree<()> = TaffyTree::new();
+fn layout_engine_can_layout_a_viewport_sized_flex_shell() {
+    let mut tree: LayoutTree<()> = LayoutTree::new();
 
     let nav = tree
         .new_leaf(Style {
-            size: TaffySize {
+            size: LayoutSize {
                 width: length(240.0),
                 height: auto(),
             },
@@ -33,7 +33,7 @@ fn taffy_can_layout_a_viewport_sized_flex_shell() {
             Style {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Row,
-                size: TaffySize {
+                size: LayoutSize {
                     width: length(1200.0),
                     height: length(800.0),
                 },
@@ -43,7 +43,7 @@ fn taffy_can_layout_a_viewport_sized_flex_shell() {
         )
         .unwrap();
 
-    tree.compute_layout(root, TaffySize::MAX_CONTENT).unwrap();
+    tree.compute_layout(root, LayoutSize::MAX_CONTENT).unwrap();
 
     let root_layout = tree.layout(root).unwrap();
     let nav_layout = tree.layout(nav).unwrap();
@@ -58,13 +58,13 @@ fn taffy_can_layout_a_viewport_sized_flex_shell() {
 }
 
 #[test]
-fn taffy_can_measure_text_with_available_width() {
-    let mut tree: TaffyTree<TextProbe> = TaffyTree::new();
+fn layout_engine_can_measure_text_with_available_width() {
+    let mut tree: LayoutTree<TextProbe> = LayoutTree::new();
 
     let text = tree
         .new_leaf_with_context(
             Style {
-                size: TaffySize {
+                size: LayoutSize {
                     width: percent(1.0),
                     height: auto(),
                 },
@@ -80,7 +80,7 @@ fn taffy_can_measure_text_with_available_width() {
         .new_with_children(
             Style {
                 display: Display::Flex,
-                size: TaffySize {
+                size: LayoutSize {
                     width: length(120.0),
                     height: auto(),
                 },
@@ -92,14 +92,14 @@ fn taffy_can_measure_text_with_available_width() {
 
     tree.compute_layout_with_measure(
         root,
-        TaffySize::MAX_CONTENT,
+        LayoutSize::MAX_CONTENT,
         |known_dimensions, available_space, _node_id, context, _style| {
             let context = context.expect("text probe context is present");
             let available_width = match available_space.width {
                 AvailableSpace::Definite(width) => width,
                 AvailableSpace::MinContent | AvailableSpace::MaxContent => context.width,
             };
-            TaffySize {
+            LayoutSize {
                 width: known_dimensions
                     .width
                     .unwrap_or(context.width.min(available_width)),
