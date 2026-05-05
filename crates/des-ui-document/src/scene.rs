@@ -1,8 +1,16 @@
 use crate::element::{ElementId, ElementRole, ElementSpec};
-use crate::geometry::Size;
-use layout_engine::prelude::{
-    Display, LayoutTree, NodeId, Size as LayoutSize, Style as LayoutStyle, length,
+use crate::geometry::{
+    AlignItems, Direction, Insets, JustifyContent, Length, Overflow, Position,
+    Rect as DocumentRect, Size,
 };
+use crate::style::ComputedStyle;
+use layout_engine::prelude::{
+    AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display, FlexDirection, FlexWrap,
+    JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage, LengthPercentageAuto,
+    NodeId, Position as LayoutPosition, Rect as LayoutRect, Size as LayoutSize,
+    Style as LayoutStyle, length, percent,
+};
+use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 
 pub type SceneResult<T> = Result<T, SceneError>;
@@ -143,6 +151,46 @@ impl DocumentScene {
             .map(|element| element.layout_node)
     }
 
+    pub fn layout_style(&self, id: impl Into<ElementId>) -> SceneResult<&LayoutStyle> {
+        let node = self.element(&id.into())?.layout_node;
+        self.layout.style(node).map_err(layout_error)
+    }
+
+    pub fn apply_computed_style(
+        &mut self,
+        id: impl Into<ElementId>,
+        style: &ComputedStyle,
+    ) -> SceneResult<()> {
+        let node = self.element(&id.into())?.layout_node;
+        self.layout
+            .set_style(node, layout_style_from_computed(style))
+            .map_err(layout_error)
+    }
+
+    pub fn compute_layout(&mut self) -> SceneResult<()> {
+        let root_node = self.element(&self.root)?.layout_node;
+        self.layout
+            .compute_layout(
+                root_node,
+                LayoutSize {
+                    width: length::<_, AvailableSpace>(self.viewport.width),
+                    height: length::<_, AvailableSpace>(self.viewport.height),
+                },
+            )
+            .map_err(layout_error)
+    }
+
+    pub fn layout_rect(&self, id: impl Into<ElementId>) -> SceneResult<DocumentRect> {
+        let node = self.element(&id.into())?.layout_node;
+        let layout = self.layout.layout(node).map_err(layout_error)?;
+        Ok(DocumentRect::new(
+            layout.location.x,
+            layout.location.y,
+            layout.size.width,
+            layout.size.height,
+        ))
+    }
+
     pub fn parent(&self, id: impl Into<ElementId>) -> SceneResult<Option<ElementId>> {
         let node = self.element(&id.into())?.layout_node;
         Ok(self
@@ -237,6 +285,147 @@ fn root_layout_style(viewport: Size) -> LayoutStyle {
             height: length(viewport.height),
         },
         ..Default::default()
+    }
+}
+
+fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
+    LayoutStyle {
+        display: Display::Flex,
+        overflow: layout_overflow(style.overflow_x, style.overflow_y),
+        scrollbar_width: style.scrollbar_width,
+        position: layout_position(style.position),
+        inset: LayoutRect {
+            left: style.inset.left.map_or_else(
+                LengthPercentageAuto::auto,
+                length_percentage_auto_from_document,
+            ),
+            right: style.inset.right.map_or_else(
+                LengthPercentageAuto::auto,
+                length_percentage_auto_from_document,
+            ),
+            top: style.inset.top.map_or_else(
+                LengthPercentageAuto::auto,
+                length_percentage_auto_from_document,
+            ),
+            bottom: style.inset.bottom.map_or_else(
+                LengthPercentageAuto::auto,
+                length_percentage_auto_from_document,
+            ),
+        },
+        size: LayoutSize {
+            width: dimension_from_document(style.width),
+            height: dimension_from_document(style.height),
+        },
+        min_size: LayoutSize {
+            width: layout_bound(style.min_size.width),
+            height: layout_bound(style.min_size.height),
+        },
+        max_size: LayoutSize {
+            width: layout_bound(style.max_size.width),
+            height: layout_bound(style.max_size.height),
+        },
+        margin: layout_auto_rect(style.margin),
+        padding: layout_rect(style.padding),
+        border: layout_rect(style.border_width),
+        align_items: Some(layout_align_items(style.align_items)),
+        justify_content: Some(layout_justify_content(style.justify_content)),
+        gap: LayoutSize::length(style.gap),
+        flex_direction: layout_flex_direction(style.direction),
+        flex_wrap: if style.wrap {
+            FlexWrap::Wrap
+        } else {
+            FlexWrap::NoWrap
+        },
+        ..Default::default()
+    }
+}
+
+fn dimension_from_document(length_value: Length) -> Dimension {
+    match length_value {
+        Length::Auto => Dimension::auto(),
+        Length::Px(value) => length(value),
+        Length::Fill => percent(1.0),
+        Length::Percent(value) => percent(value),
+    }
+}
+
+fn length_percentage_auto_from_document(length_value: Length) -> LengthPercentageAuto {
+    match length_value {
+        Length::Auto => LengthPercentageAuto::auto(),
+        Length::Px(value) => length(value),
+        Length::Fill => percent(1.0),
+        Length::Percent(value) => percent(value),
+    }
+}
+
+fn layout_bound(value: f32) -> Dimension {
+    if value.is_finite() {
+        length(value)
+    } else {
+        Dimension::auto()
+    }
+}
+
+fn layout_auto_rect(insets: Insets) -> LayoutRect<LengthPercentageAuto> {
+    LayoutRect {
+        left: length(insets.left),
+        right: length(insets.right),
+        top: length(insets.top),
+        bottom: length(insets.bottom),
+    }
+}
+
+fn layout_rect(insets: Insets) -> LayoutRect<LengthPercentage> {
+    LayoutRect {
+        left: length(insets.left),
+        right: length(insets.right),
+        top: length(insets.top),
+        bottom: length(insets.bottom),
+    }
+}
+
+fn layout_overflow(x: Overflow, y: Overflow) -> layout_engine::geometry::Point<LayoutOverflow> {
+    layout_engine::geometry::Point {
+        x: match x {
+            Overflow::Visible => LayoutOverflow::Visible,
+            Overflow::Scroll => LayoutOverflow::Scroll,
+        },
+        y: match y {
+            Overflow::Visible => LayoutOverflow::Visible,
+            Overflow::Scroll => LayoutOverflow::Scroll,
+        },
+    }
+}
+
+fn layout_position(position: Position) -> LayoutPosition {
+    match position {
+        Position::Flow => LayoutPosition::Relative,
+        Position::AbsoluteParent | Position::AbsoluteViewport => LayoutPosition::Absolute,
+    }
+}
+
+fn layout_align_items(align_items: AlignItems) -> LayoutAlignItems {
+    match align_items {
+        AlignItems::Start => LayoutAlignItems::Start,
+        AlignItems::Center => LayoutAlignItems::Center,
+        AlignItems::End => LayoutAlignItems::End,
+        AlignItems::Stretch => LayoutAlignItems::Stretch,
+    }
+}
+
+fn layout_justify_content(justify_content: JustifyContent) -> LayoutJustifyContent {
+    match justify_content {
+        JustifyContent::Start => LayoutJustifyContent::Start,
+        JustifyContent::Center => LayoutJustifyContent::Center,
+        JustifyContent::End => LayoutJustifyContent::End,
+        JustifyContent::SpaceBetween => LayoutJustifyContent::SpaceBetween,
+    }
+}
+
+fn layout_flex_direction(direction: Direction) -> FlexDirection {
+    match direction {
+        Direction::Row => FlexDirection::Row,
+        Direction::Column => FlexDirection::Column,
     }
 }
 
