@@ -25,8 +25,8 @@ pub use element::{
 };
 pub use engine::DocumentEngine;
 pub use geometry::{
-    AlignItems, CornerRadii, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
-    Point, Position, PositionInsets, Rect, ScrollAxis, Size,
+    AlignContent, AlignItems, AlignSelf, CornerRadii, FlexDirection, FlexWrap, Insets,
+    JustifyContent, Length, Overflow, Point, Position, PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use scene::{DocumentScene, SceneElement, SceneError, SceneResult, StyleApplicationReport};

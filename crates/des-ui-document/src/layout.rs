@@ -477,22 +477,36 @@ fn aligned_main_axis(
     child_count: usize,
 ) -> (f32, f32) {
     match justify_content {
-        JustifyContent::Start => (0.0, base_gap),
+        JustifyContent::Start | JustifyContent::FlexStart | JustifyContent::Stretch => {
+            (0.0, base_gap)
+        }
         JustifyContent::Center => (free_space / 2.0, base_gap),
-        JustifyContent::End => (free_space, base_gap),
+        JustifyContent::End | JustifyContent::FlexEnd => (free_space, base_gap),
         JustifyContent::SpaceBetween if child_count > 1 => {
             (0.0, base_gap + free_space / (child_count - 1) as f32)
         }
         JustifyContent::SpaceBetween => (0.0, base_gap),
+        JustifyContent::SpaceAround if child_count > 0 => {
+            let gap = free_space / child_count as f32;
+            (gap / 2.0, base_gap + gap)
+        }
+        JustifyContent::SpaceAround => (0.0, base_gap),
+        JustifyContent::SpaceEvenly if child_count > 0 => {
+            let gap = free_space / (child_count + 1) as f32;
+            (gap, base_gap + gap)
+        }
+        JustifyContent::SpaceEvenly => (0.0, base_gap),
     }
 }
 
 fn aligned_cross_axis(align_items: AlignItems, available: f32, outer: f32) -> f32 {
     let free_space = (available - outer).max(0.0);
     match align_items {
-        AlignItems::Start | AlignItems::Stretch => 0.0,
+        AlignItems::Start | AlignItems::FlexStart | AlignItems::Stretch | AlignItems::Baseline => {
+            0.0
+        }
         AlignItems::Center => free_space / 2.0,
-        AlignItems::End => free_space,
+        AlignItems::End | AlignItems::FlexEnd => free_space,
     }
 }
 

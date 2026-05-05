@@ -1,15 +1,15 @@
 use des_ui_document::{
-    AlignItems, Color, ComputedStyle, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector, FlexDirection,
-    FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis,
-    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    AlignContent, AlignItems, Color, ComputedStyle, DocumentEngine, DocumentEventKind,
+    DocumentInput, DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector,
+    FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, Rect,
+    ScrollAxis, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
     TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
     TextWrapMode, Transition,
 };
 use layout_engine::prelude::{
-    AlignItems as LayoutAlignItems, Dimension, FlexDirection as LayoutFlexDirection,
-    JustifyContent as LayoutJustifyContent, LengthPercentageAuto, Size as LayoutSize, length,
-    percent,
+    AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, Dimension,
+    FlexDirection as LayoutFlexDirection, JustifyContent as LayoutJustifyContent,
+    LengthPercentageAuto, Size as LayoutSize, length, percent,
 };
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
@@ -136,9 +136,16 @@ fn scene_applies_document_style_to_existing_layout_node() {
     let mut style = ComputedStyle::default();
     style.flex_direction = FlexDirection::Row;
     style.flex_wrap = FlexWrap::Wrap;
-    style.align_items = AlignItems::Stretch;
-    style.justify_content = JustifyContent::SpaceBetween;
+    style.flex_basis = Length::Px(88.0);
+    style.flex_grow = 2.0;
+    style.flex_shrink = 0.5;
+    style.align_content = AlignContent::SpaceAround;
+    style.align_items = AlignItems::FlexEnd;
+    style.align_self = Some(AlignItems::Baseline);
+    style.justify_content = JustifyContent::SpaceEvenly;
     style.gap = 12.0;
+    style.row_gap = 10.0;
+    style.column_gap = 14.0;
     style.margin = Insets::symmetric(8.0, 4.0);
     style.padding = Insets::all(6.0);
     style.width = Length::Percent(0.5);
@@ -156,12 +163,26 @@ fn scene_applies_document_style_to_existing_layout_node() {
         layout_style.flex_wrap,
         layout_engine::prelude::FlexWrap::Wrap
     );
-    assert_eq!(layout_style.align_items, Some(LayoutAlignItems::Stretch));
+    assert_eq!(layout_style.flex_basis, length::<_, Dimension>(88.0));
+    assert_eq!(layout_style.flex_grow, 2.0);
+    assert_eq!(layout_style.flex_shrink, 0.5);
+    assert_eq!(
+        layout_style.align_content,
+        Some(LayoutAlignContent::SpaceAround)
+    );
+    assert_eq!(layout_style.align_items, Some(LayoutAlignItems::FlexEnd));
+    assert_eq!(layout_style.align_self, Some(LayoutAlignItems::Baseline));
     assert_eq!(
         layout_style.justify_content,
-        Some(LayoutJustifyContent::SpaceBetween)
+        Some(LayoutJustifyContent::SpaceEvenly)
     );
-    assert_eq!(layout_style.gap, LayoutSize::length(12.0));
+    assert_eq!(
+        layout_style.gap,
+        LayoutSize {
+            width: length(14.0),
+            height: length(10.0),
+        }
+    );
     assert_eq!(
         layout_style.margin,
         layout_engine::prelude::Rect {

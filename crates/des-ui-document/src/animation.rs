@@ -144,6 +144,26 @@ fn eased_style(
     next.gap = ease_f32(current.gap, target.gap, amount, snap_epsilon);
     animating |= (next.gap - target.gap).abs() > snap_epsilon;
 
+    next.row_gap = ease_f32(current.row_gap, target.row_gap, amount, snap_epsilon);
+    animating |= (next.row_gap - target.row_gap).abs() > snap_epsilon;
+
+    next.column_gap = ease_f32(current.column_gap, target.column_gap, amount, snap_epsilon);
+    animating |= (next.column_gap - target.column_gap).abs() > snap_epsilon;
+
+    next.flex_basis = ease_length(current.flex_basis, target.flex_basis, amount, snap_epsilon);
+    animating |= next.flex_basis != target.flex_basis;
+
+    next.flex_grow = ease_f32(current.flex_grow, target.flex_grow, amount, snap_epsilon);
+    animating |= (next.flex_grow - target.flex_grow).abs() > snap_epsilon;
+
+    next.flex_shrink = ease_f32(
+        current.flex_shrink,
+        target.flex_shrink,
+        amount,
+        snap_epsilon,
+    );
+    animating |= (next.flex_shrink - target.flex_shrink).abs() > snap_epsilon;
+
     next.margin = ease_insets(current.margin, target.margin, amount, snap_epsilon);
     animating |= next.margin != target.margin;
 

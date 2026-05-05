@@ -1,7 +1,7 @@
 use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
 use crate::geometry::{
-    AlignItems, CornerRadii, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
-    Point, Position, PositionInsets, Size,
+    AlignContent, AlignItems, AlignSelf, CornerRadii, FlexDirection, FlexWrap, Insets,
+    JustifyContent, Length, Overflow, Point, Position, PositionInsets, Size,
 };
 use crate::state::ElementState;
 use crate::text::TextWrapMode;
@@ -209,9 +209,16 @@ impl Anchor {
 pub struct Style {
     pub flex_direction: Option<FlexDirection>,
     pub flex_wrap: Option<FlexWrap>,
+    pub flex_basis: Option<Length>,
+    pub flex_grow: Option<f32>,
+    pub flex_shrink: Option<f32>,
+    pub align_content: Option<AlignContent>,
     pub align_items: Option<AlignItems>,
+    pub align_self: Option<AlignSelf>,
     pub justify_content: Option<JustifyContent>,
     pub gap: Option<f32>,
+    pub row_gap: Option<f32>,
+    pub column_gap: Option<f32>,
     pub margin: Option<Insets>,
     pub padding: Option<Insets>,
     pub width: Option<Length>,
@@ -347,8 +354,33 @@ impl Style {
         self
     }
 
+    pub fn flex_basis(mut self, flex_basis: Length) -> Self {
+        self.flex_basis = Some(flex_basis);
+        self
+    }
+
+    pub fn flex_grow(mut self, flex_grow: f32) -> Self {
+        self.flex_grow = Some(flex_grow.max(0.0));
+        self
+    }
+
+    pub fn flex_shrink(mut self, flex_shrink: f32) -> Self {
+        self.flex_shrink = Some(flex_shrink.max(0.0));
+        self
+    }
+
+    pub fn align_content(mut self, align_content: AlignContent) -> Self {
+        self.align_content = Some(align_content);
+        self
+    }
+
     pub fn align_items(mut self, align_items: AlignItems) -> Self {
         self.align_items = Some(align_items);
+        self
+    }
+
+    pub fn align_self(mut self, align_self: AlignSelf) -> Self {
+        self.align_self = Some(align_self);
         self
     }
 
@@ -359,6 +391,18 @@ impl Style {
 
     pub fn gap(mut self, gap: f32) -> Self {
         self.gap = Some(gap);
+        self.row_gap = Some(gap);
+        self.column_gap = Some(gap);
+        self
+    }
+
+    pub fn row_gap(mut self, row_gap: f32) -> Self {
+        self.row_gap = Some(row_gap);
+        self
+    }
+
+    pub fn column_gap(mut self, column_gap: f32) -> Self {
+        self.column_gap = Some(column_gap);
         self
     }
 
@@ -726,9 +770,16 @@ impl Style {
 pub struct ComputedStyle {
     pub flex_direction: FlexDirection,
     pub flex_wrap: FlexWrap,
+    pub flex_basis: Length,
+    pub flex_grow: f32,
+    pub flex_shrink: f32,
+    pub align_content: AlignContent,
     pub align_items: AlignItems,
+    pub align_self: Option<AlignSelf>,
     pub justify_content: JustifyContent,
     pub gap: f32,
+    pub row_gap: f32,
+    pub column_gap: f32,
     pub margin: Insets,
     pub padding: Insets,
     pub width: Length,
@@ -779,9 +830,16 @@ impl Default for ComputedStyle {
         Self {
             flex_direction: FlexDirection::Column,
             flex_wrap: FlexWrap::NoWrap,
+            flex_basis: Length::Auto,
+            flex_grow: 0.0,
+            flex_shrink: 0.0,
+            align_content: AlignContent::Stretch,
             align_items: AlignItems::Start,
+            align_self: None,
             justify_content: JustifyContent::Start,
             gap: 0.0,
+            row_gap: 0.0,
+            column_gap: 0.0,
             margin: Insets::ZERO,
             padding: Insets::ZERO,
             width: Length::Auto,
@@ -837,14 +895,37 @@ impl ComputedStyle {
         if let Some(value) = style.flex_wrap {
             self.flex_wrap = value;
         }
+        if let Some(value) = style.flex_basis {
+            self.flex_basis = value;
+        }
+        if let Some(value) = style.flex_grow {
+            self.flex_grow = value.max(0.0);
+        }
+        if let Some(value) = style.flex_shrink {
+            self.flex_shrink = value.max(0.0);
+        }
+        if let Some(value) = style.align_content {
+            self.align_content = value;
+        }
         if let Some(value) = style.align_items {
             self.align_items = value;
+        }
+        if let Some(value) = style.align_self {
+            self.align_self = Some(value);
         }
         if let Some(value) = style.justify_content {
             self.justify_content = value;
         }
         if let Some(value) = style.gap {
             self.gap = value;
+            self.row_gap = value;
+            self.column_gap = value;
+        }
+        if let Some(value) = style.row_gap {
+            self.row_gap = value;
+        }
+        if let Some(value) = style.column_gap {
+            self.column_gap = value;
         }
         if let Some(value) = style.margin {
             self.margin = value;
@@ -1111,9 +1192,16 @@ pub(crate) fn classify_computed_style_change(
 fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle) -> bool {
     previous.flex_direction != next.flex_direction
         || previous.flex_wrap != next.flex_wrap
+        || previous.flex_basis != next.flex_basis
+        || previous.flex_grow != next.flex_grow
+        || previous.flex_shrink != next.flex_shrink
+        || previous.align_content != next.align_content
         || previous.align_items != next.align_items
+        || previous.align_self != next.align_self
         || previous.justify_content != next.justify_content
         || previous.gap != next.gap
+        || previous.row_gap != next.row_gap
+        || previous.column_gap != next.column_gap
         || previous.margin != next.margin
         || previous.padding != next.padding
         || previous.width != next.width

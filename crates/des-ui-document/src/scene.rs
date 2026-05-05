@@ -1,7 +1,7 @@
 use crate::element::{Element, ElementId, ElementRole, ElementSpec};
 use crate::geometry::{
-    AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, Position,
-    Rect as DocumentRect, Size,
+    AlignContent, AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
+    Point, Position, Rect as DocumentRect, Size,
 };
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{
@@ -11,8 +11,8 @@ use crate::style::{
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
 use layout_engine::prelude::{
-    AlignItems as LayoutAlignItems, AvailableSpace, Dimension, Display,
-    FlexDirection as LayoutFlexDirection, FlexWrap as LayoutFlexWrap, GridPlacement,
+    AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, AvailableSpace, Dimension,
+    Display, FlexDirection as LayoutFlexDirection, FlexWrap as LayoutFlexWrap, GridPlacement,
     GridTemplateComponent, JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage,
     LengthPercentageAuto, NodeId, Position as LayoutPosition, Rect as LayoutRect,
     Size as LayoutSize, Style as LayoutStyle, fr, length, percent,
@@ -1002,21 +1002,24 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         padding: layout_rect(style.padding),
         border: layout_rect(style.border_width),
         align_items: Some(layout_align_items(style.align_items)),
-        align_self: if style.width == Length::Fill || style.height == Length::Fill {
-            Some(LayoutAlignItems::Stretch)
-        } else {
-            None
-        },
+        align_self: layout_align_self(style),
+        align_content: Some(layout_align_content(style.align_content)),
         justify_content: Some(layout_justify_content(style.justify_content)),
-        gap: LayoutSize::length(style.gap),
+        gap: LayoutSize {
+            width: length(style.column_gap),
+            height: length(style.row_gap),
+        },
         flex_direction: layout_flex_direction(style.flex_direction),
         flex_wrap: layout_flex_wrap(style.flex_wrap),
-        flex_grow: if style.height == Length::Fill {
+        flex_basis: dimension_from_document(style.flex_basis),
+        flex_grow: if style.flex_grow > 0.0 {
+            style.flex_grow
+        } else if style.height == Length::Fill {
             1.0
         } else {
             0.0
         },
-        flex_shrink: 0.0,
+        flex_shrink: style.flex_shrink,
         ..Default::default()
     }
 }
@@ -1088,18 +1091,50 @@ fn layout_position(position: Position) -> LayoutPosition {
 fn layout_align_items(align_items: AlignItems) -> LayoutAlignItems {
     match align_items {
         AlignItems::Start => LayoutAlignItems::Start,
+        AlignItems::FlexStart => LayoutAlignItems::FlexStart,
         AlignItems::Center => LayoutAlignItems::Center,
+        AlignItems::FlexEnd => LayoutAlignItems::FlexEnd,
         AlignItems::End => LayoutAlignItems::End,
+        AlignItems::Baseline => LayoutAlignItems::Baseline,
         AlignItems::Stretch => LayoutAlignItems::Stretch,
+    }
+}
+
+fn layout_align_self(style: &ComputedStyle) -> Option<LayoutAlignItems> {
+    style.align_self.map(layout_align_items).or_else(|| {
+        if style.width == Length::Fill || style.height == Length::Fill {
+            Some(LayoutAlignItems::Stretch)
+        } else {
+            None
+        }
+    })
+}
+
+fn layout_align_content(align_content: AlignContent) -> LayoutAlignContent {
+    match align_content {
+        AlignContent::Start => LayoutAlignContent::Start,
+        AlignContent::FlexStart => LayoutAlignContent::FlexStart,
+        AlignContent::Center => LayoutAlignContent::Center,
+        AlignContent::FlexEnd => LayoutAlignContent::FlexEnd,
+        AlignContent::End => LayoutAlignContent::End,
+        AlignContent::Stretch => LayoutAlignContent::Stretch,
+        AlignContent::SpaceBetween => LayoutAlignContent::SpaceBetween,
+        AlignContent::SpaceEvenly => LayoutAlignContent::SpaceEvenly,
+        AlignContent::SpaceAround => LayoutAlignContent::SpaceAround,
     }
 }
 
 fn layout_justify_content(justify_content: JustifyContent) -> LayoutJustifyContent {
     match justify_content {
         JustifyContent::Start => LayoutJustifyContent::Start,
+        JustifyContent::FlexStart => LayoutJustifyContent::FlexStart,
         JustifyContent::Center => LayoutJustifyContent::Center,
+        JustifyContent::FlexEnd => LayoutJustifyContent::FlexEnd,
         JustifyContent::End => LayoutJustifyContent::End,
+        JustifyContent::Stretch => LayoutJustifyContent::Stretch,
         JustifyContent::SpaceBetween => LayoutJustifyContent::SpaceBetween,
+        JustifyContent::SpaceEvenly => LayoutJustifyContent::SpaceEvenly,
+        JustifyContent::SpaceAround => LayoutJustifyContent::SpaceAround,
     }
 }
 

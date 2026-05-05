@@ -175,17 +175,40 @@ pub enum FlexWrap {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AlignItems {
     Start,
+    FlexStart,
     Center,
+    FlexEnd,
+    End,
+    Baseline,
+    Stretch,
+}
+
+pub type AlignSelf = AlignItems;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AlignContent {
+    Start,
+    FlexStart,
+    Center,
+    FlexEnd,
     End,
     Stretch,
+    SpaceBetween,
+    SpaceEvenly,
+    SpaceAround,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JustifyContent {
     Start,
+    FlexStart,
     Center,
+    FlexEnd,
     End,
+    Stretch,
     SpaceBetween,
+    SpaceEvenly,
+    SpaceAround,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
