@@ -2,7 +2,7 @@ use crate::animation::{AnimationUpdate, update_element_style_animation};
 use crate::element::{Document, Element, ElementId};
 use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, layout_element};
-use crate::scene::DocumentScene;
+use crate::scene::{DocumentScene, StyleApplicationReport};
 use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
@@ -174,32 +174,29 @@ impl DocumentEngine {
         let clamp_changed = self.clamp_scroll_states();
         let animation_update = self.update_scene_style_animation(scene, stylesheet);
         let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
-        let needs_final_layout = input_update.changed
-            || input_update.layout_changed
-            || clamp_changed
-            || animation_update.changed();
+        let mut final_style_report = StyleApplicationReport::default();
+        if input_update.selector_state_changed || animation_update.changed() {
+            final_style_report = scene
+                .apply_stylesheet(stylesheet, &self.states)
+                .expect("document scene styles can be resolved");
+            scene_style_nodes_visited += final_style_report.visited;
+        }
+        let needs_final_layout =
+            input_update.layout_changed || clamp_changed || final_style_report.layout_changed;
 
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
-            if input_update.selector_state_changed || animation_update.changed() {
-                let final_style_report = scene
-                    .apply_stylesheet(stylesheet, &self.states)
-                    .expect("document scene styles can be resolved");
-                scene_style_nodes_visited += final_style_report.visited;
-                if final_style_report.layout_changed
-                    || scene
-                        .layout_dirty(scene.root().clone())
-                        .expect("document scene root dirty state can be resolved")
-                {
-                    scene
-                        .compute_layout_with_text_measurer(text_measurer)
-                        .expect("document scene layout can be computed");
-                }
-                self.scroll_limits = scene
-                    .scroll_limits()
-                    .expect("document scene scroll limits can be resolved");
-            } else {
-                scene.apply_scroll_offsets(&self.states);
+            if final_style_report.layout_changed
+                || scene
+                    .layout_dirty(scene.root().clone())
+                    .expect("document scene root dirty state can be resolved")
+            {
+                scene
+                    .compute_layout_with_text_measurer(text_measurer)
+                    .expect("document scene layout can be computed");
             }
+            self.scroll_limits = scene
+                .scroll_limits()
+                .expect("document scene scroll limits can be resolved");
             self.clamp_scroll_states();
             scene.apply_scroll_offsets(&self.states);
             let layout = scene
@@ -208,12 +205,23 @@ impl DocumentEngine {
             let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
             (layout, scroll_chrome, false)
         } else {
-            let scroll_chrome = if scrollbar_animation_update.paint_changed {
-                scroll_chrome(&input_layout, &self.states, &self.scroll_limits)
+            let layout = if final_style_report.paint_changed || animation_update.paint_changed {
+                scene
+                    .resolved_layout_with_text_measurer(text_measurer)
+                    .expect("document scene layout can be resolved")
+            } else {
+                input_layout
+            };
+            let scroll_chrome = if input_update.changed
+                || final_style_report.paint_changed
+                || animation_update.paint_changed
+                || scrollbar_animation_update.paint_changed
+            {
+                scroll_chrome(&layout, &self.states, &self.scroll_limits)
             } else {
                 input_scroll_chrome
             };
-            (input_layout, scroll_chrome, true)
+            (layout, scroll_chrome, true)
         };
 
         self.cached_layout = Some(layout.clone());
@@ -242,9 +250,12 @@ impl DocumentEngine {
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
                 animation_changed_style: animation_update.changed()
+                    || final_style_report.changed()
                     || scrollbar_animation_update.changed(),
-                animation_changed_layout: animation_update.layout_changed,
+                animation_changed_layout: animation_update.layout_changed
+                    || final_style_report.layout_changed,
                 animation_changed_paint: animation_update.paint_changed
+                    || final_style_report.paint_changed
                     || scrollbar_animation_update.paint_changed,
             },
         }

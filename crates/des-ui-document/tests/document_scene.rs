@@ -58,6 +58,22 @@ impl TextMeasurer for CountingTextMeasurer {
     }
 }
 
+fn hover_input(position: Point) -> DocumentInput {
+    DocumentInput {
+        pointer: Some(PointerInput {
+            position,
+            primary_delta: Point::ZERO,
+            primary_down: false,
+            primary_pressed: false,
+            primary_clicked: false,
+            primary_click_count: 0,
+            secondary_clicked: false,
+            time_seconds: 0.0,
+        }),
+        scroll_delta: Point::ZERO,
+    }
+}
+
 #[test]
 fn scene_reparents_existing_element_without_reallocating_layout_node() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
@@ -739,6 +755,48 @@ fn document_engine_update_scene_eases_transitioned_paint_styles() {
 }
 
 #[test]
+fn document_engine_update_scene_transitioned_paint_styles_settle_to_target() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20))
+                .transition(Transition::ease_out(0.24)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(40, 70, 95)),
+        );
+    let hover_input = hover_input(Point::new(2.0, 2.0));
+    let mut engine = DocumentEngine::default();
+
+    engine.update_scene(&mut scene, &stylesheet);
+    let output = (0..30)
+        .map(|_| engine.update_scene_with_input(&mut scene, &stylesheet, hover_input))
+        .last()
+        .unwrap();
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
+    assert!(!output.animating);
+    assert!(!output.metrics.animation_changed_style);
+
+    let output = engine.update_scene_with_input(&mut scene, &stylesheet, hover_input);
+
+    assert!(!output.animating);
+    assert!(!output.metrics.animation_changed_style);
+}
+
+#[test]
 fn document_engine_update_scene_eases_transitioned_layout_styles() {
     let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
     scene
@@ -784,6 +842,238 @@ fn document_engine_update_scene_eases_transitioned_layout_styles() {
     assert_eq!(card.rect.size, Size::new(110.0, 50.0));
     assert!(output.animating);
     assert!(output.metrics.animation_changed_layout);
+}
+
+#[test]
+fn document_engine_update_scene_eases_full_box_model_layout_styles() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .min_size(20.0, 20.0)
+                .max_size(180.0, 120.0)
+                .padding(Insets::all(4.0))
+                .margin(Insets::all(2.0))
+                .gap(4.0)
+                .border_width(2.0)
+                .radius(4.0)
+                .font_size(12.0)
+                .transition(Transition::linear(0.25)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default()
+                .size(140.0, 80.0)
+                .min_size(40.0, 60.0)
+                .max_size(220.0, 160.0)
+                .padding(Insets::all(12.0))
+                .margin(Insets::all(10.0))
+                .gap(20.0)
+                .border_width(10.0)
+                .radius(20.0)
+                .font_size(20.0),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update_scene(&mut scene, &stylesheet);
+
+    let output =
+        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(4.0, 4.0)));
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.rect.size, Size::new(110.0, 50.0));
+    assert_eq!(card.style.min_size, Size::new(25.0, 30.0));
+    assert_eq!(card.style.max_size, Size::new(190.0, 130.0));
+    assert_eq!(card.style.padding, Insets::all(6.0));
+    assert_eq!(card.style.margin, Insets::all(4.0));
+    assert_eq!(card.style.gap, 8.0);
+    assert_eq!(card.style.border_width, Insets::all(4.0));
+    assert_eq!(card.style.radius, des_ui_document::CornerRadii::all(8.0));
+    assert_eq!(card.style.font_size, 14.0);
+    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_style);
+    assert!(output.metrics.animation_changed_layout);
+    assert!(output.metrics.animation_changed_paint);
+
+    let output =
+        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(4.0, 4.0)));
+
+    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_layout);
+}
+
+#[test]
+fn document_engine_update_scene_untransitioned_hover_color_reuses_layout_and_updates_paint() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(40, 70, 95)),
+        );
+    let mut engine = DocumentEngine::default();
+
+    engine.update_scene(&mut scene, &stylesheet);
+    let output =
+        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
+    assert!(output.metrics.reused_input_layout);
+    assert!(output.metrics.input_changed_state);
+    assert!(output.metrics.animation_changed_style);
+    assert!(!output.metrics.animation_changed_layout);
+    assert!(output.metrics.animation_changed_paint);
+}
+
+#[test]
+fn document_engine_update_scene_untransitioned_hover_layout_change_rebuilds_layout() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default().size(100.0, 40.0),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().size(140.0, 40.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    engine.update_scene(&mut scene, &stylesheet);
+    let output =
+        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.rect.size, Size::new(140.0, 40.0));
+    assert!(!output.metrics.reused_input_layout);
+    assert!(output.metrics.animation_changed_style);
+    assert!(output.metrics.animation_changed_layout);
+}
+
+#[test]
+fn document_engine_update_scene_snap_element_animation_clears_rendered_style() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element(
+            "root",
+            "card",
+            ElementSpec::new(ElementRole::Card).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Role(ElementRole::Card),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20))
+                .transition(Transition::ease_out(0.24)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(40, 70, 95)),
+        );
+    let mut engine = DocumentEngine::default();
+
+    engine.update_scene(&mut scene, &stylesheet);
+    engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+
+    assert!(engine.snap_element_animation("card"));
+
+    let output =
+        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    let card = output.layout.find("card").unwrap();
+
+    assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
+    assert!(!output.animating);
+}
+
+#[test]
+fn document_engine_update_scene_scrollbar_hover_transition_reuses_layout() {
+    let mut scene = DocumentScene::new(Size::new(180.0, 140.0));
+    scene
+        .append_element("root", "scroll-panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element(
+            "scroll-panel",
+            "content",
+            ElementSpec::new(ElementRole::Card),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .size(70.0, 70.0)
+                .overflow(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_expanded_width(10.0)
+                .transition(Transition::ease_out(0.25)),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(70.0, 140.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        hover_input(Point::new(64.0, 20.0)),
+    );
+    let vertical = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .unwrap();
+
+    assert!(vertical.expanded);
+    assert!(vertical.handle_rect.size.width > 2.0);
+    assert!(vertical.handle_rect.size.width < 10.0);
+    assert!(output.animating);
+    assert!(output.metrics.reused_input_layout);
+    assert!(!output.metrics.animation_changed_layout);
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        hover_input(Point::new(64.0, 20.0)),
+    );
+
+    assert!(output.metrics.reused_input_layout);
+    assert!(!output.metrics.animation_changed_layout);
 }
 
 #[test]
