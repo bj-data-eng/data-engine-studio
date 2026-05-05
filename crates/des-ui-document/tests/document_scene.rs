@@ -1,6 +1,7 @@
 use des_ui_document::{
-    AlignItems, ComputedStyle, Direction, DocumentEngine, DocumentScene, ElementId, ElementRole,
-    ElementSpec, ElementStateSelector, Insets, JustifyContent, Length, Overflow, Rect, Size, Style,
+    AlignItems, ComputedStyle, Direction, DocumentEngine, DocumentEventKind, DocumentInput,
+    DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector, Insets,
+    JustifyContent, Length, Overflow, Point, PointerInput, Rect, ScrollAxis, Size, Style,
     StyleSelector, StyleSheet,
 };
 use layout_engine::prelude::{
@@ -354,4 +355,147 @@ fn document_engine_update_scene_reports_scroll_chrome_for_overflow() {
     assert_eq!(output.scroll_chrome[0].element_id, ElementId::new("scroll"));
     assert_eq!(output.scroll_chrome[0].max_scroll, 200.0);
     assert_eq!(output.metrics.scroll_chrome_count, 1);
+}
+
+#[test]
+fn document_engine_update_scene_with_input_clicks_interactive_element() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element(
+            "root",
+            "button",
+            ElementSpec::new(ElementRole::Control).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("button"),
+        Style::default().size(120.0, 40.0),
+    );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(10.0, 10.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_pressed: true,
+                primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.hit_id, Some(ElementId::new("button")));
+    assert!(engine.element_state("button").unwrap().hovered);
+    assert!(engine.element_state("button").unwrap().pressed);
+    assert!(
+        output
+            .events
+            .iter()
+            .any(|event| event.target == ElementId::new("button")
+                && event.kind == DocumentEventKind::Clicked)
+    );
+}
+
+#[test]
+fn document_engine_update_scene_with_input_scrolls_overflow_container() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(50.0, 50.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::new(0.0, -40.0),
+        },
+    );
+
+    assert_eq!(engine.element_state("scroll").unwrap().scroll_y, 40.0);
+    assert!(
+        output
+            .events
+            .iter()
+            .any(|event| event.target == ElementId::new("scroll")
+                && event.kind == DocumentEventKind::Scrolled(ScrollAxis::Vertical))
+    );
+    assert!(output.metrics.input_changed_state);
+}
+
+#[test]
+fn document_engine_update_scene_with_input_rerenders_state_styles() {
+    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
+    scene
+        .append_element(
+            "root",
+            "button",
+            ElementSpec::new(ElementRole::Control).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("button"),
+            Style::default().size(120.0, 40.0),
+        )
+        .rule(
+            StyleSelector::id_state("button", ElementStateSelector::Hovered),
+            Style::default().size(160.0, 40.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene_with_input(
+        &mut scene,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(10.0, 10.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(
+        output.layout.find("button").unwrap().rect,
+        Rect::new(0.0, 0.0, 160.0, 40.0)
+    );
+    assert!(!output.metrics.reused_input_layout);
 }

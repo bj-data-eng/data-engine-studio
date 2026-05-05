@@ -112,37 +112,76 @@ impl DocumentEngine {
         scene: &mut DocumentScene,
         stylesheet: &StyleSheet,
     ) -> DocumentOutput {
+        self.update_scene_with_input(scene, stylesheet, DocumentInput::default())
+    }
+
+    pub fn update_scene_with_input(
+        &mut self,
+        scene: &mut DocumentScene,
+        stylesheet: &StyleSheet,
+        input: DocumentInput,
+    ) -> DocumentOutput {
+        let mut text_measurer = FallbackTextMeasurer;
+        self.update_scene_with_input_and_text_measurer(scene, stylesheet, input, &mut text_measurer)
+    }
+
+    pub fn update_scene_with_input_and_text_measurer(
+        &mut self,
+        scene: &mut DocumentScene,
+        stylesheet: &StyleSheet,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> DocumentOutput {
         let changes = self.sync_scene_states(scene);
-        let layout = scene
+        let input_layout = scene
             .resolve_layout(stylesheet, &self.states)
             .expect("document scene layout can be resolved");
         self.scroll_limits = scene
             .scroll_limits()
             .expect("document scene scroll limits can be resolved");
+        let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
+        let input_update =
+            self.apply_input(&input_layout, &input_scroll_chrome, input, text_measurer);
+        let clamp_changed = self.clamp_scroll_states();
+        let needs_final_layout =
+            input_update.changed || input_update.layout_changed || clamp_changed;
+
+        let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
+            let layout = scene
+                .resolve_layout(stylesheet, &self.states)
+                .expect("document scene layout can be resolved");
+            self.scroll_limits = scene
+                .scroll_limits()
+                .expect("document scene scroll limits can be resolved");
+            self.clamp_scroll_states();
+            let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
+            (layout, scroll_chrome, false)
+        } else {
+            (input_layout, input_scroll_chrome, true)
+        };
+
         self.cached_layout = Some(layout.clone());
         self.cached_document_root = None;
         self.cached_text_measurer_key = None;
-
-        let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
 
         DocumentOutput {
             changes,
             layout,
-            hit_id: None,
-            active_drag: None,
-            completed_drag: None,
+            hit_id: input_update.hit_id,
+            active_drag: input_update.active_drag,
+            completed_drag: input_update.completed_drag,
             text_selection: self.text_selection.clone(),
-            events: Vec::new(),
+            events: input_update.events,
             scroll_chrome,
             animating: false,
             metrics: DocumentMetrics {
                 element_count,
                 scroll_chrome_count,
                 reused_cached_layout: false,
-                reused_input_layout: false,
-                input_changed_state: false,
+                reused_input_layout,
+                input_changed_state: input_update.changed || clamp_changed,
                 animation_changed_style: false,
                 animation_changed_layout: false,
                 animation_changed_paint: false,
