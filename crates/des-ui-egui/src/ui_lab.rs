@@ -14,10 +14,10 @@ use views::{
 
 use des_ui_document::{
     Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentMetrics, DocumentOutput, DocumentUpdate, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector, Insets, Length, Point, PointerInput, Shadow, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions,
-    VisualElementClone,
+    DocumentMetrics, DocumentOutput, DocumentScene, DocumentUpdate, Element, ElementId,
+    ElementRole, ElementSpec, ElementStateSelector, Insets, Length, Point, PointerInput, Shadow,
+    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, VisualCloneOptions, VisualElementClone,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -146,7 +146,14 @@ pub(crate) struct UiLabState {
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
     pending_stage_scroll: Option<Point>,
+    scrolling_scene: Option<RetainedScrollingScene>,
     last_perf: UiLabPerf,
+}
+
+struct RetainedScrollingScene {
+    viewport: Size,
+    debug_overlay: bool,
+    scene: DocumentScene,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -183,6 +190,7 @@ impl Default for UiLabState {
             scroll_list_drop_preview: None,
             text_context_menu: None,
             pending_stage_scroll: None,
+            scrolling_scene: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -206,6 +214,11 @@ impl UiLabState {
     }
 
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
+        if self.view == LabView::Scrolling {
+            self.render_scrolling_scene(ui, debug_overlay);
+            return;
+        }
+
         configure_text_selection_input(ui.ctx());
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
@@ -275,6 +288,82 @@ impl UiLabState {
         }
         if debug_overlay {
             self.paint_debug_overlay_document(ui, origin, viewport);
+        }
+    }
+
+    fn render_scrolling_scene(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
+        configure_text_selection_input(ui.ctx());
+        let origin = ui.max_rect().min;
+        let viewport = ui.max_rect().size();
+        let viewport_size = Size::new(viewport.x, viewport.y);
+        let stylesheet = self.active_stylesheet();
+        let document_start = Instant::now();
+        let mut retained = self.take_scrolling_scene(viewport_size, debug_overlay);
+        let document_time = document_start.elapsed();
+
+        if let Some(scroll) = self.pending_stage_scroll.take() {
+            self.document_engine
+                .update_scene(&mut retained.scene, &stylesheet);
+            if let Some(stage) = self.document_engine.element_state_mut("stage") {
+                stage.scroll_x = scroll.x.max(0.0);
+                stage.scroll_y = scroll.y.max(0.0);
+            }
+        }
+
+        let input = document_input(ui, origin);
+        let pointer = input.pointer;
+        let engine_start = Instant::now();
+        let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+        let output = self
+            .document_engine
+            .update_scene_with_input_and_text_measurer(
+                &mut retained.scene,
+                &stylesheet,
+                input,
+                &mut text_measurer,
+            );
+        let engine_time = engine_start.elapsed();
+        self.scrolling_scene = Some(retained);
+
+        copy_selected_text_on_command(ui, &output);
+        apply_cursor_icon(ui, &output);
+
+        let paint_start = Instant::now();
+        paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
+        paint_scroll_chrome(ui, origin, &output.scroll_chrome);
+        let paint_time = paint_start.elapsed();
+        self.last_perf = UiLabPerf {
+            document_time,
+            engine_time,
+            paint_time,
+            metrics: output.metrics,
+        };
+        self.apply_document_events(ui, &output, pointer);
+        self.paint_text_context_menu(ui, origin, &output);
+        if output.animating {
+            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
+        }
+        if debug_overlay {
+            self.paint_debug_overlay_document(ui, origin, viewport);
+        }
+    }
+
+    fn take_scrolling_scene(
+        &mut self,
+        viewport: Size,
+        debug_overlay: bool,
+    ) -> RetainedScrollingScene {
+        if let Some(retained) = self.scrolling_scene.take()
+            && retained.viewport == viewport
+            && retained.debug_overlay == debug_overlay
+        {
+            return retained;
+        }
+
+        RetainedScrollingScene {
+            viewport,
+            debug_overlay,
+            scene: scrolling_lab_scene(viewport, debug_overlay),
         }
     }
 
@@ -816,6 +905,107 @@ impl UiLabState {
         }
 
         update
+    }
+
+    #[cfg(test)]
+    fn scrolling_scene_output_for_test(&mut self, viewport: Size) -> DocumentOutput {
+        let stylesheet = self.active_stylesheet();
+        let mut retained = self.take_scrolling_scene(viewport, false);
+        let output = self
+            .document_engine
+            .update_scene(&mut retained.scene, &stylesheet);
+        self.scrolling_scene = Some(retained);
+        output
+    }
+
+    #[cfg(test)]
+    fn scrolling_scene_output_with_stage_scroll_for_test(
+        &mut self,
+        viewport: Size,
+        scroll_y: f32,
+    ) -> DocumentOutput {
+        let stylesheet = self.active_stylesheet();
+        let mut retained = self.take_scrolling_scene(viewport, false);
+        self.document_engine
+            .update_scene(&mut retained.scene, &stylesheet);
+        self.document_engine
+            .element_state_mut("stage")
+            .unwrap()
+            .scroll_y = scroll_y;
+        let output = self
+            .document_engine
+            .update_scene(&mut retained.scene, &stylesheet);
+        self.scrolling_scene = Some(retained);
+        output
+    }
+}
+
+fn scrolling_lab_scene(viewport: Size, debug_overlay: bool) -> DocumentScene {
+    let document = scrolling_lab_document(viewport, debug_overlay);
+    let mut scene = DocumentScene::new(viewport);
+    for child in &document.root.children {
+        append_document_element_to_scene(&mut scene, "root", child);
+    }
+    scene
+}
+
+fn scrolling_lab_document(viewport: Size, debug_overlay: bool) -> Document {
+    Document::build(viewport, |ui| {
+        ui.element(
+            "lab-root",
+            ElementSpec::new(ElementRole::Panel).class("lab-root"),
+            |ui| {
+                render_topbar(ui, debug_overlay);
+                ui.element(
+                    "lab-body",
+                    ElementSpec::new(ElementRole::Panel).class("lab-body"),
+                    |ui| {
+                        render_nav(ui, LabView::Scrolling);
+                        render_stage(
+                            ui,
+                            LabView::Scrolling,
+                            true,
+                            false,
+                            true,
+                            0,
+                            false,
+                            1,
+                            [0, 2, 4],
+                            [0, 1, 2],
+                            core::array::from_fn(|index| index),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            ShadowTuneState::default(),
+                            ShadowTuneState::hover_default(),
+                        );
+                    },
+                );
+            },
+        );
+    })
+}
+
+fn append_document_element_to_scene(scene: &mut DocumentScene, parent: &str, element: &Element) {
+    if let Some(text) = &element.text {
+        scene
+            .append_text(
+                parent,
+                element.id.clone(),
+                element.spec.clone(),
+                text.clone(),
+            )
+            .unwrap();
+    } else {
+        scene
+            .append_element(parent, element.id.clone(), element.spec.clone())
+            .unwrap();
+    }
+    for child in &element.children {
+        append_document_element_to_scene(scene, element.id.as_str(), child);
     }
 }
 

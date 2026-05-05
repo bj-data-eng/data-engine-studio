@@ -46,12 +46,22 @@ fn lab_output(initial_view: &str) -> DocumentOutput {
 }
 
 fn lab_output_with_size(initial_view: &str, size: Size) -> DocumentOutput {
+    if initial_view == "scrolling" {
+        return UiLabState::new(Some(initial_view)).scrolling_scene_output_for_test(size);
+    }
     let mut engine = DocumentEngine::default();
     let document = UiLabState::new(Some(initial_view)).document(size, false);
     engine.update(&document, &stylesheet())
 }
 
 fn lab_output_with_stage_scroll(initial_view: &str, scroll_y: f32) -> DocumentOutput {
+    if initial_view == "scrolling" {
+        return UiLabState::new(Some(initial_view))
+            .scrolling_scene_output_with_stage_scroll_for_test(
+                Size::new(TEST_WIDTH, TEST_HEIGHT),
+                scroll_y,
+            );
+    }
     let mut engine = DocumentEngine::default();
     let document =
         UiLabState::new(Some(initial_view)).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
@@ -1193,6 +1203,7 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
 #[test]
 fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
     let output = lab_output("scrolling");
+    assert!(output.metrics.scene_style_nodes_visited > 0);
 
     assert_scroll_chrome(&output, "scroll-panel-a-list", ScrollAxis::Vertical);
     assert_scroll_chrome(&output, "scroll-panel-b-list", ScrollAxis::Horizontal);
@@ -1230,6 +1241,17 @@ fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
         "scroll-nested-two-axis-list",
         ScrollAxis::Vertical,
     );
+}
+
+#[test]
+fn scrolling_view_reuses_retained_scene_on_warm_update() {
+    let mut state = UiLabState::new(Some("scrolling"));
+    let first = state.scrolling_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let warm = state.scrolling_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+
+    assert!(first.metrics.scene_style_nodes_visited > 0);
+    assert_eq!(warm.metrics.scene_style_nodes_visited, 0);
+    assert!(warm.metrics.reused_input_layout);
 }
 
 #[test]
