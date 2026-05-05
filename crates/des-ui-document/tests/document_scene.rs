@@ -905,6 +905,68 @@ fn document_engine_update_scene_wraps_row_children_and_expands_height() {
 }
 
 #[test]
+fn document_engine_update_scene_fill_width_uses_parent_content_width_after_box_model() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("panel", "row", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .size(200.0, 120.0)
+                .border_width(2.0)
+                .padding(Insets::symmetric(12.0, 8.0)),
+        )
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(24.0))
+                .margin(Insets::symmetric(3.0, 0.0)),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let row = output.layout.find("row").unwrap();
+
+    assert_eq!(row.rect.origin, Point::new(17.0, 10.0));
+    assert_eq!(row.rect.size, Size::new(166.0, 24.0));
+}
+
+#[test]
+fn document_engine_update_scene_fill_size_does_not_inflate_auto_parent() {
+    let mut scene = DocumentScene::new(Size::new(240.0, 160.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("panel", "child", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default().width(Length::Auto).height(Length::Auto),
+        )
+        .rule(
+            StyleSelector::id("child"),
+            Style::default()
+                .width_fill()
+                .height_fill()
+                .min_size(24.0, 24.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let panel = output.layout.find("panel").unwrap();
+
+    assert_eq!(panel.rect.size, Size::new(24.0, 24.0));
+}
+
+#[test]
 fn document_engine_update_scene_with_input_scrolls_overflow_container() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene

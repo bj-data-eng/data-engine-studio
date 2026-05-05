@@ -910,6 +910,11 @@ fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
         padding: layout_rect(style.padding),
         border: layout_rect(style.border_width),
         align_items: Some(layout_align_items(style.align_items)),
+        align_self: if style.width == Length::Fill || style.height == Length::Fill {
+            Some(LayoutAlignItems::Stretch)
+        } else {
+            None
+        },
         justify_content: Some(layout_justify_content(style.justify_content)),
         gap: LayoutSize::length(style.gap),
         flex_direction: layout_flex_direction(style.direction),
@@ -927,7 +932,7 @@ fn dimension_from_document(length_value: Length) -> Dimension {
     match length_value {
         Length::Auto => Dimension::auto(),
         Length::Px(value) => length(value),
-        Length::Fill => percent(1.0),
+        Length::Fill => Dimension::auto(),
         Length::Percent(value) => percent(value),
     }
 }
@@ -936,7 +941,7 @@ fn length_percentage_auto_from_document(length_value: Length) -> LengthPercentag
     match length_value {
         Length::Auto => LengthPercentageAuto::auto(),
         Length::Px(value) => length(value),
-        Length::Fill => percent(1.0),
+        Length::Fill => LengthPercentageAuto::auto(),
         Length::Percent(value) => percent(value),
     }
 }
