@@ -768,6 +768,51 @@ fn document_engine_update_scene_hits_absolute_viewport_child_outside_parent() {
 }
 
 #[test]
+fn document_engine_update_scene_positions_absolute_anchor_after_target_layout() {
+    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
+    scene
+        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+        .unwrap();
+    scene
+        .append_element("panel", "popover", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    scene
+        .append_element("panel", "anchor", ElementSpec::new(ElementRole::Card))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("panel"),
+            Style::default()
+                .width(Length::Auto)
+                .height(Length::Auto)
+                .padding(Insets::all(10.0))
+                .border_width(2.0),
+        )
+        .rule(
+            StyleSelector::id("anchor"),
+            Style::default().size(80.0, 30.0),
+        )
+        .rule(
+            StyleSelector::id("popover"),
+            Style::default()
+                .absolute_parent()
+                .anchor_bottom_start("anchor", 0.0, -1.0)
+                .size(60.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_scene(&mut scene, &stylesheet);
+    let panel = output.layout.find("panel").unwrap();
+    let anchor = output.layout.find("anchor").unwrap();
+    let popover = output.layout.find("popover").unwrap();
+
+    assert_eq!(panel.rect.size, Size::new(104.0, 54.0));
+    assert_eq!(anchor.rect.origin, Point::new(12.0, 12.0));
+    assert_eq!(popover.rect.origin, Point::new(12.0, 41.0));
+    assert_eq!(popover.rect.size, Size::new(60.0, 20.0));
+}
+
+#[test]
 fn document_engine_update_scene_with_input_scrolls_overflow_container() {
     let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
     scene

@@ -4,7 +4,9 @@ use crate::geometry::{
     Rect as DocumentRect, Size,
 };
 use crate::state::{ElementState, ResolvedElement};
-use crate::style::{ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position};
+use crate::style::{
+    AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, resolve_style_with_position,
+};
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
 use layout_engine::prelude::{
@@ -270,7 +272,14 @@ impl DocumentScene {
         &self,
         text_measurer: &mut dyn TextMeasurer,
     ) -> SceneResult<ResolvedElement> {
-        self.resolved_element(&self.root, Point::ZERO, Point::ZERO, text_measurer)
+        let mut anchors = HashMap::new();
+        self.resolved_element(
+            &self.root,
+            Point::ZERO,
+            Point::ZERO,
+            text_measurer,
+            &mut anchors,
+        )
     }
 
     pub(crate) fn scroll_limits(&self) -> SceneResult<HashMap<ElementId, Size>> {
@@ -416,6 +425,7 @@ impl DocumentScene {
         parent_origin: Point,
         parent_scroll_offset: Point,
         text_measurer: &mut dyn TextMeasurer,
+        anchors: &mut HashMap<ElementId, DocumentRect>,
     ) -> SceneResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
@@ -425,18 +435,20 @@ impl DocumentScene {
             self.viewport,
             parent_origin,
             parent_scroll_offset,
+            anchors,
         );
         let text_layout = element
             .text
             .as_deref()
             .map(|text| measure_text(text, &element.computed_style, rect, text_measurer));
-        let children = self
-            .children(id.clone())?
-            .into_iter()
-            .map(|child| {
-                self.resolved_element(&child, rect.origin, element.scroll_offset, text_measurer)
-            })
-            .collect::<SceneResult<Vec<_>>>()?;
+        anchors.insert(element.id.clone(), rect);
+        let children = self.resolved_children(
+            id,
+            rect.origin,
+            element.scroll_offset,
+            text_measurer,
+            anchors,
+        )?;
 
         Ok(ResolvedElement {
             id: element.id.clone(),
@@ -455,6 +467,46 @@ impl DocumentScene {
             interactive: element.spec.interactive && !element.spec.disabled,
             children,
         })
+    }
+
+    fn resolved_children(
+        &self,
+        id: &ElementId,
+        parent_origin: Point,
+        parent_scroll_offset: Point,
+        text_measurer: &mut dyn TextMeasurer,
+        anchors: &mut HashMap<ElementId, DocumentRect>,
+    ) -> SceneResult<Vec<ResolvedElement>> {
+        let children = self.children(id.clone())?;
+        let mut resolved = vec![None; children.len()];
+
+        for (index, child) in children.iter().enumerate() {
+            if self.element(child)?.computed_style.position != Position::Flow {
+                continue;
+            }
+            resolved[index] = Some(self.resolved_element(
+                child,
+                parent_origin,
+                parent_scroll_offset,
+                text_measurer,
+                anchors,
+            )?);
+        }
+
+        for (index, child) in children.iter().enumerate() {
+            if resolved[index].is_some() {
+                continue;
+            }
+            resolved[index] = Some(self.resolved_element(
+                child,
+                parent_origin,
+                parent_scroll_offset,
+                text_measurer,
+                anchors,
+            )?);
+        }
+
+        Ok(resolved.into_iter().flatten().collect())
     }
 
     fn collect_positions(
@@ -668,7 +720,14 @@ fn resolved_document_rect(
     viewport: Size,
     parent_origin: Point,
     parent_scroll_offset: Point,
+    anchors: &HashMap<ElementId, DocumentRect>,
 ) -> DocumentRect {
+    if let Some(anchor) = &style.anchor {
+        if let Some(anchor_rect) = anchors.get(&anchor.target) {
+            return anchored_document_rect(style, *anchor_rect, raw_rect.size);
+        }
+    }
+
     if style.position != Position::AbsoluteViewport {
         return DocumentRect::new(
             parent_origin.x + raw_rect.origin.x - parent_scroll_offset.x,
@@ -695,6 +754,40 @@ fn resolved_document_rect(
         ),
         raw_rect.size.width,
         raw_rect.size.height,
+    )
+}
+
+fn anchored_document_rect(
+    style: &ComputedStyle,
+    anchor_rect: DocumentRect,
+    measured: Size,
+) -> DocumentRect {
+    let anchor = style
+        .anchor
+        .as_ref()
+        .expect("anchored document rect requires an anchor style");
+    let (x, y) = match anchor.placement {
+        AnchorPlacement::TopStart => (anchor_rect.origin.x, anchor_rect.origin.y - measured.height),
+        AnchorPlacement::TopEnd => (
+            anchor_rect.right() - measured.width,
+            anchor_rect.origin.y - measured.height,
+        ),
+        AnchorPlacement::BottomStart => (anchor_rect.origin.x, anchor_rect.bottom()),
+        AnchorPlacement::BottomEnd => (anchor_rect.right() - measured.width, anchor_rect.bottom()),
+        AnchorPlacement::LeftStart => (anchor_rect.origin.x - measured.width, anchor_rect.origin.y),
+        AnchorPlacement::LeftEnd => (
+            anchor_rect.origin.x - measured.width,
+            anchor_rect.bottom() - measured.height,
+        ),
+        AnchorPlacement::RightStart => (anchor_rect.right(), anchor_rect.origin.y),
+        AnchorPlacement::RightEnd => (anchor_rect.right(), anchor_rect.bottom() - measured.height),
+    };
+
+    DocumentRect::new(
+        x + anchor.offset.x + style.margin.left,
+        y + anchor.offset.y + style.margin.top,
+        measured.width,
+        measured.height,
     )
 }
 
