@@ -329,6 +329,40 @@ fn nav_uses_explicit_card_spacing_and_styled_scrollbar() {
 }
 
 #[test]
+fn lab_shell_tracks_document_viewport_size() {
+    for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
+        let output = lab_output_with_size("layout", viewport);
+        let lab_root = frame(&output, "lab-root");
+        let topbar = frame(&output, "topbar");
+        let lab_body = frame(&output, "lab-body");
+        let nav = frame(&output, "nav");
+        let stage = frame(&output, "stage");
+
+        assert_eq!(lab_root.rect.size, viewport);
+        assert_eq!(topbar.rect.size.width, viewport.width);
+        assert_eq!(lab_body.rect.size.width, viewport.width);
+        assert_eq!(
+            lab_body.rect.size.height,
+            viewport.height - topbar.rect.size.height
+        );
+        assert_eq!(nav.rect.size.width, 242.0);
+        assert_eq!(
+            nav.rect.size.height,
+            lab_body.rect.size.height - lab_body.style.padding.top - lab_body.style.padding.bottom
+        );
+        assert_eq!(stage.rect.size.height, nav.rect.size.height);
+        assert_eq!(
+            stage.rect.size.width,
+            lab_body.rect.size.width
+                - lab_body.style.padding.left
+                - lab_body.style.padding.right
+                - lab_body.style.gap
+                - nav.rect.size.width
+        );
+    }
+}
+
+#[test]
 fn styling_view_renders_structural_selector_specimens() {
     let output = lab_output("styling");
 

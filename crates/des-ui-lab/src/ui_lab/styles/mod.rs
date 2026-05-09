@@ -92,14 +92,16 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("lab-root"),
             Style::default()
-                .size(1320.0, 780.0)
+                .width_fill()
+                .height_fill()
                 .background(BACKGROUND)
                 .gap(0.0),
         )
         .rule(
             StyleSelector::class("topbar"),
             Style::default()
-                .size(1320.0, 58.0)
+                .width_fill()
+                .height(Length::Px(58.0))
                 .padding(Insets::symmetric(18.0, 10.0))
                 .gap(3.0)
                 .background(PANEL),
@@ -108,7 +110,9 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("lab-body"),
             Style::default()
                 .flex_direction(FlexDirection::Row)
-                .size(1320.0, 722.0)
+                .width_fill()
+                .height(Length::Px(0.0))
+                .flex_grow(1.0)
                 .padding(Insets::all(14.0))
                 .gap(14.0)
                 .background(BACKGROUND),
@@ -116,7 +120,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("nav"),
             Style::default()
-                .size(242.0, 690.0)
+                .width(Length::Px(242.0))
+                .height_fill()
                 .padding(Insets::all(12.0))
                 .gap(8.0)
                 .background(PANEL)
@@ -128,7 +133,9 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("stage"),
             Style::default()
-                .size(1036.0, 690.0)
+                .width(Length::Px(0.0))
+                .height_fill()
+                .flex_grow(1.0)
                 .padding(Insets::all(18.0))
                 .gap(12.0)
                 .background(PANEL_ALT)
