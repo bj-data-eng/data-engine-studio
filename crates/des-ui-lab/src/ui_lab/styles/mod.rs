@@ -22,9 +22,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::Element(Element::Div),
-            Style::default()
-                .flex_direction(FlexDirection::Column)
-                .background(PANEL),
+            Style::default().flex_direction(FlexDirection::Column),
         )
         .rule(
             StyleSelector::Element(Element::Button),
@@ -559,7 +557,10 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Auto)
                 .min_size(0.0, 132.0)
                 .padding(Insets::all(10.0))
-                .gap(8.0),
+                .gap(8.0)
+                .background(PANEL)
+                .border(STROKE)
+                .radius(6.0),
         )
         .rule(
             StyleSelector::class("control-row"),
@@ -710,7 +711,10 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .width(Length::Px(190.0))
                 .height(Length::Px(104.0))
                 .padding(Insets::all(10.0))
-                .gap(8.0),
+                .gap(8.0)
+                .background(PANEL)
+                .border(STROKE)
+                .radius(6.0),
         )
         .rule(
             StyleSelector::class("loop-button"),

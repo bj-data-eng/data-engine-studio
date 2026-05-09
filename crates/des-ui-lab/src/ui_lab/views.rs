@@ -1369,8 +1369,8 @@ fn render_styling_view(
             interactive_labeled_row(
                 ui,
                 "style-row-element",
-                "Role",
-                "Element::Div sets base surface behavior.",
+                "Element",
+                "Element::Div stays structural; classes define surfaces.",
             );
             interactive_labeled_row(
                 ui,
