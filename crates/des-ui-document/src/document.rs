@@ -529,8 +529,16 @@ impl Document {
                 .layout(element.layout_node)
                 .map_err(layout_error)?;
             let max_scroll = Size::new(
-                (layout.content_size.width - layout.size.width).max(0.0),
-                (layout.content_size.height - layout.size.height).max(0.0),
+                scroll_limit_for_axis(
+                    layout.content_size.width,
+                    layout.size.width,
+                    style.border_width.right,
+                ),
+                scroll_limit_for_axis(
+                    layout.content_size.height,
+                    layout.size.height,
+                    style.border_width.bottom,
+                ),
             );
             if max_scroll.width > 0.0 || max_scroll.height > 0.0 {
                 limits.insert(id, max_scroll);
@@ -1169,6 +1177,15 @@ fn table_column_index(table: &TableSpec, column_id: &TableColumnId) -> Option<i1
 fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) -> f32 {
     let width = width.max(min_width);
     max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
+}
+
+fn scroll_limit_for_axis(content_size: f32, outer_size: f32, trailing_border_width: f32) -> f32 {
+    let overflow = content_size - outer_size;
+    if overflow > 0.0 {
+        overflow + trailing_border_width
+    } else {
+        0.0
+    }
 }
 
 fn child_parent_origin(

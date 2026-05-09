@@ -782,6 +782,60 @@ fn document_engine_update_reports_scroll_chrome_for_overflow() {
 }
 
 #[test]
+fn scroll_limits_use_inner_content_viewport_after_border_and_padding() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
+        .unwrap();
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .padding(Insets::all(10.0))
+                .border_width(2.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(76.0, 160.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    engine.update(&mut document, &stylesheet);
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(50.0, 50.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::new(0.0, -1000.0),
+        },
+    );
+    let scroll = output.layout.find("scroll").unwrap();
+    let content = output.layout.find("content").unwrap();
+    let content_viewport = scroll
+        .rect
+        .inset(scroll.style.border_width)
+        .inset(scroll.style.padding);
+
+    assert_eq!(engine.element_state("scroll").unwrap().scroll_y, 84.0);
+    assert_eq!(output.scroll_chrome[0].max_scroll, 84.0);
+    assert_eq!(content.rect.bottom(), content_viewport.bottom());
+}
+
+#[test]
 fn document_engine_update_with_input_clicks_interactive_element() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document
