@@ -122,6 +122,19 @@ fn center(rect: des_ui_document::Rect) -> egui::Pos2 {
     )
 }
 
+fn count_visible_text_selection_pixels(image: &image::RgbaImage) -> usize {
+    image
+        .pixels()
+        .filter(|pixel| {
+            let [red, green, blue, alpha] = pixel.0;
+            alpha > 220
+                && (90..=150).contains(&red)
+                && (70..=125).contains(&green)
+                && (145..=205).contains(&blue)
+        })
+        .count()
+}
+
 fn scroll_harness_stage(harness: &mut Harness<'_, UiLabState>, scroll_y: f32) {
     harness.run();
     harness
@@ -1337,9 +1350,14 @@ fn text_view_paints_pointer_selection_on_selectable_text() {
     let after = render_harness(&mut harness);
 
     let comparison = compare_images(&before, &after);
+    let selection_pixels = count_visible_text_selection_pixels(&after);
     assert!(
         comparison.differing_pixels > 0,
         "dragging selectable text should visibly paint a document text selection"
+    );
+    assert!(
+        selection_pixels > 20,
+        "text selection should use the visible accent selection color; found {selection_pixels} matching pixels"
     );
 }
 

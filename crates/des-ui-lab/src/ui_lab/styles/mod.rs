@@ -86,8 +86,8 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .font_size(13.0)
                 .text_color(TEXT)
-                .text_selection_background(Color::rgba(234, 221, 255, 190))
-                .text_selection_color(TEXT),
+                .text_selection_background(Color::rgba(103, 80, 164, 220))
+                .text_selection_color(PANEL),
         )
         .rule(
             StyleSelector::class("lab-root"),
