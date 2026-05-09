@@ -1231,7 +1231,15 @@ fn control_radio_group(ui: &mut des_ui_document::DocumentBuilder, choice: usize)
                             ElementSpec::new(Element::Div)
                                 .class("radio-dot")
                                 .selected(choice == index),
-                            |_| {},
+                            |ui| {
+                                if choice == index {
+                                    ui.element(
+                                        format!("{id}-dot-fill"),
+                                        ElementSpec::new(Element::Div).class("radio-dot-fill"),
+                                        |_| {},
+                                    );
+                                }
+                            },
                         );
                         ui.text_element(
                             format!("{id}-label"),

@@ -377,6 +377,25 @@ fn interaction_view_renders_common_control_elements() {
     assert!(frame(&output, "control-checkbox").interactive);
     assert!(frame(&output, "control-input-name").interactive);
     assert!(!frame(&output, "control-input-disabled").interactive);
+    assert!(
+        output
+            .snapshot()
+            .find("control-radio-local-dot-fill")
+            .is_some(),
+        "selected radio option should render an explicit inner dot"
+    );
+    assert!(
+        output
+            .snapshot()
+            .find("control-radio-remote-dot-fill")
+            .is_none(),
+        "unselected radio option should not render an inner dot"
+    );
+    assert_eq!(
+        frame(&output, "control-radio-local-dot").style.background,
+        Some(PANEL),
+        "selected radio ring should not collapse into a solid filled circle"
+    );
 }
 
 #[test]
@@ -416,6 +435,30 @@ fn common_control_clicks_update_lab_state() {
         harness.run();
         assert_state(harness.state());
     }
+}
+
+#[test]
+fn radio_click_refreshes_retained_document_in_same_frame() {
+    let mut harness = lab_harness("interaction");
+    let target = center(state_rect(harness.state(), "control-radio-remote"));
+
+    harness.hover_at(target);
+    harness.drag_at(target);
+    harness.drop_at(target);
+    harness.run();
+
+    assert_eq!(harness.state().radio_choice, 1);
+    assert_eq!(
+        harness
+            .state()
+            .lab_document
+            .as_ref()
+            .expect("render should retain the lab document")
+            .key
+            .radio_choice,
+        1,
+        "clicked radio action should rebuild the retained document before paint settles"
+    );
 }
 
 #[test]

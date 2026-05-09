@@ -613,6 +613,8 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("radio-dot"),
             Style::default()
                 .size(18.0, 18.0)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
                 .background(PANEL)
                 .border(STROKE)
                 .border_width(2.0)
@@ -620,10 +622,14 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class_state("radio-dot", ElementStateSelector::Selected),
+            Style::default().border(STROKE_SELECTED).border_width(2.0),
+        )
+        .rule(
+            StyleSelector::class("radio-dot-fill"),
             Style::default()
+                .size(8.0, 8.0)
                 .background(STROKE_SELECTED)
-                .border(STROKE_SELECTED)
-                .border_width(5.0),
+                .radius(4.0),
         )
         .rule(
             StyleSelector::class("control-label"),

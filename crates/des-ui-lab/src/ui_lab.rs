@@ -294,6 +294,20 @@ impl UiLabState {
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
         }
+        if self.apply_clicked_document_actions(&output) {
+            let stylesheet = self.active_stylesheet();
+            let mut retained = self.take_lab_document(viewport_size, debug_overlay);
+            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+            output = self.document_engine.update_with_input_and_text_measurer(
+                &mut retained.document,
+                &stylesheet,
+                repaint_input_after_action(input),
+                &mut text_measurer,
+            );
+            self.lab_document = Some(retained);
+            self.sync_drag_state(ui, &output);
+            ui.ctx().request_repaint();
+        }
         let engine_time = engine_start.elapsed();
 
         copy_selected_text_on_command(ui, &output);
@@ -384,12 +398,6 @@ impl UiLabState {
         }
         for event in &output.events {
             match event.kind {
-                DocumentEventKind::Clicked => {
-                    if let Some(action) = lab_action_for_id(event.target.as_str()) {
-                        self.apply_lab_action(action);
-                        ui.ctx().request_repaint();
-                    }
-                }
                 DocumentEventKind::Pressed => {
                     if source_item_element_id(event.target.as_str()).is_some() {
                         ui.ctx().request_repaint();
@@ -417,6 +425,19 @@ impl UiLabState {
             self.dropdown_open = false;
             ui.ctx().request_repaint();
         }
+    }
+
+    fn apply_clicked_document_actions(&mut self, output: &DocumentOutput) -> bool {
+        let mut changed = false;
+        for event in &output.events {
+            if event.kind == DocumentEventKind::Clicked
+                && let Some(action) = lab_action_for_id(event.target.as_str())
+            {
+                self.apply_lab_action(action);
+                changed = true;
+            }
+        }
+        changed
     }
 
     fn sync_drag_state(&mut self, ui: &egui::Ui, output: &DocumentOutput) -> bool {
@@ -1102,6 +1123,19 @@ fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {
             || id.as_str() == "control-dropdown-menu"
             || id.as_str().starts_with("control-dropdown-option-")
     })
+}
+
+fn repaint_input_after_action(input: DocumentInput) -> DocumentInput {
+    DocumentInput {
+        pointer: input.pointer.map(|mut pointer| {
+            pointer.primary_pressed = false;
+            pointer.primary_clicked = false;
+            pointer.primary_click_count = 0;
+            pointer.secondary_clicked = false;
+            pointer
+        }),
+        scroll_delta: Point::ZERO,
+    }
 }
 
 fn apply_cursor_icon(ui: &egui::Ui, output: &DocumentOutput) {
