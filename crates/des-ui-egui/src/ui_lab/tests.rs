@@ -33,9 +33,7 @@ fn lab_rect_in(initial_view: &str, id: &str) -> des_ui_document::Rect {
 }
 
 fn state_rect(state: &UiLabState, id: &str) -> des_ui_document::Rect {
-    let mut engine = DocumentEngine::default();
-    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let output = engine.update(&document, &stylesheet());
+    let output = state_output(state);
     find_frame(&output.layout, id)
         .unwrap_or_else(|| panic!("expected layout frame for {id}"))
         .rect
@@ -46,32 +44,12 @@ fn lab_output(initial_view: &str) -> DocumentOutput {
 }
 
 fn lab_output_with_size(initial_view: &str, size: Size) -> DocumentOutput {
-    if initial_view == "scrolling" {
-        return UiLabState::new(Some(initial_view)).scrolling_scene_output_for_test(size);
-    }
-    if initial_view == "draggable" {
-        return UiLabState::new(Some(initial_view)).draggable_scene_output_for_test(size);
-    }
-    let mut engine = DocumentEngine::default();
-    let document = UiLabState::new(Some(initial_view)).document(size, false);
-    engine.update(&document, &stylesheet())
+    UiLabState::new(Some(initial_view)).lab_scene_output_for_test(size)
 }
 
 fn lab_output_with_stage_scroll(initial_view: &str, scroll_y: f32) -> DocumentOutput {
-    if initial_view == "scrolling" {
-        return UiLabState::new(Some(initial_view))
-            .scrolling_scene_output_with_stage_scroll_for_test(
-                Size::new(TEST_WIDTH, TEST_HEIGHT),
-                scroll_y,
-            );
-    }
-    let mut engine = DocumentEngine::default();
-    let document =
-        UiLabState::new(Some(initial_view)).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let stylesheet = stylesheet();
-    engine.update(&document, &stylesheet);
-    engine.element_state_mut("stage").unwrap().scroll_y = scroll_y;
-    engine.update(&document, &stylesheet)
+    UiLabState::new(Some(initial_view))
+        .lab_scene_output_with_stage_scroll_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT), scroll_y)
 }
 
 fn find_frame<'a>(frame: &'a ResolvedElement, id: &str) -> Option<&'a ResolvedElement> {
@@ -89,31 +67,15 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
 }
 
 fn state_output(state: &UiLabState) -> DocumentOutput {
-    if state.view == LabView::Draggable {
-        let mut state = state.clone_for_retained_test();
-        return state.draggable_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
-    }
-    let mut engine = DocumentEngine::default();
-    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    engine.update(&document, &state.active_stylesheet())
+    let mut state = state.clone_for_retained_test();
+    state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT))
 }
 
 fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> DocumentOutput {
-    if state.view == LabView::Draggable {
-        let mut state = state.clone_for_retained_test();
-        let mut text_measurer = EguiTextMeasurer::new(ctx);
-        return state.draggable_scene_output_with_text_measurer_for_test(
-            Size::new(TEST_WIDTH, TEST_HEIGHT),
-            &mut text_measurer,
-        );
-    }
-    let mut engine = DocumentEngine::default();
+    let mut state = state.clone_for_retained_test();
     let mut text_measurer = EguiTextMeasurer::new(ctx);
-    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    engine.update_with_input_and_text_measurer(
-        &document,
-        &state.active_stylesheet(),
-        DocumentInput::default(),
+    state.lab_scene_output_with_text_measurer_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
         &mut text_measurer,
     )
 }
@@ -130,12 +92,8 @@ fn state_rect_with_egui_text(
 }
 
 fn state_output_with_scroll(state: &UiLabState, scroll_y: f32) -> DocumentOutput {
-    let mut engine = DocumentEngine::default();
-    let stylesheet = state.active_stylesheet();
-    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    engine.update(&document, &stylesheet);
-    engine.element_state_mut("stage").unwrap().scroll_y = scroll_y;
-    engine.update(&document, &stylesheet)
+    let mut state = state.clone_for_retained_test();
+    state.lab_scene_output_with_stage_scroll_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT), scroll_y)
 }
 
 fn has_class(frame: &ResolvedElement, class: &str) -> bool {
@@ -686,14 +644,9 @@ fn draggable_drag_drop_grid_moves_items_between_cells() {
         "moved item should be laid out inside the destination cell"
     );
 
-    let document = harness
-        .state()
-        .document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let stylesheet = harness.state().active_stylesheet();
     let output = harness
         .state_mut()
-        .document_engine
-        .update(&document, &stylesheet);
+        .lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let item = frame(&output, "drag-item-0");
     assert_eq!(
         item.style.height,
@@ -748,14 +701,9 @@ fn draggable_drag_drop_reorders_with_nearest_item_gap() {
     assert_eq!(harness.state().drag_item_cells[0], 0);
     assert!(harness.state().drag_item_order[0] > harness.state().drag_item_order[1]);
 
-    let document = harness
-        .state()
-        .document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let stylesheet = harness.state().active_stylesheet();
     let output = harness
         .state_mut()
-        .document_engine
-        .update(&document, &stylesheet);
+        .lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     assert_eq!(
         frame(&output, "drag-item-1").style.margin,
         Insets::ZERO,
@@ -837,14 +785,11 @@ fn draggable_drag_drop_requires_handle_to_drag_parent() {
 
 #[test]
 fn draggable_drag_drop_sets_handle_cursors() {
-    let state = UiLabState::new(Some("draggable"));
-    let output = state_output(&state);
+    let mut state = UiLabState::new(Some("draggable"));
+    let output = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let start = center(frame(&output, "drag-handle-0").rect);
-    let mut engine = DocumentEngine::default();
-    let document = state.document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let output = engine.update_with_input(
-        &document,
-        &state.active_stylesheet(),
+    let output = state.lab_scene_output_with_input_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
                 position: Point::new(start.x, start.y),
@@ -864,7 +809,7 @@ fn draggable_drag_drop_sets_handle_cursors() {
         Some(egui::CursorIcon::PointingHand)
     );
 
-    let mut output = state_output(&state);
+    let mut output = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     output.active_drag = Some(DocumentDrag {
         target: ElementId::new("drag-handle-0"),
         origin: Point::new(start.x, start.y),
@@ -1013,8 +958,8 @@ fn draggable_drag_drop_cells_expand_to_fit_stacked_items() {
 #[test]
 fn draggable_view_reuses_retained_scene_on_warm_update() {
     let mut state = UiLabState::new(Some("draggable"));
-    let first = state.draggable_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
-    let warm = state.draggable_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let first = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let warm = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
 
     assert!(first.metrics.scene_style_nodes_visited > 0);
     assert_eq!(warm.metrics.scene_style_nodes_visited, 0);
@@ -1272,12 +1217,45 @@ fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
 #[test]
 fn scrolling_view_reuses_retained_scene_on_warm_update() {
     let mut state = UiLabState::new(Some("scrolling"));
-    let first = state.scrolling_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
-    let warm = state.scrolling_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let first = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let warm = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
 
     assert!(first.metrics.scene_style_nodes_visited > 0);
     assert_eq!(warm.metrics.scene_style_nodes_visited, 0);
     assert!(warm.metrics.reused_input_layout);
+}
+
+#[test]
+fn every_lab_view_reuses_retained_scene_on_warm_update() {
+    for view in [
+        "layout",
+        "interaction",
+        "draggable",
+        "styling",
+        "animation",
+        "scrolling",
+        "table",
+        "text",
+        "nesting",
+        "graph",
+    ] {
+        let mut state = UiLabState::new(Some(view));
+        let first = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+        let warm = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+
+        assert!(
+            first.metrics.scene_style_nodes_visited > 0,
+            "{view} should resolve scene styles on the cold update"
+        );
+        assert_eq!(
+            warm.metrics.scene_style_nodes_visited, 0,
+            "{view} should skip scene style traversal on the warm update"
+        );
+        assert!(
+            warm.metrics.reused_input_layout,
+            "{view} should reuse input layout on the warm update"
+        );
+    }
 }
 
 #[test]
@@ -1476,11 +1454,8 @@ fn animation_view_renders_state_driven_specimens() {
 
 #[test]
 fn animation_margin_specimen_expands_layout_on_hover() {
-    let mut engine = DocumentEngine::default();
-    let document =
-        UiLabState::new(Some("animation")).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let stylesheet = stylesheet();
-    let base = engine.update(&document, &stylesheet);
+    let mut state = UiLabState::new(Some("animation"));
+    let base = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let target = frame(&base, "animation-hover-margin-target");
     let row = frame(&base, "animation-hover-margin-row");
     let after = frame(&base, "animation-hover-margin-after");
@@ -1489,9 +1464,8 @@ fn animation_margin_specimen_expands_layout_on_hover() {
         target.rect.origin.y + target.rect.size.height / 2.0,
     );
 
-    let hovered = engine.update_with_input(
-        &document,
-        &stylesheet,
+    let hovered = state.lab_scene_output_with_input_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
                 position: pointer,
@@ -1526,20 +1500,16 @@ fn animation_margin_specimen_expands_layout_on_hover() {
 
 #[test]
 fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
-    let mut engine = DocumentEngine::default();
-    let document =
-        UiLabState::new(Some("animation")).document(Size::new(TEST_WIDTH, TEST_HEIGHT), false);
-    let stylesheet = stylesheet();
-    let base = engine.update(&document, &stylesheet);
+    let mut state = UiLabState::new(Some("animation"));
+    let base = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let target = frame(&base, "animation-hover-margin-target");
     let hover_pointer = Point::new(
         target.rect.origin.x + target.rect.size.width / 2.0,
         target.rect.origin.y + target.rect.size.height / 2.0,
     );
 
-    let mut output = engine.update_with_input(
-        &document,
-        &stylesheet,
+    let mut output = state.lab_scene_output_with_input_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
                 position: hover_pointer,
@@ -1558,9 +1528,8 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
         if !output.animating && !output.metrics.animation_changed_style {
             break;
         }
-        output = engine.update_with_input(
-            &document,
-            &stylesheet,
+        output = state.lab_scene_output_with_input_for_test(
+            Size::new(TEST_WIDTH, TEST_HEIGHT),
             DocumentInput {
                 pointer: Some(PointerInput {
                     position: hover_pointer,
@@ -1580,9 +1549,8 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
     assert!(!output.metrics.animation_changed_style);
 
     let exit_pointer = Point::new(4.0, 4.0);
-    output = engine.update_with_input(
-        &document,
-        &stylesheet,
+    output = state.lab_scene_output_with_input_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
                 position: exit_pointer,
@@ -1604,9 +1572,8 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
         {
             break;
         }
-        output = engine.update_with_input(
-            &document,
-            &stylesheet,
+        output = state.lab_scene_output_with_input_for_test(
+            Size::new(TEST_WIDTH, TEST_HEIGHT),
             DocumentInput {
                 pointer: Some(PointerInput {
                     position: exit_pointer,
