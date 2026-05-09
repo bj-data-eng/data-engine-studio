@@ -31,6 +31,87 @@ pub enum StyleSelector {
     Compound(CompoundSelector),
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ViewportQuery {
+    pub min_width: Option<f32>,
+    pub max_width: Option<f32>,
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
+}
+
+impl ViewportQuery {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn min_width(width: f32) -> Self {
+        Self::new().with_min_width(width)
+    }
+
+    pub fn max_width(width: f32) -> Self {
+        Self::new().with_max_width(width)
+    }
+
+    pub fn min_height(height: f32) -> Self {
+        Self::new().with_min_height(height)
+    }
+
+    pub fn max_height(height: f32) -> Self {
+        Self::new().with_max_height(height)
+    }
+
+    pub fn with_min_width(mut self, width: f32) -> Self {
+        self.min_width = Some(width);
+        self
+    }
+
+    pub fn with_max_width(mut self, width: f32) -> Self {
+        self.max_width = Some(width);
+        self
+    }
+
+    pub fn with_min_height(mut self, height: f32) -> Self {
+        self.min_height = Some(height);
+        self
+    }
+
+    pub fn with_max_height(mut self, height: f32) -> Self {
+        self.max_height = Some(height);
+        self
+    }
+
+    pub(crate) fn matches(self, viewport: Size) -> bool {
+        self.min_width
+            .is_none_or(|min_width| viewport.width >= min_width)
+            && self
+                .max_width
+                .is_none_or(|max_width| viewport.width <= max_width)
+            && self
+                .min_height
+                .is_none_or(|min_height| viewport.height >= min_height)
+            && self
+                .max_height
+                .is_none_or(|max_height| viewport.height <= max_height)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StyleCondition {
+    Viewport(ViewportQuery),
+}
+
+impl StyleCondition {
+    pub fn viewport(query: ViewportQuery) -> Self {
+        Self::Viewport(query)
+    }
+
+    pub(crate) fn matches(self, viewport: Size) -> bool {
+        match self {
+            Self::Viewport(query) => query.matches(viewport),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ChildPosition {
     pub index: usize,
@@ -1273,11 +1354,24 @@ impl ComputedStyle {
 pub struct StyleRule {
     pub(crate) selector: StyleSelector,
     pub(crate) style: Style,
+    pub(crate) condition: Option<StyleCondition>,
 }
 
 impl StyleRule {
     pub fn new(selector: StyleSelector, style: Style) -> Self {
-        Self { selector, style }
+        Self {
+            selector,
+            style,
+            condition: None,
+        }
+    }
+
+    pub fn conditional(condition: StyleCondition, selector: StyleSelector, style: Style) -> Self {
+        Self {
+            selector,
+            style,
+            condition: Some(condition),
+        }
     }
 }
 
@@ -1296,8 +1390,63 @@ impl StyleSheet {
         self
     }
 
+    pub fn conditional_rule(
+        mut self,
+        condition: StyleCondition,
+        selector: StyleSelector,
+        style: Style,
+    ) -> Self {
+        self.rules
+            .push(StyleRule::conditional(condition, selector, style));
+        self
+    }
+
+    pub fn viewport_rule(
+        self,
+        query: ViewportQuery,
+        selector: StyleSelector,
+        style: Style,
+    ) -> Self {
+        self.conditional_rule(StyleCondition::viewport(query), selector, style)
+    }
+
+    pub fn viewport_min_width(self, width: f32, selector: StyleSelector, style: Style) -> Self {
+        self.viewport_rule(ViewportQuery::min_width(width), selector, style)
+    }
+
+    pub fn viewport_max_width(self, width: f32, selector: StyleSelector, style: Style) -> Self {
+        self.viewport_rule(ViewportQuery::max_width(width), selector, style)
+    }
+
+    pub fn viewport_min_height(self, height: f32, selector: StyleSelector, style: Style) -> Self {
+        self.viewport_rule(ViewportQuery::min_height(height), selector, style)
+    }
+
+    pub fn viewport_max_height(self, height: f32, selector: StyleSelector, style: Style) -> Self {
+        self.viewport_rule(ViewportQuery::max_height(height), selector, style)
+    }
+
     pub fn push_rule(&mut self, selector: StyleSelector, style: Style) {
         self.rules.push(StyleRule::new(selector, style));
+    }
+
+    pub fn push_conditional_rule(
+        &mut self,
+        condition: StyleCondition,
+        selector: StyleSelector,
+        style: Style,
+    ) {
+        self.rules
+            .push(StyleRule::conditional(condition, selector, style));
+    }
+
+    pub fn push_viewport_rule(
+        &mut self,
+        query: ViewportQuery,
+        selector: StyleSelector,
+        style: Style,
+    ) {
+        self.push_conditional_rule(StyleCondition::viewport(query), selector, style);
     }
 
     pub fn extend(&mut self, stylesheet: StyleSheet) {
@@ -1310,11 +1459,12 @@ pub(crate) fn resolve_style_with_position(
     stylesheet: &StyleSheet,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
+    viewport: Size,
 ) -> ComputedStyle {
     let mut style = ComputedStyle::default();
 
     for rule in &stylesheet.rules {
-        if selector_matches(&rule.selector, element, state, position) {
+        if rule_matches(rule, element, state, position, viewport) {
             style.apply(&rule.style);
         }
     }
@@ -1434,6 +1584,18 @@ fn selector_matches(
             compound_selector_matches(selector, element, state, position)
         }
     }
+}
+
+fn rule_matches(
+    rule: &StyleRule,
+    element: &DocumentNode,
+    state: Option<&ElementState>,
+    position: Option<ChildPosition>,
+    viewport: Size,
+) -> bool {
+    rule.condition
+        .is_none_or(|condition| condition.matches(viewport))
+        && selector_matches(&rule.selector, element, state, position)
 }
 
 fn compound_selector_matches(

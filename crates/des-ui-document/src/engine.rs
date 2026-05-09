@@ -796,7 +796,13 @@ impl DocumentEngine {
         let root = document
             .element_tree()
             .expect("document element tree can be resolved");
-        update_element_style_animation(&root, stylesheet, &mut self.states, SNAP_EPSILON)
+        update_element_style_animation(
+            &root,
+            stylesheet,
+            &mut self.states,
+            SNAP_EPSILON,
+            document.viewport(),
+        )
     }
 
     fn update_scrollbar_animation(&mut self, scroll_chrome: &[ScrollChrome]) -> AnimationUpdate {

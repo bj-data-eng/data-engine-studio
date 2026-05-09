@@ -409,8 +409,13 @@ impl Document {
 
         for (id, position) in positions {
             let element = self.snapshot_element(&id)?;
-            let computed =
-                resolve_style_with_position(&element, stylesheet, states.get(&id), position);
+            let computed = resolve_style_with_position(
+                &element,
+                stylesheet,
+                states.get(&id),
+                position,
+                self.viewport,
+            );
             let computed = if id == self.root {
                 root_sized_style(computed, self.viewport)
             } else {

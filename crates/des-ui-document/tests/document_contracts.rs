@@ -4,7 +4,7 @@ use des_ui_document::{
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextSelectionGranularity,
-    TextWrapMode, Transition, VisualCloneOptions,
+    TextWrapMode, Transition, ViewportQuery, VisualCloneOptions,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -432,6 +432,88 @@ fn document_snapshot_hit_test_returns_target_and_path() {
     assert_eq!(hit.target.id().as_str(), "overlay");
     assert_eq!(hit.point, Point::new(30.0, 20.0));
     assert_eq!(path, vec!["root", "panel", "overlay"]);
+}
+
+#[test]
+fn viewport_max_width_rule_applies_when_document_viewport_matches() {
+    let mut document = Document::build(Size::new(420.0, 320.0), |ui| {
+        ui.element(
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+            |_| {},
+        );
+    });
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("panel"),
+            Style::default().size(320.0, 48.0),
+        )
+        .viewport_max_width(
+            480.0,
+            StyleSelector::class("panel"),
+            Style::default().size(180.0, 48.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 180.0);
+}
+
+#[test]
+fn viewport_max_width_rule_is_ignored_when_document_viewport_is_wider() {
+    let mut document = Document::build(Size::new(640.0, 320.0), |ui| {
+        ui.element(
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+            |_| {},
+        );
+    });
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("panel"),
+            Style::default().size(320.0, 48.0),
+        )
+        .viewport_max_width(
+            480.0,
+            StyleSelector::class("panel"),
+            Style::default().size(180.0, 48.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 320.0);
+}
+
+#[test]
+fn viewport_rule_can_match_width_and_height_ranges() {
+    let mut document = Document::build(Size::new(720.0, 520.0), |ui| {
+        ui.element(
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+            |_| {},
+        );
+    });
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("panel"),
+            Style::default().size(320.0, 48.0),
+        )
+        .viewport_rule(
+            ViewportQuery::min_width(700.0)
+                .with_max_width(760.0)
+                .with_min_height(500.0)
+                .with_max_height(560.0),
+            StyleSelector::class("panel"),
+            Style::default().size(480.0, 72.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 480.0);
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.height, 72.0);
 }
 
 #[test]

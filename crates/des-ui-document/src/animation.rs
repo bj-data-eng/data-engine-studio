@@ -25,8 +25,9 @@ pub(crate) fn update_element_style_animation(
     stylesheet: &StyleSheet,
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
+    viewport: Size,
 ) -> AnimationUpdate {
-    update_element_style_animation_at(element, stylesheet, states, snap_epsilon, None)
+    update_element_style_animation_at(element, stylesheet, states, snap_epsilon, None, viewport)
 }
 
 fn update_element_style_animation_at(
@@ -35,9 +36,15 @@ fn update_element_style_animation_at(
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
     position: Option<ChildPosition>,
+    viewport: Size,
 ) -> AnimationUpdate {
-    let target_style =
-        resolve_style_with_position(element, stylesheet, states.get(&element.id), position);
+    let target_style = resolve_style_with_position(
+        element,
+        stylesheet,
+        states.get(&element.id),
+        position,
+        viewport,
+    );
     let mut update = AnimationUpdate::default();
 
     if let Some(state) = states.get_mut(&element.id) {
@@ -64,6 +71,7 @@ fn update_element_style_animation_at(
             states,
             snap_epsilon,
             Some(ChildPosition::new(index, element.children.len())),
+            viewport,
         );
     }
 

@@ -40,8 +40,8 @@ pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Display, Easing,
     EdgeStyle, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
     GridTemplateComponent, GridTemplateRepetition, GridTrack, MaxTrackSizingFunction,
-    MinTrackSizingFunction, RepetitionCount, Shadow, Style, StyleRule, StyleSelector, StyleSheet,
-    TrackSizingFunction, Transition,
+    MinTrackSizingFunction, RepetitionCount, Shadow, Style, StyleCondition, StyleRule,
+    StyleSelector, StyleSheet, TrackSizingFunction, Transition, ViewportQuery,
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{
