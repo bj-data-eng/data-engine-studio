@@ -1324,6 +1324,49 @@ fn text_view_allows_pointer_selection_on_selectable_text() {
 }
 
 #[test]
+fn text_view_paints_pointer_selection_on_selectable_text() {
+    let mut harness = lab_harness("text");
+    let before = render_harness(&mut harness);
+    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
+    let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(end);
+    let after = render_harness(&mut harness);
+
+    let comparison = compare_images(&before, &after);
+    assert!(
+        comparison.differing_pixels > 0,
+        "dragging selectable text should visibly paint a document text selection"
+    );
+}
+
+#[test]
+fn text_view_keeps_selection_visible_after_pointer_release() {
+    let mut harness = lab_harness("text");
+    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
+    let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(end);
+    harness.drop_at(end);
+    harness.run();
+
+    let selection = harness
+        .state()
+        .document_engine
+        .text_selection()
+        .expect("released drag should keep a completed document text selection");
+    assert_eq!(selection.target, ElementId::new("text-wrap-body"));
+    assert!(!selection.active);
+    assert!(!selection.is_empty());
+}
+
+#[test]
 fn text_view_copy_event_sends_selected_text_to_clipboard() {
     let mut harness = lab_harness("text");
     let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
