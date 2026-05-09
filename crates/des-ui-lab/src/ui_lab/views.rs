@@ -25,45 +25,51 @@ pub(super) fn render_topbar(ui: &mut des_ui_document::DocumentBuilder, debug_ove
 }
 
 pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: LabView) {
-    ui.element("nav", ElementSpec::new(Element::Div).class("nav"), |ui| {
-        ui.text_element(
-            "nav-title",
-            ElementSpec::new(Element::Text).class("section-title"),
-            "Feature Views",
-        );
-        for view in [
-            LabView::Layout,
-            LabView::Interaction,
-            LabView::Draggable,
-            LabView::Styling,
-            LabView::Animation,
-            LabView::Scrolling,
-            LabView::Table,
-            LabView::Text,
-            LabView::Nesting,
-            LabView::Graph,
-        ] {
-            ui.element(
-                view.id(),
-                ElementSpec::new(Element::Div)
-                    .class("nav-item")
-                    .interactive()
-                    .selected(view == selected),
-                |ui| {
-                    ui.text_element(
-                        format!("{}-label", view.id()),
-                        ElementSpec::new(Element::Text).class("card-title"),
-                        view.label(),
-                    );
-                    ui.text_element(
-                        format!("{}-hint", view.id()),
-                        ElementSpec::new(Element::Text).class("muted"),
-                        view_hint(view),
-                    );
-                },
+    ui.element(
+        "nav",
+        ElementSpec::new(Element::Div)
+            .class("nav")
+            .class("styled-scrollbar"),
+        |ui| {
+            ui.text_element(
+                "nav-title",
+                ElementSpec::new(Element::Text).class("section-title"),
+                "Feature Views",
             );
-        }
-    });
+            for view in [
+                LabView::Layout,
+                LabView::Interaction,
+                LabView::Draggable,
+                LabView::Styling,
+                LabView::Animation,
+                LabView::Scrolling,
+                LabView::Table,
+                LabView::Text,
+                LabView::Nesting,
+                LabView::Graph,
+            ] {
+                ui.element(
+                    view.id(),
+                    ElementSpec::new(Element::Div)
+                        .class("nav-item")
+                        .interactive()
+                        .selected(view == selected),
+                    |ui| {
+                        ui.text_element(
+                            format!("{}-label", view.id()),
+                            ElementSpec::new(Element::Text).class("card-title"),
+                            view.label(),
+                        );
+                        ui.text_element(
+                            format!("{}-hint", view.id()),
+                            ElementSpec::new(Element::Text).class("muted"),
+                            view_hint(view),
+                        );
+                    },
+                );
+            }
+        },
+    );
 }
 
 fn view_hint(view: LabView) -> &'static str {

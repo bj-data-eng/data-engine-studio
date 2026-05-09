@@ -477,8 +477,11 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .width_fill()
                 .height(des_ui_document::Length::Px(64.0))
+                .padding(Insets::all(12.0))
+                .gap(5.0)
                 .background(CARD)
-                .border(STROKE),
+                .border(STROKE)
+                .radius(7.0),
         )
         .rule(
             StyleSelector::class_state("nav-item", ElementStateSelector::Selected),

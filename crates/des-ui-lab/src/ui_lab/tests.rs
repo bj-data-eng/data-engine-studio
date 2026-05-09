@@ -286,6 +286,32 @@ fn clicked_text_nav_view_matches_directly_seeded_view() {
 }
 
 #[test]
+fn nav_uses_explicit_card_spacing_and_styled_scrollbar() {
+    let output = lab_output("text");
+    let nav = frame(&output, "nav");
+    let nav_item = frame(&output, "view-layout");
+
+    assert!(has_class(nav, "styled-scrollbar"));
+    assert_eq!(
+        nav.style.scrollbar_handle_color,
+        Color::rgba(103, 80, 164, 118)
+    );
+    assert_eq!(
+        nav.style.scrollbar_track_color,
+        Some(Color::rgba(103, 80, 164, 28))
+    );
+    assert_close(nav_item.style.padding.top, 12.0);
+    assert_close(nav_item.style.padding.right, 12.0);
+    assert_close(nav_item.style.padding.bottom, 12.0);
+    assert_close(nav_item.style.padding.left, 12.0);
+    assert_close(nav_item.style.gap, 5.0);
+    assert_close(nav_item.style.radius.top_left, 7.0);
+    assert_close(nav_item.style.radius.top_right, 7.0);
+    assert_close(nav_item.style.radius.bottom_right, 7.0);
+    assert_close(nav_item.style.radius.bottom_left, 7.0);
+}
+
+#[test]
 fn styling_view_renders_structural_selector_specimens() {
     let output = lab_output("styling");
 
