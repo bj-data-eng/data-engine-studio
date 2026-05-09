@@ -96,6 +96,7 @@ pub struct DocumentEngine {
     text_selection: Option<DocumentTextSelection>,
     last_text_click: Option<TextClickSequence>,
     cached_layout: Option<ResolvedElement>,
+    cached_document_instance_id: Option<u64>,
     cached_document_revision: Option<u64>,
     cached_document_stylesheet: Option<StyleSheet>,
     cached_text_measurer_key: Option<TextMeasurerKey>,
@@ -220,6 +221,7 @@ impl DocumentEngine {
         };
 
         self.cached_layout = Some(layout.clone());
+        self.cached_document_instance_id = Some(document.instance_id());
         self.cached_document_revision = Some(document.revision());
         self.cached_document_stylesheet = Some(stylesheet.clone());
         self.cached_text_measurer_key = Some(text_measurer_key);
@@ -306,6 +308,7 @@ impl DocumentEngine {
         text_measurer_key: TextMeasurerKey,
     ) -> bool {
         self.cached_layout.is_some()
+            && self.cached_document_instance_id == Some(document.instance_id())
             && self.cached_document_revision == Some(document.revision())
             && self.cached_document_stylesheet.as_ref() == Some(stylesheet)
             && self.cached_text_measurer_key == Some(text_measurer_key)

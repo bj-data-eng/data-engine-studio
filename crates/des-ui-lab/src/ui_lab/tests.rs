@@ -122,6 +122,23 @@ fn center(rect: des_ui_document::Rect) -> egui::Pos2 {
     )
 }
 
+fn click_at_stays_hovered(harness: &mut Harness<'_, UiLabState>, pos: egui::Pos2) {
+    harness.event(egui::Event::PointerMoved(pos));
+    harness.event(egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.event(egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.run();
+}
+
 fn count_visible_text_selection_pixels(image: &image::RgbaImage) -> usize {
     image
         .pixels()
@@ -630,6 +647,23 @@ fn interaction_update_loop_refreshes_text_on_repeated_button_clicks() {
             frame(&output, "loop-button-result-box").value.as_deref(),
             Some(expected_value.as_str())
         );
+    }
+}
+
+#[test]
+fn interaction_update_loop_counts_repeated_hovered_button_clicks() {
+    let mut harness = lab_harness("interaction");
+    scroll_harness_stage(&mut harness, INTERACTION_LOOP_SCROLL_Y);
+
+    for expected in 1..=3 {
+        let rect = frame(
+            &state_output_with_scroll(harness.state(), INTERACTION_LOOP_SCROLL_Y),
+            "loop-action-button",
+        )
+        .rect;
+        click_at_stays_hovered(&mut harness, center(rect));
+
+        assert_eq!(harness.state().loop_action_count, expected);
     }
 }
 

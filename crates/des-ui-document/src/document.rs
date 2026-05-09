@@ -24,8 +24,11 @@ use layout_engine::prelude::{
 };
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub type DocumentResult<T> = Result<T, DocumentError>;
+
+static NEXT_DOCUMENT_INSTANCE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct StyleResolutionReport {
@@ -81,6 +84,7 @@ struct DocumentLayoutNode {
 }
 
 pub struct Document {
+    instance_id: u64,
     viewport: Size,
     revision: u64,
     layout: LayoutTree<DocumentLayoutNode>,
@@ -133,6 +137,7 @@ impl Document {
         layout_to_element.insert(root_node, root.clone());
 
         Self {
+            instance_id: NEXT_DOCUMENT_INSTANCE_ID.fetch_add(1, Ordering::Relaxed),
             viewport,
             revision: 0,
             layout,
@@ -152,6 +157,10 @@ impl Document {
 
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    pub(crate) fn instance_id(&self) -> u64 {
+        self.instance_id
     }
 
     pub fn element_ids(&self) -> Vec<ElementId> {

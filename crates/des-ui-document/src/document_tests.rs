@@ -752,6 +752,33 @@ fn document_engine_can_update_from_retained_document() {
 }
 
 #[test]
+fn document_engine_does_not_reuse_cached_layout_for_distinct_document_with_same_revision() {
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default().size(160.0, 24.0),
+    );
+    let mut engine = DocumentEngine::default();
+    let mut first = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.text_element("label", ElementSpec::new(Element::Text), "first");
+    });
+    let mut second = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.text_element("label", ElementSpec::new(Element::Text), "second");
+    });
+
+    let first_output = engine.update(&mut first, &stylesheet);
+    let second_output = engine.update(&mut second, &stylesheet);
+
+    assert_eq!(
+        first_output.layout.find("label").unwrap().text.as_deref(),
+        Some("first")
+    );
+    assert_eq!(
+        second_output.layout.find("label").unwrap().text.as_deref(),
+        Some("second")
+    );
+}
+
+#[test]
 fn document_engine_update_reports_scroll_chrome_for_overflow() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document
