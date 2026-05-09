@@ -372,9 +372,13 @@ fn interaction_view_renders_common_control_elements() {
         frame(&output, "control-radio-local").element,
         Element::Radio
     );
-    assert_eq!(frame(&output, "control-dropdown").element, Element::Select);
+    assert_eq!(
+        frame(&output, "control-dropdown-trigger").element,
+        Element::Select
+    );
     assert_eq!(frame(&output, "control-input-name").element, Element::Input);
     assert!(frame(&output, "control-checkbox").interactive);
+    assert!(frame(&output, "control-dropdown").interactive);
     assert!(frame(&output, "control-input-name").interactive);
     assert!(!frame(&output, "control-input-disabled").interactive);
     assert!(
@@ -459,6 +463,18 @@ fn radio_click_refreshes_retained_document_in_same_frame() {
         1,
         "clicked radio action should rebuild the retained document before paint settles"
     );
+}
+
+#[test]
+fn dropdown_menu_matches_trigger_width() {
+    let mut state = UiLabState::new(Some("interaction"));
+    state.dropdown_open = true;
+    let output = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let trigger = frame(&output, "control-dropdown-trigger");
+    let menu = frame(&output, "control-dropdown-menu");
+
+    assert_close(menu.rect.origin.x, trigger.rect.origin.x);
+    assert_close(menu.rect.size.width, trigger.rect.size.width);
 }
 
 #[test]

@@ -644,8 +644,12 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default().text_color(TEXT_MUTED),
         )
         .rule(
-            StyleSelector::class("dropdown-control"),
+            StyleSelector::class("dropdown-field"),
             Style::default().width_fill().height(Length::Px(38.0)),
+        )
+        .rule(
+            StyleSelector::class("dropdown-control"),
+            Style::default().width_fill().height_fill(),
         )
         .rule(
             StyleSelector::class_state("dropdown-control", ElementStateSelector::Hovered),

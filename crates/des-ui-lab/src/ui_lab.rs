@@ -1118,6 +1118,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
 fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {
     hit_id.as_ref().is_some_and(|id| {
         id.as_str() == "control-dropdown"
+            || id.as_str() == "control-dropdown-trigger"
             || id.as_str() == "control-dropdown-label"
             || id.as_str() == "control-dropdown-chevron"
             || id.as_str() == "control-dropdown-menu"

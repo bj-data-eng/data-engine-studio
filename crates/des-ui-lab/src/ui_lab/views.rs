@@ -1266,59 +1266,66 @@ fn control_dropdown(ui: &mut des_ui_document::DocumentBuilder, open: bool, choic
             );
             ui.element(
                 "control-dropdown",
-                ElementSpec::new(Element::Select)
-                    .class("dropdown-control")
-                    .interactive()
-                    .selected(open),
+                ElementSpec::new(Element::Div)
+                    .class("dropdown-field")
+                    .interactive(),
                 |ui| {
-                    ui.text_element(
-                        "control-dropdown-label",
-                        ElementSpec::new(Element::Text).class("control-label"),
-                        selected,
-                    );
                     ui.element(
-                        "control-dropdown-chevron",
-                        ElementSpec::new(Element::Icon)
-                            .class("dropdown-chevron")
-                            .glyph(if open {
-                                Glyph::ChevronUp
-                            } else {
-                                Glyph::ChevronDown
-                            }),
-                        |_| {},
+                        "control-dropdown-trigger",
+                        ElementSpec::new(Element::Select)
+                            .class("dropdown-control")
+                            .selected(open),
+                        |ui| {
+                            ui.text_element(
+                                "control-dropdown-label",
+                                ElementSpec::new(Element::Text).class("control-label"),
+                                selected,
+                            );
+                            ui.element(
+                                "control-dropdown-chevron",
+                                ElementSpec::new(Element::Icon)
+                                    .class("dropdown-chevron")
+                                    .glyph(if open {
+                                        Glyph::ChevronUp
+                                    } else {
+                                        Glyph::ChevronDown
+                                    }),
+                                |_| {},
+                            );
+                        },
                     );
+                    if open {
+                        ui.element(
+                            "control-dropdown-menu",
+                            ElementSpec::new(Element::Div).class("dropdown-menu"),
+                            |ui| {
+                                for (index, id, label) in [
+                                    (0, "control-dropdown-option-csv", "CSV source"),
+                                    (1, "control-dropdown-option-duckdb", "DuckDB table"),
+                                    (2, "control-dropdown-option-python", "Python node"),
+                                ] {
+                                    ui.element(
+                                        id,
+                                        ElementSpec::new(Element::Button)
+                                            .class("dropdown-option")
+                                            .interactive()
+                                            .selected(choice == index),
+                                        |ui| {
+                                            ui.text_element(
+                                                format!("{id}-label"),
+                                                ElementSpec::new(Element::Text)
+                                                    .class("control-label")
+                                                    .selected(choice == index),
+                                                label,
+                                            );
+                                        },
+                                    );
+                                }
+                            },
+                        );
+                    }
                 },
             );
-            if open {
-                ui.element(
-                    "control-dropdown-menu",
-                    ElementSpec::new(Element::Div).class("dropdown-menu"),
-                    |ui| {
-                        for (index, id, label) in [
-                            (0, "control-dropdown-option-csv", "CSV source"),
-                            (1, "control-dropdown-option-duckdb", "DuckDB table"),
-                            (2, "control-dropdown-option-python", "Python node"),
-                        ] {
-                            ui.element(
-                                id,
-                                ElementSpec::new(Element::Button)
-                                    .class("dropdown-option")
-                                    .interactive()
-                                    .selected(choice == index),
-                                |ui| {
-                                    ui.text_element(
-                                        format!("{id}-label"),
-                                        ElementSpec::new(Element::Text)
-                                            .class("control-label")
-                                            .selected(choice == index),
-                                        label,
-                                    );
-                                },
-                            );
-                        }
-                    },
-                );
-            }
         },
     );
 }
