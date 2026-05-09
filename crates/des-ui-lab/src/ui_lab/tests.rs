@@ -69,17 +69,16 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
 }
 
 fn state_output(state: &UiLabState) -> DocumentOutput {
+    let viewport = state_viewport(state);
     let mut state = state.clone_for_retained_test();
-    state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT))
+    state.lab_document_output_for_test(viewport)
 }
 
 fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> DocumentOutput {
+    let viewport = state_viewport(state);
     let mut state = state.clone_for_retained_test();
     let mut text_measurer = EguiTextMeasurer::new(ctx);
-    state.lab_document_output_with_text_measurer_for_test(
-        Size::new(TEST_WIDTH, TEST_HEIGHT),
-        &mut text_measurer,
-    )
+    state.lab_document_output_with_text_measurer_for_test(viewport, &mut text_measurer)
 }
 
 fn state_rect_with_egui_text(
@@ -94,11 +93,17 @@ fn state_rect_with_egui_text(
 }
 
 fn state_output_with_scroll(state: &UiLabState, scroll_y: f32) -> DocumentOutput {
+    let viewport = state_viewport(state);
     let mut state = state.clone_for_retained_test();
-    state.lab_document_output_with_stage_scroll_for_test(
-        Size::new(TEST_WIDTH, TEST_HEIGHT),
-        scroll_y,
-    )
+    state.lab_document_output_with_stage_scroll_for_test(viewport, scroll_y)
+}
+
+fn state_viewport(state: &UiLabState) -> Size {
+    state
+        .lab_document
+        .as_ref()
+        .map(|retained| retained.viewport)
+        .unwrap_or(Size::new(TEST_WIDTH, TEST_HEIGHT))
 }
 
 fn has_class(frame: &ResolvedElement, class: &str) -> bool {
@@ -1117,6 +1122,33 @@ fn draggable_drag_drop_cells_expand_to_fit_stacked_items() {
     assert!(
         frame(&output, "drag-grid").rect.bottom() >= cell.rect.bottom(),
         "drag grid should expand around an expanded drop cell"
+    );
+}
+
+#[test]
+fn draggable_workbench_wraps_panels_when_stage_narrows() {
+    let output = lab_output_with_size("draggable", Size::new(1080.0, 720.0));
+    let list_card = frame(&output, "drag-scroll-list-card");
+    let drag_grid = frame(&output, "drag-grid");
+
+    assert!(
+        drag_grid.rect.origin.y > list_card.rect.bottom(),
+        "drag grid should wrap below the scroll list card when the stage cannot fit both panels"
+    );
+    assert_eq!(drag_grid.rect.origin.x, list_card.rect.origin.x);
+}
+
+#[test]
+fn draggable_workbench_keeps_panels_side_by_side_at_default_width() {
+    let harness = lab_harness("draggable");
+    let output = state_output_with_egui_text(harness.state(), &harness.ctx);
+    let list_card = frame(&output, "drag-scroll-list-card");
+    let drag_grid = frame(&output, "drag-grid");
+
+    assert_eq!(drag_grid.rect.origin.y, list_card.rect.origin.y);
+    assert!(
+        drag_grid.rect.origin.x > list_card.rect.right(),
+        "drag grid should remain beside the scroll list card at the default lab width"
     );
 }
 

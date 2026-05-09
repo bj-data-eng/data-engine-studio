@@ -803,7 +803,10 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("drag-workbench"),
             Style::default()
                 .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .align_items(AlignItems::Start)
+                .width_fill()
+                .height(Length::Auto)
                 .gap(14.0),
         )
         .rule(
