@@ -236,7 +236,7 @@ fn scroll_position(chrome: &ScrollChrome) -> f32 {
 mod tests {
     use super::*;
     use des_ui_document::{
-        Document, ElementRole, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
+        DocumentScene, ElementRole, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
     };
 
     #[test]
@@ -253,7 +253,7 @@ mod tests {
                 StyleSelector::class("row"),
                 Style::default().size(100.0, 32.0),
             );
-        let document = Document::build(Size::new(160.0, 120.0), |ui| {
+        let mut scene = DocumentScene::build(Size::new(160.0, 120.0), |ui| {
             ui.element(
                 "scroll-parent",
                 ElementSpec::new(ElementRole::Panel),
@@ -268,7 +268,7 @@ mod tests {
                 },
             );
         });
-        let output = engine.update(&document, &stylesheet);
+        let output = engine.update_scene(&mut scene, &stylesheet);
         let pointer = Point::new(40.0, 76.0);
 
         let action = AutoScroller::new(AutoScrollOptions::default())
@@ -294,7 +294,7 @@ mod tests {
                 StyleSelector::class("row"),
                 Style::default().size(100.0, 32.0),
             );
-        let document = Document::build(Size::new(160.0, 120.0), |ui| {
+        let mut scene = DocumentScene::build(Size::new(160.0, 120.0), |ui| {
             ui.element(
                 "scroll-parent",
                 ElementSpec::new(ElementRole::Panel),
@@ -309,7 +309,7 @@ mod tests {
                 },
             );
         });
-        let output = engine.update(&document, &stylesheet);
+        let output = engine.update_scene(&mut scene, &stylesheet);
 
         let action = AutoScroller::new(AutoScrollOptions {
             threshold_y: 0.0,

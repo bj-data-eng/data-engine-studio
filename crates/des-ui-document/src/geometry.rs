@@ -283,14 +283,4 @@ impl Length {
         }
         .max(0.0)
     }
-
-    pub(crate) fn resolve_intrinsic(self, available: f32, auto: f32) -> f32 {
-        match self {
-            Self::Fill => auto,
-            Self::Percent(factor) => available * factor,
-            Self::Auto => auto,
-            Self::Px(value) => value,
-        }
-        .max(0.0)
-    }
 }

@@ -1,7 +1,5 @@
-use crate::geometry::Size;
 use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
-use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ElementRole {
@@ -217,26 +215,11 @@ impl ElementSpec {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Element {
+pub(crate) struct Element {
     pub id: ElementId,
     pub spec: ElementSpec,
     pub text: Option<String>,
     pub children: Vec<Element>,
-}
-
-impl Element {
-    pub(crate) fn collect_ids(&self, ids: &mut BTreeSet<ElementId>) {
-        ids.insert(self.id.clone());
-        for child in &self.children {
-            child.collect_ids(ids);
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Document {
-    pub viewport: Size,
-    pub root: Element,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -294,7 +277,7 @@ impl VisualElementClone {
         }
     }
 
-    fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> Element {
+    pub(crate) fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> Element {
         let mut spec = ElementSpec::new(self.role);
         spec.classes = self.classes.clone();
         if is_root {
@@ -350,66 +333,5 @@ impl VisualCloneOptions {
     pub fn interactive(mut self, interactive: bool) -> Self {
         self.interactive = interactive;
         self
-    }
-}
-
-impl Document {
-    pub fn build(viewport: Size, add_contents: impl FnOnce(&mut DocumentBuilder)) -> Self {
-        let mut ui = DocumentBuilder::default();
-        add_contents(&mut ui);
-        Self {
-            viewport,
-            root: Element {
-                id: ElementId::new("root"),
-                spec: ElementSpec::new(ElementRole::Root),
-                text: None,
-                children: ui.children,
-            },
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct DocumentBuilder {
-    children: Vec<Element>,
-}
-
-impl DocumentBuilder {
-    pub fn element(
-        &mut self,
-        id: impl Into<ElementId>,
-        spec: ElementSpec,
-        add_contents: impl FnOnce(&mut DocumentBuilder),
-    ) {
-        let mut child_ui = DocumentBuilder::default();
-        add_contents(&mut child_ui);
-        self.children.push(Element {
-            id: id.into(),
-            spec,
-            text: None,
-            children: child_ui.children,
-        });
-    }
-
-    pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<String>) {
-        self.text_element(id, ElementSpec::new(ElementRole::Text), text);
-    }
-
-    pub fn text_element(
-        &mut self,
-        id: impl Into<ElementId>,
-        spec: ElementSpec,
-        text: impl Into<String>,
-    ) {
-        self.children.push(Element {
-            id: id.into(),
-            spec,
-            text: Some(text.into()),
-            children: Vec::new(),
-        });
-    }
-
-    pub fn visual_clone(&mut self, clone: &VisualElementClone, options: VisualCloneOptions) {
-        self.children.push(clone.to_element(&options, true));
     }
 }

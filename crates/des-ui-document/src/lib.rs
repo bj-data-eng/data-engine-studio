@@ -1,6 +1,6 @@
-//! Document and style primitives for building host-rendered user interfaces.
+//! Retained scene and style primitives for host-rendered user interfaces.
 //!
-//! `des-ui-document` owns a DOM-like document tree, deterministic style
+//! `des-ui-document` owns the retained scene tree, deterministic style
 //! resolution, retained element state, resolved layout output, and input
 //! routing. Rendering hosts such as egui translate platform input into
 //! [`DocumentInput`] and paint [`DocumentOutput::layout`].
@@ -17,11 +17,10 @@ mod state;
 mod style;
 mod table;
 mod text;
-mod update;
 
 pub use element::{
-    ClassName, Color, Document, DocumentBuilder, Element, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector, Glyph, VisualCloneOptions, VisualElementClone,
+    ClassName, Color, ElementId, ElementRole, ElementSpec, ElementStateSelector, Glyph,
+    VisualCloneOptions, VisualElementClone,
 };
 pub use engine::DocumentEngine;
 pub use geometry::{
@@ -29,7 +28,9 @@ pub use geometry::{
     JustifyContent, Length, Overflow, Point, Position, PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
-pub use scene::{DocumentScene, SceneElement, SceneError, SceneResult, StyleApplicationReport};
+pub use scene::{
+    DocumentScene, SceneBuilder, SceneElement, SceneError, SceneResult, StyleApplicationReport,
+};
 pub use state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
     DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,
@@ -47,4 +48,3 @@ pub use text::{
     FallbackTextMeasurer, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
     TextWrapMode,
 };
-pub use update::{DocumentUpdate, DocumentUpdateReport};

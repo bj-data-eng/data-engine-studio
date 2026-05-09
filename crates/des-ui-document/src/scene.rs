@@ -1,4 +1,6 @@
-use crate::element::{Element, ElementId, ElementRole, ElementSpec};
+use crate::element::{
+    ClassName, Element, ElementId, ElementRole, ElementSpec, VisualCloneOptions, VisualElementClone,
+};
 use crate::geometry::{
     AlignContent, AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
     Point, Position, Rect as DocumentRect, Size,
@@ -81,6 +83,18 @@ pub struct DocumentScene {
 }
 
 impl DocumentScene {
+    pub fn build(viewport: Size, add_contents: impl FnOnce(&mut SceneBuilder)) -> Self {
+        let mut builder = SceneBuilder::default();
+        add_contents(&mut builder);
+        let mut scene = Self::new(viewport);
+        for child in builder.children {
+            scene
+                .append_element_tree("root", child)
+                .expect("scene builder produces a valid element tree");
+        }
+        scene
+    }
+
     pub fn new(viewport: Size) -> Self {
         let mut layout = LayoutTree::new();
         let root = ElementId::new("root");
@@ -158,6 +172,136 @@ impl DocumentScene {
         self.append_node(parent.into(), id.into(), spec, Some(text.into()))
     }
 
+    pub(crate) fn append_element_tree(
+        &mut self,
+        parent: impl Into<ElementId>,
+        element: Element,
+    ) -> SceneResult<NodeId> {
+        let parent = parent.into();
+        let id = element.id.clone();
+        let node = self.append_node(parent, id.clone(), element.spec, element.text)?;
+        for child in element.children {
+            self.append_element_tree(id.clone(), child)?;
+        }
+        Ok(node)
+    }
+
+    pub fn set_text(
+        &mut self,
+        id: impl Into<ElementId>,
+        text: impl Into<String>,
+    ) -> SceneResult<bool> {
+        let id = id.into();
+        let text = Some(text.into());
+        let node = self.element(&id)?.layout_node;
+        if self.element(&id)?.text == text {
+            return Ok(false);
+        }
+        self.element_mut(&id)?.text = text.clone();
+        if let Some(context) = self.layout.get_node_context_mut(node) {
+            context.text = text;
+        }
+        self.layout.mark_dirty(node).map_err(layout_error)?;
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn set_value(
+        &mut self,
+        id: impl Into<ElementId>,
+        value: impl Into<String>,
+    ) -> SceneResult<bool> {
+        let id = id.into();
+        let value = Some(value.into());
+        let element = self.element_mut(&id)?;
+        if element.spec.value == value {
+            return Ok(false);
+        }
+        element.spec.value = value;
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn add_class(
+        &mut self,
+        id: impl Into<ElementId>,
+        class: impl Into<ClassName>,
+    ) -> SceneResult<bool> {
+        let id = id.into();
+        let class = class.into();
+        let element = self.element_mut(&id)?;
+        if element.spec.classes.contains(&class) {
+            return Ok(false);
+        }
+        element.spec.classes.push(class);
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn remove_class(
+        &mut self,
+        id: impl Into<ElementId>,
+        class: impl Into<ClassName>,
+    ) -> SceneResult<bool> {
+        let id = id.into();
+        let class = class.into();
+        let element = self.element_mut(&id)?;
+        let previous_len = element.spec.classes.len();
+        element.spec.classes.retain(|existing| existing != &class);
+        if element.spec.classes.len() == previous_len {
+            return Ok(false);
+        }
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn toggle_class(
+        &mut self,
+        id: impl Into<ElementId>,
+        class: impl Into<ClassName>,
+    ) -> SceneResult<bool> {
+        let id = id.into();
+        let class = class.into();
+        if self.element(&id)?.spec.classes.contains(&class) {
+            self.remove_class(id, class)
+        } else {
+            self.add_class(id, class)
+        }
+    }
+
+    pub fn set_selected(&mut self, id: impl Into<ElementId>, selected: bool) -> SceneResult<bool> {
+        let id = id.into();
+        let element = self.element_mut(&id)?;
+        if element.spec.selected == selected {
+            return Ok(false);
+        }
+        element.spec.selected = selected;
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn set_disabled(&mut self, id: impl Into<ElementId>, disabled: bool) -> SceneResult<bool> {
+        let id = id.into();
+        let element = self.element_mut(&id)?;
+        if element.spec.disabled == disabled {
+            return Ok(false);
+        }
+        element.spec.disabled = disabled;
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn set_focused(&mut self, id: impl Into<ElementId>, focused: bool) -> SceneResult<bool> {
+        let id = id.into();
+        let element = self.element_mut(&id)?;
+        if element.spec.focused == focused {
+            return Ok(false);
+        }
+        element.spec.focused = focused;
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
     pub fn reparent(
         &mut self,
         id: impl Into<ElementId>,
@@ -196,6 +340,18 @@ impl DocumentScene {
     pub fn layout_dirty(&self, id: impl Into<ElementId>) -> SceneResult<bool> {
         let node = self.element(&id.into())?.layout_node;
         self.layout.dirty(node).map_err(layout_error)
+    }
+
+    pub(crate) fn mark_layout_dirty(&mut self) -> SceneResult<()> {
+        let nodes = self
+            .elements
+            .values()
+            .map(|element| element.layout_node)
+            .collect::<Vec<_>>();
+        for node in nodes {
+            self.layout.mark_dirty(node).map_err(layout_error)?;
+        }
+        Ok(())
     }
 
     pub fn apply_computed_style(
@@ -703,6 +859,51 @@ impl DocumentScene {
         }
 
         Ok(layout_changed)
+    }
+}
+
+#[derive(Default)]
+pub struct SceneBuilder {
+    children: Vec<Element>,
+}
+
+impl SceneBuilder {
+    pub fn element(
+        &mut self,
+        id: impl Into<ElementId>,
+        spec: ElementSpec,
+        add_contents: impl FnOnce(&mut SceneBuilder),
+    ) {
+        let mut child_builder = SceneBuilder::default();
+        add_contents(&mut child_builder);
+        self.children.push(Element {
+            id: id.into(),
+            spec,
+            text: None,
+            children: child_builder.children,
+        });
+    }
+
+    pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<String>) {
+        self.text_element(id, ElementSpec::new(ElementRole::Text), text);
+    }
+
+    pub fn text_element(
+        &mut self,
+        id: impl Into<ElementId>,
+        spec: ElementSpec,
+        text: impl Into<String>,
+    ) {
+        self.children.push(Element {
+            id: id.into(),
+            spec,
+            text: Some(text.into()),
+            children: Vec::new(),
+        });
+    }
+
+    pub fn visual_clone(&mut self, clone: &VisualElementClone, options: VisualCloneOptions) {
+        self.children.push(clone.to_element(&options, true));
     }
 }
 

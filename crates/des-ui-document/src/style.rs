@@ -1324,12 +1324,6 @@ pub(crate) struct StyleInvalidation {
     pub layout_changed: bool,
 }
 
-impl StyleInvalidation {
-    pub(crate) fn changed(self) -> bool {
-        self.paint_changed || self.layout_changed
-    }
-}
-
 impl std::ops::AddAssign for StyleInvalidation {
     fn add_assign(&mut self, rhs: Self) {
         self.paint_changed |= rhs.paint_changed;

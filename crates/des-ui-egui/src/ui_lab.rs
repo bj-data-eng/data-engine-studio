@@ -13,11 +13,11 @@ use views::{
 };
 
 use des_ui_document::{
-    Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentMetrics, DocumentOutput, DocumentScene, DocumentUpdate, Element, ElementId,
-    ElementRole, ElementSpec, ElementStateSelector, Insets, Length, Point, PointerInput, Shadow,
-    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, VisualCloneOptions, VisualElementClone,
+    Color, CornerRadii, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
+    DocumentMetrics, DocumentOutput, DocumentScene, ElementId, ElementRole, ElementSpec,
+    ElementStateSelector, Insets, Length, Point, PointerInput, Shadow, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions,
+    VisualElementClone,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -340,12 +340,11 @@ impl UiLabState {
             return retained;
         }
 
-        let document = self.document(viewport, debug_overlay);
         RetainedLabScene {
             viewport,
             debug_overlay,
             key,
-            scene: scene_from_document(&document, viewport),
+            scene: self.scene(viewport, debug_overlay),
         }
     }
 
@@ -734,8 +733,8 @@ impl UiLabState {
         }
     }
 
-    fn document(&self, viewport: Size, debug_overlay: bool) -> Document {
-        let mut document = Document::build(viewport, |ui| {
+    fn scene(&self, viewport: Size, debug_overlay: bool) -> DocumentScene {
+        let mut scene = DocumentScene::build(viewport, |ui| {
             ui.element(
                 "lab-root",
                 ElementSpec::new(ElementRole::Panel).class("lab-root"),
@@ -778,9 +777,9 @@ impl UiLabState {
             );
         });
         if self.view == LabView::Interaction {
-            document.apply_update(&self.interaction_document_update());
+            self.apply_interaction_scene_state(&mut scene);
         }
-        document
+        scene
     }
 
     fn active_drag_item(&self) -> Option<SortableItemId> {
@@ -838,7 +837,7 @@ impl UiLabState {
         origin: egui::Pos2,
         viewport: egui::Vec2,
     ) {
-        let document = Document::build(Size::new(viewport.x, viewport.y), |ui| {
+        let mut scene = DocumentScene::build(Size::new(viewport.x, viewport.y), |ui| {
             ui.element(
                 "debug-overlay-root",
                 ElementSpec::new(ElementRole::Panel).class("debug-overlay-root"),
@@ -849,8 +848,8 @@ impl UiLabState {
         });
         let mut engine = DocumentEngine::default();
         let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
-        let output = engine.update_with_input_and_text_measurer(
-            &document,
+        let output = engine.update_scene_with_input_and_text_measurer(
+            &mut scene,
             &self.active_stylesheet(),
             DocumentInput::default(),
             &mut text_measurer,
@@ -858,16 +857,20 @@ impl UiLabState {
         paint_frame(ui, origin, &output.layout, None);
     }
 
-    fn interaction_document_update(&self) -> DocumentUpdate {
-        let mut update = DocumentUpdate::new()
+    fn apply_interaction_scene_state(&self, scene: &mut DocumentScene) {
+        scene
             .set_text(
                 "loop-button-result",
                 format!("Button events received: {}", self.loop_action_count),
             )
+            .expect("interaction scene contains loop-button-result");
+        scene
             .set_value(
                 "loop-button-result-box",
                 format!("button-count={}", self.loop_action_count),
             )
+            .expect("interaction scene contains loop-button-result-box");
+        scene
             .set_text(
                 "loop-checkbox-result",
                 if self.checkbox_enabled {
@@ -876,7 +879,11 @@ impl UiLabState {
                     "Profiling: disabled by checkbox"
                 },
             )
+            .expect("interaction scene contains loop-checkbox-result");
+        scene
             .set_selected("loop-checkbox-result-box", self.checkbox_enabled)
+            .expect("interaction scene contains loop-checkbox-result-box");
+        scene
             .set_text(
                 "loop-radio-result",
                 format!(
@@ -884,6 +891,8 @@ impl UiLabState {
                     ["Local runtime", "Remote worker", "Hybrid"][self.radio_choice]
                 ),
             )
+            .expect("interaction scene contains loop-radio-result");
+        scene
             .set_text(
                 "loop-dropdown-result",
                 format!(
@@ -891,6 +900,8 @@ impl UiLabState {
                     ["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]
                 ),
             )
+            .expect("interaction scene contains loop-dropdown-result");
+        scene
             .set_text(
                 "loop-summary-result",
                 format!(
@@ -906,7 +917,10 @@ impl UiLabState {
                     if self.loop_action_count == 1 { "" } else { "s" }
                 ),
             )
-            .set_focused("loop-summary-result-box", self.loop_action_count > 0);
+            .expect("interaction scene contains loop-summary-result");
+        scene
+            .set_focused("loop-summary-result-box", self.loop_action_count > 0)
+            .expect("interaction scene contains loop-summary-result-box");
 
         for (index, class) in [
             "loop-runtime-local",
@@ -917,9 +931,13 @@ impl UiLabState {
         .enumerate()
         {
             if self.radio_choice == index {
-                update = update.add_class("loop-radio-result-box", *class);
+                scene
+                    .add_class("loop-radio-result-box", *class)
+                    .expect("interaction scene contains loop-radio-result-box");
             } else {
-                update = update.remove_class("loop-radio-result-box", *class);
+                scene
+                    .remove_class("loop-radio-result-box", *class)
+                    .expect("interaction scene contains loop-radio-result-box");
             }
         }
 
@@ -932,13 +950,15 @@ impl UiLabState {
         .enumerate()
         {
             if self.dropdown_choice == index {
-                update = update.add_class("loop-dropdown-result-box", *class);
+                scene
+                    .add_class("loop-dropdown-result-box", *class)
+                    .expect("interaction scene contains loop-dropdown-result-box");
             } else {
-                update = update.remove_class("loop-dropdown-result-box", *class);
+                scene
+                    .remove_class("loop-dropdown-result-box", *class)
+                    .expect("interaction scene contains loop-dropdown-result-box");
             }
         }
-
-        update
     }
 
     #[cfg(test)]
@@ -1006,34 +1026,6 @@ impl UiLabState {
                 .update_scene_with_input(&mut retained.scene, &stylesheet, input);
         self.lab_scene = Some(retained);
         output
-    }
-}
-
-fn scene_from_document(document: &Document, viewport: Size) -> DocumentScene {
-    let mut scene = DocumentScene::new(viewport);
-    for child in &document.root.children {
-        append_document_element_to_scene(&mut scene, "root", child);
-    }
-    scene
-}
-
-fn append_document_element_to_scene(scene: &mut DocumentScene, parent: &str, element: &Element) {
-    if let Some(text) = &element.text {
-        scene
-            .append_text(
-                parent,
-                element.id.clone(),
-                element.spec.clone(),
-                text.clone(),
-            )
-            .unwrap();
-    } else {
-        scene
-            .append_element(parent, element.id.clone(), element.spec.clone())
-            .unwrap();
-    }
-    for child in &element.children {
-        append_document_element_to_scene(scene, element.id.as_str(), child);
     }
 }
 

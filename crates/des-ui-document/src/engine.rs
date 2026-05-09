@@ -1,7 +1,7 @@
 use crate::animation::{AnimationUpdate, update_element_style_animation};
-use crate::element::{Document, Element, ElementId};
+use crate::element::ElementId;
 use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
-use crate::layout::{hit_path, layout_element};
+use crate::layout::hit_path;
 use crate::scene::{DocumentScene, StyleApplicationReport};
 use crate::scroll::scroll_chrome;
 use crate::state::{
@@ -9,10 +9,7 @@ use crate::state::{
     DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
     TextSelectionGranularity,
 };
-use crate::style::{
-    ChildPosition, ComputedStyle, StyleInvalidation, StyleSheet, classify_computed_style_change,
-    resolve_style_with_position,
-};
+use crate::style::StyleSheet;
 use crate::text::{FallbackTextMeasurer, TextMeasurer, TextMeasurerKey};
 use std::collections::{BTreeSet, HashMap};
 
@@ -99,17 +96,12 @@ pub struct DocumentEngine {
     text_selection: Option<DocumentTextSelection>,
     last_text_click: Option<TextClickSequence>,
     cached_layout: Option<ResolvedElement>,
-    cached_document_root: Option<Element>,
     cached_scene_revision: Option<u64>,
     cached_scene_stylesheet: Option<StyleSheet>,
     cached_text_measurer_key: Option<TextMeasurerKey>,
 }
 
 impl DocumentEngine {
-    pub fn update(&mut self, document: &Document, stylesheet: &StyleSheet) -> DocumentOutput {
-        self.update_with_input(document, stylesheet, DocumentInput::default())
-    }
-
     pub fn update_scene(
         &mut self,
         scene: &mut DocumentScene,
@@ -137,6 +129,7 @@ impl DocumentEngine {
     ) -> DocumentOutput {
         let changes = self.sync_scene_states(scene);
         let text_measurer_key = text_measurer.cache_key();
+        let text_measurer_changed = self.cached_text_measurer_key != Some(text_measurer_key);
         let reused_scene_cache = changes.created.is_empty()
             && changes.removed.is_empty()
             && self.cached_scene_matches(scene, stylesheet, text_measurer_key);
@@ -151,7 +144,13 @@ impl DocumentEngine {
             let input_style_report = scene
                 .apply_stylesheet(stylesheet, &self.states)
                 .expect("document scene styles can be resolved");
-            if input_style_report.layout_changed
+            if text_measurer_changed {
+                scene
+                    .mark_layout_dirty()
+                    .expect("document scene layout can be marked dirty");
+            }
+            if text_measurer_changed
+                || input_style_report.layout_changed
                 || scene
                     .layout_dirty(scene.root().clone())
                     .expect("document scene root dirty state can be resolved")
@@ -225,7 +224,6 @@ impl DocumentEngine {
         };
 
         self.cached_layout = Some(layout.clone());
-        self.cached_document_root = None;
         self.cached_scene_revision = Some(scene.revision());
         self.cached_scene_stylesheet = Some(stylesheet.clone());
         self.cached_text_measurer_key = Some(text_measurer_key);
@@ -256,131 +254,6 @@ impl DocumentEngine {
                     || final_style_report.layout_changed,
                 animation_changed_paint: animation_update.paint_changed
                     || final_style_report.paint_changed
-                    || scrollbar_animation_update.paint_changed,
-            },
-        }
-    }
-
-    pub fn update_with_input(
-        &mut self,
-        document: &Document,
-        stylesheet: &StyleSheet,
-        input: DocumentInput,
-    ) -> DocumentOutput {
-        let mut text_measurer = FallbackTextMeasurer;
-        self.update_with_input_and_text_measurer(document, stylesheet, input, &mut text_measurer)
-    }
-
-    pub fn update_with_input_and_text_measurer(
-        &mut self,
-        document: &Document,
-        stylesheet: &StyleSheet,
-        input: DocumentInput,
-        text_measurer: &mut dyn TextMeasurer,
-    ) -> DocumentOutput {
-        let changes = self.sync_element_states(document);
-        let viewport_rect = Rect::new(0.0, 0.0, document.viewport.width, document.viewport.height);
-        let text_measurer_key = text_measurer.cache_key();
-        let reused_cached_layout = changes.created.is_empty()
-            && changes.removed.is_empty()
-            && self.cached_text_measurer_key == Some(text_measurer_key)
-            && self.cached_layout_matches(viewport_rect, &document.root);
-        let input_layout = if reused_cached_layout {
-            self.cached_layout
-                .clone()
-                .expect("cached layout exists when it matches the viewport")
-        } else {
-            let mut scroll_limits = HashMap::new();
-            let layout = layout_element(
-                &document.root,
-                viewport_rect,
-                stylesheet,
-                &self.states,
-                &mut scroll_limits,
-                text_measurer,
-            );
-            self.scroll_limits = scroll_limits;
-            layout
-        };
-        let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
-        let input_update =
-            self.apply_input(&input_layout, &input_scroll_chrome, input, text_measurer);
-        let input_style_invalidation = classify_resolved_style_invalidation(
-            &input_layout,
-            &document.root,
-            stylesheet,
-            &self.states,
-        );
-        let clamp_changed = self.clamp_scroll_states();
-        let animation_update = self.update_style_animation(document, stylesheet);
-        let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
-
-        let needs_final_layout = input_update.layout_changed
-            || clamp_changed
-            || input_style_invalidation.layout_changed
-            || animation_update.layout_changed;
-        let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
-            let mut scroll_limits = HashMap::new();
-            let layout = layout_element(
-                &document.root,
-                viewport_rect,
-                stylesheet,
-                &self.states,
-                &mut scroll_limits,
-                text_measurer,
-            );
-            self.scroll_limits = scroll_limits;
-            self.clamp_scroll_states();
-            let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
-            (layout, scroll_chrome, false)
-        } else {
-            let mut layout = input_layout;
-            if input_style_invalidation.paint_changed || animation_update.paint_changed {
-                apply_resolved_styles(&mut layout, &document.root, stylesheet, &self.states);
-            }
-            let scroll_chrome = if input_update.changed
-                || input_style_invalidation.paint_changed
-                || animation_update.paint_changed
-                || scrollbar_animation_update.paint_changed
-            {
-                scroll_chrome(&layout, &self.states, &self.scroll_limits)
-            } else {
-                input_scroll_chrome
-            };
-            (layout, scroll_chrome, true)
-        };
-        self.cached_layout = Some(layout.clone());
-        self.cached_document_root = Some(document.root.clone());
-        self.cached_scene_revision = None;
-        self.cached_scene_stylesheet = None;
-        self.cached_text_measurer_key = Some(text_measurer_key);
-        let element_count = count_resolved_elements(&layout);
-        let scroll_chrome_count = scroll_chrome.len();
-
-        DocumentOutput {
-            changes,
-            layout,
-            hit_id: input_update.hit_id,
-            active_drag: input_update.active_drag,
-            completed_drag: input_update.completed_drag,
-            text_selection: self.text_selection.clone(),
-            events: input_update.events,
-            scroll_chrome,
-            animating: animation_update.animating || scrollbar_animation_update.animating,
-            metrics: DocumentMetrics {
-                element_count,
-                scroll_chrome_count,
-                scene_style_nodes_visited: 0,
-                reused_cached_layout,
-                reused_input_layout,
-                input_changed_state: input_update.changed || clamp_changed,
-                animation_changed_style: input_style_invalidation.changed()
-                    || animation_update.changed()
-                    || scrollbar_animation_update.changed(),
-                animation_changed_layout: input_style_invalidation.layout_changed
-                    || animation_update.layout_changed,
-                animation_changed_paint: input_style_invalidation.paint_changed
-                    || animation_update.paint_changed
                     || scrollbar_animation_update.paint_changed,
             },
         }
@@ -430,16 +303,6 @@ impl DocumentEngine {
         changed
     }
 
-    fn cached_layout_matches(&self, viewport_rect: Rect, document_root: &Element) -> bool {
-        self.cached_layout.as_ref().is_some_and(|layout| {
-            layout.rect == viewport_rect
-                && self
-                    .cached_document_root
-                    .as_ref()
-                    .is_some_and(|cached_root| cached_root == document_root)
-        })
-    }
-
     fn cached_scene_matches(
         &self,
         scene: &DocumentScene,
@@ -447,34 +310,9 @@ impl DocumentEngine {
         text_measurer_key: TextMeasurerKey,
     ) -> bool {
         self.cached_layout.is_some()
-            && self.cached_document_root.is_none()
             && self.cached_scene_revision == Some(scene.revision())
             && self.cached_scene_stylesheet.as_ref() == Some(stylesheet)
             && self.cached_text_measurer_key == Some(text_measurer_key)
-    }
-
-    fn sync_element_states(&mut self, document: &Document) -> ChangeSet {
-        let mut next_ids = BTreeSet::new();
-        document.root.collect_ids(&mut next_ids);
-
-        let existing_ids: BTreeSet<_> = self.states.keys().cloned().collect();
-        let mut changes = ChangeSet::default();
-
-        for id in &next_ids {
-            if existing_ids.contains(id) {
-                changes.retained.push(id.clone());
-            } else {
-                changes.created.push(id.clone());
-                self.states.insert(id.clone(), ElementState::default());
-            }
-        }
-
-        for id in existing_ids.difference(&next_ids) {
-            changes.removed.push(id.clone());
-            self.states.remove(id);
-        }
-
-        changes
     }
 
     fn sync_scene_states(&mut self, scene: &DocumentScene) -> ChangeSet {
@@ -950,15 +788,6 @@ impl DocumentEngine {
         changed
     }
 
-    fn update_style_animation(
-        &mut self,
-        document: &Document,
-        stylesheet: &StyleSheet,
-    ) -> AnimationUpdate {
-        const SNAP_EPSILON: f32 = 0.001;
-        update_element_style_animation(&document.root, stylesheet, &mut self.states, SNAP_EPSILON)
-    }
-
     fn update_scene_style_animation(
         &mut self,
         scene: &DocumentScene,
@@ -1019,84 +848,6 @@ impl DocumentEngine {
             animating: (next - target).abs() > snap_epsilon,
         }
     }
-}
-
-fn classify_resolved_style_invalidation(
-    frame: &ResolvedElement,
-    element: &Element,
-    stylesheet: &StyleSheet,
-    states: &HashMap<ElementId, ElementState>,
-) -> StyleInvalidation {
-    classify_resolved_style_invalidation_at(frame, element, stylesheet, states, None)
-}
-
-fn classify_resolved_style_invalidation_at(
-    frame: &ResolvedElement,
-    element: &Element,
-    stylesheet: &StyleSheet,
-    states: &HashMap<ElementId, ElementState>,
-    position: Option<ChildPosition>,
-) -> StyleInvalidation {
-    let next_style = resolved_style_for(element, states, stylesheet, position);
-    let mut invalidation = classify_computed_style_change(Some(&frame.style), Some(&next_style));
-
-    for (index, (child_frame, child_element)) in
-        frame.children.iter().zip(&element.children).enumerate()
-    {
-        invalidation += classify_resolved_style_invalidation_at(
-            child_frame,
-            child_element,
-            stylesheet,
-            states,
-            Some(ChildPosition::new(index, element.children.len())),
-        );
-    }
-
-    invalidation
-}
-
-fn apply_resolved_styles(
-    frame: &mut ResolvedElement,
-    element: &Element,
-    stylesheet: &StyleSheet,
-    states: &HashMap<ElementId, ElementState>,
-) {
-    apply_resolved_styles_at(frame, element, stylesheet, states, None);
-}
-
-fn apply_resolved_styles_at(
-    frame: &mut ResolvedElement,
-    element: &Element,
-    stylesheet: &StyleSheet,
-    states: &HashMap<ElementId, ElementState>,
-    position: Option<ChildPosition>,
-) {
-    frame.style = resolved_style_for(element, states, stylesheet, position);
-    for (index, (child_frame, child_element)) in
-        frame.children.iter_mut().zip(&element.children).enumerate()
-    {
-        apply_resolved_styles_at(
-            child_frame,
-            child_element,
-            stylesheet,
-            states,
-            Some(ChildPosition::new(index, element.children.len())),
-        );
-    }
-}
-
-fn resolved_style_for(
-    element: &Element,
-    states: &HashMap<ElementId, ElementState>,
-    stylesheet: &StyleSheet,
-    position: Option<ChildPosition>,
-) -> ComputedStyle {
-    states
-        .get(&element.id)
-        .and_then(|state| state.rendered_style.clone())
-        .unwrap_or_else(|| {
-            resolve_style_with_position(element, stylesheet, states.get(&element.id), position)
-        })
 }
 
 fn count_resolved_elements(frame: &ResolvedElement) -> usize {

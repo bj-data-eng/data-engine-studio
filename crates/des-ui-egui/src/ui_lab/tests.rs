@@ -5,9 +5,9 @@ use crate::graphics_testing::{
     test_harness,
 };
 use des_ui_document::{
-    Document, DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec, Insets,
-    Length, Point, PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, TextWrapMode,
+    DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec, Insets, Length, Point,
+    PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
+    TextWrapMode,
 };
 use egui_kittest::Harness;
 
@@ -145,7 +145,7 @@ fn kittest_renders_lab_frame_to_shapes() {
 
     assert!(
         harness.output().shapes.len() > 20,
-        "expected the UI lab to produce a non-trivial painted document"
+        "expected the UI lab to produce a non-trivial painted scene"
     );
 }
 
@@ -1315,7 +1315,7 @@ fn text_view_allows_pointer_selection_on_selectable_text() {
         .state()
         .document_engine
         .text_selection()
-        .expect("dragging selectable text should create document text selection");
+        .expect("dragging selectable text should create scene text selection");
     assert_eq!(selection.target, ElementId::new("text-wrap-body"));
     assert!(selection.active);
     assert!(rect.contains(selection.anchor));
@@ -1341,7 +1341,7 @@ fn text_view_copy_event_sends_selected_text_to_clipboard() {
             .document_engine
             .text_selection()
             .is_some_and(|selection| !selection.is_empty()),
-        "drag should leave a non-empty document text selection before copy"
+        "drag should leave a non-empty scene text selection before copy"
     );
     harness.input_mut().modifiers = egui::Modifiers::COMMAND;
     harness.input_mut().events.push(egui::Event::Key {
@@ -1357,7 +1357,7 @@ fn text_view_copy_event_sends_selected_text_to_clipboard() {
         harness.output().platform_output.commands.iter().any(
             |command| matches!(command, egui::OutputCommand::CopyText(text) if !text.is_empty())
         ),
-        "copy event should send the document selection to the platform clipboard"
+        "copy event should send the scene selection to the platform clipboard"
     );
 }
 
@@ -1629,7 +1629,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
             StyleSelector::class("cell"),
             Style::default().size(10.0, 10.0),
         );
-    let document = Document::build(Size::new(240.0, 160.0), |ui| {
+    let mut scene = DocumentScene::build(Size::new(240.0, 160.0), |ui| {
         ui.element("outer", ElementSpec::new(ElementRole::Panel), |ui| {
             ui.element("inner", ElementSpec::new(ElementRole::Panel), |ui| {
                 for row in 0..3 {
@@ -1651,7 +1651,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         });
     });
 
-    let output = engine.update(&document, &stylesheet);
+    let output = engine.update_scene(&mut scene, &stylesheet);
 
     assert_close(output.layout.find("outer").unwrap().rect.size.width, 58.0);
     assert_close(output.layout.find("outer").unwrap().rect.size.height, 58.0);
