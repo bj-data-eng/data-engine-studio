@@ -236,7 +236,7 @@ fn scroll_position(chrome: &ScrollChrome) -> f32 {
 mod tests {
     use super::*;
     use des_ui_document::{
-        DocumentScene, ElementRole, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
+        Document, Element, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
     };
 
     #[test]
@@ -253,22 +253,18 @@ mod tests {
                 StyleSelector::class("row"),
                 Style::default().size(100.0, 32.0),
             );
-        let mut scene = DocumentScene::build(Size::new(160.0, 120.0), |ui| {
-            ui.element(
-                "scroll-parent",
-                ElementSpec::new(ElementRole::Panel),
-                |ui| {
-                    for index in 0..8 {
-                        ui.element(
-                            format!("row-{index}"),
-                            ElementSpec::new(ElementRole::Card).class("row"),
-                            |_| {},
-                        );
-                    }
-                },
-            );
+        let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
+            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
+                for index in 0..8 {
+                    ui.element(
+                        format!("row-{index}"),
+                        ElementSpec::new(Element::Div).class("row"),
+                        |_| {},
+                    );
+                }
+            });
         });
-        let output = engine.update_scene(&mut scene, &stylesheet);
+        let output = engine.update(&mut document, &stylesheet);
         let pointer = Point::new(40.0, 76.0);
 
         let action = AutoScroller::new(AutoScrollOptions::default())
@@ -294,22 +290,18 @@ mod tests {
                 StyleSelector::class("row"),
                 Style::default().size(100.0, 32.0),
             );
-        let mut scene = DocumentScene::build(Size::new(160.0, 120.0), |ui| {
-            ui.element(
-                "scroll-parent",
-                ElementSpec::new(ElementRole::Panel),
-                |ui| {
-                    for index in 0..8 {
-                        ui.element(
-                            format!("row-{index}"),
-                            ElementSpec::new(ElementRole::Card).class("row"),
-                            |_| {},
-                        );
-                    }
-                },
-            );
+        let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
+            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
+                for index in 0..8 {
+                    ui.element(
+                        format!("row-{index}"),
+                        ElementSpec::new(Element::Div).class("row"),
+                        |_| {},
+                    );
+                }
+            });
         });
-        let output = engine.update_scene(&mut scene, &stylesheet);
+        let output = engine.update(&mut document, &stylesheet);
 
         let action = AutoScroller::new(AutoScrollOptions {
             threshold_y: 0.0,

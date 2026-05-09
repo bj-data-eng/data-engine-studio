@@ -1,4 +1,4 @@
-use des_ui_egui::NativeLaunchOptions;
+use des_ui_lab::NativeLaunchOptions;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
@@ -32,7 +32,7 @@ fn launch(title: Option<String>) -> PyResult<()> {
     if let Some(title) = title {
         options.title = title;
     }
-    des_ui_egui::run_native(options).map_err(|error| PyRuntimeError::new_err(error.to_string()))
+    des_ui_lab::run_native(options).map_err(|error| PyRuntimeError::new_err(error.to_string()))
 }
 
 #[pymodule]

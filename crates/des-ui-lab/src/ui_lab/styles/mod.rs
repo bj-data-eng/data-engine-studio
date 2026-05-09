@@ -7,7 +7,7 @@ use super::{
     TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
 use des_ui_document::{
-    AlignItems, Color, ElementRole, ElementStateSelector, FlexDirection, FlexWrap, Insets,
+    AlignItems, Color, Element, ElementStateSelector, FlexDirection, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, Shadow, Style, StyleSelector, StyleSheet,
     TextWrapMode, Transition,
 };
@@ -15,29 +15,19 @@ use des_ui_document::{
 pub(super) fn stylesheet() -> StyleSheet {
     let mut stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Root),
+            StyleSelector::Element(Element::Root),
             Style::default()
                 .flex_direction(FlexDirection::Column)
                 .background(BACKGROUND),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Panel),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .flex_direction(FlexDirection::Column)
                 .background(PANEL),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Card),
-            Style::default()
-                .flex_direction(FlexDirection::Column)
-                .padding(Insets::all(12.0))
-                .gap(5.0)
-                .background(CARD)
-                .border(STROKE)
-                .radius(7.0),
-        )
-        .rule(
-            StyleSelector::Role(ElementRole::Control),
+            StyleSelector::Element(Element::Button),
             Style::default()
                 .padding(Insets::symmetric(12.0, 7.0))
                 .background(CARD)
@@ -45,7 +35,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Checkbox),
+            StyleSelector::Element(Element::Checkbox),
             Style::default()
                 .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
@@ -56,7 +46,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Radio),
+            StyleSelector::Element(Element::Radio),
             Style::default()
                 .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
@@ -67,7 +57,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Dropdown),
+            StyleSelector::Element(Element::Select),
             Style::default()
                 .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
@@ -79,7 +69,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Role(ElementRole::TextInput),
+            StyleSelector::Element(Element::Input),
             Style::default()
                 .padding(Insets::symmetric(10.0, 7.0))
                 .background(PANEL)
@@ -87,14 +77,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(5.0),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Icon),
+            StyleSelector::Element(Element::Icon),
             Style::default()
                 .size(14.0, 14.0)
                 .font_size(14.0)
                 .text_color(TEXT_MUTED),
         )
         .rule(
-            StyleSelector::Role(ElementRole::Text),
+            StyleSelector::Element(Element::Text),
             Style::default()
                 .font_size(13.0)
                 .text_color(TEXT)

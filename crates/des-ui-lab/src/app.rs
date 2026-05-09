@@ -2,21 +2,21 @@ use crate::ui_lab::UiLabState;
 use des_app::{AppCommand, StudioAppState};
 use eframe::egui;
 
-pub(crate) struct StudioEguiApp {
+pub(crate) struct StudioLabApp {
     _state: StudioAppState,
     ui_lab: UiLabState,
     debug_overlay: bool,
 }
 
-pub(crate) struct StudioEguiAppOptions {
+pub(crate) struct StudioLabAppOptions {
     pub(crate) debug_overlay: bool,
     pub(crate) initial_lab_view: Option<String>,
     pub(crate) initial_lab_scroll: Option<[f32; 2]>,
     pub(crate) startup_commands: Vec<AppCommand>,
 }
 
-impl StudioEguiApp {
-    pub(crate) fn new(options: StudioEguiAppOptions) -> Self {
+impl StudioLabApp {
+    pub(crate) fn new(options: StudioLabAppOptions) -> Self {
         let mut state = StudioAppState::default();
         for command in options.startup_commands {
             state.dispatch(command);
@@ -36,7 +36,7 @@ impl StudioEguiApp {
     }
 }
 
-impl eframe::App for StudioEguiApp {
+impl eframe::App for StudioLabApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.ui_lab.render(ui, self.debug_overlay);
     }

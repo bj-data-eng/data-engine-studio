@@ -1,5 +1,6 @@
 use crate::element::{
-    ClassName, Element, ElementId, ElementRole, ElementSpec, VisualCloneOptions, VisualElementClone,
+    ClassName, DocumentNode, Element, ElementId, ElementSpec, Glyph, VisualCloneOptions,
+    VisualElementClone,
 };
 use crate::geometry::{
     AlignContent, AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
@@ -11,7 +12,9 @@ use crate::style::{
     resolve_style_with_position,
 };
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
-use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextWrapMode};
+#[cfg(test)]
+use crate::text::FallbackTextMeasurer;
+use crate::text::{TextLayoutRequest, TextMeasurer, TextWrapMode};
 use layout_engine::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, AvailableSpace, Dimension,
     Display, FlexDirection as LayoutFlexDirection, FlexWrap as LayoutFlexWrap, GridPlacement,
@@ -22,42 +25,46 @@ use layout_engine::prelude::{
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 
-pub type SceneResult<T> = Result<T, SceneError>;
+pub type DocumentResult<T> = Result<T, DocumentError>;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct StyleApplicationReport {
+pub(crate) struct StyleResolutionReport {
     pub visited: usize,
     pub paint_changed: bool,
     pub layout_changed: bool,
 }
 
-impl StyleApplicationReport {
+impl StyleResolutionReport {
     pub fn changed(self) -> bool {
         self.paint_changed || self.layout_changed
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SceneError {
+pub enum DocumentError {
     DuplicateElement(ElementId),
     MissingElement(ElementId),
     Layout(String),
 }
 
-impl std::fmt::Display for SceneError {
+impl std::fmt::Display for DocumentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SceneError::DuplicateElement(id) => write!(f, "Element {} already exists", id.as_str()),
-            SceneError::MissingElement(id) => write!(f, "Element {} does not exist", id.as_str()),
-            SceneError::Layout(message) => write!(f, "{message}"),
+            DocumentError::DuplicateElement(id) => {
+                write!(f, "DocumentNode {} already exists", id.as_str())
+            }
+            DocumentError::MissingElement(id) => {
+                write!(f, "DocumentNode {} does not exist", id.as_str())
+            }
+            DocumentError::Layout(message) => write!(f, "{message}"),
         }
     }
 }
 
-impl std::error::Error for SceneError {}
+impl std::error::Error for DocumentError {}
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SceneElement {
+pub(crate) struct DocumentElement {
     pub id: ElementId,
     pub spec: ElementSpec,
     pub text: Option<String>,
@@ -67,32 +74,32 @@ pub struct SceneElement {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct SceneLayoutNode {
+struct DocumentLayoutNode {
     id: ElementId,
-    role: ElementRole,
+    element: Element,
     text: Option<String>,
 }
 
-pub struct DocumentScene {
+pub struct Document {
     viewport: Size,
     revision: u64,
-    layout: LayoutTree<SceneLayoutNode>,
-    elements: HashMap<ElementId, SceneElement>,
+    layout: LayoutTree<DocumentLayoutNode>,
+    elements: HashMap<ElementId, DocumentElement>,
     layout_to_element: HashMap<NodeId, ElementId>,
     root: ElementId,
 }
 
-impl DocumentScene {
-    pub fn build(viewport: Size, add_contents: impl FnOnce(&mut SceneBuilder)) -> Self {
-        let mut builder = SceneBuilder::default();
+impl Document {
+    pub fn build(viewport: Size, add_contents: impl FnOnce(&mut DocumentBuilder)) -> Self {
+        let mut builder = DocumentBuilder::default();
         add_contents(&mut builder);
-        let mut scene = Self::new(viewport);
+        let mut document = Self::new(viewport);
         for child in builder.children {
-            scene
+            document
                 .append_element_tree("root", child)
-                .expect("scene builder produces a valid element tree");
+                .expect("document builder produces a valid element tree");
         }
-        scene
+        document
     }
 
     pub fn new(viewport: Size) -> Self {
@@ -101,9 +108,9 @@ impl DocumentScene {
         let root_node = layout
             .new_leaf_with_context(
                 root_layout_style(viewport),
-                SceneLayoutNode {
+                DocumentLayoutNode {
                     id: root.clone(),
-                    role: ElementRole::Root,
+                    element: Element::Root,
                     text: None,
                 },
             )
@@ -112,9 +119,9 @@ impl DocumentScene {
         let mut elements = HashMap::new();
         elements.insert(
             root.clone(),
-            SceneElement {
+            DocumentElement {
                 id: root.clone(),
-                spec: ElementSpec::new(ElementRole::Root),
+                spec: ElementSpec::new(Element::Root),
                 text: None,
                 computed_style: root_sized_style(ComputedStyle::default(), viewport),
                 scroll_offset: Point::ZERO,
@@ -158,8 +165,9 @@ impl DocumentScene {
         parent: impl Into<ElementId>,
         id: impl Into<ElementId>,
         spec: ElementSpec,
-    ) -> SceneResult<NodeId> {
-        self.append_node(parent.into(), id.into(), spec, None)
+    ) -> DocumentResult<()> {
+        self.append_node(parent.into(), id.into(), spec, None)?;
+        Ok(())
     }
 
     pub fn append_text(
@@ -168,15 +176,16 @@ impl DocumentScene {
         id: impl Into<ElementId>,
         spec: ElementSpec,
         text: impl Into<String>,
-    ) -> SceneResult<NodeId> {
-        self.append_node(parent.into(), id.into(), spec, Some(text.into()))
+    ) -> DocumentResult<()> {
+        self.append_node(parent.into(), id.into(), spec, Some(text.into()))?;
+        Ok(())
     }
 
     pub(crate) fn append_element_tree(
         &mut self,
         parent: impl Into<ElementId>,
-        element: Element,
-    ) -> SceneResult<NodeId> {
+        element: DocumentNode,
+    ) -> DocumentResult<NodeId> {
         let parent = parent.into();
         let id = element.id.clone();
         let node = self.append_node(parent, id.clone(), element.spec, element.text)?;
@@ -190,7 +199,7 @@ impl DocumentScene {
         &mut self,
         id: impl Into<ElementId>,
         text: impl Into<String>,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let text = Some(text.into());
         let node = self.element(&id)?.layout_node;
@@ -210,7 +219,7 @@ impl DocumentScene {
         &mut self,
         id: impl Into<ElementId>,
         value: impl Into<String>,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let value = Some(value.into());
         let element = self.element_mut(&id)?;
@@ -226,7 +235,7 @@ impl DocumentScene {
         &mut self,
         id: impl Into<ElementId>,
         class: impl Into<ClassName>,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let class = class.into();
         let element = self.element_mut(&id)?;
@@ -242,7 +251,7 @@ impl DocumentScene {
         &mut self,
         id: impl Into<ElementId>,
         class: impl Into<ClassName>,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let class = class.into();
         let element = self.element_mut(&id)?;
@@ -259,7 +268,7 @@ impl DocumentScene {
         &mut self,
         id: impl Into<ElementId>,
         class: impl Into<ClassName>,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let class = class.into();
         if self.element(&id)?.spec.classes.contains(&class) {
@@ -269,7 +278,11 @@ impl DocumentScene {
         }
     }
 
-    pub fn set_selected(&mut self, id: impl Into<ElementId>, selected: bool) -> SceneResult<bool> {
+    pub fn set_selected(
+        &mut self,
+        id: impl Into<ElementId>,
+        selected: bool,
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let element = self.element_mut(&id)?;
         if element.spec.selected == selected {
@@ -280,7 +293,11 @@ impl DocumentScene {
         Ok(true)
     }
 
-    pub fn set_disabled(&mut self, id: impl Into<ElementId>, disabled: bool) -> SceneResult<bool> {
+    pub fn set_disabled(
+        &mut self,
+        id: impl Into<ElementId>,
+        disabled: bool,
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let element = self.element_mut(&id)?;
         if element.spec.disabled == disabled {
@@ -291,7 +308,7 @@ impl DocumentScene {
         Ok(true)
     }
 
-    pub fn set_focused(&mut self, id: impl Into<ElementId>, focused: bool) -> SceneResult<bool> {
+    pub fn set_focused(&mut self, id: impl Into<ElementId>, focused: bool) -> DocumentResult<bool> {
         let id = id.into();
         let element = self.element_mut(&id)?;
         if element.spec.focused == focused {
@@ -306,7 +323,7 @@ impl DocumentScene {
         &mut self,
         id: impl Into<ElementId>,
         new_parent: impl Into<ElementId>,
-    ) -> SceneResult<()> {
+    ) -> DocumentResult<()> {
         let id = id.into();
         let new_parent = new_parent.into();
         let node = self.element(&id)?.layout_node;
@@ -318,31 +335,33 @@ impl DocumentScene {
         Ok(())
     }
 
-    pub fn remove(&mut self, id: impl Into<ElementId>) -> SceneResult<()> {
+    pub fn remove(&mut self, id: impl Into<ElementId>) -> DocumentResult<()> {
         let id = id.into();
         if id == self.root {
-            return Err(SceneError::MissingElement(id));
+            return Err(DocumentError::MissingElement(id));
         }
         self.remove_subtree(&id)
     }
 
-    pub fn layout_node(&self, id: impl Into<ElementId>) -> Option<NodeId> {
+    #[cfg(test)]
+    pub(crate) fn layout_node(&self, id: impl Into<ElementId>) -> Option<NodeId> {
         self.elements
             .get(&id.into())
             .map(|element| element.layout_node)
     }
 
-    pub fn layout_style(&self, id: impl Into<ElementId>) -> SceneResult<&LayoutStyle> {
+    #[cfg(test)]
+    pub(crate) fn layout_style(&self, id: impl Into<ElementId>) -> DocumentResult<&LayoutStyle> {
         let node = self.element(&id.into())?.layout_node;
         self.layout.style(node).map_err(layout_error)
     }
 
-    pub fn layout_dirty(&self, id: impl Into<ElementId>) -> SceneResult<bool> {
+    pub(crate) fn layout_dirty(&self, id: impl Into<ElementId>) -> DocumentResult<bool> {
         let node = self.element(&id.into())?.layout_node;
         self.layout.dirty(node).map_err(layout_error)
     }
 
-    pub(crate) fn mark_layout_dirty(&mut self) -> SceneResult<()> {
+    pub(crate) fn mark_layout_dirty(&mut self) -> DocumentResult<()> {
         let nodes = self
             .elements
             .values()
@@ -354,11 +373,11 @@ impl DocumentScene {
         Ok(())
     }
 
-    pub fn apply_computed_style(
+    pub(crate) fn apply_computed_style(
         &mut self,
         id: impl Into<ElementId>,
         style: &ComputedStyle,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         let id = id.into();
         let node = self.element(&id)?.layout_node;
         let layout_changed =
@@ -367,14 +386,14 @@ impl DocumentScene {
         Ok(layout_changed)
     }
 
-    pub fn apply_stylesheet(
+    pub(crate) fn apply_stylesheet(
         &mut self,
         stylesheet: &StyleSheet,
         states: &HashMap<ElementId, ElementState>,
-    ) -> SceneResult<StyleApplicationReport> {
+    ) -> DocumentResult<StyleResolutionReport> {
         let mut positions = Vec::new();
         self.collect_positions(self.root.clone(), None, &mut positions)?;
-        let mut report = StyleApplicationReport {
+        let mut report = StyleResolutionReport {
             visited: positions.len(),
             ..Default::default()
         };
@@ -416,7 +435,7 @@ impl DocumentScene {
         Ok(report)
     }
 
-    pub fn apply_scroll_offsets(&mut self, states: &HashMap<ElementId, ElementState>) {
+    pub(crate) fn apply_scroll_offsets(&mut self, states: &HashMap<ElementId, ElementState>) {
         for (id, element) in &mut self.elements {
             element.scroll_offset = states
                 .get(id)
@@ -425,15 +444,16 @@ impl DocumentScene {
         }
     }
 
-    pub fn compute_layout(&mut self) -> SceneResult<()> {
+    #[cfg(test)]
+    pub(crate) fn compute_layout(&mut self) -> DocumentResult<()> {
         let mut text_measurer = FallbackTextMeasurer;
         self.compute_layout_with_text_measurer(&mut text_measurer)
     }
 
-    pub fn compute_layout_with_text_measurer(
+    pub(crate) fn compute_layout_with_text_measurer(
         &mut self,
         text_measurer: &mut dyn TextMeasurer,
-    ) -> SceneResult<()> {
+    ) -> DocumentResult<()> {
         let root_node = self.element(&self.root)?.layout_node;
         let measure_inputs = self.measure_inputs();
         self.layout
@@ -464,7 +484,7 @@ impl DocumentScene {
             .map_err(layout_error)
     }
 
-    pub fn layout_rect(&self, id: impl Into<ElementId>) -> SceneResult<DocumentRect> {
+    pub(crate) fn layout_rect(&self, id: impl Into<ElementId>) -> DocumentResult<DocumentRect> {
         let node = self.element(&id.into())?.layout_node;
         let layout = self.layout.layout(node).map_err(layout_error)?;
         Ok(DocumentRect::new(
@@ -475,15 +495,16 @@ impl DocumentScene {
         ))
     }
 
-    pub fn resolved_layout(&self) -> SceneResult<ResolvedElement> {
+    #[cfg(test)]
+    pub(crate) fn resolved_layout(&self) -> DocumentResult<ResolvedElement> {
         let mut text_measurer = FallbackTextMeasurer;
         self.resolved_layout_with_text_measurer(&mut text_measurer)
     }
 
-    pub fn resolved_layout_with_text_measurer(
+    pub(crate) fn resolved_layout_with_text_measurer(
         &self,
         text_measurer: &mut dyn TextMeasurer,
-    ) -> SceneResult<ResolvedElement> {
+    ) -> DocumentResult<ResolvedElement> {
         let mut anchors = HashMap::new();
         self.resolved_element(
             &self.root,
@@ -494,7 +515,7 @@ impl DocumentScene {
         )
     }
 
-    pub(crate) fn scroll_limits(&self) -> SceneResult<HashMap<ElementId, Size>> {
+    pub(crate) fn scroll_limits(&self) -> DocumentResult<HashMap<ElementId, Size>> {
         let mut limits = HashMap::new();
         for id in self.element_ids() {
             let element = self.element(&id)?;
@@ -518,21 +539,23 @@ impl DocumentScene {
         Ok(limits)
     }
 
-    pub fn resolve_layout(
+    #[cfg(test)]
+    pub(crate) fn resolve_layout(
         &mut self,
         stylesheet: &StyleSheet,
         states: &HashMap<ElementId, ElementState>,
-    ) -> SceneResult<ResolvedElement> {
+    ) -> DocumentResult<ResolvedElement> {
         let mut text_measurer = FallbackTextMeasurer;
         self.resolve_layout_with_text_measurer(stylesheet, states, &mut text_measurer)
     }
 
-    pub fn resolve_layout_with_text_measurer(
+    #[cfg(test)]
+    pub(crate) fn resolve_layout_with_text_measurer(
         &mut self,
         stylesheet: &StyleSheet,
         states: &HashMap<ElementId, ElementState>,
         text_measurer: &mut dyn TextMeasurer,
-    ) -> SceneResult<ResolvedElement> {
+    ) -> DocumentResult<ResolvedElement> {
         let report = self.apply_stylesheet(stylesheet, states)?;
         if report.layout_changed || self.layout_dirty(self.root.clone())? {
             self.compute_layout_with_text_measurer(text_measurer)?;
@@ -540,7 +563,7 @@ impl DocumentScene {
         self.resolved_layout_with_text_measurer(text_measurer)
     }
 
-    pub fn parent(&self, id: impl Into<ElementId>) -> SceneResult<Option<ElementId>> {
+    pub fn parent(&self, id: impl Into<ElementId>) -> DocumentResult<Option<ElementId>> {
         let node = self.element(&id.into())?.layout_node;
         Ok(self
             .layout
@@ -548,7 +571,7 @@ impl DocumentScene {
             .and_then(|parent| self.layout_to_element.get(&parent).cloned()))
     }
 
-    pub fn children(&self, id: impl Into<ElementId>) -> SceneResult<Vec<ElementId>> {
+    pub fn children(&self, id: impl Into<ElementId>) -> DocumentResult<Vec<ElementId>> {
         let node = self.element(&id.into())?.layout_node;
         self.layout
             .children(node)
@@ -556,7 +579,7 @@ impl DocumentScene {
             .into_iter()
             .map(|child| {
                 self.layout_to_element.get(&child).cloned().ok_or_else(|| {
-                    SceneError::Layout(format!("Layout node {child:?} is not indexed"))
+                    DocumentError::Layout(format!("Layout node {child:?} is not indexed"))
                 })
             })
             .collect()
@@ -568,9 +591,9 @@ impl DocumentScene {
         id: ElementId,
         spec: ElementSpec,
         text: Option<String>,
-    ) -> SceneResult<NodeId> {
+    ) -> DocumentResult<NodeId> {
         if self.elements.contains_key(&id) {
-            return Err(SceneError::DuplicateElement(id));
+            return Err(DocumentError::DuplicateElement(id));
         }
 
         let parent_node = self.element(&parent)?.layout_node;
@@ -578,9 +601,9 @@ impl DocumentScene {
             .layout
             .new_leaf_with_context(
                 LayoutStyle::default(),
-                SceneLayoutNode {
+                DocumentLayoutNode {
                     id: id.clone(),
-                    role: spec.role,
+                    element: spec.element,
                     text: text.clone(),
                 },
             )
@@ -591,7 +614,7 @@ impl DocumentScene {
         self.layout_to_element.insert(node, id.clone());
         self.elements.insert(
             id.clone(),
-            SceneElement {
+            DocumentElement {
                 id,
                 spec,
                 text,
@@ -605,7 +628,7 @@ impl DocumentScene {
         Ok(node)
     }
 
-    fn remove_subtree(&mut self, id: &ElementId) -> SceneResult<()> {
+    fn remove_subtree(&mut self, id: &ElementId) -> DocumentResult<()> {
         let children = self.children(id.clone())?;
         for child in children {
             self.remove_subtree(&child)?;
@@ -614,7 +637,7 @@ impl DocumentScene {
         let element = self
             .elements
             .remove(id)
-            .ok_or_else(|| SceneError::MissingElement(id.clone()))?;
+            .ok_or_else(|| DocumentError::MissingElement(id.clone()))?;
         self.layout_to_element.remove(&element.layout_node);
         self.layout
             .remove(element.layout_node)
@@ -623,16 +646,16 @@ impl DocumentScene {
         Ok(())
     }
 
-    fn element(&self, id: &ElementId) -> SceneResult<&SceneElement> {
+    fn element(&self, id: &ElementId) -> DocumentResult<&DocumentElement> {
         self.elements
             .get(id)
-            .ok_or_else(|| SceneError::MissingElement(id.clone()))
+            .ok_or_else(|| DocumentError::MissingElement(id.clone()))
     }
 
-    fn element_mut(&mut self, id: &ElementId) -> SceneResult<&mut SceneElement> {
+    fn element_mut(&mut self, id: &ElementId) -> DocumentResult<&mut DocumentElement> {
         self.elements
             .get_mut(id)
-            .ok_or_else(|| SceneError::MissingElement(id.clone()))
+            .ok_or_else(|| DocumentError::MissingElement(id.clone()))
     }
 
     fn resolved_element(
@@ -642,7 +665,7 @@ impl DocumentScene {
         parent_scroll_offset: Point,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
-    ) -> SceneResult<ResolvedElement> {
+    ) -> DocumentResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
         let rect = resolved_document_rect(
@@ -663,7 +686,7 @@ impl DocumentScene {
 
         Ok(ResolvedElement {
             id: element.id.clone(),
-            role: element.spec.role,
+            element: element.spec.element,
             classes: element.spec.classes.clone(),
             rect,
             style: element.computed_style.clone(),
@@ -687,7 +710,7 @@ impl DocumentScene {
         parent_scroll_offset: Point,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
-    ) -> SceneResult<Vec<ResolvedElement>> {
+    ) -> DocumentResult<Vec<ResolvedElement>> {
         let children = self.children(id.clone())?;
         let mut resolved = vec![None; children.len()];
 
@@ -733,7 +756,7 @@ impl DocumentScene {
         id: ElementId,
         position: Option<ChildPosition>,
         positions: &mut Vec<(ElementId, Option<ChildPosition>)>,
-    ) -> SceneResult<()> {
+    ) -> DocumentResult<()> {
         positions.push((id.clone(), position));
 
         let children = self.children(id)?;
@@ -749,9 +772,9 @@ impl DocumentScene {
         Ok(())
     }
 
-    fn snapshot_element(&self, id: &ElementId) -> SceneResult<Element> {
+    fn snapshot_element(&self, id: &ElementId) -> DocumentResult<DocumentNode> {
         let element = self.element(id)?;
-        Ok(Element {
+        Ok(DocumentNode {
             id: element.id.clone(),
             spec: element.spec.clone(),
             text: element.text.clone(),
@@ -759,19 +782,19 @@ impl DocumentScene {
         })
     }
 
-    pub(crate) fn element_tree(&self) -> SceneResult<Element> {
+    pub(crate) fn element_tree(&self) -> DocumentResult<DocumentNode> {
         self.element_subtree(&self.root)
     }
 
-    fn element_subtree(&self, id: &ElementId) -> SceneResult<Element> {
+    fn element_subtree(&self, id: &ElementId) -> DocumentResult<DocumentNode> {
         let element = self.element(id)?;
         let children = self
             .children(id.clone())?
             .into_iter()
             .map(|child| self.element_subtree(&child))
-            .collect::<SceneResult<Vec<_>>>()?;
+            .collect::<DocumentResult<Vec<_>>>()?;
 
-        Ok(Element {
+        Ok(DocumentNode {
             id: element.id.clone(),
             spec: element.spec.clone(),
             text: element.text.clone(),
@@ -779,14 +802,14 @@ impl DocumentScene {
         })
     }
 
-    fn measure_inputs(&self) -> HashMap<NodeId, SceneMeasureInput> {
+    fn measure_inputs(&self) -> HashMap<NodeId, DocumentMeasureInput> {
         self.elements
             .values()
             .filter_map(|element| {
                 element.text.as_ref().map(|text| {
                     (
                         element.layout_node,
-                        SceneMeasureInput {
+                        DocumentMeasureInput {
                             text: text.clone(),
                             style: element.computed_style.clone(),
                         },
@@ -800,7 +823,7 @@ impl DocumentScene {
         &mut self,
         node: NodeId,
         style: LayoutStyle,
-    ) -> SceneResult<bool> {
+    ) -> DocumentResult<bool> {
         if self.layout.style(node).map_err(layout_error)? == &style {
             return Ok(false);
         }
@@ -809,14 +832,12 @@ impl DocumentScene {
         Ok(true)
     }
 
-    fn apply_table_grid_styles(&mut self) -> SceneResult<bool> {
+    fn apply_table_grid_styles(&mut self) -> DocumentResult<bool> {
         let ids = self.element_ids();
         let mut layout_changed = false;
         for id in ids {
             let element = self.element(&id)?;
-            if element.spec.role != ElementRole::TableHeader
-                && element.spec.role != ElementRole::TableRow
-            {
+            if element.spec.element != Element::Thead && element.spec.element != Element::Tr {
                 continue;
             }
 
@@ -832,7 +853,7 @@ impl DocumentScene {
             style.display = Display::Grid;
             style.grid_template_columns = table_grid_columns(&table);
             style.size.width = length(table_grid_width(&table));
-            style.size.height = length(if element.spec.role == ElementRole::TableHeader {
+            style.size.height = length(if element.spec.element == Element::Thead {
                 table.header_height
             } else {
                 table.row_height
@@ -863,20 +884,79 @@ impl DocumentScene {
 }
 
 #[derive(Default)]
-pub struct SceneBuilder {
-    children: Vec<Element>,
+pub struct DocumentBuilder {
+    children: Vec<DocumentNode>,
 }
 
-impl SceneBuilder {
+pub struct ElementBuilder<'a> {
+    parent: &'a mut DocumentBuilder,
+    id: ElementId,
+    spec: ElementSpec,
+}
+
+macro_rules! element_builder_methods {
+    ($($name:ident => $element:expr),+ $(,)?) => {
+        $(
+            pub fn $name(&mut self, id: impl Into<ElementId>) -> ElementBuilder<'_> {
+                self.child(id, $element)
+            }
+        )+
+    };
+}
+
+impl DocumentBuilder {
+    pub fn child(&mut self, id: impl Into<ElementId>, element: Element) -> ElementBuilder<'_> {
+        ElementBuilder {
+            parent: self,
+            id: id.into(),
+            spec: ElementSpec::new(element),
+        }
+    }
+
+    element_builder_methods! {
+        div => Element::Div,
+        span => Element::Span,
+        main => Element::Main,
+        section => Element::Section,
+        article => Element::Article,
+        header => Element::Header,
+        footer => Element::Footer,
+        nav => Element::Nav,
+        aside => Element::Aside,
+        p => Element::P,
+        h1 => Element::H1,
+        h2 => Element::H2,
+        h3 => Element::H3,
+        h4 => Element::H4,
+        h5 => Element::H5,
+        h6 => Element::H6,
+        button => Element::Button,
+        input => Element::Input,
+        checkbox => Element::Checkbox,
+        radio => Element::Radio,
+        select => Element::Select,
+        option => Element::Option,
+        textarea => Element::Textarea,
+        label => Element::Label,
+        canvas => Element::Canvas,
+        icon => Element::Icon,
+        table => Element::Table,
+        thead => Element::Thead,
+        tbody => Element::Tbody,
+        tr => Element::Tr,
+        th => Element::Th,
+        td => Element::Td,
+    }
+
     pub fn element(
         &mut self,
         id: impl Into<ElementId>,
         spec: ElementSpec,
-        add_contents: impl FnOnce(&mut SceneBuilder),
+        add_contents: impl FnOnce(&mut DocumentBuilder),
     ) {
-        let mut child_builder = SceneBuilder::default();
+        let mut child_builder = DocumentBuilder::default();
         add_contents(&mut child_builder);
-        self.children.push(Element {
+        self.children.push(DocumentNode {
             id: id.into(),
             spec,
             text: None,
@@ -885,7 +965,7 @@ impl SceneBuilder {
     }
 
     pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<String>) {
-        self.text_element(id, ElementSpec::new(ElementRole::Text), text);
+        self.text_element(id, ElementSpec::new(Element::Text), text);
     }
 
     pub fn text_element(
@@ -894,7 +974,7 @@ impl SceneBuilder {
         spec: ElementSpec,
         text: impl Into<String>,
     ) {
-        self.children.push(Element {
+        self.children.push(DocumentNode {
             id: id.into(),
             spec,
             text: Some(text.into()),
@@ -907,7 +987,88 @@ impl SceneBuilder {
     }
 }
 
-struct SceneMeasureInput {
+impl ElementBuilder<'_> {
+    pub fn class(mut self, class: impl Into<ClassName>) -> Self {
+        self.spec.classes.push(class.into());
+        self
+    }
+
+    pub fn interactive(mut self) -> Self {
+        self.spec.interactive = true;
+        self
+    }
+
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.spec.selected = selected;
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.spec.disabled = disabled;
+        self
+    }
+
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.spec.focused = focused;
+        self
+    }
+
+    pub fn selectable_text(mut self) -> Self {
+        self.spec.selectable_text = true;
+        self.spec.copyable_text = true;
+        self
+    }
+
+    pub fn copyable_text(mut self, copyable_text: bool) -> Self {
+        self.spec.copyable_text = copyable_text;
+        self
+    }
+
+    pub fn value(mut self, value: impl Into<String>) -> Self {
+        self.spec.value = Some(value.into());
+        self
+    }
+
+    pub fn glyph(mut self, glyph: Glyph) -> Self {
+        self.spec.glyph = Some(glyph);
+        self
+    }
+
+    pub fn table(mut self, table: TableSpec) -> Self {
+        self.spec.table = Some(table);
+        self
+    }
+
+    pub fn table_cell(mut self, table_cell: crate::table::TableCellSpec) -> Self {
+        self.spec.table_cell = Some(table_cell);
+        self
+    }
+
+    pub fn empty(self) {
+        self.push(None, Vec::new());
+    }
+
+    pub fn text(self, text: impl Into<String>) {
+        self.push(Some(text.into()), Vec::new());
+    }
+
+    pub fn children(self, add_contents: impl FnOnce(&mut DocumentBuilder)) {
+        let mut child_builder = DocumentBuilder::default();
+        add_contents(&mut child_builder);
+        self.push(None, child_builder.children);
+    }
+
+    fn push(self, text: Option<String>, children: Vec<DocumentNode>) {
+        self.parent.children.push(DocumentNode {
+            id: self.id,
+            spec: self.spec,
+            text,
+            children,
+        });
+    }
+}
+
+struct DocumentMeasureInput {
     text: String,
     style: ComputedStyle,
 }
@@ -1352,6 +1513,6 @@ fn layout_flex_wrap(flex_wrap: FlexWrap) -> LayoutFlexWrap {
     }
 }
 
-fn layout_error(error: layout_engine::LayoutError) -> SceneError {
-    SceneError::Layout(error.to_string())
+fn layout_error(error: layout_engine::LayoutError) -> DocumentError {
+    DocumentError::Layout(error.to_string())
 }

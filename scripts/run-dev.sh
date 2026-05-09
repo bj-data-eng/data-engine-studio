@@ -5,5 +5,5 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
 
 cd "$repo_root"
-cargo build -p des-ui-egui --bin des-ui-dev
+cargo build -p des-ui-lab --bin des-ui-dev
 exec ./target/debug/des-ui-dev

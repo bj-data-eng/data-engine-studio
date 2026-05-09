@@ -37,7 +37,7 @@ ui-debug-windows out='target/ui-shots/studio-debug.png':
     pwsh -NoLogo -NoProfile -File ./scripts/capture-ui.ps1 -Out "{{out}}" -Width 1320 -Height 780 -DebugOverlay -LabView graph
 
 ui-test:
-    cargo test -p des-ui-egui ui_lab::tests
+    cargo test -p des-ui-lab ui_lab::tests
 
 audit:
     cargo audit

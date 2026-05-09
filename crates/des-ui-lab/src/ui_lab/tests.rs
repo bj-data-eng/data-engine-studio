@@ -1,14 +1,14 @@
 use super::*;
-use crate::adapter::EguiTextMeasurer;
 use crate::graphics_testing::{
     TEST_HEIGHT, TEST_WIDTH, assert_exact_image_match, compare_images, image_stats, render_harness,
     test_harness,
 };
 use des_ui_document::{
-    DocumentEngine, DocumentInput, DocumentOutput, ElementRole, ElementSpec, Insets, Length, Point,
+    DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, Insets, Length, Point,
     PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
     TextWrapMode,
 };
+use des_ui_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
 
 const INTERACTION_LOOP_SCROLL_Y: f32 = 300.0;
@@ -44,12 +44,14 @@ fn lab_output(initial_view: &str) -> DocumentOutput {
 }
 
 fn lab_output_with_size(initial_view: &str, size: Size) -> DocumentOutput {
-    UiLabState::new(Some(initial_view)).lab_scene_output_for_test(size)
+    UiLabState::new(Some(initial_view)).lab_document_output_for_test(size)
 }
 
 fn lab_output_with_stage_scroll(initial_view: &str, scroll_y: f32) -> DocumentOutput {
-    UiLabState::new(Some(initial_view))
-        .lab_scene_output_with_stage_scroll_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT), scroll_y)
+    UiLabState::new(Some(initial_view)).lab_document_output_with_stage_scroll_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
+        scroll_y,
+    )
 }
 
 fn find_frame<'a>(frame: &'a ResolvedElement, id: &str) -> Option<&'a ResolvedElement> {
@@ -68,13 +70,13 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
 
 fn state_output(state: &UiLabState) -> DocumentOutput {
     let mut state = state.clone_for_retained_test();
-    state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT))
+    state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT))
 }
 
 fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> DocumentOutput {
     let mut state = state.clone_for_retained_test();
     let mut text_measurer = EguiTextMeasurer::new(ctx);
-    state.lab_scene_output_with_text_measurer_for_test(
+    state.lab_document_output_with_text_measurer_for_test(
         Size::new(TEST_WIDTH, TEST_HEIGHT),
         &mut text_measurer,
     )
@@ -93,7 +95,10 @@ fn state_rect_with_egui_text(
 
 fn state_output_with_scroll(state: &UiLabState, scroll_y: f32) -> DocumentOutput {
     let mut state = state.clone_for_retained_test();
-    state.lab_scene_output_with_stage_scroll_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT), scroll_y)
+    state.lab_document_output_with_stage_scroll_for_test(
+        Size::new(TEST_WIDTH, TEST_HEIGHT),
+        scroll_y,
+    )
 }
 
 fn has_class(frame: &ResolvedElement, class: &str) -> bool {
@@ -145,7 +150,7 @@ fn kittest_renders_lab_frame_to_shapes() {
 
     assert!(
         harness.output().shapes.len() > 20,
-        "expected the UI lab to produce a non-trivial painted scene"
+        "expected the UI lab to produce a non-trivial painted output"
     );
 }
 
@@ -317,25 +322,19 @@ fn styling_view_renders_structural_selector_specimens() {
 }
 
 #[test]
-fn interaction_view_renders_common_control_roles() {
+fn interaction_view_renders_common_control_elements() {
     let output = lab_output("interaction");
 
     assert_eq!(
-        frame(&output, "control-checkbox").role,
-        ElementRole::Checkbox
+        frame(&output, "control-checkbox").element,
+        Element::Checkbox
     );
     assert_eq!(
-        frame(&output, "control-radio-local").role,
-        ElementRole::Radio
+        frame(&output, "control-radio-local").element,
+        Element::Radio
     );
-    assert_eq!(
-        frame(&output, "control-dropdown").role,
-        ElementRole::Dropdown
-    );
-    assert_eq!(
-        frame(&output, "control-input-name").role,
-        ElementRole::TextInput
-    );
+    assert_eq!(frame(&output, "control-dropdown").element, Element::Select);
+    assert_eq!(frame(&output, "control-input-name").element, Element::Input);
     assert!(frame(&output, "control-checkbox").interactive);
     assert!(frame(&output, "control-input-name").interactive);
     assert!(!frame(&output, "control-input-disabled").interactive);
@@ -646,7 +645,7 @@ fn draggable_drag_drop_grid_moves_items_between_cells() {
 
     let output = harness
         .state_mut()
-        .lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+        .lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let item = frame(&output, "drag-item-0");
     assert_eq!(
         item.style.height,
@@ -703,7 +702,7 @@ fn draggable_drag_drop_reorders_with_nearest_item_gap() {
 
     let output = harness
         .state_mut()
-        .lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+        .lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     assert_eq!(
         frame(&output, "drag-item-1").style.margin,
         Insets::ZERO,
@@ -786,9 +785,9 @@ fn draggable_drag_drop_requires_handle_to_drag_parent() {
 #[test]
 fn draggable_drag_drop_sets_handle_cursors() {
     let mut state = UiLabState::new(Some("draggable"));
-    let output = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let output = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let start = center(frame(&output, "drag-handle-0").rect);
-    let output = state.lab_scene_output_with_input_for_test(
+    let output = state.lab_document_output_with_input_for_test(
         Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
@@ -809,7 +808,7 @@ fn draggable_drag_drop_sets_handle_cursors() {
         Some(egui::CursorIcon::PointingHand)
     );
 
-    let mut output = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let mut output = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     output.active_drag = Some(DocumentDrag {
         target: ElementId::new("drag-handle-0"),
         origin: Point::new(start.x, start.y),
@@ -956,13 +955,13 @@ fn draggable_drag_drop_cells_expand_to_fit_stacked_items() {
 }
 
 #[test]
-fn draggable_view_reuses_retained_scene_on_warm_update() {
+fn draggable_view_reuses_retained_document_on_warm_update() {
     let mut state = UiLabState::new(Some("draggable"));
-    let first = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
-    let warm = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let first = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let warm = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
 
-    assert!(first.metrics.scene_style_nodes_visited > 0);
-    assert_eq!(warm.metrics.scene_style_nodes_visited, 0);
+    assert!(first.metrics.style_nodes_visited > 0);
+    assert_eq!(warm.metrics.style_nodes_visited, 0);
     assert!(warm.metrics.reused_input_layout);
 }
 
@@ -1174,7 +1173,7 @@ fn box_model_specimens_cover_size_inset_and_flow_contracts() {
 #[test]
 fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
     let output = lab_output("scrolling");
-    assert!(output.metrics.scene_style_nodes_visited > 0);
+    assert!(output.metrics.style_nodes_visited > 0);
 
     assert_scroll_chrome(&output, "scroll-panel-a-list", ScrollAxis::Vertical);
     assert_scroll_chrome(&output, "scroll-panel-b-list", ScrollAxis::Horizontal);
@@ -1215,18 +1214,18 @@ fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
 }
 
 #[test]
-fn scrolling_view_reuses_retained_scene_on_warm_update() {
+fn scrolling_view_reuses_retained_document_on_warm_update() {
     let mut state = UiLabState::new(Some("scrolling"));
-    let first = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
-    let warm = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let first = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let warm = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
 
-    assert!(first.metrics.scene_style_nodes_visited > 0);
-    assert_eq!(warm.metrics.scene_style_nodes_visited, 0);
+    assert!(first.metrics.style_nodes_visited > 0);
+    assert_eq!(warm.metrics.style_nodes_visited, 0);
     assert!(warm.metrics.reused_input_layout);
 }
 
 #[test]
-fn every_lab_view_reuses_retained_scene_on_warm_update() {
+fn every_lab_view_reuses_retained_document_on_warm_update() {
     for view in [
         "layout",
         "interaction",
@@ -1240,16 +1239,16 @@ fn every_lab_view_reuses_retained_scene_on_warm_update() {
         "graph",
     ] {
         let mut state = UiLabState::new(Some(view));
-        let first = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
-        let warm = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+        let first = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+        let warm = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
 
         assert!(
-            first.metrics.scene_style_nodes_visited > 0,
-            "{view} should resolve scene styles on the cold update"
+            first.metrics.style_nodes_visited > 0,
+            "{view} should resolve document styles on the cold update"
         );
         assert_eq!(
-            warm.metrics.scene_style_nodes_visited, 0,
-            "{view} should skip scene style traversal on the warm update"
+            warm.metrics.style_nodes_visited, 0,
+            "{view} should skip document style traversal on the warm update"
         );
         assert!(
             warm.metrics.reused_input_layout,
@@ -1259,7 +1258,7 @@ fn every_lab_view_reuses_retained_scene_on_warm_update() {
 }
 
 #[test]
-fn table_view_renders_document_table_roles_and_shared_tracks() {
+fn table_view_renders_document_table_elements_and_shared_tracks() {
     let output = lab_output("table");
     let table = frame(&output, "customer-preview-table");
     let header_customer = frame(&output, "customer-preview-header-customer");
@@ -1267,8 +1266,8 @@ fn table_view_renders_document_table_roles_and_shared_tracks() {
     let header_revenue = frame(&output, "customer-preview-header-revenue");
     let row_revenue = frame(&output, "customer-preview-row-0-revenue");
 
-    assert_eq!(table.role, ElementRole::Table);
-    assert_eq!(header_customer.role, ElementRole::TableCell);
+    assert_eq!(table.element, Element::Table);
+    assert_eq!(header_customer.element, Element::Td);
     assert_close(
         header_customer.rect.size.width,
         row_customer.rect.size.width,
@@ -1315,7 +1314,7 @@ fn text_view_allows_pointer_selection_on_selectable_text() {
         .state()
         .document_engine
         .text_selection()
-        .expect("dragging selectable text should create scene text selection");
+        .expect("dragging selectable text should create document text selection");
     assert_eq!(selection.target, ElementId::new("text-wrap-body"));
     assert!(selection.active);
     assert!(rect.contains(selection.anchor));
@@ -1341,7 +1340,7 @@ fn text_view_copy_event_sends_selected_text_to_clipboard() {
             .document_engine
             .text_selection()
             .is_some_and(|selection| !selection.is_empty()),
-        "drag should leave a non-empty scene text selection before copy"
+        "drag should leave a non-empty document text selection before copy"
     );
     harness.input_mut().modifiers = egui::Modifiers::COMMAND;
     harness.input_mut().events.push(egui::Event::Key {
@@ -1357,7 +1356,7 @@ fn text_view_copy_event_sends_selected_text_to_clipboard() {
         harness.output().platform_output.commands.iter().any(
             |command| matches!(command, egui::OutputCommand::CopyText(text) if !text.is_empty())
         ),
-        "copy event should send the scene selection to the platform clipboard"
+        "copy event should send the document selection to the platform clipboard"
     );
 }
 
@@ -1455,7 +1454,7 @@ fn animation_view_renders_state_driven_specimens() {
 #[test]
 fn animation_margin_specimen_expands_layout_on_hover() {
     let mut state = UiLabState::new(Some("animation"));
-    let base = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let base = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let target = frame(&base, "animation-hover-margin-target");
     let row = frame(&base, "animation-hover-margin-row");
     let after = frame(&base, "animation-hover-margin-after");
@@ -1464,7 +1463,7 @@ fn animation_margin_specimen_expands_layout_on_hover() {
         target.rect.origin.y + target.rect.size.height / 2.0,
     );
 
-    let hovered = state.lab_scene_output_with_input_for_test(
+    let hovered = state.lab_document_output_with_input_for_test(
         Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1501,14 +1500,14 @@ fn animation_margin_specimen_expands_layout_on_hover() {
 #[test]
 fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
     let mut state = UiLabState::new(Some("animation"));
-    let base = state.lab_scene_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let base = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     let target = frame(&base, "animation-hover-margin-target");
     let hover_pointer = Point::new(
         target.rect.origin.x + target.rect.size.width / 2.0,
         target.rect.origin.y + target.rect.size.height / 2.0,
     );
 
-    let mut output = state.lab_scene_output_with_input_for_test(
+    let mut output = state.lab_document_output_with_input_for_test(
         Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1528,7 +1527,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
         if !output.animating && !output.metrics.animation_changed_style {
             break;
         }
-        output = state.lab_scene_output_with_input_for_test(
+        output = state.lab_document_output_with_input_for_test(
             Size::new(TEST_WIDTH, TEST_HEIGHT),
             DocumentInput {
                 pointer: Some(PointerInput {
@@ -1549,7 +1548,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
     assert!(!output.metrics.animation_changed_style);
 
     let exit_pointer = Point::new(4.0, 4.0);
-    output = state.lab_scene_output_with_input_for_test(
+    output = state.lab_document_output_with_input_for_test(
         Size::new(TEST_WIDTH, TEST_HEIGHT),
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1572,7 +1571,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
         {
             break;
         }
-        output = state.lab_scene_output_with_input_for_test(
+        output = state.lab_document_output_with_input_for_test(
             Size::new(TEST_WIDTH, TEST_HEIGHT),
             DocumentInput {
                 pointer: Some(PointerInput {
@@ -1629,18 +1628,18 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
             StyleSelector::class("cell"),
             Style::default().size(10.0, 10.0),
         );
-    let mut scene = DocumentScene::build(Size::new(240.0, 160.0), |ui| {
-        ui.element("outer", ElementSpec::new(ElementRole::Panel), |ui| {
-            ui.element("inner", ElementSpec::new(ElementRole::Panel), |ui| {
+    let mut document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.element("outer", ElementSpec::new(Element::Div), |ui| {
+            ui.element("inner", ElementSpec::new(Element::Div), |ui| {
                 for row in 0..3 {
                     ui.element(
                         format!("row-{row}"),
-                        ElementSpec::new(ElementRole::Panel).class("row"),
+                        ElementSpec::new(Element::Div).class("row"),
                         |ui| {
                             for column in 0..3 {
                                 ui.element(
                                     format!("cell-{row}-{column}"),
-                                    ElementSpec::new(ElementRole::Panel).class("cell"),
+                                    ElementSpec::new(Element::Div).class("cell"),
                                     |_| {},
                                 );
                             }
@@ -1651,7 +1650,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         });
     });
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
 
     assert_close(output.layout.find("outer").unwrap().rect.size.width, 58.0);
     assert_close(output.layout.find("outer").unwrap().rect.size.height, 58.0);

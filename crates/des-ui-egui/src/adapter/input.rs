@@ -1,6 +1,6 @@
 use des_ui_document::{DocumentInput, Point, PointerInput};
 use eframe::egui;
-pub(crate) fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
+pub fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
     ui.input(|input| DocumentInput {
         pointer: input.pointer.hover_pos().map(|position| PointerInput {
             position: Point::new(position.x - origin.x, position.y - origin.y),

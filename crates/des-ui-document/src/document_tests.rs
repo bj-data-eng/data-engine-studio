@@ -1,11 +1,11 @@
-use des_ui_document::{
-    AlignContent, AlignItems, Color, ComputedStyle, Display, DocumentEngine, DocumentEventKind,
-    DocumentInput, DocumentScene, ElementId, ElementRole, ElementSpec, ElementStateSelector,
-    FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
-    GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets, JustifyContent, Length,
-    Overflow, Point, PointerInput, Rect, RepetitionCount, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
-    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode, Transition,
+use crate::{
+    AlignContent, AlignItems, Color, ComputedStyle, CornerRadii, Display, Document, DocumentEngine,
+    DocumentEventKind, DocumentInput, Element, ElementId, ElementSpec, ElementState,
+    ElementStateSelector, FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine,
+    GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets,
+    JustifyContent, Length, Overflow, Point, PointerInput, Rect, RepetitionCount, ScrollAxis, Size,
+    Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode, Transition,
 };
 use layout_engine::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, Dimension,
@@ -76,63 +76,66 @@ fn hover_input(position: Point) -> DocumentInput {
 }
 
 #[test]
-fn scene_reparents_existing_element_without_reallocating_layout_node() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_reparents_existing_element_without_reallocating_layout_node() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
+    document
         .append_text(
             "panel",
             "label",
-            ElementSpec::new(ElementRole::Text),
+            ElementSpec::new(Element::Text),
             "Retained text",
         )
         .unwrap();
 
-    let original_layout_node = scene.layout_node("label").unwrap();
+    let original_layout_node = document.layout_node("label").unwrap();
 
-    scene.reparent("label", "root").unwrap();
+    document.reparent("label", "root").unwrap();
 
-    assert_eq!(scene.layout_node("label"), Some(original_layout_node));
-    assert_eq!(scene.parent("label").unwrap(), Some(ElementId::new("root")));
-    assert!(scene.children("panel").unwrap().is_empty());
+    assert_eq!(document.layout_node("label"), Some(original_layout_node));
     assert_eq!(
-        scene.children("root").unwrap(),
+        document.parent("label").unwrap(),
+        Some(ElementId::new("root"))
+    );
+    assert!(document.children("panel").unwrap().is_empty());
+    assert_eq!(
+        document.children("root").unwrap(),
         vec![ElementId::new("panel"), ElementId::new("label")]
     );
 }
 
 #[test]
-fn scene_remove_prunes_descendants_from_model_and_layout_graph() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_remove_prunes_descendants_from_model_and_layout_graph() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
+    document
         .append_text(
             "panel",
             "label",
-            ElementSpec::new(ElementRole::Text),
+            ElementSpec::new(Element::Text),
             "Retained text",
         )
         .unwrap();
 
-    scene.remove("panel").unwrap();
+    document.remove("panel").unwrap();
 
-    assert_eq!(scene.children("root").unwrap(), Vec::<ElementId>::new());
-    assert!(scene.layout_node("panel").is_none());
-    assert!(scene.layout_node("label").is_none());
-    assert!(scene.parent("label").is_err());
+    assert_eq!(document.children("root").unwrap(), Vec::<ElementId>::new());
+    assert!(document.layout_node("panel").is_none());
+    assert!(document.layout_node("label").is_none());
+    assert!(document.parent("label").is_err());
 }
 
 #[test]
-fn scene_applies_document_style_to_existing_layout_node() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_applies_document_style_to_existing_layout_node() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    let original_layout_node = scene.layout_node("panel").unwrap();
+    let original_layout_node = document.layout_node("panel").unwrap();
 
     let mut style = ComputedStyle::default();
     style.display = Display::Grid;
@@ -187,10 +190,10 @@ fn scene_applies_document_style_to_existing_layout_node() {
     style.max_size = Size::new(640.0, 480.0);
     style.overflow_x = Overflow::Scroll;
 
-    scene.apply_computed_style("panel", &style).unwrap();
+    document.apply_computed_style("panel", &style).unwrap();
 
-    assert_eq!(scene.layout_node("panel"), Some(original_layout_node));
-    let layout_style = scene.layout_style("panel").unwrap();
+    assert_eq!(document.layout_node("panel"), Some(original_layout_node));
+    let layout_style = document.layout_style("panel").unwrap();
     assert_eq!(layout_style.display, Display::Grid);
     assert_eq!(layout_style.flex_direction, LayoutFlexDirection::Row);
     assert_eq!(
@@ -277,31 +280,31 @@ fn scene_applies_document_style_to_existing_layout_node() {
 }
 
 #[test]
-fn scene_fill_size_does_not_imply_flex_layout_style() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_fill_size_does_not_imply_flex_layout_style() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
 
     let mut style = ComputedStyle::default();
     style.width = Length::Fill;
     style.height = Length::Fill;
 
-    scene.apply_computed_style("panel", &style).unwrap();
+    document.apply_computed_style("panel", &style).unwrap();
 
-    let layout_style = scene.layout_style("panel").unwrap();
+    let layout_style = document.layout_style("panel").unwrap();
     assert_eq!(layout_style.align_self, None);
     assert_eq!(layout_style.flex_grow, 0.0);
 }
 
 #[test]
-fn scene_stylesheet_applies_grid_style_surface() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element("root", "grid", ElementSpec::new(ElementRole::Panel))
+fn document_stylesheet_applies_grid_style_surface() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "grid", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("grid", "cell", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("grid", "cell", ElementSpec::new(Element::Div))
         .unwrap();
     let columns = vec![
         GridTemplateComponent::Single(length::<_, GridTrack>(48.0)),
@@ -334,9 +337,9 @@ fn scene_stylesheet_applies_grid_style_surface() {
         );
 
     let states = HashMap::new();
-    scene.apply_stylesheet(&stylesheet, &states).unwrap();
+    document.apply_stylesheet(&stylesheet, &states).unwrap();
 
-    let grid_style = scene.layout_style("grid").unwrap();
+    let grid_style = document.layout_style("grid").unwrap();
     assert_eq!(grid_style.display, Display::Grid);
     assert_eq!(grid_style.grid_template_columns, columns);
     assert_eq!(
@@ -346,55 +349,55 @@ fn scene_stylesheet_applies_grid_style_surface() {
     assert_eq!(grid_style.grid_auto_flow, GridAutoFlow::RowDense);
     assert_eq!(grid_style.justify_items, Some(LayoutAlignItems::Stretch));
 
-    let cell_style = scene.layout_style("cell").unwrap();
+    let cell_style = document.layout_style("cell").unwrap();
     assert_eq!(cell_style.grid_row, row);
     assert_eq!(cell_style.grid_column, column);
     assert_eq!(cell_style.justify_self, Some(LayoutAlignItems::Center));
 }
 
 #[test]
-fn scene_computes_layout_rects_from_retained_graph() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_computes_layout_rects_from_retained_graph() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
 
     let mut style = ComputedStyle::default();
     style.width = Length::Px(200.0);
     style.height = Length::Px(100.0);
-    scene.apply_computed_style("panel", &style).unwrap();
+    document.apply_computed_style("panel", &style).unwrap();
 
-    scene.compute_layout().unwrap();
+    document.compute_layout().unwrap();
 
     assert_eq!(
-        scene.layout_rect("root").unwrap(),
+        document.layout_rect("root").unwrap(),
         Rect::new(0.0, 0.0, 800.0, 600.0)
     );
     assert_eq!(
-        scene.layout_rect("panel").unwrap(),
+        document.layout_rect("panel").unwrap(),
         Rect::new(0.0, 0.0, 200.0, 100.0)
     );
 }
 
 #[test]
-fn scene_resolves_stylesheet_over_retained_elements() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
+fn document_resolves_stylesheet_over_retained_elements() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
         .append_element(
             "root",
             "first",
-            ElementSpec::new(ElementRole::Panel).class("primary"),
+            ElementSpec::new(Element::Div).class("primary"),
         )
         .unwrap();
-    scene
-        .append_element("root", "second", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("root", "second", ElementSpec::new(Element::Div))
         .unwrap();
-    let first_node = scene.layout_node("first").unwrap();
-    let second_node = scene.layout_node("second").unwrap();
+    let first_node = document.layout_node("first").unwrap();
+    let second_node = document.layout_node("second").unwrap();
 
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Root),
+            StyleSelector::Element(Element::Root),
             Style::default().flex_direction(FlexDirection::Row),
         )
         .rule(
@@ -410,43 +413,43 @@ fn scene_resolves_stylesheet_over_retained_elements() {
             Style::default().width(Length::Px(240.0)),
         );
     let mut states = HashMap::new();
-    let mut second_state = des_ui_document::ElementState::default();
+    let mut second_state = ElementState::default();
     second_state.hovered = true;
     states.insert(ElementId::new("second"), second_state);
 
-    scene.apply_stylesheet(&stylesheet, &states).unwrap();
+    document.apply_stylesheet(&stylesheet, &states).unwrap();
 
-    assert_eq!(scene.layout_node("first"), Some(first_node));
-    assert_eq!(scene.layout_node("second"), Some(second_node));
+    assert_eq!(document.layout_node("first"), Some(first_node));
+    assert_eq!(document.layout_node("second"), Some(second_node));
     assert_eq!(
-        scene.layout_style("root").unwrap().flex_direction,
+        document.layout_style("root").unwrap().flex_direction,
         LayoutFlexDirection::Row
     );
     assert_eq!(
-        scene.layout_style("root").unwrap().size,
+        document.layout_style("root").unwrap().size,
         LayoutSize {
             width: length::<_, Dimension>(800.0),
             height: length::<_, Dimension>(600.0),
         }
     );
     assert_eq!(
-        scene.layout_style("first").unwrap().size,
+        document.layout_style("first").unwrap().size,
         LayoutSize {
             width: length::<_, Dimension>(120.0),
             height: length::<_, Dimension>(40.0),
         }
     );
     assert_eq!(
-        scene.layout_style("second").unwrap().size.width,
+        document.layout_style("second").unwrap().size.width,
         length::<_, Dimension>(240.0)
     );
 }
 
 #[test]
-fn scene_does_not_dirty_layout_graph_when_resolved_layout_style_is_unchanged() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_does_not_dirty_layout_graph_when_resolved_layout_style_is_unchanged() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("panel"),
@@ -455,30 +458,30 @@ fn scene_does_not_dirty_layout_graph_when_resolved_layout_style_is_unchanged() {
             .height(Length::Px(40.0)),
     );
 
-    let first_report = scene
+    let first_report = document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
-    scene.compute_layout().unwrap();
+    document.compute_layout().unwrap();
     assert!(first_report.layout_changed);
     assert_eq!(first_report.visited, 2);
-    assert!(!scene.layout_dirty("root").unwrap());
-    assert!(!scene.layout_dirty("panel").unwrap());
+    assert!(!document.layout_dirty("root").unwrap());
+    assert!(!document.layout_dirty("panel").unwrap());
 
-    let second_report = scene
+    let second_report = document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
 
     assert!(!second_report.changed());
     assert_eq!(second_report.visited, 2);
-    assert!(!scene.layout_dirty("root").unwrap());
-    assert!(!scene.layout_dirty("panel").unwrap());
+    assert!(!document.layout_dirty("root").unwrap());
+    assert!(!document.layout_dirty("panel").unwrap());
 }
 
 #[test]
-fn scene_paint_only_style_update_does_not_dirty_layout_graph() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_paint_only_style_update_does_not_dirty_layout_graph() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
     let layout_stylesheet = StyleSheet::new().rule(
         StyleSelector::id("panel"),
@@ -486,40 +489,40 @@ fn scene_paint_only_style_update_does_not_dirty_layout_graph() {
             .width(Length::Px(120.0))
             .height(Length::Px(40.0)),
     );
-    scene
+    document
         .apply_stylesheet(&layout_stylesheet, &HashMap::new())
         .unwrap();
-    scene.compute_layout().unwrap();
+    document.compute_layout().unwrap();
 
     let paint_stylesheet = layout_stylesheet.clone().rule(
         StyleSelector::id("panel"),
-        Style::default().background(des_ui_document::Color::rgb(16, 24, 32)),
+        Style::default().background(Color::rgb(16, 24, 32)),
     );
-    let report = scene
+    let report = document
         .apply_stylesheet(&paint_stylesheet, &HashMap::new())
         .unwrap();
 
     assert!(report.paint_changed);
     assert!(!report.layout_changed);
-    assert!(!scene.layout_dirty("root").unwrap());
-    assert!(!scene.layout_dirty("panel").unwrap());
+    assert!(!document.layout_dirty("root").unwrap());
+    assert!(!document.layout_dirty("panel").unwrap());
     assert_eq!(
-        scene
+        document
             .resolved_layout()
             .unwrap()
             .find("panel")
             .unwrap()
             .style
             .background,
-        Some(des_ui_document::Color::rgb(16, 24, 32))
+        Some(Color::rgb(16, 24, 32))
     );
 }
 
 #[test]
-fn scene_layout_style_update_dirties_changed_node_and_ancestors() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_layout_style_update_dirties_changed_node_and_ancestors() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("panel"),
@@ -527,10 +530,10 @@ fn scene_layout_style_update_dirties_changed_node_and_ancestors() {
             .width(Length::Px(120.0))
             .height(Length::Px(40.0)),
     );
-    scene
+    document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
-    scene.compute_layout().unwrap();
+    document.compute_layout().unwrap();
 
     let changed_stylesheet = StyleSheet::new().rule(
         StyleSelector::id("panel"),
@@ -538,31 +541,31 @@ fn scene_layout_style_update_dirties_changed_node_and_ancestors() {
             .width(Length::Px(240.0))
             .height(Length::Px(40.0)),
     );
-    scene
+    document
         .apply_stylesheet(&changed_stylesheet, &HashMap::new())
         .unwrap();
 
-    assert!(scene.layout_dirty("root").unwrap());
-    assert!(scene.layout_dirty("panel").unwrap());
+    assert!(document.layout_dirty("root").unwrap());
+    assert!(document.layout_dirty("panel").unwrap());
 }
 
 #[test]
-fn scene_emits_resolved_element_tree_from_retained_layout() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
+fn document_emits_resolved_element_tree_from_retained_layout() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
         .append_element(
             "root",
             "panel",
-            ElementSpec::new(ElementRole::Panel)
+            ElementSpec::new(Element::Div)
                 .class("primary")
                 .interactive(),
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "panel",
             "label",
-            ElementSpec::new(ElementRole::Text).selectable_text(),
+            ElementSpec::new(Element::Text).selectable_text(),
             "Retained text",
         )
         .unwrap();
@@ -579,17 +582,17 @@ fn scene_emits_resolved_element_tree_from_retained_layout() {
             Style::default().size(80.0, 20.0),
         );
 
-    scene
+    document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
-    scene.compute_layout().unwrap();
+    document.compute_layout().unwrap();
 
-    let root = scene.resolved_layout().unwrap();
+    let root = document.resolved_layout().unwrap();
     let panel = root.find("panel").unwrap();
     let label = root.find("label").unwrap();
 
     assert_eq!(root.rect, Rect::new(0.0, 0.0, 800.0, 600.0));
-    assert_eq!(panel.role, ElementRole::Panel);
+    assert_eq!(panel.element, Element::Div);
     assert_eq!(panel.classes, vec!["primary".into()]);
     assert_eq!(panel.rect, Rect::new(0.0, 0.0, 200.0, 100.0));
     assert_eq!(panel.style.padding, Insets::all(10.0));
@@ -601,13 +604,13 @@ fn scene_emits_resolved_element_tree_from_retained_layout() {
 }
 
 #[test]
-fn scene_emits_text_layout_from_retained_layout() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
+fn document_emits_text_layout_from_retained_layout() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
         .append_text(
             "root",
             "label",
-            ElementSpec::new(ElementRole::Text),
+            ElementSpec::new(Element::Text),
             "Retained text",
         )
         .unwrap();
@@ -621,11 +624,11 @@ fn scene_emits_text_layout_from_retained_layout() {
     );
     let mut text_measurer = RecordingTextMeasurer::default();
 
-    scene
+    document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
-    scene.compute_layout().unwrap();
-    let root = scene
+    document.compute_layout().unwrap();
+    let root = document
         .resolved_layout_with_text_measurer(&mut text_measurer)
         .unwrap();
     let label = root.find("label").unwrap();
@@ -645,15 +648,10 @@ fn scene_emits_text_layout_from_retained_layout() {
 }
 
 #[test]
-fn scene_uses_text_measurement_for_auto_sized_text_layout() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_text(
-            "root",
-            "label",
-            ElementSpec::new(ElementRole::Text),
-            "Measured",
-        )
+fn document_uses_text_measurement_for_auto_sized_text_layout() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_text("root", "label", ElementSpec::new(Element::Text), "Measured")
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("label"),
@@ -661,13 +659,13 @@ fn scene_uses_text_measurement_for_auto_sized_text_layout() {
     );
     let mut text_measurer = RecordingTextMeasurer::default();
 
-    scene
+    document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
-    scene
+    document
         .compute_layout_with_text_measurer(&mut text_measurer)
         .unwrap();
-    let label = scene
+    let label = document
         .resolved_layout_with_text_measurer(&mut text_measurer)
         .unwrap()
         .find("label")
@@ -678,17 +676,19 @@ fn scene_uses_text_measurement_for_auto_sized_text_layout() {
 }
 
 #[test]
-fn scene_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("panel"),
         Style::default().size(320.0, 180.0),
     );
 
-    let root = scene.resolve_layout(&stylesheet, &HashMap::new()).unwrap();
+    let root = document
+        .resolve_layout(&stylesheet, &HashMap::new())
+        .unwrap();
 
     assert_eq!(
         root.find("panel").unwrap().rect,
@@ -697,16 +697,11 @@ fn scene_resolves_styles_computes_layout_and_emits_tree_in_one_pass() {
 }
 
 #[test]
-fn scene_resolve_layout_skips_compute_when_layout_graph_is_clean() {
+fn document_resolve_layout_skips_compute_when_layout_graph_is_clean() {
     COMPUTE_TEXT_MEASURE_COUNT.store(0, Ordering::SeqCst);
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_text(
-            "root",
-            "label",
-            ElementSpec::new(ElementRole::Text),
-            "Measured",
-        )
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_text("root", "label", ElementSpec::new(Element::Text), "Measured")
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("label"),
@@ -714,13 +709,13 @@ fn scene_resolve_layout_skips_compute_when_layout_graph_is_clean() {
     );
     let mut text_measurer = CountingTextMeasurer;
 
-    scene
+    document
         .resolve_layout_with_text_measurer(&stylesheet, &HashMap::new(), &mut text_measurer)
         .unwrap();
     let first_resolve_count = COMPUTE_TEXT_MEASURE_COUNT.load(Ordering::SeqCst);
     assert!(first_resolve_count > 1);
 
-    scene
+    document
         .resolve_layout_with_text_measurer(&stylesheet, &HashMap::new(), &mut text_measurer)
         .unwrap();
 
@@ -731,10 +726,10 @@ fn scene_resolve_layout_skips_compute_when_layout_graph_is_clean() {
 }
 
 #[test]
-fn document_engine_can_update_from_retained_scene() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_can_update_from_retained_document() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("panel"),
@@ -742,7 +737,7 @@ fn document_engine_can_update_from_retained_scene() {
     );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
 
     assert_eq!(
         output.layout.find("panel").unwrap().rect,
@@ -757,13 +752,13 @@ fn document_engine_can_update_from_retained_scene() {
 }
 
 #[test]
-fn document_engine_update_scene_reports_scroll_chrome_for_overflow() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_reports_scroll_chrome_for_overflow() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -778,7 +773,7 @@ fn document_engine_update_scene_reports_scroll_chrome_for_overflow() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
 
     assert_eq!(output.scroll_chrome.len(), 1);
     assert_eq!(output.scroll_chrome[0].element_id, ElementId::new("scroll"));
@@ -787,13 +782,13 @@ fn document_engine_update_scene_reports_scroll_chrome_for_overflow() {
 }
 
 #[test]
-fn document_engine_update_scene_with_input_clicks_interactive_element() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
+fn document_engine_update_with_input_clicks_interactive_element() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
         .append_element(
             "root",
             "button",
-            ElementSpec::new(ElementRole::Control).interactive(),
+            ElementSpec::new(Element::Button).interactive(),
         )
         .unwrap();
     let stylesheet = StyleSheet::new().rule(
@@ -802,8 +797,8 @@ fn document_engine_update_scene_with_input_clicks_interactive_element() {
     );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -833,18 +828,14 @@ fn document_engine_update_scene_with_input_clicks_interactive_element() {
 }
 
 #[test]
-fn document_engine_update_scene_eases_transitioned_paint_styles() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_eases_transitioned_paint_styles() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20))
@@ -855,10 +846,10 @@ fn document_engine_update_scene_eases_transitioned_paint_styles() {
             Style::default().background(Color::rgb(40, 70, 95)),
         );
     let mut engine = DocumentEngine::default();
-    engine.update_scene(&mut scene, &stylesheet);
+    engine.update(&mut document, &stylesheet);
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -882,8 +873,8 @@ fn document_engine_update_scene_eases_transitioned_paint_styles() {
     assert!(!output.metrics.animation_changed_layout);
     assert!(output.metrics.animation_changed_paint);
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -907,18 +898,14 @@ fn document_engine_update_scene_eases_transitioned_paint_styles() {
 }
 
 #[test]
-fn document_engine_update_scene_transitioned_paint_styles_settle_to_target() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_transitioned_paint_styles_settle_to_target() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20))
@@ -931,9 +918,9 @@ fn document_engine_update_scene_transitioned_paint_styles_settle_to_target() {
     let hover_input = hover_input(Point::new(2.0, 2.0));
     let mut engine = DocumentEngine::default();
 
-    engine.update_scene(&mut scene, &stylesheet);
+    engine.update(&mut document, &stylesheet);
     let output = (0..30)
-        .map(|_| engine.update_scene_with_input(&mut scene, &stylesheet, hover_input))
+        .map(|_| engine.update_with_input(&mut document, &stylesheet, hover_input))
         .last()
         .unwrap();
     let card = output.layout.find("card").unwrap();
@@ -942,25 +929,21 @@ fn document_engine_update_scene_transitioned_paint_styles_settle_to_target() {
     assert!(!output.animating);
     assert!(!output.metrics.animation_changed_style);
 
-    let output = engine.update_scene_with_input(&mut scene, &stylesheet, hover_input);
+    let output = engine.update_with_input(&mut document, &stylesheet, hover_input);
 
     assert!(!output.animating);
     assert!(!output.metrics.animation_changed_style);
 }
 
 #[test]
-fn document_engine_update_scene_eases_transitioned_layout_styles() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_eases_transitioned_layout_styles() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .size(100.0, 40.0)
                 .transition(Transition::linear(0.25)),
@@ -970,10 +953,10 @@ fn document_engine_update_scene_eases_transitioned_layout_styles() {
             Style::default().size(140.0, 80.0),
         );
     let mut engine = DocumentEngine::default();
-    engine.update_scene(&mut scene, &stylesheet);
+    engine.update(&mut document, &stylesheet);
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -997,18 +980,14 @@ fn document_engine_update_scene_eases_transitioned_layout_styles() {
 }
 
 #[test]
-fn document_engine_update_scene_eases_full_box_model_layout_styles() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_eases_full_box_model_layout_styles() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .size(100.0, 40.0)
                 .min_size(20.0, 20.0)
@@ -1035,10 +1014,13 @@ fn document_engine_update_scene_eases_full_box_model_layout_styles() {
                 .font_size(20.0),
         );
     let mut engine = DocumentEngine::default();
-    engine.update_scene(&mut scene, &stylesheet);
+    engine.update(&mut document, &stylesheet);
 
-    let output =
-        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(4.0, 4.0)));
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        hover_input(Point::new(4.0, 4.0)),
+    );
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.rect.size, Size::new(110.0, 50.0));
@@ -1048,33 +1030,32 @@ fn document_engine_update_scene_eases_full_box_model_layout_styles() {
     assert_eq!(card.style.margin, Insets::all(4.0));
     assert_eq!(card.style.gap, 8.0);
     assert_eq!(card.style.border_width, Insets::all(4.0));
-    assert_eq!(card.style.radius, des_ui_document::CornerRadii::all(8.0));
+    assert_eq!(card.style.radius, CornerRadii::all(8.0));
     assert_eq!(card.style.font_size, 14.0);
     assert!(!output.metrics.reused_input_layout);
     assert!(output.metrics.animation_changed_style);
     assert!(output.metrics.animation_changed_layout);
     assert!(output.metrics.animation_changed_paint);
 
-    let output =
-        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(4.0, 4.0)));
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        hover_input(Point::new(4.0, 4.0)),
+    );
 
     assert!(!output.metrics.reused_input_layout);
     assert!(output.metrics.animation_changed_layout);
 }
 
 #[test]
-fn document_engine_update_scene_untransitioned_hover_color_reuses_layout_and_updates_paint() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_untransitioned_hover_color_reuses_layout_and_updates_paint() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20)),
@@ -1085,9 +1066,12 @@ fn document_engine_update_scene_untransitioned_hover_color_reuses_layout_and_upd
         );
     let mut engine = DocumentEngine::default();
 
-    engine.update_scene(&mut scene, &stylesheet);
-    let output =
-        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    engine.update(&mut document, &stylesheet);
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        hover_input(Point::new(2.0, 2.0)),
+    );
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
@@ -1099,18 +1083,14 @@ fn document_engine_update_scene_untransitioned_hover_color_reuses_layout_and_upd
 }
 
 #[test]
-fn document_engine_update_scene_untransitioned_hover_layout_change_rebuilds_layout() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_untransitioned_hover_layout_change_rebuilds_layout() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default().size(100.0, 40.0),
         )
         .rule(
@@ -1119,9 +1099,12 @@ fn document_engine_update_scene_untransitioned_hover_layout_change_rebuilds_layo
         );
     let mut engine = DocumentEngine::default();
 
-    engine.update_scene(&mut scene, &stylesheet);
-    let output =
-        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    engine.update(&mut document, &stylesheet);
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        hover_input(Point::new(2.0, 2.0)),
+    );
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.rect.size, Size::new(140.0, 40.0));
@@ -1131,18 +1114,14 @@ fn document_engine_update_scene_untransitioned_hover_layout_change_rebuilds_layo
 }
 
 #[test]
-fn document_engine_update_scene_snap_element_animation_clears_rendered_style() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element(
-            "root",
-            "card",
-            ElementSpec::new(ElementRole::Card).interactive(),
-        )
+fn document_engine_update_snap_element_animation_clears_rendered_style() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
-            StyleSelector::Role(ElementRole::Card),
+            StyleSelector::Element(Element::Div),
             Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20))
@@ -1154,13 +1133,20 @@ fn document_engine_update_scene_snap_element_animation_clears_rendered_style() {
         );
     let mut engine = DocumentEngine::default();
 
-    engine.update_scene(&mut scene, &stylesheet);
-    engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    engine.update(&mut document, &stylesheet);
+    engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        hover_input(Point::new(2.0, 2.0)),
+    );
 
     assert!(engine.snap_element_animation("card"));
 
-    let output =
-        engine.update_scene_with_input(&mut scene, &stylesheet, hover_input(Point::new(2.0, 2.0)));
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        hover_input(Point::new(2.0, 2.0)),
+    );
     let card = output.layout.find("card").unwrap();
 
     assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
@@ -1168,17 +1154,13 @@ fn document_engine_update_scene_snap_element_animation_clears_rendered_style() {
 }
 
 #[test]
-fn document_engine_update_scene_scrollbar_hover_transition_reuses_layout() {
-    let mut scene = DocumentScene::new(Size::new(180.0, 140.0));
-    scene
-        .append_element("root", "scroll-panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_scrollbar_hover_transition_reuses_layout() {
+    let mut document = Document::new(Size::new(180.0, 140.0));
+    document
+        .append_element("root", "scroll-panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element(
-            "scroll-panel",
-            "content",
-            ElementSpec::new(ElementRole::Card),
-        )
+    document
+        .append_element("scroll-panel", "content", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1196,9 +1178,9 @@ fn document_engine_update_scene_scrollbar_hover_transition_reuses_layout() {
         );
     let mut engine = DocumentEngine::default();
 
-    engine.update_scene(&mut scene, &stylesheet);
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    engine.update(&mut document, &stylesheet);
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         hover_input(Point::new(64.0, 20.0)),
     );
@@ -1218,8 +1200,8 @@ fn document_engine_update_scene_scrollbar_hover_transition_reuses_layout() {
     assert!(output.metrics.reused_input_layout);
     assert!(!output.metrics.animation_changed_layout);
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         hover_input(Point::new(64.0, 20.0)),
     );
@@ -1229,13 +1211,13 @@ fn document_engine_update_scene_scrollbar_hover_transition_reuses_layout() {
 }
 
 #[test]
-fn document_engine_update_scene_uses_scene_text_layout() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
+fn document_engine_update_uses_document_text_layout() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
         .append_text(
             "root",
             "label",
-            ElementSpec::new(ElementRole::Text),
+            ElementSpec::new(Element::Text),
             "Retained text",
         )
         .unwrap();
@@ -1246,8 +1228,8 @@ fn document_engine_update_scene_uses_scene_text_layout() {
     let mut engine = DocumentEngine::default();
     let mut text_measurer = RecordingTextMeasurer::default();
 
-    let output = engine.update_scene_with_input_and_text_measurer(
-        &mut scene,
+    let output = engine.update_with_input_and_text_measurer(
+        &mut document,
         &stylesheet,
         DocumentInput::default(),
         &mut text_measurer,
@@ -1266,22 +1248,17 @@ fn document_engine_update_scene_uses_scene_text_layout() {
 }
 
 #[test]
-fn document_engine_update_scene_uses_text_measurement_for_auto_text_size() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_text(
-            "root",
-            "label",
-            ElementSpec::new(ElementRole::Text),
-            "Measured",
-        )
+fn document_engine_update_uses_text_measurement_for_auto_text_size() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_text("root", "label", ElementSpec::new(Element::Text), "Measured")
         .unwrap();
     let stylesheet = StyleSheet::new();
     let mut engine = DocumentEngine::default();
     let mut text_measurer = RecordingTextMeasurer::default();
 
-    let output = engine.update_scene_with_input_and_text_measurer(
-        &mut scene,
+    let output = engine.update_with_input_and_text_measurer(
+        &mut document,
         &stylesheet,
         DocumentInput::default(),
         &mut text_measurer,
@@ -1294,7 +1271,7 @@ fn document_engine_update_scene_uses_text_measurement_for_auto_text_size() {
 }
 
 #[test]
-fn document_engine_update_scene_resolves_table_column_tracks() {
+fn document_engine_update_resolves_table_column_tracks() {
     let table = TableSpec::new(vec![
         TableColumnSpec::new("customer", "Customer").width(TableTrackSize::px(120.0)),
         TableColumnSpec::new("country", "Country").width(TableTrackSize::px(100.0)),
@@ -1302,73 +1279,73 @@ fn document_engine_update_scene_resolves_table_column_tracks() {
     ])
     .header_height(28.0)
     .row_height(26.0);
-    let mut scene = DocumentScene::new(Size::new(320.0, 220.0));
-    scene
+    let mut document = Document::new(Size::new(320.0, 220.0));
+    document
         .append_element(
             "root",
             "customers",
-            ElementSpec::new(ElementRole::Table).table(table),
+            ElementSpec::new(Element::Table).table(table),
         )
         .unwrap();
-    scene
+    document
         .append_element(
             "customers",
             "customers-header",
-            ElementSpec::new(ElementRole::TableHeader),
+            ElementSpec::new(Element::Thead),
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "customers-header",
             "customers-header-customer",
-            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("customer")),
+            ElementSpec::new(Element::Td).table_cell(TableCellSpec::new("customer")),
             "Customer",
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "customers-header",
             "customers-header-country",
-            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("country")),
+            ElementSpec::new(Element::Td).table_cell(TableCellSpec::new("country")),
             "Country",
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "customers-header",
             "customers-header-orders",
-            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("orders")),
+            ElementSpec::new(Element::Td).table_cell(TableCellSpec::new("orders")),
             "Orders",
         )
         .unwrap();
-    scene
+    document
         .append_element(
             "customers",
             "customers-row-0",
-            ElementSpec::new(ElementRole::TableRow),
+            ElementSpec::new(Element::Tr),
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "customers-row-0",
             "customers-row-0-customer",
-            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("customer")),
+            ElementSpec::new(Element::Td).table_cell(TableCellSpec::new("customer")),
             "Acme",
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "customers-row-0",
             "customers-row-0-country",
-            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("country")),
+            ElementSpec::new(Element::Td).table_cell(TableCellSpec::new("country")),
             "US",
         )
         .unwrap();
-    scene
+    document
         .append_text(
             "customers-row-0",
             "customers-row-0-orders",
-            ElementSpec::new(ElementRole::TableCell).table_cell(TableCellSpec::new("orders")),
+            ElementSpec::new(Element::Td).table_cell(TableCellSpec::new("orders")),
             "42",
         )
         .unwrap();
@@ -1381,18 +1358,18 @@ fn document_engine_update_scene_resolves_table_column_tracks() {
                 .overflow_x(Overflow::Scroll),
         )
         .rule(
-            StyleSelector::Role(ElementRole::TableCell),
+            StyleSelector::Element(Element::Td),
             Style::default().border_width(1.0),
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let header_customer = output.layout.find("customers-header-customer").unwrap();
     let row_customer = output.layout.find("customers-row-0-customer").unwrap();
     let header_orders = output.layout.find("customers-header-orders").unwrap();
     let row_orders = output.layout.find("customers-row-0-orders").unwrap();
 
-    assert_eq!(header_customer.role, ElementRole::TableCell);
+    assert_eq!(header_customer.element, Element::Td);
     assert_eq!(
         header_customer.rect.size.width,
         row_customer.rect.size.width
@@ -1408,17 +1385,13 @@ fn document_engine_update_scene_resolves_table_column_tracks() {
 }
 
 #[test]
-fn document_engine_update_scene_anchors_absolute_viewport_elements_to_window() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_anchors_absolute_viewport_elements_to_window() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element(
-            "panel",
-            "absolute-child",
-            ElementSpec::new(ElementRole::Card),
-        )
+    document
+        .append_element("panel", "absolute-child", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1437,23 +1410,23 @@ fn document_engine_update_scene_anchors_absolute_viewport_elements_to_window() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let absolute_child = output.layout.find("absolute-child").unwrap();
 
     assert_eq!(absolute_child.rect.origin, Point::new(272.0, 171.0));
 }
 
 #[test]
-fn document_engine_update_scene_hits_absolute_viewport_child_outside_parent() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_hits_absolute_viewport_child_outside_parent() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
+    document
         .append_element(
             "panel",
             "absolute-child",
-            ElementSpec::new(ElementRole::Card).interactive(),
+            ElementSpec::new(Element::Div).interactive(),
         )
         .unwrap();
     let stylesheet = StyleSheet::new()
@@ -1471,8 +1444,8 @@ fn document_engine_update_scene_hits_absolute_viewport_child_outside_parent() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1494,20 +1467,16 @@ fn document_engine_update_scene_hits_absolute_viewport_child_outside_parent() {
 }
 
 #[test]
-fn document_engine_update_scene_positions_absolute_parent_without_flow_measurement() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_positions_absolute_parent_without_flow_measurement() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element(
-            "panel",
-            "absolute-child",
-            ElementSpec::new(ElementRole::Card),
-        )
+    document
+        .append_element("panel", "absolute-child", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "flow-child", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "flow-child", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1532,7 +1501,7 @@ fn document_engine_update_scene_positions_absolute_parent_without_flow_measureme
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let panel = output.layout.find("panel").unwrap();
     let absolute_child = output.layout.find("absolute-child").unwrap();
     let flow_child = output.layout.find("flow-child").unwrap();
@@ -1543,16 +1512,16 @@ fn document_engine_update_scene_positions_absolute_parent_without_flow_measureme
 }
 
 #[test]
-fn document_engine_update_scene_positions_absolute_anchor_after_target_layout() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_positions_absolute_anchor_after_target_layout() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "popover", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "popover", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "anchor", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "anchor", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1576,7 +1545,7 @@ fn document_engine_update_scene_positions_absolute_anchor_after_target_layout() 
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let panel = output.layout.find("panel").unwrap();
     let anchor = output.layout.find("anchor").unwrap();
     let popover = output.layout.find("popover").unwrap();
@@ -1588,17 +1557,17 @@ fn document_engine_update_scene_positions_absolute_anchor_after_target_layout() 
 }
 
 #[test]
-fn document_engine_update_scene_wraps_row_children_and_expands_height() {
-    let mut scene = DocumentScene::new(Size::new(240.0, 160.0));
-    scene
-        .append_element("root", "row", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_wraps_row_children_and_expands_height() {
+    let mut document = Document::new(Size::new(240.0, 160.0));
+    document
+        .append_element("root", "row", ElementSpec::new(Element::Div))
         .unwrap();
     for index in 0..3 {
-        scene
+        document
             .append_element(
                 "row",
                 format!("item-{index}"),
-                ElementSpec::new(ElementRole::Card).class("item"),
+                ElementSpec::new(Element::Div).class("item"),
             )
             .unwrap();
     }
@@ -1618,7 +1587,7 @@ fn document_engine_update_scene_wraps_row_children_and_expands_height() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let row = output.layout.find("row").unwrap();
     let item_0 = output.layout.find("item-0").unwrap();
     let item_1 = output.layout.find("item-1").unwrap();
@@ -1631,13 +1600,13 @@ fn document_engine_update_scene_wraps_row_children_and_expands_height() {
 }
 
 #[test]
-fn document_engine_update_scene_fill_width_uses_parent_content_width_after_box_model() {
-    let mut scene = DocumentScene::new(Size::new(320.0, 200.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_fill_width_uses_parent_content_width_after_box_model() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "row", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "row", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1656,7 +1625,7 @@ fn document_engine_update_scene_fill_width_uses_parent_content_width_after_box_m
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let row = output.layout.find("row").unwrap();
 
     assert_eq!(row.rect.origin, Point::new(17.0, 10.0));
@@ -1664,13 +1633,13 @@ fn document_engine_update_scene_fill_width_uses_parent_content_width_after_box_m
 }
 
 #[test]
-fn document_engine_update_scene_fill_size_does_not_inflate_auto_parent() {
-    let mut scene = DocumentScene::new(Size::new(240.0, 160.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_fill_size_does_not_inflate_auto_parent() {
+    let mut document = Document::new(Size::new(240.0, 160.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "child", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "child", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1686,33 +1655,33 @@ fn document_engine_update_scene_fill_size_does_not_inflate_auto_parent() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
     let panel = output.layout.find("panel").unwrap();
 
     assert_eq!(panel.rect.size, Size::new(24.0, 24.0));
 }
 
 #[test]
-fn document_engine_update_scene_max_size_clamps_auto_explicit_and_fill_sizes() {
-    let mut scene = DocumentScene::new(Size::new(260.0, 180.0));
-    scene
-        .append_element("root", "panel", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_max_size_clamps_auto_explicit_and_fill_sizes() {
+    let mut document = Document::new(Size::new(260.0, 180.0));
+    document
+        .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "auto-child", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("panel", "auto-child", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
+    document
         .append_element(
             "auto-child",
             "wide-child",
-            ElementSpec::new(ElementRole::Card).class("wide"),
+            ElementSpec::new(Element::Div).class("wide"),
         )
         .unwrap();
-    scene
-        .append_element("panel", "fixed-child", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "fixed-child", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("panel", "fill-child", ElementSpec::new(ElementRole::Card))
+    document
+        .append_element("panel", "fill-child", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1745,7 +1714,7 @@ fn document_engine_update_scene_max_size_clamps_auto_explicit_and_fill_sizes() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene(&mut scene, &stylesheet);
+    let output = engine.update(&mut document, &stylesheet);
 
     assert_eq!(
         output.layout.find("auto-child").unwrap().rect.size,
@@ -1762,13 +1731,13 @@ fn document_engine_update_scene_max_size_clamps_auto_explicit_and_fill_sizes() {
 }
 
 #[test]
-fn document_engine_update_scene_with_input_scrolls_overflow_container() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_with_input_scrolls_overflow_container() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1783,8 +1752,8 @@ fn document_engine_update_scene_with_input_scrolls_overflow_container() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1813,13 +1782,13 @@ fn document_engine_update_scene_with_input_scrolls_overflow_container() {
 }
 
 #[test]
-fn document_engine_update_scene_scroll_only_final_pass_skips_style_resolution() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_scroll_only_final_pass_skips_style_resolution() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1846,10 +1815,10 @@ fn document_engine_update_scene_scroll_only_final_pass_skips_style_resolution() 
         }),
         scroll_delta: Point::ZERO,
     };
-    engine.update_scene_with_input(&mut scene, &stylesheet, hover_input);
+    engine.update_with_input(&mut document, &stylesheet, hover_input);
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             scroll_delta: Point::new(0.0, -40.0),
@@ -1857,7 +1826,7 @@ fn document_engine_update_scene_scroll_only_final_pass_skips_style_resolution() 
         },
     );
 
-    assert_eq!(output.metrics.scene_style_nodes_visited, 0);
+    assert_eq!(output.metrics.style_nodes_visited, 0);
     assert!(!output.metrics.reused_input_layout);
     assert_eq!(
         output.layout.find("content").unwrap().rect.origin,
@@ -1866,13 +1835,13 @@ fn document_engine_update_scene_scroll_only_final_pass_skips_style_resolution() 
 }
 
 #[test]
-fn document_engine_update_scene_with_input_offsets_scrolled_child_rects() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_with_input_offsets_scrolled_child_rects() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
         .unwrap();
     let stylesheet = StyleSheet::new()
         .rule(
@@ -1887,8 +1856,8 @@ fn document_engine_update_scene_with_input_offsets_scrolled_child_rects() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1912,22 +1881,22 @@ fn document_engine_update_scene_with_input_offsets_scrolled_child_rects() {
 }
 
 #[test]
-fn document_engine_update_scene_with_input_hit_tests_scrolled_child_position() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
-        .append_element("root", "scroll", ElementSpec::new(ElementRole::Panel))
+fn document_engine_update_with_input_hit_tests_scrolled_child_position() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("scroll", "content", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
-        .append_element("content", "spacer", ElementSpec::new(ElementRole::Panel))
+    document
+        .append_element("content", "spacer", ElementSpec::new(Element::Div))
         .unwrap();
-    scene
+    document
         .append_element(
             "content",
             "target",
-            ElementSpec::new(ElementRole::Control).interactive(),
+            ElementSpec::new(Element::Button).interactive(),
         )
         .unwrap();
     let stylesheet = StyleSheet::new()
@@ -1950,8 +1919,8 @@ fn document_engine_update_scene_with_input_hit_tests_scrolled_child_position() {
             Style::default().size(100.0, 30.0),
         );
     let mut engine = DocumentEngine::default();
-    engine.update_scene_with_input(
-        &mut scene,
+    engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1968,8 +1937,8 @@ fn document_engine_update_scene_with_input_hit_tests_scrolled_child_position() {
         },
     );
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {
@@ -1991,13 +1960,13 @@ fn document_engine_update_scene_with_input_hit_tests_scrolled_child_position() {
 }
 
 #[test]
-fn document_engine_update_scene_with_input_rerenders_state_styles() {
-    let mut scene = DocumentScene::new(Size::new(800.0, 600.0));
-    scene
+fn document_engine_update_with_input_rerenders_state_styles() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
         .append_element(
             "root",
             "button",
-            ElementSpec::new(ElementRole::Control).interactive(),
+            ElementSpec::new(Element::Button).interactive(),
         )
         .unwrap();
     let stylesheet = StyleSheet::new()
@@ -2011,8 +1980,8 @@ fn document_engine_update_scene_with_input_rerenders_state_styles() {
         );
     let mut engine = DocumentEngine::default();
 
-    let output = engine.update_scene_with_input(
-        &mut scene,
+    let output = engine.update_with_input(
+        &mut document,
         &stylesheet,
         DocumentInput {
             pointer: Some(PointerInput {

@@ -1,8 +1,8 @@
 use crate::animation::{AnimationUpdate, update_element_style_animation};
+use crate::document::{Document, StyleResolutionReport};
 use crate::element::ElementId;
 use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
 use crate::layout::hit_path;
-use crate::scene::{DocumentScene, StyleApplicationReport};
 use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
@@ -96,118 +96,114 @@ pub struct DocumentEngine {
     text_selection: Option<DocumentTextSelection>,
     last_text_click: Option<TextClickSequence>,
     cached_layout: Option<ResolvedElement>,
-    cached_scene_revision: Option<u64>,
-    cached_scene_stylesheet: Option<StyleSheet>,
+    cached_document_revision: Option<u64>,
+    cached_document_stylesheet: Option<StyleSheet>,
     cached_text_measurer_key: Option<TextMeasurerKey>,
 }
 
 impl DocumentEngine {
-    pub fn update_scene(
-        &mut self,
-        scene: &mut DocumentScene,
-        stylesheet: &StyleSheet,
-    ) -> DocumentOutput {
-        self.update_scene_with_input(scene, stylesheet, DocumentInput::default())
+    pub fn update(&mut self, document: &mut Document, stylesheet: &StyleSheet) -> DocumentOutput {
+        self.update_with_input(document, stylesheet, DocumentInput::default())
     }
 
-    pub fn update_scene_with_input(
+    pub fn update_with_input(
         &mut self,
-        scene: &mut DocumentScene,
+        document: &mut Document,
         stylesheet: &StyleSheet,
         input: DocumentInput,
     ) -> DocumentOutput {
         let mut text_measurer = FallbackTextMeasurer;
-        self.update_scene_with_input_and_text_measurer(scene, stylesheet, input, &mut text_measurer)
+        self.update_with_input_and_text_measurer(document, stylesheet, input, &mut text_measurer)
     }
 
-    pub fn update_scene_with_input_and_text_measurer(
+    pub fn update_with_input_and_text_measurer(
         &mut self,
-        scene: &mut DocumentScene,
+        document: &mut Document,
         stylesheet: &StyleSheet,
         input: DocumentInput,
         text_measurer: &mut dyn TextMeasurer,
     ) -> DocumentOutput {
-        let changes = self.sync_scene_states(scene);
+        let changes = self.sync_document_states(document);
         let text_measurer_key = text_measurer.cache_key();
         let text_measurer_changed = self.cached_text_measurer_key != Some(text_measurer_key);
-        let reused_scene_cache = changes.created.is_empty()
+        let reused_document_cache = changes.created.is_empty()
             && changes.removed.is_empty()
-            && self.cached_scene_matches(scene, stylesheet, text_measurer_key);
-        let (input_layout, mut scene_style_nodes_visited) = if reused_scene_cache {
+            && self.cached_document_matches(document, stylesheet, text_measurer_key);
+        let (input_layout, mut style_nodes_visited) = if reused_document_cache {
             (
                 self.cached_layout
                     .clone()
-                    .expect("cached scene layout exists when cache metadata matches"),
+                    .expect("cached document layout exists when cache metadata matches"),
                 0,
             )
         } else {
-            let input_style_report = scene
+            let input_style_report = document
                 .apply_stylesheet(stylesheet, &self.states)
-                .expect("document scene styles can be resolved");
+                .expect("document styles can be resolved");
             if text_measurer_changed {
-                scene
+                document
                     .mark_layout_dirty()
-                    .expect("document scene layout can be marked dirty");
+                    .expect("document layout can be marked dirty");
             }
             if text_measurer_changed
                 || input_style_report.layout_changed
-                || scene
-                    .layout_dirty(scene.root().clone())
-                    .expect("document scene root dirty state can be resolved")
+                || document
+                    .layout_dirty(document.root().clone())
+                    .expect("document root dirty state can be resolved")
             {
-                scene
+                document
                     .compute_layout_with_text_measurer(text_measurer)
-                    .expect("document scene layout can be computed");
+                    .expect("document layout can be computed");
             }
-            let input_layout = scene
+            let input_layout = document
                 .resolved_layout_with_text_measurer(text_measurer)
-                .expect("document scene layout can be resolved");
-            self.scroll_limits = scene
+                .expect("document layout can be resolved");
+            self.scroll_limits = document
                 .scroll_limits()
-                .expect("document scene scroll limits can be resolved");
+                .expect("document scroll limits can be resolved");
             (input_layout, input_style_report.visited)
         };
         let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
         let input_update =
             self.apply_input(&input_layout, &input_scroll_chrome, input, text_measurer);
         let clamp_changed = self.clamp_scroll_states();
-        let animation_update = self.update_scene_style_animation(scene, stylesheet);
+        let animation_update = self.update_style_animation(document, stylesheet);
         let scrollbar_animation_update = self.update_scrollbar_animation(&input_scroll_chrome);
-        let mut final_style_report = StyleApplicationReport::default();
+        let mut final_style_report = StyleResolutionReport::default();
         if input_update.selector_state_changed || animation_update.changed() {
-            final_style_report = scene
+            final_style_report = document
                 .apply_stylesheet(stylesheet, &self.states)
-                .expect("document scene styles can be resolved");
-            scene_style_nodes_visited += final_style_report.visited;
+                .expect("document styles can be resolved");
+            style_nodes_visited += final_style_report.visited;
         }
         let needs_final_layout =
             input_update.layout_changed || clamp_changed || final_style_report.layout_changed;
 
         let (layout, scroll_chrome, reused_input_layout) = if needs_final_layout {
             if final_style_report.layout_changed
-                || scene
-                    .layout_dirty(scene.root().clone())
-                    .expect("document scene root dirty state can be resolved")
+                || document
+                    .layout_dirty(document.root().clone())
+                    .expect("document root dirty state can be resolved")
             {
-                scene
+                document
                     .compute_layout_with_text_measurer(text_measurer)
-                    .expect("document scene layout can be computed");
+                    .expect("document layout can be computed");
             }
-            self.scroll_limits = scene
+            self.scroll_limits = document
                 .scroll_limits()
-                .expect("document scene scroll limits can be resolved");
+                .expect("document scroll limits can be resolved");
             self.clamp_scroll_states();
-            scene.apply_scroll_offsets(&self.states);
-            let layout = scene
+            document.apply_scroll_offsets(&self.states);
+            let layout = document
                 .resolved_layout_with_text_measurer(text_measurer)
-                .expect("document scene layout can be resolved");
+                .expect("document layout can be resolved");
             let scroll_chrome = scroll_chrome(&layout, &self.states, &self.scroll_limits);
             (layout, scroll_chrome, false)
         } else {
             let layout = if final_style_report.paint_changed || animation_update.paint_changed {
-                scene
+                document
                     .resolved_layout_with_text_measurer(text_measurer)
-                    .expect("document scene layout can be resolved")
+                    .expect("document layout can be resolved")
             } else {
                 input_layout
             };
@@ -224,8 +220,8 @@ impl DocumentEngine {
         };
 
         self.cached_layout = Some(layout.clone());
-        self.cached_scene_revision = Some(scene.revision());
-        self.cached_scene_stylesheet = Some(stylesheet.clone());
+        self.cached_document_revision = Some(document.revision());
+        self.cached_document_stylesheet = Some(stylesheet.clone());
         self.cached_text_measurer_key = Some(text_measurer_key);
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
@@ -243,7 +239,7 @@ impl DocumentEngine {
             metrics: DocumentMetrics {
                 element_count,
                 scroll_chrome_count,
-                scene_style_nodes_visited,
+                style_nodes_visited,
                 reused_cached_layout: false,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
@@ -303,20 +299,20 @@ impl DocumentEngine {
         changed
     }
 
-    fn cached_scene_matches(
+    fn cached_document_matches(
         &self,
-        scene: &DocumentScene,
+        document: &Document,
         stylesheet: &StyleSheet,
         text_measurer_key: TextMeasurerKey,
     ) -> bool {
         self.cached_layout.is_some()
-            && self.cached_scene_revision == Some(scene.revision())
-            && self.cached_scene_stylesheet.as_ref() == Some(stylesheet)
+            && self.cached_document_revision == Some(document.revision())
+            && self.cached_document_stylesheet.as_ref() == Some(stylesheet)
             && self.cached_text_measurer_key == Some(text_measurer_key)
     }
 
-    fn sync_scene_states(&mut self, scene: &DocumentScene) -> ChangeSet {
-        let next_ids = scene.element_ids().into_iter().collect::<BTreeSet<_>>();
+    fn sync_document_states(&mut self, document: &Document) -> ChangeSet {
+        let next_ids = document.element_ids().into_iter().collect::<BTreeSet<_>>();
         let existing_ids: BTreeSet<_> = self.states.keys().cloned().collect();
         let mut changes = ChangeSet::default();
 
@@ -788,15 +784,15 @@ impl DocumentEngine {
         changed
     }
 
-    fn update_scene_style_animation(
+    fn update_style_animation(
         &mut self,
-        scene: &DocumentScene,
+        document: &Document,
         stylesheet: &StyleSheet,
     ) -> AnimationUpdate {
         const SNAP_EPSILON: f32 = 0.001;
-        let root = scene
+        let root = document
             .element_tree()
-            .expect("document scene element tree can be resolved");
+            .expect("document element tree can be resolved");
         update_element_style_animation(&root, stylesheet, &mut self.states, SNAP_EPSILON)
     }
 

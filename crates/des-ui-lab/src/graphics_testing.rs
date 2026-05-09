@@ -55,7 +55,9 @@ where
 
 pub(crate) fn render_harness<State>(harness: &mut Harness<'_, State>) -> RgbaImage {
     harness.run();
-    harness.render().expect("render egui scene through kittest")
+    harness
+        .render()
+        .expect("render egui output through kittest")
 }
 
 pub(crate) fn image_stats(image: &RgbaImage) -> ImageStats {

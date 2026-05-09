@@ -3,7 +3,7 @@ mod styles;
 mod tests;
 mod views;
 
-use crate::adapter::{
+use des_ui_egui::adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
     document_input, paint_frame, paint_scroll_chrome, paint_surface,
 };
@@ -13,11 +13,10 @@ use views::{
 };
 
 use des_ui_document::{
-    Color, CornerRadii, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentMetrics, DocumentOutput, DocumentScene, ElementId, ElementRole, ElementSpec,
-    ElementStateSelector, Insets, Length, Point, PointerInput, Shadow, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions,
-    VisualElementClone,
+    Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
+    DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector, Insets,
+    Length, Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
+    TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions, VisualElementClone,
 };
 use des_ui_widgets::{
     AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
@@ -146,19 +145,19 @@ pub(crate) struct UiLabState {
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
     pending_stage_scroll: Option<Point>,
-    lab_scene: Option<RetainedLabScene<LabSceneKey>>,
+    lab_document: Option<RetainedLabDocument<LabDocumentKey>>,
     last_perf: UiLabPerf,
 }
 
-struct RetainedLabScene<Key> {
+struct RetainedLabDocument<Key> {
     viewport: Size,
     debug_overlay: bool,
     key: Key,
-    scene: DocumentScene,
+    document: Document,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct LabSceneKey {
+struct LabDocumentKey {
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
@@ -215,7 +214,7 @@ impl Default for UiLabState {
             scroll_list_drop_preview: None,
             text_context_menu: None,
             pending_stage_scroll: None,
-            lab_scene: None,
+            lab_document: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -245,12 +244,12 @@ impl UiLabState {
         let viewport_size = Size::new(viewport.x, viewport.y);
         let stylesheet = self.active_stylesheet();
         let document_start = Instant::now();
-        let mut retained = self.take_lab_scene(viewport_size, debug_overlay);
+        let mut retained = self.take_lab_document(viewport_size, debug_overlay);
         let document_time = document_start.elapsed();
 
         if let Some(scroll) = self.pending_stage_scroll.take() {
             self.document_engine
-                .update_scene(&mut retained.scene, &stylesheet);
+                .update(&mut retained.document, &stylesheet);
             if let Some(stage) = self.document_engine.element_state_mut("stage") {
                 stage.scroll_x = scroll.x.max(0.0);
                 stage.scroll_y = scroll.y.max(0.0);
@@ -261,44 +260,38 @@ impl UiLabState {
         let pointer = input.pointer;
         let engine_start = Instant::now();
         let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
-        let mut output = self
-            .document_engine
-            .update_scene_with_input_and_text_measurer(
-                &mut retained.scene,
+        let mut output = self.document_engine.update_with_input_and_text_measurer(
+            &mut retained.document,
+            &stylesheet,
+            input,
+            &mut text_measurer,
+        );
+        self.lab_document = Some(retained);
+
+        if self.sync_drag_state(ui, &output) {
+            let stylesheet = self.active_stylesheet();
+            let mut retained = self.take_lab_document(viewport_size, debug_overlay);
+            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+            output = self.document_engine.update_with_input_and_text_measurer(
+                &mut retained.document,
                 &stylesheet,
                 input,
                 &mut text_measurer,
             );
-        self.lab_scene = Some(retained);
-
-        if self.sync_drag_state(ui, &output) {
-            let stylesheet = self.active_stylesheet();
-            let mut retained = self.take_lab_scene(viewport_size, debug_overlay);
-            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
-            output = self
-                .document_engine
-                .update_scene_with_input_and_text_measurer(
-                    &mut retained.scene,
-                    &stylesheet,
-                    input,
-                    &mut text_measurer,
-                );
-            self.lab_scene = Some(retained);
+            self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
         }
         if self.sync_drag_press_state(&output, pointer) {
             let stylesheet = self.active_stylesheet();
-            let mut retained = self.take_lab_scene(viewport_size, debug_overlay);
+            let mut retained = self.take_lab_document(viewport_size, debug_overlay);
             let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
-            output = self
-                .document_engine
-                .update_scene_with_input_and_text_measurer(
-                    &mut retained.scene,
-                    &stylesheet,
-                    input,
-                    &mut text_measurer,
-                );
-            self.lab_scene = Some(retained);
+            output = self.document_engine.update_with_input_and_text_measurer(
+                &mut retained.document,
+                &stylesheet,
+                input,
+                &mut text_measurer,
+            );
+            self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
         }
         let engine_time = engine_start.elapsed();
@@ -326,13 +319,13 @@ impl UiLabState {
         }
     }
 
-    fn take_lab_scene(
+    fn take_lab_document(
         &mut self,
         viewport: Size,
         debug_overlay: bool,
-    ) -> RetainedLabScene<LabSceneKey> {
-        let key = self.lab_scene_key();
-        if let Some(retained) = self.lab_scene.take()
+    ) -> RetainedLabDocument<LabDocumentKey> {
+        let key = self.lab_document_key();
+        if let Some(retained) = self.lab_document.take()
             && retained.viewport == viewport
             && retained.debug_overlay == debug_overlay
             && retained.key == key
@@ -340,16 +333,16 @@ impl UiLabState {
             return retained;
         }
 
-        RetainedLabScene {
+        RetainedLabDocument {
             viewport,
             debug_overlay,
             key,
-            scene: self.scene(viewport, debug_overlay),
+            document: self.document(viewport, debug_overlay),
         }
     }
 
-    fn lab_scene_key(&self) -> LabSceneKey {
-        LabSceneKey {
+    fn lab_document_key(&self) -> LabDocumentKey {
+        LabDocumentKey {
             view: self.view,
             show_optional_card: self.show_optional_card,
             dense_mode: self.dense_mode,
@@ -733,16 +726,16 @@ impl UiLabState {
         }
     }
 
-    fn scene(&self, viewport: Size, debug_overlay: bool) -> DocumentScene {
-        let mut scene = DocumentScene::build(viewport, |ui| {
+    fn document(&self, viewport: Size, debug_overlay: bool) -> Document {
+        let mut document = Document::build(viewport, |ui| {
             ui.element(
                 "lab-root",
-                ElementSpec::new(ElementRole::Panel).class("lab-root"),
+                ElementSpec::new(Element::Div).class("lab-root"),
                 |ui| {
                     render_topbar(ui, debug_overlay);
                     ui.element(
                         "lab-body",
-                        ElementSpec::new(ElementRole::Panel).class("lab-body"),
+                        ElementSpec::new(Element::Div).class("lab-body"),
                         |ui| {
                             render_nav(ui, self.view);
                             render_stage(
@@ -777,9 +770,9 @@ impl UiLabState {
             );
         });
         if self.view == LabView::Interaction {
-            self.apply_interaction_scene_state(&mut scene);
+            self.apply_interaction_document_state(&mut document);
         }
-        scene
+        document
     }
 
     fn active_drag_item(&self) -> Option<SortableItemId> {
@@ -837,10 +830,10 @@ impl UiLabState {
         origin: egui::Pos2,
         viewport: egui::Vec2,
     ) {
-        let mut scene = DocumentScene::build(Size::new(viewport.x, viewport.y), |ui| {
+        let mut document = Document::build(Size::new(viewport.x, viewport.y), |ui| {
             ui.element(
                 "debug-overlay-root",
-                ElementSpec::new(ElementRole::Panel).class("debug-overlay-root"),
+                ElementSpec::new(Element::Div).class("debug-overlay-root"),
                 |ui| {
                     render_debug_overlay_layer(ui, self.last_perf);
                 },
@@ -848,8 +841,8 @@ impl UiLabState {
         });
         let mut engine = DocumentEngine::default();
         let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
-        let output = engine.update_scene_with_input_and_text_measurer(
-            &mut scene,
+        let output = engine.update_with_input_and_text_measurer(
+            &mut document,
             &self.active_stylesheet(),
             DocumentInput::default(),
             &mut text_measurer,
@@ -857,20 +850,20 @@ impl UiLabState {
         paint_frame(ui, origin, &output.layout, None);
     }
 
-    fn apply_interaction_scene_state(&self, scene: &mut DocumentScene) {
-        scene
+    fn apply_interaction_document_state(&self, document: &mut Document) {
+        document
             .set_text(
                 "loop-button-result",
                 format!("Button events received: {}", self.loop_action_count),
             )
-            .expect("interaction scene contains loop-button-result");
-        scene
+            .expect("interaction document contains loop-button-result");
+        document
             .set_value(
                 "loop-button-result-box",
                 format!("button-count={}", self.loop_action_count),
             )
-            .expect("interaction scene contains loop-button-result-box");
-        scene
+            .expect("interaction document contains loop-button-result-box");
+        document
             .set_text(
                 "loop-checkbox-result",
                 if self.checkbox_enabled {
@@ -879,11 +872,11 @@ impl UiLabState {
                     "Profiling: disabled by checkbox"
                 },
             )
-            .expect("interaction scene contains loop-checkbox-result");
-        scene
+            .expect("interaction document contains loop-checkbox-result");
+        document
             .set_selected("loop-checkbox-result-box", self.checkbox_enabled)
-            .expect("interaction scene contains loop-checkbox-result-box");
-        scene
+            .expect("interaction document contains loop-checkbox-result-box");
+        document
             .set_text(
                 "loop-radio-result",
                 format!(
@@ -891,8 +884,8 @@ impl UiLabState {
                     ["Local runtime", "Remote worker", "Hybrid"][self.radio_choice]
                 ),
             )
-            .expect("interaction scene contains loop-radio-result");
-        scene
+            .expect("interaction document contains loop-radio-result");
+        document
             .set_text(
                 "loop-dropdown-result",
                 format!(
@@ -900,8 +893,8 @@ impl UiLabState {
                     ["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]
                 ),
             )
-            .expect("interaction scene contains loop-dropdown-result");
-        scene
+            .expect("interaction document contains loop-dropdown-result");
+        document
             .set_text(
                 "loop-summary-result",
                 format!(
@@ -917,10 +910,10 @@ impl UiLabState {
                     if self.loop_action_count == 1 { "" } else { "s" }
                 ),
             )
-            .expect("interaction scene contains loop-summary-result");
-        scene
+            .expect("interaction document contains loop-summary-result");
+        document
             .set_focused("loop-summary-result-box", self.loop_action_count > 0)
-            .expect("interaction scene contains loop-summary-result-box");
+            .expect("interaction document contains loop-summary-result-box");
 
         for (index, class) in [
             "loop-runtime-local",
@@ -931,13 +924,13 @@ impl UiLabState {
         .enumerate()
         {
             if self.radio_choice == index {
-                scene
+                document
                     .add_class("loop-radio-result-box", *class)
-                    .expect("interaction scene contains loop-radio-result-box");
+                    .expect("interaction document contains loop-radio-result-box");
             } else {
-                scene
+                document
                     .remove_class("loop-radio-result-box", *class)
-                    .expect("interaction scene contains loop-radio-result-box");
+                    .expect("interaction document contains loop-radio-result-box");
             }
         }
 
@@ -950,81 +943,79 @@ impl UiLabState {
         .enumerate()
         {
             if self.dropdown_choice == index {
-                scene
+                document
                     .add_class("loop-dropdown-result-box", *class)
-                    .expect("interaction scene contains loop-dropdown-result-box");
+                    .expect("interaction document contains loop-dropdown-result-box");
             } else {
-                scene
+                document
                     .remove_class("loop-dropdown-result-box", *class)
-                    .expect("interaction scene contains loop-dropdown-result-box");
+                    .expect("interaction document contains loop-dropdown-result-box");
             }
         }
     }
 
     #[cfg(test)]
-    fn lab_scene_output_for_test(&mut self, viewport: Size) -> DocumentOutput {
+    fn lab_document_output_for_test(&mut self, viewport: Size) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
-        let mut retained = self.take_lab_scene(viewport, false);
+        let mut retained = self.take_lab_document(viewport, false);
         let output = self
             .document_engine
-            .update_scene(&mut retained.scene, &stylesheet);
-        self.lab_scene = Some(retained);
+            .update(&mut retained.document, &stylesheet);
+        self.lab_document = Some(retained);
         output
     }
 
     #[cfg(test)]
-    fn lab_scene_output_with_stage_scroll_for_test(
+    fn lab_document_output_with_stage_scroll_for_test(
         &mut self,
         viewport: Size,
         scroll_y: f32,
     ) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
-        let mut retained = self.take_lab_scene(viewport, false);
+        let mut retained = self.take_lab_document(viewport, false);
         self.document_engine
-            .update_scene(&mut retained.scene, &stylesheet);
+            .update(&mut retained.document, &stylesheet);
         self.document_engine
             .element_state_mut("stage")
             .unwrap()
             .scroll_y = scroll_y;
         let output = self
             .document_engine
-            .update_scene(&mut retained.scene, &stylesheet);
-        self.lab_scene = Some(retained);
+            .update(&mut retained.document, &stylesheet);
+        self.lab_document = Some(retained);
         output
     }
 
     #[cfg(test)]
-    fn lab_scene_output_with_text_measurer_for_test(
+    fn lab_document_output_with_text_measurer_for_test(
         &mut self,
         viewport: Size,
         text_measurer: &mut dyn des_ui_document::TextMeasurer,
     ) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
-        let mut retained = self.take_lab_scene(viewport, false);
-        let output = self
-            .document_engine
-            .update_scene_with_input_and_text_measurer(
-                &mut retained.scene,
-                &stylesheet,
-                DocumentInput::default(),
-                text_measurer,
-            );
-        self.lab_scene = Some(retained);
+        let mut retained = self.take_lab_document(viewport, false);
+        let output = self.document_engine.update_with_input_and_text_measurer(
+            &mut retained.document,
+            &stylesheet,
+            DocumentInput::default(),
+            text_measurer,
+        );
+        self.lab_document = Some(retained);
         output
     }
 
     #[cfg(test)]
-    fn lab_scene_output_with_input_for_test(
+    fn lab_document_output_with_input_for_test(
         &mut self,
         viewport: Size,
         input: DocumentInput,
     ) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
-        let mut retained = self.take_lab_scene(viewport, false);
+        let mut retained = self.take_lab_document(viewport, false);
         let output =
             self.document_engine
-                .update_scene_with_input(&mut retained.scene, &stylesheet, input);
-        self.lab_scene = Some(retained);
+                .update_with_input(&mut retained.document, &stylesheet, input);
+        self.lab_document = Some(retained);
         output
     }
 }

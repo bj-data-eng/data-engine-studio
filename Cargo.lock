@@ -744,7 +744,7 @@ name = "des-python"
 version = "0.1.0"
 dependencies = [
  "des-core",
- "des-ui-egui",
+ "des-ui-lab",
  "pyo3",
 ]
 
@@ -759,10 +759,22 @@ dependencies = [
 name = "des-ui-egui"
 version = "0.1.0"
 dependencies = [
+ "des-core",
+ "des-ui-document",
+ "eframe",
+ "egui",
+ "iconflow",
+]
+
+[[package]]
+name = "des-ui-lab"
+version = "0.1.0"
+dependencies = [
  "des-app",
  "des-core",
  "des-graph-egui",
  "des-ui-document",
+ "des-ui-egui",
  "des-ui-widgets",
  "eframe",
  "egui",

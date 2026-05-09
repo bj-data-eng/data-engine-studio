@@ -1,4 +1,4 @@
-use crate::element::{Color, Element, ElementId};
+use crate::element::{Color, DocumentNode, ElementId};
 use crate::geometry::{CornerRadii, Insets, Length, Point, Size};
 use crate::state::ElementState;
 use crate::style::{
@@ -21,7 +21,7 @@ impl AnimationUpdate {
 }
 
 pub(crate) fn update_element_style_animation(
-    element: &Element,
+    element: &DocumentNode,
     stylesheet: &StyleSheet,
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
@@ -30,7 +30,7 @@ pub(crate) fn update_element_style_animation(
 }
 
 fn update_element_style_animation_at(
-    element: &Element,
+    element: &DocumentNode,
     stylesheet: &StyleSheet,
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,

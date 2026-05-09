@@ -1,19 +1,19 @@
 use super::*;
 use des_ui_document::Glyph;
 
-pub(super) fn render_topbar(ui: &mut des_ui_document::SceneBuilder, debug_overlay: bool) {
+pub(super) fn render_topbar(ui: &mut des_ui_document::DocumentBuilder, debug_overlay: bool) {
     ui.element(
         "topbar",
-        ElementSpec::new(ElementRole::Panel).class("topbar"),
+        ElementSpec::new(Element::Div).class("topbar"),
         |ui| {
             ui.text_element(
                 "title",
-                ElementSpec::new(ElementRole::Text).class("title"),
+                ElementSpec::new(Element::Text).class("title"),
                 "Data Engine Studio UI Lab",
             );
             ui.text_element(
                 "subtitle",
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 if debug_overlay {
                     "document layout, style, input, and graph experiments / debug"
                 } else {
@@ -24,50 +24,46 @@ pub(super) fn render_topbar(ui: &mut des_ui_document::SceneBuilder, debug_overla
     );
 }
 
-pub(super) fn render_nav(ui: &mut des_ui_document::SceneBuilder, selected: LabView) {
-    ui.element(
-        "nav",
-        ElementSpec::new(ElementRole::Panel).class("nav"),
-        |ui| {
-            ui.text_element(
-                "nav-title",
-                ElementSpec::new(ElementRole::Text).class("section-title"),
-                "Feature Views",
+pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: LabView) {
+    ui.element("nav", ElementSpec::new(Element::Div).class("nav"), |ui| {
+        ui.text_element(
+            "nav-title",
+            ElementSpec::new(Element::Text).class("section-title"),
+            "Feature Views",
+        );
+        for view in [
+            LabView::Layout,
+            LabView::Interaction,
+            LabView::Draggable,
+            LabView::Styling,
+            LabView::Animation,
+            LabView::Scrolling,
+            LabView::Table,
+            LabView::Text,
+            LabView::Nesting,
+            LabView::Graph,
+        ] {
+            ui.element(
+                view.id(),
+                ElementSpec::new(Element::Div)
+                    .class("nav-item")
+                    .interactive()
+                    .selected(view == selected),
+                |ui| {
+                    ui.text_element(
+                        format!("{}-label", view.id()),
+                        ElementSpec::new(Element::Text).class("card-title"),
+                        view.label(),
+                    );
+                    ui.text_element(
+                        format!("{}-hint", view.id()),
+                        ElementSpec::new(Element::Text).class("muted"),
+                        view_hint(view),
+                    );
+                },
             );
-            for view in [
-                LabView::Layout,
-                LabView::Interaction,
-                LabView::Draggable,
-                LabView::Styling,
-                LabView::Animation,
-                LabView::Scrolling,
-                LabView::Table,
-                LabView::Text,
-                LabView::Nesting,
-                LabView::Graph,
-            ] {
-                ui.element(
-                    view.id(),
-                    ElementSpec::new(ElementRole::Card)
-                        .class("nav-item")
-                        .interactive()
-                        .selected(view == selected),
-                    |ui| {
-                        ui.text_element(
-                            format!("{}-label", view.id()),
-                            ElementSpec::new(ElementRole::Text).class("card-title"),
-                            view.label(),
-                        );
-                        ui.text_element(
-                            format!("{}-hint", view.id()),
-                            ElementSpec::new(ElementRole::Text).class("muted"),
-                            view_hint(view),
-                        );
-                    },
-                );
-            }
-        },
-    );
+        }
+    });
 }
 
 fn view_hint(view: LabView) -> &'static str {
@@ -75,7 +71,7 @@ fn view_hint(view: LabView) -> &'static str {
         LabView::Layout => "nesting, margins, rows, columns",
         LabView::Interaction => "hover, press, click ownership",
         LabView::Draggable => "clone layers, handles, sorting",
-        LabView::Styling => "roles, classes, states, ids",
+        LabView::Styling => "elements, classes, states, ids",
         LabView::Animation => "state transitions and easing",
         LabView::Scrolling => "document scroll ownership",
         LabView::Table => "columns, rows, headers, cells",
@@ -86,7 +82,7 @@ fn view_hint(view: LabView) -> &'static str {
 }
 
 pub(super) fn render_stage(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
@@ -108,7 +104,7 @@ pub(super) fn render_stage(
 ) {
     ui.element(
         "stage",
-        ElementSpec::new(ElementRole::Panel)
+        ElementSpec::new(Element::Div)
             .class("stage")
             .class("styled-scrollbar"),
         |ui| match view {
@@ -144,23 +140,23 @@ pub(super) fn render_stage(
 }
 
 fn render_layout_view(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     _show_optional_card: bool,
     _dense_mode: bool,
 ) {
     ui.text_element(
         "layout-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Box Model Specimens",
     );
     ui.text_element(
         "layout-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Each subject isolates one layout contract. Selector rules are printed above the specimen.",
     );
     ui.element(
         "box-model-grid",
-        ElementSpec::new(ElementRole::Panel).class("box-model-grid"),
+        ElementSpec::new(Element::Div).class("box-model-grid"),
         |ui| {
             box_model_row(ui, "box-row-size", |ui| {
                 box_model_case(
@@ -370,31 +366,31 @@ fn render_layout_view(
 }
 
 fn box_model_section_label(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
 ) {
     ui.text_element(
         id,
-        ElementSpec::new(ElementRole::Text).class("box-section-label"),
+        ElementSpec::new(Element::Text).class("box-section-label"),
         label,
     );
 }
 
 fn box_model_row(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
-    add_contents: impl FnOnce(&mut des_ui_document::SceneBuilder),
+    add_contents: impl FnOnce(&mut des_ui_document::DocumentBuilder),
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Panel).class("box-model-row"),
+        ElementSpec::new(Element::Div).class("box-model-row"),
         add_contents,
     );
 }
 
 fn box_model_case(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     note: &'static str,
@@ -403,28 +399,28 @@ fn box_model_case(
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Panel).class("box-model-case"),
+        ElementSpec::new(Element::Div).class("box-model-case"),
         |ui| {
             ui.text_element(
                 format!("{id}-title"),
-                ElementSpec::new(ElementRole::Text).class("box-label"),
+                ElementSpec::new(Element::Text).class("box-label"),
                 title,
             );
             ui.text_element(
                 format!("{id}-note"),
-                ElementSpec::new(ElementRole::Text).class("box-note"),
+                ElementSpec::new(Element::Text).class("box-note"),
                 note,
             );
             for (line_index, line) in rule_text.split(" | ").enumerate() {
                 ui.text_element(
                     format!("{id}-rule-{line_index}"),
-                    ElementSpec::new(ElementRole::Text).class("box-rule"),
+                    ElementSpec::new(Element::Text).class("box-rule"),
                     line,
                 );
             }
             ui.element(
                 format!("{id}-frame"),
-                ElementSpec::new(ElementRole::Panel).class("box-subject-frame"),
+                ElementSpec::new(Element::Div).class("box-subject-frame"),
                 |ui| {
                     box_model_subject(ui, id, subject_class);
                 },
@@ -434,11 +430,11 @@ fn box_model_case(
 }
 
 fn box_model_subject(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     case_id: &'static str,
     subject_class: &'static str,
 ) {
-    let mut spec = ElementSpec::new(ElementRole::Panel)
+    let mut spec = ElementSpec::new(Element::Div)
         .class("box-subject")
         .class(subject_class);
     if matches!(
@@ -463,7 +459,7 @@ fn box_model_subject(
             "box-subject-max" => {
                 ui.element(
                     format!("{case_id}-wide-child"),
-                    ElementSpec::new(ElementRole::Panel).class("box-max-wide-child"),
+                    ElementSpec::new(Element::Div).class("box-max-wide-child"),
                     |_| {},
                 );
             }
@@ -487,29 +483,28 @@ fn box_model_subject(
             | "box-subject-scroll-xy-overflow" => {
                 ui.element(
                     format!("{case_id}-overflow-child"),
-                    ElementSpec::new(ElementRole::Panel).class("box-overflow-child"),
+                    ElementSpec::new(Element::Div).class("box-overflow-child"),
                     |_| {},
                 );
             }
             "box-subject-nested-nine" => {
                 ui.element(
                     format!("{case_id}-outer"),
-                    ElementSpec::new(ElementRole::Panel).class("box-nested-outer"),
+                    ElementSpec::new(Element::Div).class("box-nested-outer"),
                     |ui| {
                         ui.element(
                             format!("{case_id}-inner"),
-                            ElementSpec::new(ElementRole::Panel).class("box-nested-inner"),
+                            ElementSpec::new(Element::Div).class("box-nested-inner"),
                             |ui| {
                                 for row in 0..3 {
                                     ui.element(
                                         format!("{case_id}-row-{row}"),
-                                        ElementSpec::new(ElementRole::Panel)
-                                            .class("box-nested-row"),
+                                        ElementSpec::new(Element::Div).class("box-nested-row"),
                                         |ui| {
                                             for column in 0..3 {
                                                 ui.element(
                                                     format!("{case_id}-cell-{row}-{column}"),
-                                                    ElementSpec::new(ElementRole::Panel)
+                                                    ElementSpec::new(Element::Div)
                                                         .class("box-nested-cell"),
                                                     |_| {},
                                                 );
@@ -525,11 +520,11 @@ fn box_model_subject(
             "box-subject-inset-percent" => {
                 ui.element(
                     format!("{case_id}-parent"),
-                    ElementSpec::new(ElementRole::Panel).class("box-inset-percent-parent"),
+                    ElementSpec::new(Element::Div).class("box-inset-percent-parent"),
                     |ui| {
                         ui.element(
                             format!("{case_id}-child"),
-                            ElementSpec::new(ElementRole::Panel).class("box-inset-percent-child"),
+                            ElementSpec::new(Element::Div).class("box-inset-percent-child"),
                             |_| {},
                         );
                     },
@@ -538,16 +533,16 @@ fn box_model_subject(
             "box-subject-absolute-parent" => {
                 ui.element(
                     format!("{case_id}-parent"),
-                    ElementSpec::new(ElementRole::Panel).class("box-absolute-parent-frame"),
+                    ElementSpec::new(Element::Div).class("box-absolute-parent-frame"),
                     |ui| {
                         ui.element(
                             format!("{case_id}-flow-child"),
-                            ElementSpec::new(ElementRole::Panel).class("box-absolute-flow-child"),
+                            ElementSpec::new(Element::Div).class("box-absolute-flow-child"),
                             |_| {},
                         );
                         ui.element(
                             format!("{case_id}-child"),
-                            ElementSpec::new(ElementRole::Panel).class("box-absolute-parent-child"),
+                            ElementSpec::new(Element::Div).class("box-absolute-parent-child"),
                             |_| {},
                         );
                     },
@@ -556,11 +551,11 @@ fn box_model_subject(
             "box-subject-absolute-window" => {
                 ui.element(
                     format!("{case_id}-host"),
-                    ElementSpec::new(ElementRole::Panel).class("box-absolute-window-host"),
+                    ElementSpec::new(Element::Div).class("box-absolute-window-host"),
                     |ui| {
                         ui.element(
                             format!("{case_id}-child"),
-                            ElementSpec::new(ElementRole::Panel).class("box-absolute-window-child"),
+                            ElementSpec::new(Element::Div).class("box-absolute-window-child"),
                             |_| {},
                         );
                     },
@@ -571,16 +566,16 @@ fn box_model_subject(
     );
 }
 
-fn box_chip(ui: &mut des_ui_document::SceneBuilder, case_id: &'static str, index: usize) {
+fn box_chip(ui: &mut des_ui_document::DocumentBuilder, case_id: &'static str, index: usize) {
     ui.element(
         format!("{case_id}-chip-{index}"),
-        ElementSpec::new(ElementRole::Panel).class("box-chip"),
+        ElementSpec::new(Element::Div).class("box-chip"),
         |_| {},
     );
 }
 
 fn render_interaction_view(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     checkbox_enabled: bool,
     radio_choice: usize,
     dropdown_open: bool,
@@ -588,17 +583,17 @@ fn render_interaction_view(
 ) {
     ui.text_element(
         "interaction-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Document Interaction",
     );
     ui.text_element(
         "interaction-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Hover and click styles are resolved by document state. Inner text does not own clicks.",
     );
     ui.element(
         "interaction-row",
-        ElementSpec::new(ElementRole::Panel).class("card-row"),
+        ElementSpec::new(Element::Div).class("card-row"),
         |ui| {
             for (id, title, body) in [
                 (
@@ -619,18 +614,18 @@ fn render_interaction_view(
             ] {
                 ui.element(
                     id,
-                    ElementSpec::new(ElementRole::Card)
+                    ElementSpec::new(Element::Div)
                         .class("feature-card")
                         .interactive(),
                     |ui| {
                         ui.text_element(
                             format!("{id}-title"),
-                            ElementSpec::new(ElementRole::Text).class("card-title"),
+                            ElementSpec::new(Element::Text).class("card-title"),
                             title,
                         );
                         ui.text_element(
                             format!("{id}-body"),
-                            ElementSpec::new(ElementRole::Text).class("muted"),
+                            ElementSpec::new(Element::Text).class("muted"),
                             body,
                         );
                     },
@@ -640,12 +635,12 @@ fn render_interaction_view(
     );
     ui.text_element(
         "controls-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
-        "Control roles",
+        ElementSpec::new(Element::Text).class("section-title"),
+        "Control elements",
     );
     ui.element(
         "controls-grid",
-        ElementSpec::new(ElementRole::Panel).class("controls-grid"),
+        ElementSpec::new(Element::Div).class("controls-grid"),
         |ui| {
             control_checkbox(ui, checkbox_enabled);
             control_radio_group(ui, radio_choice);
@@ -657,7 +652,7 @@ fn render_interaction_view(
 }
 
 fn render_draggable_view(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
@@ -668,16 +663,12 @@ fn render_draggable_view(
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
-    ui.text_element(
-        "draggable-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
-        "Document Draggables",
-    );
-    ui.text_element(
-        "draggable-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
-        "Sortable drag/drop uses document events, visual subtree clones, optional handles, and style-owned overlays.",
-    );
+    ui.child("draggable-heading", Element::Text)
+        .class("heading")
+        .text("Document Draggables");
+    ui.child("draggable-copy", Element::Text)
+        .class("muted")
+        .text("Sortable drag/drop uses document events, visual subtree clones, optional handles, and style-owned overlays.");
     render_drag_drop_lab(
         ui,
         drag_item_cells,
@@ -692,34 +683,34 @@ fn render_draggable_view(
     );
 }
 
-fn render_document_update_loop(ui: &mut des_ui_document::SceneBuilder) {
+fn render_document_update_loop(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "loop-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
+        ElementSpec::new(Element::Text).class("section-title"),
         "Event to document update loop",
     );
     ui.element(
         "loop-grid",
-        ElementSpec::new(ElementRole::Panel).class("loop-grid"),
+        ElementSpec::new(Element::Div).class("loop-grid"),
         |ui| {
             ui.element(
                 "loop-action-card",
-                ElementSpec::new(ElementRole::Card).class("loop-control-card"),
+                ElementSpec::new(Element::Div).class("loop-control-card"),
                 |ui| {
                     ui.text_element(
                         "loop-action-title",
-                        ElementSpec::new(ElementRole::Text).class("card-title"),
+                        ElementSpec::new(Element::Text).class("card-title"),
                         "Button event",
                     );
                     ui.element(
                         "loop-action-button",
-                        ElementSpec::new(ElementRole::Control)
+                        ElementSpec::new(Element::Button)
                             .class("loop-button")
                             .interactive(),
                         |ui| {
                             ui.text_element(
                                 "loop-action-button-label",
-                                ElementSpec::new(ElementRole::Text).class("control-label"),
+                                ElementSpec::new(Element::Text).class("control-label"),
                                 "Send update",
                             );
                         },
@@ -766,7 +757,7 @@ fn render_document_update_loop(ui: &mut des_ui_document::SceneBuilder) {
 }
 
 fn loop_result_card(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     box_id: &'static str,
     text_id: &'static str,
     title: &'static str,
@@ -774,16 +765,16 @@ fn loop_result_card(
 ) {
     ui.element(
         box_id,
-        ElementSpec::new(ElementRole::Card).class("loop-result-card"),
+        ElementSpec::new(Element::Div).class("loop-result-card"),
         |ui| {
             ui.text_element(
                 format!("{text_id}-title"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 title,
             );
             ui.text_element(
                 text_id,
-                ElementSpec::new(ElementRole::Text).class("control-label"),
+                ElementSpec::new(Element::Text).class("control-label"),
                 fallback,
             );
         },
@@ -791,7 +782,7 @@ fn loop_result_card(
 }
 
 fn render_drag_drop_lab(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
@@ -802,15 +793,12 @@ fn render_drag_drop_lab(
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
-    ui.text_element(
-        "drag-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
-        "Drag and drop grid",
-    );
-    ui.element(
-        "drag-workbench",
-        ElementSpec::new(ElementRole::Panel).class("drag-workbench"),
-        |ui| {
+    ui.child("drag-title", Element::Text)
+        .class("section-title")
+        .text("Drag and drop grid");
+    ui.div("drag-workbench")
+        .class("drag-workbench")
+        .children(|ui| {
             render_elevated_scrollable_drag_list(
                 ui,
                 "Scrollable list target",
@@ -819,81 +807,66 @@ fn render_drag_drop_lab(
                 scroll_list_drop_preview,
                 pressed_drag_source,
             );
-            ui.element(
-                "drag-grid",
-                ElementSpec::new(ElementRole::Panel).class("drag-grid"),
-                |ui| {
-                    for cell in 0..6 {
-                        let column = if cell % 2 == 0 { "Left" } else { "Right" };
-                        let row = cell / 2 + 1;
-                        ui.element(
-                            format!("drag-cell-{cell}"),
-                            ElementSpec::new(ElementRole::Panel).class("drag-cell"),
-                            |ui| {
-                                ui.text_element(
-                                    format!("drag-cell-{cell}-label"),
-                                    ElementSpec::new(ElementRole::Text).class("muted"),
-                                    format!("{column} row {row}"),
-                                );
-                                let mut cell_items: Vec<_> = drag_item_cells
-                                    .iter()
-                                    .enumerate()
-                                    .filter_map(|(item, item_cell)| {
-                                        (*item_cell == cell).then_some(item)
-                                    })
-                                    .collect();
-                                cell_items.sort_by_key(|item| drag_item_order[*item]);
-                                for item in cell_items {
-                                    if active_drag_item
-                                        == Some(des_ui_widgets::SortableItemId(item))
-                                    {
-                                        drag_item(
-                                            ui,
-                                            item,
-                                            drag_drop_preview,
-                                            true,
-                                            pressed_drag_source,
-                                        );
-                                    } else {
-                                        drag_item(
-                                            ui,
-                                            item,
-                                            drag_drop_preview,
-                                            false,
-                                            pressed_drag_source,
-                                        );
-                                    }
+            ui.div("drag-grid").class("drag-grid").children(|ui| {
+                for cell in 0..6 {
+                    let column = if cell % 2 == 0 { "Left" } else { "Right" };
+                    let row = cell / 2 + 1;
+                    ui.div(format!("drag-cell-{cell}"))
+                        .class("drag-cell")
+                        .children(|ui| {
+                            ui.child(format!("drag-cell-{cell}-label"), Element::Text)
+                                .class("muted")
+                                .text(format!("{column} row {row}"));
+                            let mut cell_items: Vec<_> = drag_item_cells
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(item, item_cell)| {
+                                    (*item_cell == cell).then_some(item)
+                                })
+                                .collect();
+                            cell_items.sort_by_key(|item| drag_item_order[*item]);
+                            for item in cell_items {
+                                if active_drag_item == Some(des_ui_widgets::SortableItemId(item)) {
+                                    drag_item(
+                                        ui,
+                                        item,
+                                        drag_drop_preview,
+                                        true,
+                                        pressed_drag_source,
+                                    );
+                                } else {
+                                    drag_item(
+                                        ui,
+                                        item,
+                                        drag_drop_preview,
+                                        false,
+                                        pressed_drag_source,
+                                    );
                                 }
-                            },
-                        );
-                    }
-                },
-            );
-        },
-    );
+                            }
+                        });
+                }
+            });
+        });
 }
 
 fn render_elevated_scrollable_drag_list(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     title: &'static str,
     scroll_list_item_order: [usize; 14],
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     pressed_drag_source: Option<&str>,
 ) {
-    ui.element(
-        "drag-scroll-list-card",
-        ElementSpec::new(ElementRole::Panel).class("drag-scroll-list-card"),
-        |ui| {
-            ui.text_element(
-                "drag-scroll-list-title",
-                ElementSpec::new(ElementRole::Text).class("section-subtitle"),
-                title,
-            );
-            ui.element(
-                "drag-scroll-list-0",
-                ElementSpec::new(ElementRole::Panel).class("drag-scroll-list"),
-                |ui| {
+    ui.div("drag-scroll-list-card")
+        .class("drag-scroll-list-card")
+        .children(|ui| {
+            ui.child("drag-scroll-list-title", Element::Text)
+                .class("section-subtitle")
+                .text(title);
+            ui.div("drag-scroll-list-0")
+                .class("drag-scroll-list")
+                .children(|ui| {
                     let mut list_items: Vec<_> = (0..scroll_list_item_order.len()).collect();
                     list_items.sort_by_key(|item| scroll_list_item_order[*item]);
                     for item in list_items {
@@ -906,14 +879,12 @@ fn render_elevated_scrollable_drag_list(
                             pressed_drag_source,
                         );
                     }
-                },
-            );
-        },
-    );
+                });
+        });
 }
 
 pub(super) fn render_drag_overlay_layer(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     drag_pointer: Option<des_ui_document::Point>,
     drag_visual_clone: Option<&des_ui_document::VisualElementClone>,
 ) {
@@ -928,14 +899,17 @@ pub(super) fn render_drag_overlay_layer(
     }
 }
 
-pub(super) fn render_debug_overlay_layer(ui: &mut des_ui_document::SceneBuilder, perf: UiLabPerf) {
+pub(super) fn render_debug_overlay_layer(
+    ui: &mut des_ui_document::DocumentBuilder,
+    perf: UiLabPerf,
+) {
     ui.element(
         "debug-overlay",
-        ElementSpec::new(ElementRole::Panel).class("debug-overlay"),
+        ElementSpec::new(Element::Div).class("debug-overlay"),
         |ui| {
             ui.text_element(
                 "debug-overlay-title",
-                ElementSpec::new(ElementRole::Text).class("debug-overlay-title"),
+                ElementSpec::new(Element::Text).class("debug-overlay-title"),
                 "UI Lab Runtime",
             );
             debug_metric_row(
@@ -1009,23 +983,23 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_ui_document::SceneBuilder,
 }
 
 fn debug_metric_row(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     value: String,
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Panel).class("debug-row"),
+        ElementSpec::new(Element::Div).class("debug-row"),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
-                ElementSpec::new(ElementRole::Text).class("debug-label"),
+                ElementSpec::new(Element::Text).class("debug-label"),
                 label,
             );
             ui.text_element(
                 format!("{id}-value"),
-                ElementSpec::new(ElementRole::Text).class("debug-value"),
+                ElementSpec::new(Element::Text).class("debug-value"),
                 value,
             );
         },
@@ -1037,123 +1011,131 @@ fn format_duration(duration: std::time::Duration) -> String {
 }
 
 fn drag_scroll_item(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     item: usize,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
     pressed_drag_source: Option<&str>,
 ) {
     let label = format!("auto-scroll row {:02}", item + 1);
-    let mut spec = ElementSpec::new(ElementRole::Card)
+    let mut item_builder = ui
+        .div(format!("drag-scroll-item-{item}"))
         .class("drag-item")
         .class("drag-scroll-item")
         .value(label.clone());
     if pressed_drag_source == Some(format!("drag-scroll-item-{item}").as_str()) {
-        spec = spec.class("drag-handle-pressed");
+        item_builder = item_builder.class("drag-handle-pressed");
     }
     if origin_space {
-        spec = spec.class("drag-origin-space");
+        item_builder = item_builder.class("drag-origin-space");
         if drag_drop_preview.is_some() {
-            spec = spec.class("drag-origin-collapsed");
+            item_builder = item_builder.class("drag-origin-collapsed");
         }
     }
     if let Some(preview) = drag_drop_preview
         && preview.nearest_item == Some(des_ui_widgets::SortableItemId(item))
     {
-        spec = spec.class(match preview.edge {
+        item_builder = item_builder.class(match preview.edge {
             des_ui_widgets::DropEdge::Before => "drag-gap-before",
             des_ui_widgets::DropEdge::After => "drag-gap-after",
         });
     }
-    ui.element(format!("drag-scroll-item-{item}"), spec, |ui| {
-        let mut label_spec = ElementSpec::new(ElementRole::Text).class("control-label");
+    item_builder.children(|ui| {
+        let mut label_builder = ui
+            .child(format!("drag-scroll-item-{item}-label"), Element::Text)
+            .class("control-label");
         if origin_space {
-            label_spec = label_spec.class("drag-origin-content");
+            label_builder = label_builder.class("drag-origin-content");
         }
-        ui.text_element(format!("drag-scroll-item-{item}-label"), label_spec, label);
+        label_builder.text(label);
         drag_scroll_handle(ui, item, origin_space);
     });
 }
 
-fn drag_scroll_handle(ui: &mut des_ui_document::SceneBuilder, item: usize, origin_space: bool) {
-    let mut handle_spec = ElementSpec::new(ElementRole::Control)
+fn drag_scroll_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_space: bool) {
+    let mut handle_builder = ui
+        .button(format!("drag-scroll-handle-{item}"))
         .class("drag-handle")
         .class("drag-scroll-handle")
         .interactive()
         .value(format!("drag-scroll-item-{item}"));
-    let mut glyph_spec = ElementSpec::new(ElementRole::Icon).class("drag-handle-glyph");
     if origin_space {
-        handle_spec = handle_spec.class("drag-origin-content");
-        glyph_spec = glyph_spec.class("drag-origin-content");
+        handle_builder = handle_builder.class("drag-origin-content");
     }
-    ui.element(format!("drag-scroll-handle-{item}"), handle_spec, |ui| {
-        ui.element(
-            format!("drag-scroll-handle-{item}-glyph"),
-            glyph_spec.glyph(Glyph::DragHandle),
-            |_| {},
-        );
+    handle_builder.children(|ui| {
+        let mut glyph_builder = ui
+            .icon(format!("drag-scroll-handle-{item}-glyph"))
+            .class("drag-handle-glyph");
+        if origin_space {
+            glyph_builder = glyph_builder.class("drag-origin-content");
+        }
+        glyph_builder.glyph(Glyph::DragHandle).empty();
     });
 }
 
 fn drag_item(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     item: usize,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
     pressed_drag_source: Option<&str>,
 ) {
     let label = ["Customers", "Orders", "Rates"][item];
-    let mut spec = ElementSpec::new(ElementRole::Card)
+    let mut item_builder = ui
+        .div(format!("drag-item-{item}"))
         .class("drag-item")
         .value(label);
     if pressed_drag_source == Some(format!("drag-item-{item}").as_str()) {
-        spec = spec.class("drag-handle-pressed");
+        item_builder = item_builder.class("drag-handle-pressed");
     }
     if origin_space {
-        spec = spec.class("drag-origin-space");
+        item_builder = item_builder.class("drag-origin-space");
         if drag_drop_preview.is_some() {
-            spec = spec.class("drag-origin-collapsed");
+            item_builder = item_builder.class("drag-origin-collapsed");
         }
     }
     if let Some(preview) = drag_drop_preview
         && preview.nearest_item == Some(des_ui_widgets::SortableItemId(item))
     {
-        spec = spec.class(match preview.edge {
+        item_builder = item_builder.class(match preview.edge {
             des_ui_widgets::DropEdge::Before => "drag-gap-before",
             des_ui_widgets::DropEdge::After => "drag-gap-after",
         });
     }
-    ui.element(format!("drag-item-{item}"), spec, |ui| {
-        let mut label_spec = ElementSpec::new(ElementRole::Text).class("control-label");
+    item_builder.children(|ui| {
+        let mut label_builder = ui
+            .child(format!("drag-item-{item}-label"), Element::Text)
+            .class("control-label");
         if origin_space {
-            label_spec = label_spec.class("drag-origin-content");
+            label_builder = label_builder.class("drag-origin-content");
         }
-        ui.text_element(format!("drag-item-{item}-label"), label_spec, label);
+        label_builder.text(label);
         drag_handle(ui, item, origin_space);
     });
 }
 
-fn drag_handle(ui: &mut des_ui_document::SceneBuilder, item: usize, origin_space: bool) {
-    let mut handle_spec = ElementSpec::new(ElementRole::Control)
+fn drag_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_space: bool) {
+    let mut handle_builder = ui
+        .button(format!("drag-handle-{item}"))
         .class("drag-handle")
         .interactive()
         .value(format!("drag-item-{item}"));
-    let mut glyph_spec = ElementSpec::new(ElementRole::Icon).class("drag-handle-glyph");
     if origin_space {
-        handle_spec = handle_spec.class("drag-origin-content");
-        glyph_spec = glyph_spec.class("drag-origin-content");
+        handle_builder = handle_builder.class("drag-origin-content");
     }
-    ui.element(format!("drag-handle-{item}"), handle_spec, |ui| {
-        ui.element(
-            format!("drag-handle-{item}-glyph"),
-            glyph_spec.glyph(Glyph::DragHandle),
-            |_| {},
-        );
+    handle_builder.children(|ui| {
+        let mut glyph_builder = ui
+            .icon(format!("drag-handle-{item}-glyph"))
+            .class("drag-handle-glyph");
+        if origin_space {
+            glyph_builder = glyph_builder.class("drag-origin-content");
+        }
+        glyph_builder.glyph(Glyph::DragHandle).empty();
     });
 }
 
 fn drag_visual_overlay(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     clone: &des_ui_document::VisualElementClone,
 ) {
     ui.visual_clone(
@@ -1163,44 +1145,41 @@ fn drag_visual_overlay(
     );
 }
 
-fn drag_overlay_placeholder(ui: &mut des_ui_document::SceneBuilder) {
-    ui.element(
-        "drag-overlay",
-        ElementSpec::new(ElementRole::Card)
-            .class("drag-overlay")
-            .class("drag-overlay-idle")
-            .value(""),
-        |_| {},
-    );
+fn drag_overlay_placeholder(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.div("drag-overlay")
+        .class("drag-overlay")
+        .class("drag-overlay-idle")
+        .value("")
+        .empty();
 }
 
-fn control_checkbox(ui: &mut des_ui_document::SceneBuilder, checked: bool) {
+fn control_checkbox(ui: &mut des_ui_document::DocumentBuilder, checked: bool) {
     ui.element(
         "control-checkbox-card",
-        ElementSpec::new(ElementRole::Card).class("control-card"),
+        ElementSpec::new(Element::Div).class("control-card"),
         |ui| {
             ui.text_element(
                 "control-checkbox-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Checkbox",
             );
             ui.element(
                 "control-checkbox",
-                ElementSpec::new(ElementRole::Checkbox)
+                ElementSpec::new(Element::Checkbox)
                     .class("control-row")
                     .interactive()
                     .selected(checked),
                 |ui| {
                     ui.element(
                         "control-checkbox-mark",
-                        ElementSpec::new(ElementRole::Panel)
+                        ElementSpec::new(Element::Div)
                             .class("checkbox-mark")
                             .selected(checked),
                         |ui| {
                             if checked {
                                 ui.element(
                                     "control-checkbox-glyph",
-                                    ElementSpec::new(ElementRole::Icon)
+                                    ElementSpec::new(Element::Icon)
                                         .class("check-glyph")
                                         .glyph(Glyph::Check),
                                     |_| {},
@@ -1210,7 +1189,7 @@ fn control_checkbox(ui: &mut des_ui_document::SceneBuilder, checked: bool) {
                     );
                     ui.text_element(
                         "control-checkbox-label",
-                        ElementSpec::new(ElementRole::Text).class("control-label"),
+                        ElementSpec::new(Element::Text).class("control-label"),
                         "Profile this transform",
                     );
                 },
@@ -1219,14 +1198,14 @@ fn control_checkbox(ui: &mut des_ui_document::SceneBuilder, checked: bool) {
     );
 }
 
-fn control_radio_group(ui: &mut des_ui_document::SceneBuilder, choice: usize) {
+fn control_radio_group(ui: &mut des_ui_document::DocumentBuilder, choice: usize) {
     ui.element(
         "control-radio-card",
-        ElementSpec::new(ElementRole::Card).class("control-card"),
+        ElementSpec::new(Element::Div).class("control-card"),
         |ui| {
             ui.text_element(
                 "control-radio-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Radio group",
             );
             for (index, id, label) in [
@@ -1236,21 +1215,21 @@ fn control_radio_group(ui: &mut des_ui_document::SceneBuilder, choice: usize) {
             ] {
                 ui.element(
                     id,
-                    ElementSpec::new(ElementRole::Radio)
+                    ElementSpec::new(Element::Radio)
                         .class("control-row")
                         .interactive()
                         .selected(choice == index),
                     |ui| {
                         ui.element(
                             format!("{id}-dot"),
-                            ElementSpec::new(ElementRole::Panel)
+                            ElementSpec::new(Element::Div)
                                 .class("radio-dot")
                                 .selected(choice == index),
                             |_| {},
                         );
                         ui.text_element(
                             format!("{id}-label"),
-                            ElementSpec::new(ElementRole::Text).class("control-label"),
+                            ElementSpec::new(Element::Text).class("control-label"),
                             label,
                         );
                     },
@@ -1260,32 +1239,32 @@ fn control_radio_group(ui: &mut des_ui_document::SceneBuilder, choice: usize) {
     );
 }
 
-fn control_dropdown(ui: &mut des_ui_document::SceneBuilder, open: bool, choice: usize) {
+fn control_dropdown(ui: &mut des_ui_document::DocumentBuilder, open: bool, choice: usize) {
     let selected = ["CSV source", "DuckDB table", "Python node"][choice];
     ui.element(
         "control-dropdown-card",
-        ElementSpec::new(ElementRole::Card).class("control-card"),
+        ElementSpec::new(Element::Div).class("control-card"),
         |ui| {
             ui.text_element(
                 "control-dropdown-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Dropdown",
             );
             ui.element(
                 "control-dropdown",
-                ElementSpec::new(ElementRole::Dropdown)
+                ElementSpec::new(Element::Select)
                     .class("dropdown-control")
                     .interactive()
                     .selected(open),
                 |ui| {
                     ui.text_element(
                         "control-dropdown-label",
-                        ElementSpec::new(ElementRole::Text).class("control-label"),
+                        ElementSpec::new(Element::Text).class("control-label"),
                         selected,
                     );
                     ui.element(
                         "control-dropdown-chevron",
-                        ElementSpec::new(ElementRole::Icon)
+                        ElementSpec::new(Element::Icon)
                             .class("dropdown-chevron")
                             .glyph(if open {
                                 Glyph::ChevronUp
@@ -1299,7 +1278,7 @@ fn control_dropdown(ui: &mut des_ui_document::SceneBuilder, open: bool, choice: 
             if open {
                 ui.element(
                     "control-dropdown-menu",
-                    ElementSpec::new(ElementRole::Panel).class("dropdown-menu"),
+                    ElementSpec::new(Element::Div).class("dropdown-menu"),
                     |ui| {
                         for (index, id, label) in [
                             (0, "control-dropdown-option-csv", "CSV source"),
@@ -1308,14 +1287,14 @@ fn control_dropdown(ui: &mut des_ui_document::SceneBuilder, open: bool, choice: 
                         ] {
                             ui.element(
                                 id,
-                                ElementSpec::new(ElementRole::Control)
+                                ElementSpec::new(Element::Button)
                                     .class("dropdown-option")
                                     .interactive()
                                     .selected(choice == index),
                                 |ui| {
                                     ui.text_element(
                                         format!("{id}-label"),
-                                        ElementSpec::new(ElementRole::Text)
+                                        ElementSpec::new(Element::Text)
                                             .class("control-label")
                                             .selected(choice == index),
                                         label,
@@ -1330,14 +1309,14 @@ fn control_dropdown(ui: &mut des_ui_document::SceneBuilder, open: bool, choice: 
     );
 }
 
-fn control_text_inputs(ui: &mut des_ui_document::SceneBuilder) {
+fn control_text_inputs(ui: &mut des_ui_document::DocumentBuilder) {
     ui.element(
         "control-input-card",
-        ElementSpec::new(ElementRole::Card).class("control-card"),
+        ElementSpec::new(Element::Div).class("control-card"),
         |ui| {
             ui.text_element(
                 "control-input-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Input fields",
             );
             for (id, label, focused, disabled) in [
@@ -1346,7 +1325,7 @@ fn control_text_inputs(ui: &mut des_ui_document::SceneBuilder) {
             ] {
                 ui.element(
                     id,
-                    ElementSpec::new(ElementRole::TextInput)
+                    ElementSpec::new(Element::Input)
                         .class("input-field")
                         .interactive()
                         .focused(focused)
@@ -1354,7 +1333,7 @@ fn control_text_inputs(ui: &mut des_ui_document::SceneBuilder) {
                     |ui| {
                         ui.text_element(
                             format!("{id}-label"),
-                            ElementSpec::new(ElementRole::Text)
+                            ElementSpec::new(Element::Text)
                                 .class("control-label")
                                 .focused(focused)
                                 .disabled(disabled),
@@ -1368,30 +1347,30 @@ fn control_text_inputs(ui: &mut des_ui_document::SceneBuilder) {
 }
 
 fn render_styling_view(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     dense_mode: bool,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
 ) {
     ui.text_element(
         "styling-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Deterministic Styling",
     );
     ui.text_element(
         "styling-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
-        "Style order is role, class, state, id. No CSS specificity maze.",
+        ElementSpec::new(Element::Text).class("muted"),
+        "Style order is element, class, state, id. No CSS specificity maze.",
     );
     ui.element(
         "style-stack",
-        ElementSpec::new(ElementRole::Panel).class("stack"),
+        ElementSpec::new(Element::Div).class("stack"),
         |ui| {
             interactive_labeled_row(
                 ui,
-                "style-row-role",
+                "style-row-element",
                 "Role",
-                "ElementRole::Card sets base surface behavior.",
+                "Element::Div sets base surface behavior.",
             );
             interactive_labeled_row(
                 ui,
@@ -1422,20 +1401,20 @@ fn render_styling_view(
     render_structural_selector_specimens(ui);
 }
 
-fn render_shadow_specimens(ui: &mut des_ui_document::SceneBuilder) {
+fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "shadow-specimen-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
+        ElementSpec::new(Element::Text).class("section-title"),
         "Shadow Styling",
     );
     ui.text_element(
         "shadow-specimen-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Single soft shadows are paint-only; spread can contract or expand the source shape.",
     );
     ui.element(
         "shadow-specimen-grid",
-        ElementSpec::new(ElementRole::Panel).class("shadow-grid"),
+        ElementSpec::new(Element::Div).class("shadow-grid"),
         |ui| {
             shadow_item(
                 ui,
@@ -1459,7 +1438,7 @@ fn render_shadow_specimens(ui: &mut des_ui_document::SceneBuilder) {
     );
     ui.element(
         "shadow-light-stage",
-        ElementSpec::new(ElementRole::Panel).class("shadow-light-stage"),
+        ElementSpec::new(Element::Div).class("shadow-light-stage"),
         |ui| {
             light_shadow_card(ui, "shadow-light-top", "48", true);
             light_shadow_card(ui, "shadow-light-bottom", "30", false);
@@ -1467,7 +1446,7 @@ fn render_shadow_specimens(ui: &mut des_ui_document::SceneBuilder) {
     );
     ui.element(
         "shadow-web-stage",
-        ElementSpec::new(ElementRole::Panel).class("shadow-web-stage"),
+        ElementSpec::new(Element::Div).class("shadow-web-stage"),
         |ui| {
             web_shadow_card(ui, "shadow-web-top", "46", true);
             web_shadow_card(ui, "shadow-web-bottom", "48", false);
@@ -1476,27 +1455,27 @@ fn render_shadow_specimens(ui: &mut des_ui_document::SceneBuilder) {
 }
 
 fn render_shadow_tuner(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
 ) {
     ui.text_element(
         "shadow-tune-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
+        ElementSpec::new(Element::Text).class("section-title"),
         "Shadow Tuner",
     );
     ui.text_element(
         "shadow-tune-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Tune base and hover shadows by eye, then copy the numbers into the elevation recipe.",
     );
     ui.element(
         "shadow-tune-panel",
-        ElementSpec::new(ElementRole::Panel).class("shadow-tune-panel"),
+        ElementSpec::new(Element::Div).class("shadow-tune-panel"),
         |ui| {
             ui.element(
                 "shadow-tune-preview",
-                ElementSpec::new(ElementRole::Panel).class("shadow-tune-preview"),
+                ElementSpec::new(Element::Div).class("shadow-tune-preview"),
                 |ui| {
                     shadow_tune_preview_card(ui, "shadow-tune-preview-card-1", "base row 01");
                     shadow_tune_preview_card(ui, "shadow-tune-preview-card-2", "hover row 02");
@@ -1505,13 +1484,13 @@ fn render_shadow_tuner(
             );
             ui.element(
                 "shadow-tune-controls",
-                ElementSpec::new(ElementRole::Panel).class("shadow-tune-controls"),
+                ElementSpec::new(Element::Div).class("shadow-tune-controls"),
                 |ui| {
                     shadow_tune_group(ui, ShadowTuneTarget::Base, shadow_tune);
                     shadow_tune_group(ui, ShadowTuneTarget::Hover, shadow_hover_tune);
                     ui.text_element(
                         "shadow-tune-output",
-                        ElementSpec::new(ElementRole::Text)
+                        ElementSpec::new(Element::Text)
                             .class("shadow-tune-output")
                             .selectable_text(),
                         shadow_tune_output(shadow_tune, shadow_hover_tune),
@@ -1523,24 +1502,24 @@ fn render_shadow_tuner(
 }
 
 fn shadow_tune_preview_card(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Card)
+        ElementSpec::new(Element::Div)
             .class("shadow-tune-preview-card")
             .interactive(),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
-                ElementSpec::new(ElementRole::Text).class("shadow-web-label"),
+                ElementSpec::new(Element::Text).class("shadow-web-label"),
                 label,
             );
             ui.element(
                 format!("{id}-handle"),
-                ElementSpec::new(ElementRole::Icon)
+                ElementSpec::new(Element::Icon)
                     .class("shadow-web-handle")
                     .glyph(Glyph::DragHandle),
                 |_| {},
@@ -1550,17 +1529,17 @@ fn shadow_tune_preview_card(
 }
 
 fn shadow_tune_group(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     target: ShadowTuneTarget,
     state: ShadowTuneState,
 ) {
     ui.element(
         format!("shadow-tune-{}-group", target.id_prefix()),
-        ElementSpec::new(ElementRole::Panel).class("shadow-tune-group"),
+        ElementSpec::new(Element::Div).class("shadow-tune-group"),
         |ui| {
             ui.text_element(
                 format!("shadow-tune-{}-group-title", target.id_prefix()),
-                ElementSpec::new(ElementRole::Text).class("section-title"),
+                ElementSpec::new(Element::Text).class("section-title"),
                 format!("{} shadow", target.label()),
             );
             shadow_tune_layer(ui, target, 0, state.layers[0]);
@@ -1570,7 +1549,7 @@ fn shadow_tune_group(
 }
 
 fn shadow_tune_layer(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     target: ShadowTuneTarget,
     layer_index: usize,
     layer: ShadowTuneLayer,
@@ -1579,15 +1558,15 @@ fn shadow_tune_layer(
     let layer_id = format!("shadow-tune-{target_id}-layer-{layer_index}");
     ui.element(
         layer_id,
-        ElementSpec::new(ElementRole::Panel).class("shadow-tune-layer"),
+        ElementSpec::new(Element::Div).class("shadow-tune-layer"),
         |ui| {
             ui.element(
                 format!("shadow-tune-{target_id}-layer-{layer_index}-header"),
-                ElementSpec::new(ElementRole::Panel).class("shadow-tune-header"),
+                ElementSpec::new(Element::Div).class("shadow-tune-header"),
                 |ui| {
                     ui.text_element(
                         format!("shadow-tune-{target_id}-layer-{layer_index}-title"),
-                        ElementSpec::new(ElementRole::Text).class("card-title"),
+                        ElementSpec::new(Element::Text).class("card-title"),
                         format!(
                             "Layer {} ({})",
                             layer_index + 1,
@@ -1596,13 +1575,13 @@ fn shadow_tune_layer(
                     );
                     ui.element(
                         format!("shadow-tune-{target_id}-layer-{layer_index}-toggle"),
-                        ElementSpec::new(ElementRole::Control)
+                        ElementSpec::new(Element::Button)
                             .class("shadow-tune-toggle")
                             .interactive(),
                         |ui| {
                             ui.text_element(
                                 format!("shadow-tune-{target_id}-layer-{layer_index}-toggle-label"),
-                                ElementSpec::new(ElementRole::Text).class("button-label"),
+                                ElementSpec::new(Element::Text).class("button-label"),
                                 if layer.enabled { "Disable" } else { "Enable" },
                             );
                         },
@@ -1640,7 +1619,7 @@ fn shadow_tune_layer(
 }
 
 fn shadow_tune_control(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     target: ShadowTuneTarget,
     layer_index: usize,
     field: &'static str,
@@ -1651,17 +1630,17 @@ fn shadow_tune_control(
     let row_id = format!("shadow-tune-{target_id}-l{layer_index}-{field}-row");
     ui.element(
         row_id,
-        ElementSpec::new(ElementRole::Panel).class("shadow-tune-row"),
+        ElementSpec::new(Element::Div).class("shadow-tune-row"),
         |ui| {
             ui.text_element(
                 format!("shadow-tune-{target_id}-l{layer_index}-{field}-label"),
-                ElementSpec::new(ElementRole::Text).class("shadow-tune-label"),
+                ElementSpec::new(Element::Text).class("shadow-tune-label"),
                 label,
             );
             shadow_tune_button(ui, target, layer_index, field, "dec", "-");
             ui.text_element(
                 format!("shadow-tune-{target_id}-l{layer_index}-{field}-value"),
-                ElementSpec::new(ElementRole::Text).class("shadow-tune-value"),
+                ElementSpec::new(Element::Text).class("shadow-tune-value"),
                 value,
             );
             shadow_tune_button(ui, target, layer_index, field, "inc", "+");
@@ -1670,7 +1649,7 @@ fn shadow_tune_control(
 }
 
 fn shadow_tune_button(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     target: ShadowTuneTarget,
     layer_index: usize,
     field: &'static str,
@@ -1683,13 +1662,13 @@ fn shadow_tune_button(
     );
     ui.element(
         button_id.clone(),
-        ElementSpec::new(ElementRole::Control)
+        ElementSpec::new(Element::Button)
             .class("shadow-tune-button")
             .interactive(),
         |ui| {
             ui.text_element(
                 format!("{button_id}-label"),
-                ElementSpec::new(ElementRole::Text).class("button-label"),
+                ElementSpec::new(Element::Text).class("button-label"),
                 label,
             );
         },
@@ -1719,25 +1698,25 @@ fn shadow_tune_output(base: ShadowTuneState, hover: ShadowTuneState) -> String {
 }
 
 fn shadow_item(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Card)
+        ElementSpec::new(Element::Div)
             .class("shadow-card")
             .class(id),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 label,
             );
             ui.text_element(
                 format!("{id}-body"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 body,
             );
         },
@@ -1745,27 +1724,27 @@ fn shadow_item(
 }
 
 fn light_shadow_card(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     raised: bool,
 ) {
     let card_spec = if raised {
-        ElementSpec::new(ElementRole::Card)
+        ElementSpec::new(Element::Div)
             .class("shadow-light-card")
             .class("shadow-light-card-raised")
     } else {
-        ElementSpec::new(ElementRole::Card).class("shadow-light-card")
+        ElementSpec::new(Element::Div).class("shadow-light-card")
     };
     ui.element(id, card_spec, |ui| {
         ui.text_element(
             format!("{id}-label"),
-            ElementSpec::new(ElementRole::Text).class("shadow-light-label"),
+            ElementSpec::new(Element::Text).class("shadow-light-label"),
             label,
         );
         ui.element(
             format!("{id}-handle"),
-            ElementSpec::new(ElementRole::Icon)
+            ElementSpec::new(Element::Icon)
                 .class("shadow-light-handle")
                 .glyph(Glyph::DragHandle),
             |_| {},
@@ -1774,27 +1753,27 @@ fn light_shadow_card(
 }
 
 fn web_shadow_card(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     raised: bool,
 ) {
     let card_spec = if raised {
-        ElementSpec::new(ElementRole::Card)
+        ElementSpec::new(Element::Div)
             .class("shadow-web-card")
             .class("shadow-web-card-raised")
     } else {
-        ElementSpec::new(ElementRole::Card).class("shadow-web-card")
+        ElementSpec::new(Element::Div).class("shadow-web-card")
     };
     ui.element(id, card_spec, |ui| {
         ui.text_element(
             format!("{id}-label"),
-            ElementSpec::new(ElementRole::Text).class("shadow-web-label"),
+            ElementSpec::new(Element::Text).class("shadow-web-label"),
             label,
         );
         ui.element(
             format!("{id}-handle"),
-            ElementSpec::new(ElementRole::Icon)
+            ElementSpec::new(Element::Icon)
                 .class("shadow-web-handle")
                 .glyph(Glyph::DragHandle),
             |_| {},
@@ -1802,24 +1781,24 @@ fn web_shadow_card(
     });
 }
 
-fn render_structural_selector_specimens(ui: &mut des_ui_document::SceneBuilder) {
+fn render_structural_selector_specimens(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "structural-selector-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
+        ElementSpec::new(Element::Text).class("section-title"),
         "Structural Selectors",
     );
     ui.text_element(
         "structural-selector-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "first-child, last-child, and nth-child are resolved from document nesting.",
     );
     ui.element(
         "structural-selector-grid",
-        ElementSpec::new(ElementRole::Panel).class("structural-grid"),
+        ElementSpec::new(Element::Div).class("structural-grid"),
         |ui| {
             ui.element(
                 "structural-main-list",
-                ElementSpec::new(ElementRole::Panel).class("structural-list"),
+                ElementSpec::new(Element::Div).class("structural-list"),
                 |ui| {
                     structural_item(
                         ui,
@@ -1849,12 +1828,12 @@ fn render_structural_selector_specimens(ui: &mut des_ui_document::SceneBuilder) 
             );
             ui.element(
                 "structural-nested-shell",
-                ElementSpec::new(ElementRole::Panel).class("structural-nested-shell"),
+                ElementSpec::new(Element::Div).class("structural-nested-shell"),
                 |ui| {
                     for (list, label) in [("a", "Project A"), ("b", "Project B")] {
                         ui.element(
                             format!("structural-nested-list-{list}"),
-                            ElementSpec::new(ElementRole::Panel).class("structural-list"),
+                            ElementSpec::new(Element::Div).class("structural-list"),
                             |ui| {
                                 structural_nested_item(
                                     ui,
@@ -1878,23 +1857,23 @@ fn render_structural_selector_specimens(ui: &mut des_ui_document::SceneBuilder) 
 }
 
 fn structural_item(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Card).class("structural-item"),
+        ElementSpec::new(Element::Div).class("structural-item"),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 label,
             );
             ui.text_element(
                 format!("{id}-body"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 body,
             );
         },
@@ -1902,43 +1881,43 @@ fn structural_item(
 }
 
 fn structural_nested_item(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: String,
     label: &'static str,
     body: &'static str,
 ) {
     ui.element(
         id.clone(),
-        ElementSpec::new(ElementRole::Card).class("structural-item"),
+        ElementSpec::new(Element::Div).class("structural-item"),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 label,
             );
             ui.text_element(
                 format!("{id}-body"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 body,
             );
         },
     );
 }
 
-fn render_animation_view(ui: &mut des_ui_document::SceneBuilder) {
+fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "animation-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Animation Specimens",
     );
     ui.text_element(
         "animation-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Each specimen isolates one state selector and the style properties it animates.",
     );
     ui.element(
         "animation-grid",
-        ElementSpec::new(ElementRole::Panel).class("animation-grid"),
+        ElementSpec::new(Element::Div).class("animation-grid"),
         |ui| {
             animation_specimen(
                 ui,
@@ -2000,45 +1979,45 @@ fn render_animation_view(ui: &mut des_ui_document::SceneBuilder) {
     );
 }
 
-fn animation_margin_specimen(ui: &mut des_ui_document::SceneBuilder) {
+fn animation_margin_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     ui.element(
         "animation-hover-margin",
-        ElementSpec::new(ElementRole::Panel).class("animation-specimen"),
+        ElementSpec::new(Element::Div).class("animation-specimen"),
         |ui| {
             ui.text_element(
                 "animation-hover-margin-title",
-                ElementSpec::new(ElementRole::Text).class("box-label"),
+                ElementSpec::new(Element::Text).class("box-label"),
                 "Hovered Margin",
             );
             ui.text_element(
                 "animation-hover-margin-note",
-                ElementSpec::new(ElementRole::Text).class("box-note"),
+                ElementSpec::new(Element::Text).class("box-note"),
                 "margin animates inside the parent and pushes neighboring boxes",
             );
             ui.text_element(
                 "animation-hover-margin-rule-0",
-                ElementSpec::new(ElementRole::Text).class("box-rule"),
+                ElementSpec::new(Element::Text).class("box-rule"),
                 "base: margin all sides 0",
             );
             ui.text_element(
                 "animation-hover-margin-rule-1",
-                ElementSpec::new(ElementRole::Text).class("box-rule"),
+                ElementSpec::new(Element::Text).class("box-rule"),
                 "hovered: margin all sides 18",
             );
             ui.element(
                 "animation-hover-margin-surface",
-                ElementSpec::new(ElementRole::Panel).class("animation-surface"),
+                ElementSpec::new(Element::Div).class("animation-surface"),
                 |ui| {
                     ui.element(
                         "animation-hover-margin-row",
-                        ElementSpec::new(ElementRole::Panel).class("animation-margin-row"),
+                        ElementSpec::new(Element::Div).class("animation-margin-row"),
                         |ui| {
                             for id in [
                                 "animation-hover-margin-before",
                                 "animation-hover-margin-target",
                                 "animation-hover-margin-after",
                             ] {
-                                let spec = ElementSpec::new(ElementRole::Card)
+                                let spec = ElementSpec::new(Element::Div)
                                     .class("animation-margin-chip")
                                     .class(match id {
                                         "animation-hover-margin-target" => {
@@ -2064,7 +2043,7 @@ fn animation_margin_specimen(ui: &mut des_ui_document::SceneBuilder) {
 }
 
 fn animation_specimen(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     note: &'static str,
@@ -2076,32 +2055,32 @@ fn animation_specimen(
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Panel).class("animation-specimen"),
+        ElementSpec::new(Element::Div).class("animation-specimen"),
         |ui| {
             ui.text_element(
                 format!("{id}-title"),
-                ElementSpec::new(ElementRole::Text).class("box-label"),
+                ElementSpec::new(Element::Text).class("box-label"),
                 title,
             );
             ui.text_element(
                 format!("{id}-note"),
-                ElementSpec::new(ElementRole::Text).class("box-note"),
+                ElementSpec::new(Element::Text).class("box-note"),
                 note,
             );
             for (line_index, line) in rule_text.split(" | ").enumerate() {
                 ui.text_element(
                     format!("{id}-rule-{line_index}"),
-                    ElementSpec::new(ElementRole::Text).class("box-rule"),
+                    ElementSpec::new(Element::Text).class("box-rule"),
                     line,
                 );
             }
             ui.element(
                 format!("{id}-surface"),
-                ElementSpec::new(ElementRole::Panel).class("animation-surface"),
+                ElementSpec::new(Element::Div).class("animation-surface"),
                 |ui| {
                     ui.element(
                         format!("{id}-box"),
-                        ElementSpec::new(ElementRole::Card)
+                        ElementSpec::new(Element::Div)
                             .class("animation-box")
                             .class(box_class)
                             .interactive()
@@ -2111,7 +2090,7 @@ fn animation_specimen(
                         |ui| {
                             ui.text_element(
                                 format!("{id}-box-label"),
-                                ElementSpec::new(ElementRole::Text)
+                                ElementSpec::new(Element::Text)
                                     .class("animation-box-label")
                                     .selected(selected)
                                     .disabled(disabled)
@@ -2120,7 +2099,7 @@ fn animation_specimen(
                             );
                             ui.text_element(
                                 format!("{id}-box-body"),
-                                ElementSpec::new(ElementRole::Text)
+                                ElementSpec::new(Element::Text)
                                     .class("animation-box-body")
                                     .selected(selected)
                                     .disabled(disabled)
@@ -2135,25 +2114,25 @@ fn animation_specimen(
     );
 }
 
-fn render_scrolling_view(ui: &mut des_ui_document::SceneBuilder) {
+fn render_scrolling_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "scroll-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Document Scrolling",
     );
     ui.text_element(
         "scroll-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Use the wheel or touchpad over each panel. Scroll offsets live in des-ui-document.",
     );
     ui.text_element(
         "scroll-direct-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
+        ElementSpec::new(Element::Text).class("section-title"),
         "Direct containers",
     );
     ui.element(
         "scroll-row",
-        ElementSpec::new(ElementRole::Panel).class("card-row"),
+        ElementSpec::new(Element::Div).class("card-row"),
         |ui| {
             scroll_panel(
                 ui,
@@ -2183,12 +2162,12 @@ fn render_scrolling_view(ui: &mut des_ui_document::SceneBuilder) {
     );
     ui.text_element(
         "scroll-nested-title",
-        ElementSpec::new(ElementRole::Text).class("section-title"),
+        ElementSpec::new(Element::Text).class("section-title"),
         "Nested containers",
     );
     ui.element(
         "scroll-nested-row",
-        ElementSpec::new(ElementRole::Panel).class("card-row"),
+        ElementSpec::new(Element::Div).class("card-row"),
         |ui| {
             nested_scroll_panel(
                 ui,
@@ -2218,29 +2197,29 @@ fn render_scrolling_view(ui: &mut des_ui_document::SceneBuilder) {
     );
 }
 
-fn render_table_view(ui: &mut des_ui_document::SceneBuilder) {
+fn render_table_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "table-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Document Table",
     );
     ui.text_element(
         "table-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Table layout resolves column tracks once and applies them to headers and body cells.",
     );
     ui.element(
         "table-specimen-card",
-        ElementSpec::new(ElementRole::Card).class("specimen-card"),
+        ElementSpec::new(Element::Div).class("specimen-card"),
         |ui| {
             ui.text_element(
                 "table-specimen-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Data-driven columns",
             );
             ui.element(
                 "customer-preview-table",
-                ElementSpec::new(ElementRole::Table)
+                ElementSpec::new(Element::Table)
                     .class("data-table")
                     .class("styled-scrollbar")
                     .table(sample_table_spec()),
@@ -2255,22 +2234,22 @@ fn render_table_view(ui: &mut des_ui_document::SceneBuilder) {
     );
 }
 
-fn render_text_view(ui: &mut des_ui_document::SceneBuilder) {
+fn render_text_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "text-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Text Measurement",
     );
     ui.text_element(
         "text-copy",
-        ElementSpec::new(ElementRole::Text)
+        ElementSpec::new(Element::Text)
             .class("muted")
             .class("text-copy"),
         "These specimens use the document text contract with egui/epaint providing the real measurement and galley painting.",
     );
     ui.element(
         "text-specimen-grid",
-        ElementSpec::new(ElementRole::Panel).class("text-specimen-grid"),
+        ElementSpec::new(Element::Div).class("text-specimen-grid"),
         |ui| {
             text_specimen(
                 ui,
@@ -2309,7 +2288,7 @@ fn render_text_view(ui: &mut des_ui_document::SceneBuilder) {
 }
 
 fn text_specimen(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &str,
     title: &str,
     rule: &str,
@@ -2318,23 +2297,23 @@ fn text_specimen(
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Card).class("text-specimen-card"),
+        ElementSpec::new(Element::Div).class("text-specimen-card"),
         |ui| {
             ui.text_element(
                 format!("{id}-title"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 title,
             );
             ui.text_element(
                 format!("{id}-rule"),
-                ElementSpec::new(ElementRole::Text)
+                ElementSpec::new(Element::Text)
                     .class("muted")
                     .class("text-rule"),
                 rule,
             );
             ui.text_element(
                 format!("{id}-body"),
-                ElementSpec::new(ElementRole::Text)
+                ElementSpec::new(Element::Text)
                     .class("text-box")
                     .class(text_class)
                     .selectable_text(),
@@ -2366,15 +2345,15 @@ fn sample_table_spec() -> TableSpec {
     .row_height(32.0)
 }
 
-fn table_header(ui: &mut des_ui_document::SceneBuilder) {
+fn table_header(ui: &mut des_ui_document::DocumentBuilder) {
     ui.element(
         "customer-preview-header",
-        ElementSpec::new(ElementRole::TableHeader).class("table-header-row"),
+        ElementSpec::new(Element::Thead).class("table-header-row"),
         |ui| {
             for column in sample_table_spec().columns {
                 ui.text_element(
                     format!("customer-preview-header-{}", column.id.as_str()),
-                    ElementSpec::new(ElementRole::TableCell)
+                    ElementSpec::new(Element::Td)
                         .class("table-header-cell")
                         .table_cell(TableCellSpec::new(column.id)),
                     column.title,
@@ -2384,15 +2363,15 @@ fn table_header(ui: &mut des_ui_document::SceneBuilder) {
     );
 }
 
-fn table_row(ui: &mut des_ui_document::SceneBuilder, index: usize, row: &[&str; 5]) {
+fn table_row(ui: &mut des_ui_document::DocumentBuilder, index: usize, row: &[&str; 5]) {
     ui.element(
         format!("customer-preview-row-{index}"),
-        ElementSpec::new(ElementRole::TableRow).class("table-row"),
+        ElementSpec::new(Element::Tr).class("table-row"),
         |ui| {
             for (column, value) in sample_table_spec().columns.iter().zip(row.iter()) {
                 ui.text_element(
                     format!("customer-preview-row-{index}-{}", column.id.as_str()),
-                    ElementSpec::new(ElementRole::TableCell)
+                    ElementSpec::new(Element::Td)
                         .class("table-cell")
                         .table_cell(TableCellSpec::new(column.id.clone())),
                     *value,
@@ -2413,49 +2392,49 @@ fn sample_table_rows() -> [[&'static str; 5]; 6] {
     ]
 }
 
-fn render_nesting_view(ui: &mut des_ui_document::SceneBuilder) {
+fn render_nesting_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "nesting-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Nested Relative Boxes",
     );
     ui.text_element(
         "nesting-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "Each child is positioned relative to its parent content rect. Absolute positioning comes next.",
     );
     ui.element(
         "nest-outer",
-        ElementSpec::new(ElementRole::Panel).class("nest-outer"),
+        ElementSpec::new(Element::Div).class("nest-outer"),
         |ui| {
             ui.text_element(
                 "nest-outer-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Outer panel",
             );
             ui.element(
                 "nest-middle",
-                ElementSpec::new(ElementRole::Card).class("nest-middle"),
+                ElementSpec::new(Element::Div).class("nest-middle"),
                 |ui| {
                     ui.text_element(
                         "nest-middle-title",
-                        ElementSpec::new(ElementRole::Text).class("card-title"),
+                        ElementSpec::new(Element::Text).class("card-title"),
                         "Middle card",
                     );
                     ui.element(
                         "nest-inner",
-                        ElementSpec::new(ElementRole::Card)
+                        ElementSpec::new(Element::Div)
                             .class("nest-inner")
                             .interactive(),
                         |ui| {
                             ui.text_element(
                                 "nest-inner-title",
-                                ElementSpec::new(ElementRole::Text).class("card-title"),
+                                ElementSpec::new(Element::Text).class("card-title"),
                                 "Inner interactive box",
                             );
                             ui.text_element(
                                 "nest-inner-body",
-                                ElementSpec::new(ElementRole::Text).class("muted"),
+                                ElementSpec::new(Element::Text).class("muted"),
                                 "Hover proves hit testing through nested relative frames.",
                             );
                         },
@@ -2466,29 +2445,29 @@ fn render_nesting_view(ui: &mut des_ui_document::SceneBuilder) {
     );
 }
 
-fn render_graph_view(ui: &mut des_ui_document::SceneBuilder) {
+fn render_graph_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "graph-heading",
-        ElementSpec::new(ElementRole::Text).class("heading"),
+        ElementSpec::new(Element::Text).class("heading"),
         "Graph Surface Plan",
     );
     ui.text_element(
         "graph-copy",
-        ElementSpec::new(ElementRole::Text).class("muted"),
+        ElementSpec::new(Element::Text).class("muted"),
         "This placeholder reserves the lab view for canvas, layers, custom geometry, and bezier hit testing.",
     );
     ui.element(
         "graph-canvas-placeholder",
-        ElementSpec::new(ElementRole::Canvas).class("canvas-placeholder"),
+        ElementSpec::new(Element::Canvas).class("canvas-placeholder"),
         |ui| {
             ui.text_element(
                 "graph-canvas-title",
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 "Canvas adapter target",
             );
             ui.text_element(
                 "graph-canvas-body",
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 "Next: document-managed canvas bounds with egui/epaint geometry inside.",
             );
         },
@@ -2496,26 +2475,26 @@ fn render_graph_view(ui: &mut des_ui_document::SceneBuilder) {
 }
 
 fn interactive_labeled_row(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Card)
+        ElementSpec::new(Element::Div)
             .class("list-row")
             .class("specificity-proof")
             .interactive(),
         |ui| {
             ui.text_element(
                 format!("{id}-label"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 label,
             );
             ui.text_element(
                 format!("{id}-body"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 body,
             );
         },
@@ -2523,7 +2502,7 @@ fn interactive_labeled_row(
 }
 
 fn scroll_panel(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     row_count: usize,
@@ -2532,16 +2511,16 @@ fn scroll_panel(
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Panel).class("scroll-panel"),
+        ElementSpec::new(Element::Div).class("scroll-panel"),
         |ui| {
             ui.text_element(
                 format!("{id}-title"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 title,
             );
             ui.element(
                 format!("{id}-list"),
-                ElementSpec::new(ElementRole::Panel)
+                ElementSpec::new(Element::Div)
                     .class(list_class)
                     .class("styled-scrollbar"),
                 |ui| {
@@ -2553,7 +2532,7 @@ fn scroll_panel(
 }
 
 fn nested_scroll_panel(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     row_count: usize,
@@ -2562,20 +2541,20 @@ fn nested_scroll_panel(
 ) {
     ui.element(
         id,
-        ElementSpec::new(ElementRole::Panel).class("scroll-panel"),
+        ElementSpec::new(Element::Div).class("scroll-panel"),
         |ui| {
             ui.text_element(
                 format!("{id}-title"),
-                ElementSpec::new(ElementRole::Text).class("card-title"),
+                ElementSpec::new(Element::Text).class("card-title"),
                 title,
             );
             ui.element(
                 format!("{id}-shell"),
-                ElementSpec::new(ElementRole::Panel).class("scroll-nested-shell"),
+                ElementSpec::new(Element::Div).class("scroll-nested-shell"),
                 |ui| {
                     ui.element(
                         format!("{id}-list"),
-                        ElementSpec::new(ElementRole::Panel)
+                        ElementSpec::new(Element::Div)
                             .class(list_class)
                             .class("scroll-list-nested")
                             .class("styled-scrollbar"),
@@ -2590,7 +2569,7 @@ fn nested_scroll_panel(
 }
 
 fn scroll_rows(
-    ui: &mut des_ui_document::SceneBuilder,
+    ui: &mut des_ui_document::DocumentBuilder,
     id: &'static str,
     row_count: usize,
     row_class: &'static str,
@@ -2603,13 +2582,13 @@ fn scroll_rows(
 
         ui.element(
             format!("{id}-row-{index}"),
-            ElementSpec::new(ElementRole::Card)
+            ElementSpec::new(Element::Div)
                 .class(row_class)
                 .interactive(),
             |ui| {
                 ui.text_element(
                     format!("{id}-row-{index}-label"),
-                    ElementSpec::new(ElementRole::Text).class("muted"),
+                    ElementSpec::new(Element::Text).class("muted"),
                     format!("document-owned scroll row {:02}", index + 1),
                 );
             },
@@ -2617,34 +2596,34 @@ fn scroll_rows(
     }
 }
 
-fn scroll_wide_card(ui: &mut des_ui_document::SceneBuilder, id: &'static str, index: usize) {
+fn scroll_wide_card(ui: &mut des_ui_document::DocumentBuilder, id: &'static str, index: usize) {
     ui.element(
         format!("{id}-row-{index}"),
-        ElementSpec::new(ElementRole::Card)
+        ElementSpec::new(Element::Div)
             .class("scroll-wide-row-card")
             .interactive(),
         |ui| {
             ui.text_element(
                 format!("{id}-row-{index}-label"),
-                ElementSpec::new(ElementRole::Text).class("muted"),
+                ElementSpec::new(Element::Text).class("muted"),
                 format!("horizontal card {:02}", index + 1),
             );
             ui.element(
                 format!("{id}-row-{index}-mini-list"),
-                ElementSpec::new(ElementRole::Panel)
+                ElementSpec::new(Element::Div)
                     .class("scroll-mini-list")
                     .class("styled-scrollbar"),
                 |ui| {
                     for item_index in 0..8 {
                         ui.element(
                             format!("{id}-row-{index}-mini-row-{item_index}"),
-                            ElementSpec::new(ElementRole::Card)
+                            ElementSpec::new(Element::Div)
                                 .class("scroll-mini-row")
                                 .interactive(),
                             |ui| {
                                 ui.text_element(
                                     format!("{id}-row-{index}-mini-row-{item_index}-label"),
-                                    ElementSpec::new(ElementRole::Text).class("muted"),
+                                    ElementSpec::new(Element::Text).class("muted"),
                                     format!("nested item {:02}", item_index + 1),
                                 );
                             },

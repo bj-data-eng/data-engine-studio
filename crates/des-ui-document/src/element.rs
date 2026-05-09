@@ -2,22 +2,41 @@ use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ElementRole {
+pub enum Element {
     Root,
-    Panel,
-    Card,
+    Div,
+    Span,
+    Main,
+    Section,
+    Article,
+    Header,
+    Footer,
+    Nav,
+    Aside,
+    P,
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
     Text,
-    Canvas,
-    Control,
+    Button,
+    Input,
     Checkbox,
     Radio,
-    Dropdown,
-    TextInput,
+    Select,
+    Option,
+    Textarea,
+    Label,
+    Canvas,
     Icon,
     Table,
-    TableHeader,
-    TableRow,
-    TableCell,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -125,7 +144,7 @@ impl From<String> for ClassName {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElementSpec {
-    pub role: ElementRole,
+    pub element: Element,
     pub classes: Vec<ClassName>,
     pub interactive: bool,
     pub selected: bool,
@@ -140,9 +159,9 @@ pub struct ElementSpec {
 }
 
 impl ElementSpec {
-    pub fn new(role: ElementRole) -> Self {
+    pub fn new(element: Element) -> Self {
         Self {
-            role,
+            element,
             classes: Vec::new(),
             interactive: false,
             selected: false,
@@ -215,17 +234,17 @@ impl ElementSpec {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Element {
+pub(crate) struct DocumentNode {
     pub id: ElementId,
     pub spec: ElementSpec,
     pub text: Option<String>,
-    pub children: Vec<Element>,
+    pub children: Vec<DocumentNode>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VisualElementClone {
     pub source_id: ElementId,
-    pub role: ElementRole,
+    pub element: Element,
     pub classes: Vec<ClassName>,
     pub text: Option<String>,
     pub value: Option<String>,
@@ -237,7 +256,7 @@ impl VisualElementClone {
     pub fn from_resolved(element: &ResolvedElement) -> Self {
         Self {
             source_id: element.id.clone(),
-            role: element.role,
+            element: element.element,
             classes: element.classes.clone(),
             text: element.text.clone(),
             value: element.value.clone(),
@@ -277,8 +296,8 @@ impl VisualElementClone {
         }
     }
 
-    pub(crate) fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> Element {
-        let mut spec = ElementSpec::new(self.role);
+    pub(crate) fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> DocumentNode {
+        let mut spec = ElementSpec::new(self.element);
         spec.classes = self.classes.clone();
         if is_root {
             spec.classes.extend(options.root_classes.iter().cloned());
@@ -287,7 +306,7 @@ impl VisualElementClone {
         spec.glyph = self.glyph;
         spec.interactive = options.interactive;
 
-        Element {
+        DocumentNode {
             id: self.clone_id(options, is_root),
             spec,
             text: self.text.clone(),

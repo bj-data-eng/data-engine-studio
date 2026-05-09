@@ -1,5 +1,5 @@
 use des_app::AppCommand;
-use des_ui_egui::NativeLaunchOptions;
+use des_ui_lab::NativeLaunchOptions;
 
 fn main() {
     let title = std::env::var("DES_UI_HARNESS_TITLE")
@@ -16,7 +16,7 @@ fn main() {
         startup_commands: startup_commands(),
     };
 
-    if let Err(error) = des_ui_egui::run_native(options) {
+    if let Err(error) = des_ui_lab::run_native(options) {
         eprintln!("{error}");
         std::process::exit(1);
     }

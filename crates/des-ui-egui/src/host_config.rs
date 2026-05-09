@@ -4,7 +4,7 @@ use eframe::egui;
 use egui::{FontData, FontDefinitions, FontFamily, FontId, TextStyle, vec2};
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
-pub(crate) fn apply_host_configuration(context: &egui::Context) {
+pub fn apply_host_configuration(context: &egui::Context) {
     apply_fonts(context);
     apply_text_metrics(context);
 }

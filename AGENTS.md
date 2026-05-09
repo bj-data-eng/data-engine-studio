@@ -24,7 +24,8 @@ Good refinement lets developers declare structure, classes, and behavior intent 
 - `crates/des-app`: app state, commands, snapshots, orchestration.
 - `crates/des-ui-document`: egui-free document tree, style model, layout, input, retained state.
 - `crates/des-ui-widgets`: egui-free reusable widget behavior over document contracts.
-- `crates/des-ui-egui`: egui adapter/host plus current UI lab.
+- `crates/des-ui-egui`: egui adapter for document input, painting, text measurement, and host defaults.
+- `crates/des-ui-lab`: UI lab app, dev/screenshot binaries, lab styles, and lab regression tests.
 - `crates/des-graph-egui`: vendored graph interaction crate while graph UX is explored.
 - `crates/des-python` and `python/data_engine_studio`: thin Python launcher/native wrapper.
 - `ROADMAP.md`: architecture and milestone plan.
@@ -37,15 +38,15 @@ Add crates only for real API boundaries, not architecture theater.
 - Prefer typed commands, events, snapshots, reports, and change sets over shared mutable state.
 - Domain/project/runtime/query/validation logic must not depend on `des-ui-egui` or Python.
 - `des-ui-document` and `des-ui-widgets` must not depend on `egui` or Python.
-- `des-ui-egui` should translate egui input/output, render document/app snapshots, and dispatch commands. Keep business logic out.
+- `des-ui-egui` should translate egui input/output, measure text, and paint document snapshots. Keep business logic out.
 - `des-python` stays thin: launch/runtime diagnostics only.
 - If a small change touches many crates, revisit the boundary before continuing.
 
 Dependency direction:
 
 ```text
-python -> des-python -> des-app -> des-ui-egui -> des-ui-widgets -> des-ui-document
-                              \-> domain/service crates -> des-core
+python -> des-python -> des-ui-lab -> des-app -> domain/service crates -> des-core
+                          \-> des-ui-egui -> des-ui-widgets -> des-ui-document
 ```
 
 ## UI Toolkit Rules
@@ -54,7 +55,7 @@ python -> des-python -> des-app -> des-ui-egui -> des-ui-widgets -> des-ui-docum
 - Add product behavior through `des-app` commands/snapshots first or alongside UI work.
 - Add low-level layout, z-order, hover, press, focus, scroll, clipping, routing, and retained state to `des-ui-document` when reusable.
 - Add reusable widget behavior to `des-ui-widgets`.
-- Keep `des-ui-egui` internally modular: `adapter`, `ui_lab`, later `shell`, `workspace_browser`, `flow_editor`, `graph_canvas`, `inspector`, etc.
+- Keep `des-ui-egui` adapter-focused; put exploratory app surfaces and proving-ground views in `des-ui-lab` until promoted into app crates.
 - The UI lab is the proving ground for layout, styling, input, graph/canvas, table, editor, markdown, and widgets before app promotion.
 - Avoid throwaway GUI framework spikes in the main tree. Remove short-lived spikes once a direction is chosen.
 
@@ -137,7 +138,7 @@ UI iteration:
 macOS/Linux:
 
 ```sh
-cargo build -p des-ui-egui --bin des-ui-dev
+cargo build -p des-ui-lab --bin des-ui-dev
 ./target/debug/des-ui-dev
 just dev-mac
 ./scripts/capture-ui.sh --out target/ui-shots/studio.png --width 1320 --height 780
@@ -148,7 +149,7 @@ just ui-test
 Windows:
 
 ```powershell
-cargo build -p des-ui-egui --bin des-ui-dev
+cargo build -p des-ui-lab --bin des-ui-dev
 .\target\debug\des-ui-dev.exe
 just dev-windows
 .\scripts\capture-ui.ps1 -Out target\ui-shots\studio.png -Width 1320 -Height 780
@@ -161,7 +162,7 @@ Prefer the Rust dev launcher and screenshot harness for UI iteration. Rebuild th
 ## Compile-Time Hygiene
 
 - Keep `des-core` tiny and stable.
-- Put volatile UI work in `des-ui-egui`.
+- Put volatile lab UI work in `des-ui-lab`.
 - Put volatile orchestration in `des-app`.
 - Isolate heavy backend dependencies in future backend crates, e.g. `des-duckdb`, `des-polars`.
 - Avoid broad common crates.

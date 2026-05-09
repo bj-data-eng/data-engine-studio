@@ -120,7 +120,7 @@ if [ -n "$scroll_y" ]; then
     export DES_UI_LAB_SCROLL_Y="$scroll_y"
 fi
 
-cargo run -p des-ui-egui --features ui-screenshot --bin des-ui-shot
+cargo run -p des-ui-lab --features ui-screenshot --bin des-ui-shot
 
 if [ ! -f "$output_path" ]; then
     printf '%s\n' "UI screenshot was not created: $output_path" >&2

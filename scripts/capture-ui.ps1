@@ -61,7 +61,7 @@ if ($ScrollY -ne 0) {
 }
 
 try {
-    cargo run -p des-ui-egui --features ui-screenshot --bin des-ui-shot
+    cargo run -p des-ui-lab --features ui-screenshot --bin des-ui-shot
 }
 finally {
     Remove-Item Env:\EFRAME_SCREENSHOT_TO -ErrorAction SilentlyContinue

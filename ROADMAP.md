@@ -32,7 +32,8 @@ Initial crates:
 - `des-duckdb`: DuckDB connection management, SQL lowering, query execution, and result materialization.
 - `des-polars`: Polars LazyFrame/DataFrame support, previews, profiling, and local transform lowering.
 - `des-ui-document`: standalone-style UI document and style model with DOM-like element trees, deterministic CSS-like style sheets, resolved elements, retained interaction state, z-order, hit testing, and input routing.
-- `des-ui-egui`: egui host adapter, temporary egui-native widgets, canvas, panels, inspector, and document paint/input integration.
+- `des-ui-egui`: egui host adapter, document paint/input integration, text measurement, and host defaults.
+- `des-ui-lab`: current document-engine-backed lab app, screenshot harness, lab styles, and lab regression suite.
 - `des-app`: application orchestration, command handling, undo/redo, document lifecycle, validation/runtime wiring.
 - `des-python`: PyO3 extension module exposing the native app launcher to Python.
 
@@ -41,7 +42,8 @@ Dependency direction:
 ```text
 python package
   -> des-python
-    -> des-app
+    -> des-ui-lab
+      -> des-app
       -> des-ui-egui
         -> des-ui-document
       -> des-project
@@ -86,10 +88,10 @@ Studio needs complex, browser-grade composition behavior without adopting HTML/C
 The document style model should be CSS-like, not CSS-compatible. Avoid CSS specificity rules. Preferred style resolution order:
 
 ```text
-role defaults -> classes in rule/declaration order -> state variants -> id overrides
+element defaults -> classes in rule/declaration order -> state variants -> id overrides
 ```
 
-The document tree defines what exists: identity, nesting, semantic role, classes, text, and event intent. The style sheet defines how it is sized, positioned, layered, and painted. `des-ui-egui` should increasingly become an adapter that translates egui input into document input and paints resolved document elements through egui/epaint.
+The document tree defines what exists: identity, nesting, semantic element, classes, text, and event intent. The style sheet defines how it is sized, positioned, layered, and painted. `des-ui-egui` is the adapter that translates egui input into document input and paints resolved document elements through egui/epaint.
 
 Specialized engines should plug into this document layer rather than being reimplemented inside it. Markdown rendering, code editing, syntax highlighting, virtualized data grids, charts, graph canvases, and transform visualizations can be dedicated subsystems with document-managed bounds, focus, z-order, and input ownership.
 
@@ -105,7 +107,7 @@ data-engine-studio console script
   -> data_engine_studio.native.launch_native()
   -> data_engine_studio._native.launch()
   -> des-python
-  -> des-app / des-ui-egui
+  -> des-ui-lab
 ```
 
 Implementation requirements:
@@ -248,7 +250,7 @@ Runtime communication should be command/event based:
 ```text
 des-app -> RuntimeCommand -> des-runtime
 des-runtime -> RuntimeEvent -> des-app
-des-app -> RuntimeSnapshot -> des-ui-egui
+des-app -> RuntimeSnapshot -> des-ui-lab
 ```
 
 Use Rayon later for CPU-bound work such as semantic model analysis, profiling, lineage, dependency resolution, or large local transforms.
@@ -320,14 +322,14 @@ Lessons carried forward from `data-engine`:
 
 ### Milestone 5: egui Shell
 
-- Use the document-engine-backed UI lab as the first screen while the UI platform is being built. The lab should expose each document feature in one or more views before that feature is used in the app proper.
+- Use the document-engine-backed `des-ui-lab` app as the first screen while the UI platform is being built. The lab should expose each document feature in one or more views before that feature is used in the app proper.
 - Build the first usable app shell:
   - menu/toolbar
   - left node palette
   - central graph canvas
   - right inspector
   - bottom status/runtime bar
-- Split `des-ui-egui` into internal modules for shell, workspace browser, flow list, flow editor, graph canvas, node palette, inspector, runtime panel, and theme as those surfaces become real.
+- Keep `des-ui-egui` adapter-only; promote real product surfaces out of `des-ui-lab` into focused app/UI crates as they become real.
 - Implement selection, panning, zooming, adding nodes, moving nodes, and connecting ports.
 - Keep UI state out of graph/project state.
 - Begin migrating reusable layout/interaction behavior into `des-ui-document`.

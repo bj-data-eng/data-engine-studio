@@ -4,7 +4,7 @@ use des_ui_document::{
     ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
 };
 use eframe::egui;
-pub(crate) fn paint_frame(
+pub fn paint_frame(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
     frame: &ResolvedElement,
@@ -132,7 +132,7 @@ fn frame_rect(origin: egui::Pos2, frame: &ResolvedElement) -> egui::Rect {
     document_rect_to_egui(origin, frame.rect)
 }
 
-pub(crate) fn paint_surface(
+pub fn paint_surface(
     ui: &mut egui::Ui,
     rect: egui::Rect,
     radius: CornerRadii,
@@ -351,7 +351,7 @@ fn gaussian_alpha(distance: f32, sigma: f32) -> f32 {
     (-0.5 * (distance / sigma).powi(2)).exp()
 }
 
-pub(crate) fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {
+pub fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {
     let painter = ui.painter();
     for chrome in chromes {
         if !chrome.visible {

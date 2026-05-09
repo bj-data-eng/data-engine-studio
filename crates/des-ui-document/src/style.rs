@@ -1,4 +1,4 @@
-use crate::element::{ClassName, Color, Element, ElementId, ElementRole, ElementStateSelector};
+use crate::element::{ClassName, Color, DocumentNode, Element, ElementId, ElementStateSelector};
 use crate::geometry::{
     AlignContent, AlignItems, AlignSelf, CornerRadii, FlexDirection, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, Position, PositionInsets, Size,
@@ -19,7 +19,7 @@ pub type GridTrack = TrackSizingFunction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StyleSelector {
-    Role(ElementRole),
+    Element(Element),
     Class(ClassName),
     Id(ElementId),
     State(ElementStateSelector),
@@ -67,7 +67,7 @@ pub enum ChildPositionSelector {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CompoundSelector {
-    pub(crate) role: Option<ElementRole>,
+    pub(crate) element: Option<Element>,
     pub(crate) id: Option<ElementId>,
     pub(crate) classes: Vec<ClassName>,
     pub(crate) states: Vec<ElementStateSelector>,
@@ -75,6 +75,10 @@ pub struct CompoundSelector {
 }
 
 impl StyleSelector {
+    pub fn element(element: Element) -> Self {
+        Self::Element(element)
+    }
+
     pub fn class(class: impl Into<ClassName>) -> Self {
         Self::Class(class.into())
     }
@@ -109,8 +113,8 @@ impl StyleSelector {
 }
 
 impl CompoundSelector {
-    pub fn role(mut self, role: ElementRole) -> Self {
-        self.role = Some(role);
+    pub fn element(mut self, element: Element) -> Self {
+        self.element = Some(element);
         self
     }
 
@@ -1302,7 +1306,7 @@ impl StyleSheet {
 }
 
 pub(crate) fn resolve_style_with_position(
-    element: &Element,
+    element: &DocumentNode,
     stylesheet: &StyleSheet,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
@@ -1399,12 +1403,12 @@ fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle)
 
 fn selector_matches(
     selector: &StyleSelector,
-    element: &Element,
+    element: &DocumentNode,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
 ) -> bool {
     match selector {
-        StyleSelector::Role(role) => element.spec.role == *role,
+        StyleSelector::Element(target) => element.spec.element == *target,
         StyleSelector::Class(class) => element
             .spec
             .classes
@@ -1434,11 +1438,14 @@ fn selector_matches(
 
 fn compound_selector_matches(
     selector: &CompoundSelector,
-    element: &Element,
+    element: &DocumentNode,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
 ) -> bool {
-    if selector.role.is_some_and(|role| element.spec.role != role) {
+    if selector
+        .element
+        .is_some_and(|target| element.spec.element != target)
+    {
         return false;
     }
     if selector.id.as_ref().is_some_and(|id| &element.id != id) {
@@ -1488,7 +1495,7 @@ fn child_position_selector_matches(
 
 fn state_selector_matches(
     selector: ElementStateSelector,
-    element: &Element,
+    element: &DocumentNode,
     state: Option<&ElementState>,
 ) -> bool {
     match selector {

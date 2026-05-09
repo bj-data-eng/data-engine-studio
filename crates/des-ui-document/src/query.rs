@@ -1,4 +1,4 @@
-use crate::element::{ClassName, ElementId, ElementRole, VisualElementClone};
+use crate::element::{ClassName, Element, ElementId, VisualElementClone};
 use crate::geometry::{Point, Rect};
 use crate::layout::hit_path;
 use crate::state::ResolvedElement;
@@ -50,10 +50,10 @@ impl<'a> DocumentSnapshot<'a> {
         elements
     }
 
-    pub fn elements_by_role(&self, role: ElementRole) -> Vec<ElementSnapshot<'a>> {
+    pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
         let mut elements = Vec::new();
         collect_elements(self.root, &mut elements, &mut |element| {
-            element.role == role
+            element.element == target
         });
         elements
     }
@@ -69,8 +69,8 @@ impl<'a> ElementSnapshot<'a> {
         &self.element.id
     }
 
-    pub fn role(&self) -> ElementRole {
-        self.element.role
+    pub fn element(&self) -> Element {
+        self.element.element
     }
 
     pub fn classes(&self) -> &[ClassName] {

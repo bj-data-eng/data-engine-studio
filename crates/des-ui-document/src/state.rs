@@ -1,4 +1,4 @@
-use crate::element::{ClassName, Color, ElementId, ElementRole, Glyph};
+use crate::element::{ClassName, Color, Element, ElementId, Glyph};
 use crate::geometry::{Point, Rect, ScrollAxis};
 use crate::query::DocumentSnapshot;
 use crate::style::{ComputedStyle, Transition};
@@ -30,7 +30,7 @@ pub struct ChangeSet {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResolvedElement {
     pub id: ElementId,
-    pub role: ElementRole,
+    pub element: Element,
     pub classes: Vec<ClassName>,
     pub rect: Rect,
     pub style: ComputedStyle,
@@ -213,7 +213,7 @@ fn slice_char_range(text: &str, range: std::ops::Range<usize>) -> String {
 pub struct DocumentMetrics {
     pub element_count: usize,
     pub scroll_chrome_count: usize,
-    pub scene_style_nodes_visited: usize,
+    pub style_nodes_visited: usize,
     pub reused_cached_layout: bool,
     pub reused_input_layout: bool,
     pub input_changed_state: bool,

@@ -4,15 +4,15 @@ use des_ui_document::{
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
-pub(crate) const TEXT_SELECTION_CLICK_INTERVAL: Duration = Duration::from_millis(800);
-pub(crate) const TEXT_SELECTION_CLICK_DISTANCE: f32 = 6.0;
+pub const TEXT_SELECTION_CLICK_INTERVAL: Duration = Duration::from_millis(800);
+pub const TEXT_SELECTION_CLICK_DISTANCE: f32 = 6.0;
 
-pub(crate) struct EguiTextMeasurer {
+pub struct EguiTextMeasurer {
     ctx: egui::Context,
 }
 
 impl EguiTextMeasurer {
-    pub(crate) fn new(ctx: &egui::Context) -> Self {
+    pub fn new(ctx: &egui::Context) -> Self {
         Self { ctx: ctx.clone() }
     }
 }
@@ -41,14 +41,14 @@ impl TextMeasurer for EguiTextMeasurer {
         galley.cursor_from_pos(egui::vec2(point.x, point.y)).index
     }
 }
-pub(crate) fn configure_text_selection_input(context: &egui::Context) {
+pub fn configure_text_selection_input(context: &egui::Context) {
     context.options_mut(|options| {
         options.input_options.max_click_duration = TEXT_SELECTION_CLICK_INTERVAL.as_secs_f64();
         options.input_options.max_click_dist = TEXT_SELECTION_CLICK_DISTANCE;
     });
 }
 
-pub(crate) fn copy_selected_text_on_command(ui: &egui::Ui, output: &DocumentOutput) {
+pub fn copy_selected_text_on_command(ui: &egui::Ui, output: &DocumentOutput) {
     if copy_requested(ui)
         && let Some(text) = output.selected_text()
         && !text.is_empty()
