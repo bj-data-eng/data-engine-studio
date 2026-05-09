@@ -882,6 +882,51 @@ fn document_engine_update_with_input_clicks_interactive_element() {
 }
 
 #[test]
+fn document_engine_update_treats_primary_click_count_as_control_click() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "button",
+            ElementSpec::new(Element::Button).interactive(),
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("button"),
+        Style::default().size(120.0, 40.0),
+    );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(10.0, 10.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 2,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(output.hit_id, Some(ElementId::new("button")));
+    assert_eq!(engine.element_state("button").unwrap().click_count, 1);
+    assert!(
+        output
+            .events
+            .iter()
+            .any(|event| event.target == ElementId::new("button")
+                && event.kind == DocumentEventKind::Clicked)
+    );
+}
+
+#[test]
 fn document_engine_update_eases_transitioned_paint_styles() {
     let mut document = Document::new(Size::new(320.0, 200.0));
     document

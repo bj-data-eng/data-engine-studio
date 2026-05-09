@@ -503,7 +503,7 @@ impl DocumentEngine {
             && let Some(state) = self.states.get_mut(hit_id)
         {
             state.pressed = pointer.primary_down;
-            if pointer.primary_clicked {
+            if primary_click_fired(pointer) {
                 state.click_count += 1;
             }
         }
@@ -1016,6 +1016,10 @@ fn is_word_char(value: char) -> bool {
 
 fn drag_delta_is_click(drag: &DocumentDrag) -> bool {
     drag.delta.x.abs() <= f32::EPSILON && drag.delta.y.abs() <= f32::EPSILON
+}
+
+fn primary_click_fired(pointer: PointerInput) -> bool {
+    pointer.primary_clicked || pointer.primary_click_count > 0
 }
 
 fn interaction_snapshot(
