@@ -1792,8 +1792,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("floating-offset-reference"),
             Style::default()
-                .width(Length::Px(112.0))
-                .height(Length::Px(112.0))
+                .width(Length::Px(56.0))
+                .height(Length::Px(56.0))
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::Center)
                 .background(Color::rgba(255, 255, 255, 0))
@@ -1804,33 +1804,28 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("floating-main-axis-reference"),
-            Style::default()
-                .width(Length::Px(92.0))
-                .height(Length::Px(92.0)),
+            Style::default(),
         )
         .rule(
             StyleSelector::class("floating-alignment-axis-reference"),
-            Style::default()
-                .width(Length::Px(138.0))
-                .height(Length::Px(90.0))
-                .gap(6.0),
+            Style::default().gap(3.0),
         )
         .rule(
             StyleSelector::class("floating-offset-reference-label"),
             Style::default()
-                .font_size(18.0)
+                .font_size(9.0)
                 .text_color(Color::rgba(30, 31, 38, 255)),
         )
         .rule(
             StyleSelector::class("floating-alignment-axis-placement-label"),
             Style::default()
-                .font_size(16.0)
+                .font_size(8.0)
                 .text_color(Color::rgba(30, 31, 38, 255)),
         )
         .rule(
             StyleSelector::class("floating-alignment-axis-axis-label"),
             Style::default()
-                .font_size(14.0)
+                .font_size(7.0)
                 .text_color(Color::rgba(30, 31, 38, 255)),
         )
         .rule(
@@ -1849,7 +1844,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("floating-offset-popover-label"),
             Style::default()
-                .font_size(14.0)
+                .font_size(7.0)
                 .text_color(Color::rgba(255, 255, 255, 255)),
         )
         .rule(
@@ -1975,39 +1970,30 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::id("floating-vertical-overlap-reference"),
-            Style::default()
-                .width(Length::Px(112.0))
-                .height(Length::Px(112.0))
-                .margin(Insets {
-                    top: 92.0,
-                    right: 0.0,
-                    bottom: 0.0,
-                    left: 118.0,
-                }),
+            Style::default().margin(Insets {
+                top: 92.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 118.0,
+            }),
         )
         .rule(
             StyleSelector::id("floating-vertical-flip-reference"),
-            Style::default()
-                .width(Length::Px(112.0))
-                .height(Length::Px(112.0))
-                .margin(Insets {
-                    top: 132.0,
-                    right: 0.0,
-                    bottom: 0.0,
-                    left: 118.0,
-                }),
+            Style::default().margin(Insets {
+                top: 132.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 118.0,
+            }),
         )
         .rule(
             StyleSelector::id("floating-edge-flip-reference"),
-            Style::default()
-                .width(Length::Px(112.0))
-                .height(Length::Px(112.0))
-                .margin(Insets {
-                    top: 132.0,
-                    right: 0.0,
-                    bottom: 0.0,
-                    left: 118.0,
-                }),
+            Style::default().margin(Insets {
+                top: 132.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 118.0,
+            }),
         )
         .rule(
             StyleSelector::id("floating-scroll-shift-popover"),

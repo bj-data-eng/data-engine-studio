@@ -343,7 +343,9 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let specimen_title = frame(&output, "floating-offset-specimen-title");
     let offset_row = frame(&output, "floating-offset-row");
     let zero_reference = frame(&output, "floating-offset-zero-reference");
+    let zero_reference_label = frame(&output, "floating-offset-zero-reference-label");
     let zero_popover = frame(&output, "floating-offset-zero-popover");
+    let zero_popover_label = frame(&output, "floating-offset-zero-popover-label");
     let ten_reference = frame(&output, "floating-offset-ten-reference");
     let ten_popover = frame(&output, "floating-offset-ten-popover");
     let main_axis_specimen = frame(&output, "floating-main-axis-specimen");
@@ -418,6 +420,34 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_eq!(bottom_reference.style.position, Position::Flow);
     assert_eq!(left_reference.style.position, Position::Flow);
     assert_eq!(right_reference.style.position, Position::Flow);
+    for reference in [
+        zero_reference,
+        ten_reference,
+        top_reference,
+        bottom_reference,
+        left_reference,
+        right_reference,
+        cross_top_reference,
+        cross_bottom_reference,
+        cross_left_reference,
+        cross_right_reference,
+        alignment_cross_start_reference,
+        alignment_cross_end_reference,
+        alignment_start_reference,
+        alignment_end_reference,
+        centered_reference,
+        top_start_reference,
+        scroll_shift_reference,
+        scroll_attach_reference,
+        vertical_overlap_reference,
+        vertical_flip_reference,
+        edge_flip_reference,
+    ] {
+        assert_close(reference.rect.size.width, 56.0);
+        assert_close(reference.rect.size.height, 56.0);
+    }
+    assert_close(zero_reference_label.style.font_size, 9.0);
+    assert_close(zero_popover_label.style.font_size, 7.0);
     let playground_gap = length_px(playground.style.column_gap);
     let playground_content_width =
         playground.rect.size.width - playground.style.padding.horizontal();
