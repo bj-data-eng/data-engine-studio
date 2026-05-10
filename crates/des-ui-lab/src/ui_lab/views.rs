@@ -2280,6 +2280,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
             floating_centered_axis_specimen(ui);
             floating_top_start_specimen(ui);
             floating_scroll_shift_specimen(ui);
+            floating_scroll_attach_specimen(ui);
         },
     );
 }
@@ -2647,6 +2648,52 @@ fn floating_scroll_shift_specimen(ui: &mut des_ui_document::DocumentBuilder) {
                                 ElementSpec::new(Element::Text)
                                     .class("floating-offset-popover-label"),
                                 "A floating element that shifts along the x-axis",
+                            );
+                        },
+                    );
+                },
+            );
+        },
+    );
+}
+
+fn floating_scroll_attach_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-scroll-attach-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-centered-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-scroll-attach-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Horizontal scroll attached",
+            );
+            ui.element(
+                "floating-scroll-attach-panel",
+                ElementSpec::new(Element::Div)
+                    .class("floating-scroll-shift-panel")
+                    .class("styled-scrollbar"),
+                |ui| {
+                    ui.element(
+                        "floating-scroll-attach-track",
+                        ElementSpec::new(Element::Div).class("floating-scroll-shift-track"),
+                        |ui| {
+                            floating_offset_reference(ui, "floating-scroll-attach-reference", "");
+                        },
+                    );
+                    ui.element(
+                        "floating-scroll-attach-popover",
+                        ElementSpec::new(Element::Button)
+                            .class("floating-offset-popover")
+                            .class("floating-scroll-shift-popover")
+                            .interactive(),
+                        |ui| {
+                            ui.text_element(
+                                "floating-scroll-attach-popover-label",
+                                ElementSpec::new(Element::Text)
+                                    .class("floating-offset-popover-label"),
+                                "A floating element that does not shift along the x-axis",
                             );
                         },
                     );

@@ -373,6 +373,9 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let scroll_shift_panel = frame(&output, "floating-scroll-shift-panel");
     let scroll_shift_reference = frame(&output, "floating-scroll-shift-reference");
     let scroll_shift_popover = frame(&output, "floating-scroll-shift-popover");
+    let scroll_attach_specimen = frame(&output, "floating-scroll-attach-specimen");
+    let scroll_attach_reference = frame(&output, "floating-scroll-attach-reference");
+    let scroll_attach_popover = frame(&output, "floating-scroll-attach-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
@@ -381,6 +384,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_eq!(centered_axis_specimen.style.position, Position::Flow);
     assert_eq!(top_start_specimen.style.position, Position::Flow);
     assert_eq!(scroll_shift_specimen.style.position, Position::Flow);
+    assert_eq!(scroll_attach_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -441,6 +445,18 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         scroll_shift_specimen.rect.origin.y,
         centered_axis_specimen.rect.bottom(),
+    );
+    assert_close(
+        scroll_attach_specimen.rect.size.width,
+        specimen.rect.size.width,
+    );
+    assert_close(
+        scroll_attach_specimen.rect.origin.x,
+        scroll_shift_specimen.rect.right(),
+    );
+    assert_close(
+        scroll_attach_specimen.rect.origin.y,
+        scroll_shift_specimen.rect.origin.y,
     );
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
@@ -534,6 +550,14 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         scroll_shift_panel.rect.right() - scroll_shift_panel.style.border_width.right;
     assert!(scroll_shift_reference.rect.origin.x > scroll_boundary_right);
     assert_close(scroll_shift_popover.rect.right(), scroll_boundary_right);
+    assert_close(
+        scroll_attach_popover.rect.origin.y,
+        scroll_attach_reference.rect.bottom(),
+    );
+    assert_close(
+        scroll_attach_popover.rect.origin.x + scroll_attach_popover.rect.size.width * 0.5,
+        scroll_attach_reference.rect.origin.x + scroll_attach_reference.rect.size.width * 0.5,
+    );
     let scrolled_output = lab_output_with_stage_scroll("floating", 900.0);
     assert!(
         scrolled_output.scroll_chrome.iter().any(|chrome| {
@@ -542,6 +566,35 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
                 && chrome.visible
         }),
         "floating scroll boundary specimen should expose a visible horizontal scrollbar when it is within the stage viewport"
+    );
+    let mut inner_scrolled = UiLabState::new(Some("floating"));
+    inner_scrolled.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    inner_scrolled
+        .document_engine
+        .element_state_mut("floating-scroll-attach-panel")
+        .unwrap()
+        .scroll_x = 240.0;
+    let inner_scrolled_output =
+        inner_scrolled.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let scrolled_attach_reference = frame(&scrolled_output, "floating-scroll-attach-reference");
+    let scrolled_attach_popover = frame(&scrolled_output, "floating-scroll-attach-popover");
+    let inner_scrolled_attach_reference =
+        frame(&inner_scrolled_output, "floating-scroll-attach-reference");
+    let inner_scrolled_attach_popover =
+        frame(&inner_scrolled_output, "floating-scroll-attach-popover");
+    assert_close(
+        scrolled_attach_popover.rect.origin.x + scrolled_attach_popover.rect.size.width * 0.5,
+        scrolled_attach_reference.rect.origin.x + scrolled_attach_reference.rect.size.width * 0.5,
+    );
+    assert_close(
+        inner_scrolled_attach_popover.rect.origin.x
+            + inner_scrolled_attach_popover.rect.size.width * 0.5,
+        inner_scrolled_attach_reference.rect.origin.x
+            + inner_scrolled_attach_reference.rect.size.width * 0.5,
+    );
+    assert!(
+        inner_scrolled_attach_popover.rect.origin.x < scroll_attach_popover.rect.origin.x,
+        "attached popover should continue moving with horizontally scrolled content"
     );
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);

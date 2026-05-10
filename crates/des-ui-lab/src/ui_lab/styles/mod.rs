@@ -1904,6 +1904,15 @@ pub(super) fn stylesheet() -> StyleSheet {
             }),
         )
         .rule(
+            StyleSelector::id("floating-scroll-attach-reference"),
+            Style::default().margin(Insets {
+                top: 88.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 360.0,
+            }),
+        )
+        .rule(
             StyleSelector::id("floating-scroll-shift-popover"),
             Style::default()
                 .width(Length::Px(350.0))
@@ -1912,6 +1921,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_placement(FloatingPlacement::Bottom)
                 .floating_boundary_to("floating-scroll-shift-panel")
                 .floating_shift(FloatingShift::new(false, true)),
+        )
+        .rule(
+            StyleSelector::id("floating-scroll-attach-popover"),
+            Style::default()
+                .width(Length::Px(390.0))
+                .height(Length::Px(44.0))
+                .floating_to("floating-scroll-attach-reference")
+                .floating_placement(FloatingPlacement::Bottom),
         )
         .rule(
             StyleSelector::class("nest-outer"),
