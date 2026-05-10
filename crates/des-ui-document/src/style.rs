@@ -546,6 +546,7 @@ pub struct Style {
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: EdgeStyle,
+    pub border_style: Option<BorderStyle>,
     pub shadows: Option<Vec<Shadow>>,
     pub animate_paint: Option<bool>,
     pub animate_shadows: Option<bool>,
@@ -580,6 +581,14 @@ pub struct Style {
     pub anchor: Option<Anchor>,
     pub z_index: Option<i32>,
     pub transition: Option<Transition>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BorderStyle {
+    #[default]
+    Solid,
+    Dashed,
+    Dotted,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -887,6 +896,23 @@ impl Style {
     pub fn border_widths(mut self, widths: Insets) -> Self {
         self.border_width = EdgeStyle::from_insets(widths);
         self
+    }
+
+    pub fn border_style(mut self, style: BorderStyle) -> Self {
+        self.border_style = Some(style);
+        self
+    }
+
+    pub fn border_solid(self) -> Self {
+        self.border_style(BorderStyle::Solid)
+    }
+
+    pub fn border_dashed(self) -> Self {
+        self.border_style(BorderStyle::Dashed)
+    }
+
+    pub fn border_dotted(self) -> Self {
+        self.border_style(BorderStyle::Dotted)
     }
 
     pub fn shadow(mut self, shadow: Shadow) -> Self {
@@ -1285,6 +1311,7 @@ pub struct ComputedStyle {
     pub background: Option<Color>,
     pub border: Option<Color>,
     pub border_width: Insets,
+    pub border_style: BorderStyle,
     pub shadows: Vec<Shadow>,
     pub animate_paint: bool,
     pub animate_shadows: bool,
@@ -1359,6 +1386,7 @@ impl Default for ComputedStyle {
             background: None,
             border: None,
             border_width: Insets::ZERO,
+            border_style: BorderStyle::Solid,
             shadows: Vec::new(),
             animate_paint: true,
             animate_shadows: true,
@@ -1532,6 +1560,9 @@ impl ComputedStyle {
         }
         if let Some(value) = style.border_width.left {
             self.border_width.left = value.max(0.0);
+        }
+        if let Some(value) = style.border_style {
+            self.border_style = value;
         }
         if let Some(value) = style.text_color {
             self.text_color = value;

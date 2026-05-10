@@ -7,9 +7,9 @@ use super::{
     TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
 use des_ui_document::{
-    AlignItems, Color, Element, ElementStateSelector, FlexDirection, FlexWrap, FloatingPlacement,
-    FloatingShift, Insets, JustifyContent, Length, Overflow, Point, Shadow, Style, StyleSelector,
-    StyleSheet, TextWrapMode, Transition, ViewportQuery,
+    AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
+    FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow, Point, Shadow,
+    Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -1644,12 +1644,115 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("floating-playground"),
             Style::default()
                 .width_fill()
-                .height(Length::Px(420.0))
+                .height(Length::Px(760.0))
                 .padding(Insets::all(18.0))
                 .gap(10.0)
                 .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-window"),
+            Style::default()
+                .width(Length::Px(760.0))
+                .height(Length::Px(360.0))
+                .background(PANEL)
+                .border(STROKE)
+                .radius(8.0)
+                .shadows(web_elevation(1, SHADOW_COLOR)),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-titlebar"),
+            Style::default()
+                .flex_direction(FlexDirection::Row)
+                .width_fill()
+                .height(Length::Px(52.0))
+                .padding(Insets::symmetric(18.0, 15.0))
+                .gap(10.0)
+                .background(Color::rgba(67, 68, 82, 255))
+                .top_left_radius(8.0)
+                .top_right_radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-dot"),
+            Style::default()
+                .size(13.0, 13.0)
+                .radius(6.5)
+                .background(Color::rgba(246, 73, 89, 255)),
+        )
+        .rule(
+            StyleSelector::id("floating-offset-dot-1"),
+            Style::default().background(Color::rgba(245, 181, 64, 255)),
+        )
+        .rule(
+            StyleSelector::id("floating-offset-dot-2"),
+            Style::default().background(Color::rgba(85, 202, 84, 255)),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-reference"),
+            Style::default()
+                .width(Length::Px(148.0))
+                .height(Length::Px(148.0))
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(Color::rgba(255, 255, 255, 0))
+                .border(Color::rgba(30, 31, 38, 255))
+                .border_width(2.0)
+                .border_style(BorderStyle::Dashed)
+                .radius(0.0),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-reference-label"),
+            Style::default()
+                .font_size(23.0)
+                .text_color(Color::rgba(30, 31, 38, 255)),
+        )
+        .rule(
+            StyleSelector::id("floating-offset-zero-reference"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(410.0))
+                .top(Length::Px(252.0)),
+        )
+        .rule(
+            StyleSelector::id("floating-offset-ten-reference"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(588.0))
+                .top(Length::Px(252.0)),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-popover"),
+            Style::default()
+                .width(Length::Px(88.0))
+                .height(Length::Px(42.0))
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
+                .background(Color::rgba(244, 52, 87, 255))
+                .border(Color::rgba(244, 52, 87, 255))
+                .border_width(1.0)
+                .radius(0.0)
+                .z_index(2300),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-popover-label"),
+            Style::default()
+                .font_size(18.0)
+                .text_color(Color::rgba(255, 255, 255, 255)),
+        )
+        .rule(
+            StyleSelector::id("floating-offset-zero-popover"),
+            Style::default()
+                .floating_to("floating-offset-zero-reference")
+                .floating_placement(FloatingPlacement::Bottom)
+                .floating_offset(0.0, 0.0),
+        )
+        .rule(
+            StyleSelector::id("floating-offset-ten-popover"),
+            Style::default()
+                .floating_to("floating-offset-ten-reference")
+                .floating_placement(FloatingPlacement::Bottom)
+                .floating_offset(10.0, 0.0),
         )
         .rule(
             StyleSelector::class("floating-anchor"),

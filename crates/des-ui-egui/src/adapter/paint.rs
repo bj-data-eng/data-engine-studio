@@ -1,7 +1,7 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_ui_document::{
-    Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph, Insets, Overflow, Rect,
-    ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
+    BorderStyle, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph, Insets,
+    Overflow, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
 };
 use eframe::egui;
 pub fn paint_frame(
@@ -43,6 +43,7 @@ fn paint_frame_clipped(
                     rect,
                     frame.style.radius,
                     frame.style.border_width,
+                    frame.style.border_style,
                     color,
                 );
             }
@@ -149,7 +150,14 @@ pub fn paint_surface(
     paint_shadows(painter, rect, radius, shadows);
     painter.rect_filled(rect, to_egui_radius(radius), to_egui_color(background));
     if let Some(border) = border {
-        paint_border(painter, rect, radius, border_width, border);
+        paint_border(
+            painter,
+            rect,
+            radius,
+            border_width,
+            BorderStyle::Solid,
+            border,
+        );
     }
 }
 
@@ -214,9 +222,14 @@ fn paint_border(
     rect: egui::Rect,
     radius: CornerRadii,
     widths: Insets,
+    style: BorderStyle,
     color: Color,
 ) {
     let color = to_egui_color(color);
+    if style != BorderStyle::Solid {
+        paint_segmented_border(painter, rect, widths, style, color);
+        return;
+    }
     if widths.is_uniform() {
         if widths.top > 0.0 {
             painter.rect_stroke(
@@ -268,6 +281,211 @@ fn paint_border(
             0.0,
             color,
         );
+    }
+}
+
+fn paint_segmented_border(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    widths: Insets,
+    style: BorderStyle,
+    color: egui::Color32,
+) {
+    let width = widths
+        .top
+        .max(widths.right)
+        .max(widths.bottom)
+        .max(widths.left);
+    if width <= 0.0 {
+        return;
+    }
+    let stroke = egui::Stroke::new(width, color);
+    match style {
+        BorderStyle::Solid => {}
+        BorderStyle::Dashed => {
+            let dash = (width * 3.0).max(8.0);
+            let gap = (width * 2.0).max(5.0);
+            paint_corner_preserved_dashed_border(painter, rect, dash, gap, stroke);
+        }
+        BorderStyle::Dotted => {
+            let radius = (width * 0.5).max(1.0);
+            let gap = (width * 3.0).max(6.0);
+            paint_corner_preserved_dotted_border(painter, rect, radius, gap, color);
+        }
+    }
+}
+
+fn paint_corner_preserved_dashed_border(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    dash: f32,
+    gap: f32,
+    stroke: egui::Stroke,
+) {
+    let corner_x = dash.min(rect.width() * 0.5);
+    let corner_y = dash.min(rect.height() * 0.5);
+    paint_dashed_corner_segments(painter, rect, corner_x, corner_y, stroke);
+    paint_dashed_segment(
+        painter,
+        rect.left_top() + egui::vec2(corner_x + gap, 0.0),
+        rect.right_top() - egui::vec2(corner_x + gap, 0.0),
+        dash,
+        gap,
+        stroke,
+    );
+    paint_dashed_segment(
+        painter,
+        rect.right_top() + egui::vec2(0.0, corner_y + gap),
+        rect.right_bottom() - egui::vec2(0.0, corner_y + gap),
+        dash,
+        gap,
+        stroke,
+    );
+    paint_dashed_segment(
+        painter,
+        rect.right_bottom() - egui::vec2(corner_x + gap, 0.0),
+        rect.left_bottom() + egui::vec2(corner_x + gap, 0.0),
+        dash,
+        gap,
+        stroke,
+    );
+    paint_dashed_segment(
+        painter,
+        rect.left_bottom() - egui::vec2(0.0, corner_y + gap),
+        rect.left_top() + egui::vec2(0.0, corner_y + gap),
+        dash,
+        gap,
+        stroke,
+    );
+}
+
+fn paint_dashed_corner_segments(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    corner_x: f32,
+    corner_y: f32,
+    stroke: egui::Stroke,
+) {
+    for (corner, horizontal, vertical) in [
+        (
+            rect.left_top(),
+            egui::vec2(corner_x, 0.0),
+            egui::vec2(0.0, corner_y),
+        ),
+        (
+            rect.right_top(),
+            egui::vec2(-corner_x, 0.0),
+            egui::vec2(0.0, corner_y),
+        ),
+        (
+            rect.right_bottom(),
+            egui::vec2(-corner_x, 0.0),
+            egui::vec2(0.0, -corner_y),
+        ),
+        (
+            rect.left_bottom(),
+            egui::vec2(corner_x, 0.0),
+            egui::vec2(0.0, -corner_y),
+        ),
+    ] {
+        painter.line_segment([corner, corner + horizontal], stroke);
+        painter.line_segment([corner, corner + vertical], stroke);
+    }
+}
+
+fn paint_corner_preserved_dotted_border(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    radius: f32,
+    gap: f32,
+    color: egui::Color32,
+) {
+    for corner in [
+        rect.left_top(),
+        rect.right_top(),
+        rect.right_bottom(),
+        rect.left_bottom(),
+    ] {
+        painter.circle_filled(corner, radius, color);
+    }
+    let corner_gap = gap.max(radius * 3.0);
+    paint_dotted_segment(
+        painter,
+        rect.left_top() + egui::vec2(corner_gap, 0.0),
+        rect.right_top() - egui::vec2(corner_gap, 0.0),
+        radius,
+        gap,
+        color,
+    );
+    paint_dotted_segment(
+        painter,
+        rect.right_top() + egui::vec2(0.0, corner_gap),
+        rect.right_bottom() - egui::vec2(0.0, corner_gap),
+        radius,
+        gap,
+        color,
+    );
+    paint_dotted_segment(
+        painter,
+        rect.right_bottom() - egui::vec2(corner_gap, 0.0),
+        rect.left_bottom() + egui::vec2(corner_gap, 0.0),
+        radius,
+        gap,
+        color,
+    );
+    paint_dotted_segment(
+        painter,
+        rect.left_bottom() - egui::vec2(0.0, corner_gap),
+        rect.left_top() + egui::vec2(0.0, corner_gap),
+        radius,
+        gap,
+        color,
+    );
+}
+
+fn paint_dashed_segment(
+    painter: &egui::Painter,
+    start: egui::Pos2,
+    end: egui::Pos2,
+    dash: f32,
+    gap: f32,
+    stroke: egui::Stroke,
+) {
+    let vector = end - start;
+    let length = vector.length();
+    if length <= f32::EPSILON {
+        return;
+    }
+    let direction = vector / length;
+    let mut cursor = 0.0;
+    while cursor < length {
+        let segment_end = (cursor + dash).min(length);
+        painter.line_segment(
+            [start + direction * cursor, start + direction * segment_end],
+            stroke,
+        );
+        cursor += dash + gap;
+    }
+}
+
+fn paint_dotted_segment(
+    painter: &egui::Painter,
+    start: egui::Pos2,
+    end: egui::Pos2,
+    radius: f32,
+    gap: f32,
+    color: egui::Color32,
+) {
+    let vector = end - start;
+    let length = vector.length();
+    if length <= f32::EPSILON {
+        return;
+    }
+    let direction = vector / length;
+    let mut cursor = 0.0;
+    while cursor <= length {
+        painter.circle_filled(start + direction * cursor, radius, color);
+        cursor += gap;
     }
 }
 
@@ -384,6 +602,7 @@ fn paint_floating_surface(
             rect,
             frame.style.radius,
             frame.style.border_width,
+            frame.style.border_style,
             color,
         );
         paint_arrow_border(painter, arrow, frame.style.border_width, color);

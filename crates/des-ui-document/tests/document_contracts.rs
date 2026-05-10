@@ -1903,6 +1903,56 @@ fn interactive_element_secondary_click_requests_context() {
 }
 
 #[test]
+fn border_style_resolves_as_paint_only_property() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("dashed"),
+        Style::default()
+            .size(80.0, 40.0)
+            .border(Color::rgba(20, 20, 24, 255))
+            .border_width(3.0)
+            .border_style(des_ui_document::BorderStyle::Dashed),
+    );
+    let mut document = Document::build(Size::new(180.0, 120.0), |ui| {
+        ui.element("dashed", ElementSpec::new(Element::Div), |_| {});
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let dashed = output.snapshot().find("dashed").unwrap();
+
+    assert_eq!(
+        dashed.style().border_style,
+        des_ui_document::BorderStyle::Dashed
+    );
+    assert_eq!(dashed.rect().size, Size::new(80.0, 40.0));
+
+    let previous = output.layout.clone();
+    let output = engine.update(
+        &mut document,
+        &StyleSheet::new().rule(
+            StyleSelector::id("dashed"),
+            Style::default()
+                .size(80.0, 40.0)
+                .border(Color::rgba(20, 20, 24, 255))
+                .border_width(3.0)
+                .border_style(des_ui_document::BorderStyle::Dotted),
+        ),
+    );
+
+    assert!(output.metrics.reused_input_layout);
+    assert_eq!(output.layout.rect, previous.rect);
+    assert_eq!(
+        output
+            .snapshot()
+            .find("dashed")
+            .unwrap()
+            .style()
+            .border_style,
+        des_ui_document::BorderStyle::Dotted
+    );
+}
+
+#[test]
 fn style_rules_resolve_shadow_as_paint_only_property() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new().rule(

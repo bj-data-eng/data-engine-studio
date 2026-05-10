@@ -2273,6 +2273,29 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
         "floating-playground",
         ElementSpec::new(Element::Div).class("floating-playground"),
         |ui| {
+            ui.element(
+                "floating-offset-window",
+                ElementSpec::new(Element::Div).class("floating-offset-window"),
+                |ui| {
+                    ui.element(
+                        "floating-offset-titlebar",
+                        ElementSpec::new(Element::Div).class("floating-offset-titlebar"),
+                        |ui| {
+                            for index in 0..3 {
+                                ui.element(
+                                    format!("floating-offset-dot-{index}"),
+                                    ElementSpec::new(Element::Div).class("floating-offset-dot"),
+                                    |_| {},
+                                );
+                            }
+                        },
+                    );
+                    floating_offset_reference(ui, "floating-offset-zero-reference", "0px");
+                    floating_offset_reference(ui, "floating-offset-ten-reference", "10px");
+                    floating_offset_popover(ui, "floating-offset-zero-popover");
+                    floating_offset_popover(ui, "floating-offset-ten-popover");
+                },
+            );
             floating_anchor(ui, "floating-anchor-edge", "Edge anchor");
             floating_anchor(ui, "floating-anchor-arrow", "Arrow anchor");
             floating_anchor(ui, "floating-anchor-plain", "Plain anchor");
@@ -2297,6 +2320,38 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
                 "No arrow",
                 "Same floating contract with rectangular painting.",
                 "floating-popover",
+            );
+        },
+    );
+}
+
+fn floating_offset_reference(ui: &mut des_ui_document::DocumentBuilder, id: &str, label: &str) {
+    ui.element(
+        id,
+        ElementSpec::new(Element::Button)
+            .class("floating-offset-reference")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(Element::Text).class("floating-offset-reference-label"),
+                label,
+            );
+        },
+    );
+}
+
+fn floating_offset_popover(ui: &mut des_ui_document::DocumentBuilder, id: &str) {
+    ui.element(
+        id,
+        ElementSpec::new(Element::Button)
+            .class("floating-offset-popover")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(Element::Text).class("floating-offset-popover-label"),
+                "Floating",
             );
         },
     );
