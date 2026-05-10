@@ -2,8 +2,8 @@ use crate::animation::{AnimationUpdate, update_element_style_animation};
 use crate::document::{Document, StyleResolutionReport};
 use crate::element::ElementId;
 use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
-use crate::layout::hit_path;
-use crate::scroll::{layout_scroll_axis, layout_scroll_point, layout_scroll_rect, scroll_chrome};
+use crate::layout::{hit_path, to_layout_point, to_scroll_axis, to_scroll_rect};
+use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
     DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
@@ -303,7 +303,7 @@ impl DocumentEngine {
         };
 
         let scroll = layout_engine::scroll::clamp_scroll_offset(
-            layout_scroll_point(Point::new(
+            to_layout_point(Point::new(
                 state.scroll_x + delta.x,
                 state.scroll_y + delta.y,
             )),
@@ -760,9 +760,9 @@ impl DocumentEngine {
             .as_ref()
             .is_none_or(|drag| drag.element_id != chrome.element_id || drag.axis != chrome.axis)
         {
-            let axis = layout_scroll_axis(chrome.axis);
-            let pointer_main = axis.position(layout_scroll_point(pointer.position));
-            let handle_rect = layout_scroll_rect(chrome.handle_rect);
+            let axis = to_scroll_axis(chrome.axis);
+            let pointer_main = axis.position(to_layout_point(pointer.position));
+            let handle_rect = to_scroll_rect(chrome.handle_rect);
             let handle_start = axis.rect_origin(handle_rect);
             let handle_length = axis.rect_length(handle_rect);
             let offset = if chrome.handle_rect.contains(pointer.position) {
@@ -782,10 +782,10 @@ impl DocumentEngine {
             return changed;
         };
         let scroll_offset = layout_engine::scroll::scroll_offset_from_handle_drag(
-            layout_scroll_axis(chrome.axis),
-            layout_scroll_rect(chrome.track_rect),
-            layout_scroll_rect(chrome.handle_rect),
-            layout_scroll_point(pointer.position),
+            to_scroll_axis(chrome.axis),
+            to_scroll_rect(chrome.track_rect),
+            to_scroll_rect(chrome.handle_rect),
+            to_layout_point(pointer.position),
             drag.pointer_offset_from_handle_start,
             chrome.max_scroll,
         );
@@ -807,7 +807,7 @@ impl DocumentEngine {
         for (id, state) in &mut self.states {
             let max_scroll = self.scroll_limits.get(id).copied().unwrap_or_default();
             let scroll = layout_engine::scroll::clamp_scroll_offset(
-                layout_scroll_point(Point::new(state.scroll_x, state.scroll_y)),
+                to_layout_point(Point::new(state.scroll_x, state.scroll_y)),
                 layout_engine::geometry::Size {
                     width: max_scroll.width,
                     height: max_scroll.height,

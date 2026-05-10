@@ -1,5 +1,8 @@
-use crate::geometry::{Overflow, Point};
+use crate::geometry::{Insets, Overflow, Point, Rect, ScrollAxis, Size};
 use crate::state::ResolvedElement;
+use layout_engine::geometry::{Point as LayoutPoint, Rect as LayoutInsets, Size as LayoutSize};
+use layout_engine::scroll::{ScrollAxis as LayoutScrollAxis, ScrollRect};
+use layout_engine::style::Overflow as LayoutOverflow;
 
 pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {
     let mut children: Vec<_> = frame.children.iter().collect();
@@ -24,4 +27,54 @@ pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&Res
     }
 
     None
+}
+
+pub(crate) fn to_layout_point(point: Point) -> LayoutPoint<f32> {
+    LayoutPoint {
+        x: point.x,
+        y: point.y,
+    }
+}
+
+pub(crate) fn to_layout_size(size: Size) -> LayoutSize<f32> {
+    LayoutSize {
+        width: size.width,
+        height: size.height,
+    }
+}
+
+pub(crate) fn to_layout_insets(insets: Insets) -> LayoutInsets<f32> {
+    LayoutInsets {
+        left: insets.left,
+        right: insets.right,
+        top: insets.top,
+        bottom: insets.bottom,
+    }
+}
+
+pub(crate) fn to_layout_overflow(overflow: Overflow) -> LayoutOverflow {
+    match overflow {
+        Overflow::Visible => LayoutOverflow::Visible,
+        Overflow::Scroll => LayoutOverflow::Scroll,
+    }
+}
+
+pub(crate) fn to_scroll_axis(axis: ScrollAxis) -> LayoutScrollAxis {
+    match axis {
+        ScrollAxis::Horizontal => LayoutScrollAxis::Horizontal,
+        ScrollAxis::Vertical => LayoutScrollAxis::Vertical,
+    }
+}
+
+pub(crate) fn to_scroll_rect(rect: Rect) -> ScrollRect {
+    ScrollRect::new(to_layout_point(rect.origin), to_layout_size(rect.size))
+}
+
+pub(crate) fn from_scroll_rect(rect: ScrollRect) -> Rect {
+    Rect::new(
+        rect.origin.x,
+        rect.origin.y,
+        rect.size.width,
+        rect.size.height,
+    )
 }

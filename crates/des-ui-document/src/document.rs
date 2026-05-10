@@ -6,6 +6,7 @@ use crate::geometry::{
     AlignContent, AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
     Point, Position, Rect as DocumentRect, Size,
 };
+use crate::layout::{to_layout_insets, to_layout_size};
 use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
     ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
@@ -617,12 +618,12 @@ impl Document {
                 .map_err(layout_error)?;
             let content_size = self.scroll_content_size(element)?;
             let max_scroll = layout_scroll::scroll_limits(
-                layout_scroll_size(content_size),
+                to_layout_size(content_size),
                 layout_engine::geometry::Size {
                     width: layout.size.width,
                     height: layout.size.height,
                 },
-                layout_scroll_insets(style.border_width),
+                to_layout_insets(style.border_width),
             );
             let max_scroll = Size::new(max_scroll.width, max_scroll.height);
             if max_scroll.width > 0.0 || max_scroll.height > 0.0 {
@@ -1308,22 +1309,6 @@ fn table_column_index(table: &TableSpec, column_id: &TableColumnId) -> Option<i1
 fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) -> f32 {
     let width = width.max(min_width);
     max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
-}
-
-fn layout_scroll_size(size: Size) -> layout_engine::geometry::Size<f32> {
-    layout_engine::geometry::Size {
-        width: size.width,
-        height: size.height,
-    }
-}
-
-fn layout_scroll_insets(insets: Insets) -> LayoutRect<f32> {
-    LayoutRect {
-        left: insets.left,
-        right: insets.right,
-        top: insets.top,
-        bottom: insets.bottom,
-    }
 }
 
 fn child_parent_origin(

@@ -1,11 +1,10 @@
 use crate::element::ElementId;
-use crate::geometry::{Insets, Overflow, Point, Rect, ScrollAxis, Size};
-use crate::state::{ElementState, ResolvedElement, ScrollChrome};
-use layout_engine::geometry::{Point as LayoutPoint, Rect as LayoutInsets, Size as LayoutSize};
-use layout_engine::scroll::{
-    self as layout_scroll, ScrollAxis as LayoutScrollAxis, ScrollRect, ScrollbarGeometryInput,
+use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
+use crate::layout::{
+    from_scroll_rect, to_layout_insets, to_layout_overflow, to_scroll_axis, to_scroll_rect,
 };
-use layout_engine::style::Overflow as LayoutOverflow;
+use crate::state::{ElementState, ResolvedElement, ScrollChrome};
+use layout_engine::scroll::{self as layout_scroll, ScrollbarGeometryInput};
 use std::collections::HashMap;
 
 pub(crate) fn scroll_chrome(
@@ -94,18 +93,18 @@ fn scroll_chrome_for_frame(
         })
         .unwrap_or_default();
     let geometry = layout_scroll::scrollbar_geometry(ScrollbarGeometryInput {
-        axis: layout_scroll_axis(axis),
+        axis: to_scroll_axis(axis),
         viewport_rect: layout_scroll::viewport_rect(
-            layout_scroll_rect(frame.rect),
-            layout_scroll_insets(frame.style.border_width),
-            layout_scroll_insets(frame.style.padding),
+            to_scroll_rect(frame.rect),
+            to_layout_insets(frame.style.border_width),
+            to_layout_insets(frame.style.padding),
         ),
         max_scroll,
         scroll_offset: state_scroll,
         visual_width,
         hit_width: HIT_WIDTH,
         min_handle_length: MIN_HANDLE_LENGTH,
-        clip_rect: clip_rect.map(layout_scroll_rect),
+        clip_rect: clip_rect.map(to_scroll_rect),
     })?;
     let handle_color = if dragged {
         frame
@@ -163,9 +162,9 @@ fn scroll_chrome_for_frame(
     Some(ScrollChrome {
         element_id: frame.id.clone(),
         axis,
-        track_rect: document_rect(geometry.track_rect),
-        hit_rect: document_rect(geometry.hit_rect),
-        handle_rect: document_rect(geometry.handle_rect),
+        track_rect: from_scroll_rect(geometry.track_rect),
+        hit_rect: from_scroll_rect(geometry.hit_rect),
+        handle_rect: from_scroll_rect(geometry.handle_rect),
         handle_color,
         track_color,
         handle_border_color,
@@ -184,61 +183,12 @@ fn scroll_chrome_for_frame(
 
 fn child_clip_rect(frame: &ResolvedElement, parent_clip: Option<Rect>) -> Option<Rect> {
     layout_scroll::child_clip_rect(
-        layout_scroll_rect(frame.rect),
-        layout_scroll_insets(frame.style.border_width),
-        layout_scroll_insets(frame.style.padding),
-        layout_overflow(frame.style.overflow_x),
-        layout_overflow(frame.style.overflow_y),
-        parent_clip.map(layout_scroll_rect),
+        to_scroll_rect(frame.rect),
+        to_layout_insets(frame.style.border_width),
+        to_layout_insets(frame.style.padding),
+        to_layout_overflow(frame.style.overflow_x),
+        to_layout_overflow(frame.style.overflow_y),
+        parent_clip.map(to_scroll_rect),
     )
-    .map(document_rect)
-}
-
-pub(crate) fn layout_scroll_axis(axis: ScrollAxis) -> LayoutScrollAxis {
-    match axis {
-        ScrollAxis::Horizontal => LayoutScrollAxis::Horizontal,
-        ScrollAxis::Vertical => LayoutScrollAxis::Vertical,
-    }
-}
-
-pub(crate) fn layout_scroll_point(point: Point) -> LayoutPoint<f32> {
-    LayoutPoint {
-        x: point.x,
-        y: point.y,
-    }
-}
-
-pub(crate) fn layout_scroll_rect(rect: Rect) -> ScrollRect {
-    ScrollRect::new(
-        layout_scroll_point(rect.origin),
-        LayoutSize {
-            width: rect.size.width,
-            height: rect.size.height,
-        },
-    )
-}
-
-fn layout_scroll_insets(insets: Insets) -> LayoutInsets<f32> {
-    LayoutInsets {
-        left: insets.left,
-        right: insets.right,
-        top: insets.top,
-        bottom: insets.bottom,
-    }
-}
-
-fn layout_overflow(overflow: Overflow) -> LayoutOverflow {
-    match overflow {
-        Overflow::Visible => LayoutOverflow::Visible,
-        Overflow::Scroll => LayoutOverflow::Scroll,
-    }
-}
-
-pub(crate) fn document_rect(rect: ScrollRect) -> Rect {
-    Rect::new(
-        rect.origin.x,
-        rect.origin.y,
-        rect.size.width,
-        rect.size.height,
-    )
+    .map(from_scroll_rect)
 }
