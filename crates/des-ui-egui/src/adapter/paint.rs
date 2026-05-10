@@ -576,6 +576,10 @@ fn floating_arrow_points(
     height: f32,
 ) -> [egui::Pos2; 3] {
     match placement {
+        FloatingPlacement::Center => {
+            let center = rect.center();
+            [center, center, center]
+        }
         FloatingPlacement::Bottom
         | FloatingPlacement::BottomStart
         | FloatingPlacement::BottomEnd => {

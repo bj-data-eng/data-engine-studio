@@ -104,6 +104,8 @@ pub enum FloatingAlignment {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum FloatingPlacement {
+    /// Center inside the reference.
+    Center,
     /// Center above the reference.
     Top,
     /// Start-aligned above the reference.
@@ -135,11 +137,18 @@ impl FloatingPlacement {
     #[must_use]
     pub const fn side(self) -> FloatingSide {
         match self {
+            Self::Center => FloatingSide::Top,
             Self::Top | Self::TopStart | Self::TopEnd => FloatingSide::Top,
             Self::Right | Self::RightStart | Self::RightEnd => FloatingSide::Right,
             Self::Bottom | Self::BottomStart | Self::BottomEnd => FloatingSide::Bottom,
             Self::Left | Self::LeftStart | Self::LeftEnd => FloatingSide::Left,
         }
+    }
+
+    /// Returns true when placement is centered inside the reference.
+    #[must_use]
+    pub const fn is_center(self) -> bool {
+        matches!(self, Self::Center)
     }
 
     /// Returns the alignment component of the placement.
@@ -159,7 +168,11 @@ impl FloatingPlacement {
     /// Returns the same alignment on the opposite side.
     #[must_use]
     pub const fn opposite(self) -> Self {
-        Self::from_side_alignment(self.side().opposite(), self.alignment())
+        if self.is_center() {
+            Self::Center
+        } else {
+            Self::from_side_alignment(self.side().opposite(), self.alignment())
+        }
     }
 
     /// Creates a placement from side and optional alignment.
@@ -525,6 +538,12 @@ pub fn compute_coords_from_placement(
 ) -> Point<f32> {
     let common_x = reference.left() + reference.size.width / 2.0 - floating.width / 2.0;
     let common_y = reference.top() + reference.size.height / 2.0 - floating.height / 2.0;
+    if placement.is_center() {
+        return Point {
+            x: common_x,
+            y: common_y,
+        };
+    }
     let common_align = if placement.side().is_vertical() {
         reference.size.width / 2.0 - floating.width / 2.0
     } else {
@@ -602,22 +621,27 @@ pub fn compute_floating_position(
     let mut origin =
         placed_origin_with_offset(reference, floating, placement, options.offset, options.rtl);
 
-    if let Some(boundary) = options.boundary {
-        let fallback = choose_fallback_placement(reference, floating, &options, boundary);
-        if fallback != placement {
-            placement = fallback;
-            origin = placed_origin_with_offset(
-                reference,
-                floating,
-                placement,
-                options.offset,
-                options.rtl,
-            );
+    if !placement.is_center() {
+        if let Some(boundary) = options.boundary {
+            let fallback = choose_fallback_placement(reference, floating, &options, boundary);
+            if fallback != placement {
+                placement = fallback;
+                origin = placed_origin_with_offset(
+                    reference,
+                    floating,
+                    placement,
+                    options.offset,
+                    options.rtl,
+                );
+            }
         }
     }
 
-    if let (Some(boundary), Some(shift)) = (options.boundary, options.shift) {
-        origin = shift_origin_into_boundary(origin, floating, placement.side(), boundary, shift);
+    if !placement.is_center() {
+        if let (Some(boundary), Some(shift)) = (options.boundary, options.shift) {
+            origin =
+                shift_origin_into_boundary(origin, floating, placement.side(), boundary, shift);
+        }
     }
 
     let rect = FloatingRect::new(origin, floating);
@@ -626,14 +650,24 @@ pub fn compute_floating_position(
         .map(|boundary| detect_overflow(rect, boundary, FloatingPadding::default()));
     let available_size = options
         .boundary
-        .map(|boundary| available_size(reference, placement.side(), boundary))
+        .map(|boundary| {
+            if placement.is_center() {
+                Size {
+                    width: f32::INFINITY,
+                    height: f32::INFINITY,
+                }
+            } else {
+                available_size(reference, placement.side(), boundary)
+            }
+        })
         .unwrap_or(Size {
             width: f32::INFINITY,
             height: f32::INFINITY,
         });
-    let arrow_offset = options
-        .arrow
-        .map(|arrow| compute_arrow_offset(reference, rect, placement.side(), arrow));
+    let arrow_offset = options.arrow.and_then(|arrow| {
+        (!placement.is_center())
+            .then(|| compute_arrow_offset(reference, rect, placement.side(), arrow))
+    });
     let visibility = options
         .boundary
         .map(|boundary| visibility_state(reference, rect, boundary))
@@ -656,6 +690,11 @@ pub fn apply_offset(
     placement: FloatingPlacement,
     offset: FloatingOffset,
 ) -> Point<f32> {
+    if placement.is_center() {
+        origin.x += offset.cross_axis;
+        origin.y += offset.main_axis;
+        return origin;
+    }
     let side = placement.side();
     let cross_axis = offset
         .alignment_axis

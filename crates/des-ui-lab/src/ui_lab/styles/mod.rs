@@ -1669,6 +1669,10 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default().height(Length::Px(440.0)),
         )
         .rule(
+            StyleSelector::class("floating-centered-axis-specimen"),
+            Style::default().height(Length::Px(320.0)),
+        )
+        .rule(
             StyleSelector::class("floating-offset-row"),
             Style::default()
                 .width_fill()
@@ -1697,6 +1701,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .flex_direction(FlexDirection::Row)
                 .justify_content(JustifyContent::Center)
                 .gap(28.0),
+        )
+        .rule(
+            StyleSelector::class("floating-centered-axis-row"),
+            Style::default()
+                .width_fill()
+                .height_fill()
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center),
         )
         .rule(
             StyleSelector::class("floating-offset-reference"),
@@ -1850,6 +1862,12 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_to("floating-alignment-axis-end-reference")
                 .floating_placement(FloatingPlacement::TopEnd)
                 .floating_alignment_axis(34.0),
+        )
+        .rule(
+            StyleSelector::id("floating-centered-axis-popover"),
+            Style::default()
+                .floating_to("floating-centered-axis-reference")
+                .floating_placement(FloatingPlacement::Center),
         )
         .rule(
             StyleSelector::class("nest-outer"),

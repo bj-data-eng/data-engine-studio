@@ -93,6 +93,24 @@ fn floating_position_applies_alignment_axis_to_aligned_placements() {
 }
 
 #[test]
+fn floating_position_can_center_on_both_axes() {
+    let reference = rect(20.0, 30.0, 100.0, 80.0);
+    let floating = Size {
+        width: 50.0,
+        height: 40.0,
+    };
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Center),
+    );
+
+    assert_eq!(output.origin, Point { x: 45.0, y: 50.0 });
+    assert_eq!(output.placement.opposite(), FloatingPlacement::Center);
+}
+
+#[test]
 fn floating_overflow_reports_signed_distance_from_boundary() {
     let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 80.0));
     let overflow = detect_overflow(

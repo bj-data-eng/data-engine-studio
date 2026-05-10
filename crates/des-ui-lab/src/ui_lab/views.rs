@@ -2277,6 +2277,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
             floating_main_axis_specimen(ui);
             floating_cross_axis_specimen(ui);
             floating_alignment_axis_specimen(ui);
+            floating_centered_axis_specimen(ui);
         },
     );
 }
@@ -2554,6 +2555,30 @@ fn floating_alignment_axis_reference(
                 format!("{id}-axis"),
                 ElementSpec::new(Element::Text).class("floating-alignment-axis-axis-label"),
                 axis,
+            );
+        },
+    );
+}
+
+fn floating_centered_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-centered-axis-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-centered-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-centered-axis-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Centered axes",
+            );
+            ui.element(
+                "floating-centered-axis-row",
+                ElementSpec::new(Element::Div).class("floating-centered-axis-row"),
+                |ui| {
+                    floating_offset_reference(ui, "floating-centered-axis-reference", "");
+                    floating_offset_popover(ui, "floating-centered-axis-popover");
+                },
             );
         },
     );
