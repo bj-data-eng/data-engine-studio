@@ -1088,6 +1088,42 @@ fn draggable_drag_drop_auto_scrolls_opted_in_list_pane() {
 }
 
 #[test]
+fn draggable_scroll_list_can_drop_after_last_visible_card() {
+    let mut harness = lab_harness("draggable");
+    harness.run();
+
+    let start = center(state_rect_with_egui_text(
+        harness.state(),
+        &harness.ctx,
+        "drag-scroll-handle-0",
+    ));
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(egui::pos2(start.x + 8.0, start.y));
+    harness.run();
+
+    let output = state_output_with_egui_text(harness.state(), &harness.ctx);
+    let list = frame(&output, "drag-scroll-list-0").rect;
+    let last_visible = frame(&output, "drag-scroll-item-3").rect;
+    let destination = egui::pos2(
+        last_visible.origin.x + last_visible.size.width / 2.0,
+        (last_visible.bottom() + 12.0).min(list.bottom() - 2.0),
+    );
+
+    harness.hover_at(destination);
+    harness.run_steps(4);
+
+    assert_eq!(
+        harness.state().scroll_list_drop_preview,
+        Some(SortableDropPreview {
+            zone: DropZoneId(0),
+            nearest_item: Some(SortableItemId(3)),
+            edge: des_ui_widgets::DropEdge::After,
+        })
+    );
+}
+
+#[test]
 fn draggable_drag_drop_uses_snapshot_path_for_drop_targets() {
     let output = lab_output("draggable");
     let cell = frame(&output, "drag-cell-5").rect;

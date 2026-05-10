@@ -96,6 +96,12 @@ impl SortableDocumentConfig {
         active_item: Option<SortableItemId>,
     ) -> Option<SortableDropPreview> {
         let zone = self.drop_zone_at(output, point)?;
+        let zone_rect = output
+            .snapshot()
+            .elements_with_class(self.zone_class.as_str())
+            .into_iter()
+            .find(|element| self.zone_for_element_id(element.id().as_str()) == Some(zone))?
+            .rect();
         let nearest = output
             .snapshot()
             .elements_with_class(self.item_class.as_str())
@@ -110,6 +116,9 @@ impl SortableDocumentConfig {
                 }
                 let rect = element.rect();
                 let center_y = rect.origin.y + rect.size.height / 2.0;
+                if center_y < zone_rect.origin.y || center_y > zone_rect.bottom() {
+                    return None;
+                }
                 Some((item, center_y, (point.y - center_y).abs()))
             })
             .min_by(|left, right| left.2.total_cmp(&right.2));
