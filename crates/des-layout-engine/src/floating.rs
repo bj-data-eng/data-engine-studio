@@ -100,6 +100,17 @@ pub enum FloatingAlignment {
     End,
 }
 
+impl FloatingAlignment {
+    /// Returns the opposite cross-axis alignment.
+    #[must_use]
+    pub const fn opposite(self) -> Self {
+        match self {
+            Self::Start => Self::End,
+            Self::End => Self::Start,
+        }
+    }
+}
+
 /// A side plus optional alignment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -172,6 +183,38 @@ impl FloatingPlacement {
             Self::Center
         } else {
             Self::from_side_alignment(self.side().opposite(), self.alignment())
+        }
+    }
+
+    /// Returns the same side with the opposite start/end alignment.
+    #[must_use]
+    pub const fn opposite_alignment(self) -> Self {
+        if self.is_center() {
+            Self::Center
+        } else {
+            Self::from_side_alignment(
+                self.side(),
+                match self.alignment() {
+                    Some(alignment) => Some(alignment.opposite()),
+                    None => None,
+                },
+            )
+        }
+    }
+
+    /// Returns the opposite side with the opposite start/end alignment.
+    #[must_use]
+    pub const fn opposite_side_and_alignment(self) -> Self {
+        if self.is_center() {
+            Self::Center
+        } else {
+            Self::from_side_alignment(
+                self.side().opposite(),
+                match self.alignment() {
+                    Some(alignment) => Some(alignment.opposite()),
+                    None => None,
+                },
+            )
         }
     }
 
@@ -782,7 +825,13 @@ fn choose_fallback_placement(
     candidates.push(options.placement);
     candidates.extend(options.fallbacks.iter().copied());
     if options.flip {
+        if options.placement.alignment().is_some() {
+            candidates.push(options.placement.opposite_alignment());
+        }
         candidates.push(options.placement.opposite());
+        if options.placement.alignment().is_some() {
+            candidates.push(options.placement.opposite_side_and_alignment());
+        }
     }
 
     let mut best = options.placement;

@@ -1765,6 +1765,24 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .flex_shrink(0.0),
         )
         .rule(
+            StyleSelector::class("floating-edge-flip-panel"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(210.0))
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_visible(true)
+                .border(STROKE)
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-edge-flip-track"),
+            Style::default()
+                .width(Length::Px(660.0))
+                .height(Length::Px(420.0))
+                .flex_shrink(0.0),
+        )
+        .rule(
             StyleSelector::class("floating-offset-reference"),
             Style::default()
                 .width(Length::Px(148.0))
@@ -1973,6 +1991,18 @@ pub(super) fn stylesheet() -> StyleSheet {
                 }),
         )
         .rule(
+            StyleSelector::id("floating-edge-flip-reference"),
+            Style::default()
+                .width(Length::Px(150.0))
+                .height(Length::Px(150.0))
+                .margin(Insets {
+                    top: 170.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 150.0,
+                }),
+        )
+        .rule(
             StyleSelector::id("floating-scroll-shift-popover"),
             Style::default()
                 .width(Length::Px(350.0))
@@ -2006,6 +2036,16 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_to("floating-vertical-flip-reference")
                 .floating_placement(FloatingPlacement::Bottom)
                 .floating_boundary_to("floating-vertical-flip-panel")
+                .floating_flip(true),
+        )
+        .rule(
+            StyleSelector::id("floating-edge-flip-popover"),
+            Style::default()
+                .width(Length::Px(370.0))
+                .height(Length::Px(44.0))
+                .floating_to("floating-edge-flip-reference")
+                .floating_placement(FloatingPlacement::BottomStart)
+                .floating_boundary_to("floating-edge-flip-panel")
                 .floating_flip(true),
         )
         .rule(

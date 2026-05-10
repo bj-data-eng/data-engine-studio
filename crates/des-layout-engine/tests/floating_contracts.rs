@@ -147,6 +147,48 @@ fn floating_position_flips_when_preferred_side_overflows() {
 }
 
 #[test]
+fn floating_position_flips_alignment_when_cross_axis_overflows() {
+    let reference = rect(78.0, 36.0, 16.0, 16.0);
+    let floating = Size {
+        width: 44.0,
+        height: 24.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::BottomStart)
+            .boundary(boundary)
+            .flip(true),
+    );
+
+    assert_eq!(output.placement, FloatingPlacement::BottomEnd);
+    assert_eq!(output.origin, Point { x: 50.0, y: 52.0 });
+}
+
+#[test]
+fn floating_position_flips_side_and_alignment_near_corner() {
+    let reference = rect(78.0, 72.0, 16.0, 16.0);
+    let floating = Size {
+        width: 44.0,
+        height: 24.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::BottomStart)
+            .boundary(boundary)
+            .flip(true),
+    );
+
+    assert_eq!(output.placement, FloatingPlacement::TopEnd);
+    assert_eq!(output.origin, Point { x: 50.0, y: 48.0 });
+}
+
+#[test]
 fn floating_position_shifts_into_boundary_without_changing_side() {
     let reference = rect(102.0, 40.0, 12.0, 12.0);
     let floating = Size {

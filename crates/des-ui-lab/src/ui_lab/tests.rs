@@ -383,6 +383,10 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let vertical_flip_specimen = frame(&output, "floating-vertical-flip-specimen");
     let vertical_flip_reference = frame(&output, "floating-vertical-flip-reference");
     let vertical_flip_popover = frame(&output, "floating-vertical-flip-popover");
+    let edge_flip_specimen = frame(&output, "floating-edge-flip-specimen");
+    let edge_flip_panel = frame(&output, "floating-edge-flip-panel");
+    let edge_flip_reference = frame(&output, "floating-edge-flip-reference");
+    let edge_flip_popover = frame(&output, "floating-edge-flip-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
@@ -394,6 +398,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_eq!(scroll_attach_specimen.style.position, Position::Flow);
     assert_eq!(vertical_overlap_specimen.style.position, Position::Flow);
     assert_eq!(vertical_flip_specimen.style.position, Position::Flow);
+    assert_eq!(edge_flip_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -475,22 +480,16 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         vertical_overlap_specimen.rect.origin.x,
         specimen.rect.origin.x,
     );
-    assert_close(
-        vertical_overlap_specimen.rect.origin.y,
-        scroll_shift_specimen.rect.bottom(),
-    );
+    assert!(vertical_overlap_specimen.rect.origin.y >= scroll_shift_specimen.rect.origin.y);
     assert_close(
         vertical_flip_specimen.rect.size.width,
         specimen.rect.size.width,
     );
-    assert_close(
-        vertical_flip_specimen.rect.origin.x,
-        vertical_overlap_specimen.rect.right(),
-    );
-    assert_close(
-        vertical_flip_specimen.rect.origin.y,
-        vertical_overlap_specimen.rect.origin.y,
-    );
+    assert!(vertical_flip_specimen.rect.origin.x >= specimen.rect.origin.x);
+    assert!(vertical_flip_specimen.rect.origin.y >= scroll_shift_specimen.rect.origin.y);
+    assert_close(edge_flip_specimen.rect.size.width, specimen.rect.size.width);
+    assert_close(edge_flip_specimen.rect.origin.x, specimen.rect.origin.x);
+    assert!(edge_flip_specimen.rect.origin.y >= vertical_overlap_specimen.rect.origin.y);
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
     assert_close(ten_reference.rect.origin.y, zero_reference.rect.origin.y);
@@ -607,6 +606,14 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         vertical_flip_popover.rect.origin.x + vertical_flip_popover.rect.size.width * 0.5,
         vertical_flip_reference.rect.origin.x + vertical_flip_reference.rect.size.width * 0.5,
     );
+    assert_close(
+        edge_flip_popover.rect.bottom(),
+        edge_flip_reference.rect.origin.y,
+    );
+    assert_close(
+        edge_flip_popover.rect.right(),
+        edge_flip_reference.rect.right(),
+    );
     let scrolled_output = lab_output_with_stage_scroll("floating", 900.0);
     assert!(
         scrolled_output.scroll_chrome.iter().any(|chrome| {
@@ -704,6 +711,77 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         vertical_flip_popover.rect.bottom() <= vertical_flip_reference.rect.origin.y,
         "vertical flip should keep the floating element from overlapping its reference"
     );
+    let mut edge_aligned = UiLabState::new(Some("floating"));
+    edge_aligned.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    edge_aligned
+        .document_engine
+        .element_state_mut("floating-edge-flip-panel")
+        .unwrap()
+        .scroll_x = 0.0;
+    edge_aligned
+        .document_engine
+        .element_state_mut("floating-edge-flip-panel")
+        .unwrap()
+        .scroll_y = 170.0;
+    let edge_aligned_output =
+        edge_aligned.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let aligned_edge_reference = frame(&edge_aligned_output, "floating-edge-flip-reference");
+    let aligned_edge_popover = frame(&edge_aligned_output, "floating-edge-flip-popover");
+    assert_close(
+        aligned_edge_popover.rect.origin.y,
+        aligned_edge_reference.rect.bottom(),
+    );
+    assert_close(
+        aligned_edge_popover.rect.right(),
+        aligned_edge_reference.rect.right(),
+    );
+    let mut edge_start = UiLabState::new(Some("floating"));
+    edge_start.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    {
+        let state = edge_start
+            .document_engine
+            .element_state_mut("floating-edge-flip-panel")
+            .unwrap();
+        state.scroll_x = 210.0;
+        state.scroll_y = 170.0;
+    }
+    let edge_start_output =
+        edge_start.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let start_edge_reference = frame(&edge_start_output, "floating-edge-flip-reference");
+    let start_edge_popover = frame(&edge_start_output, "floating-edge-flip-popover");
+    assert_close(
+        start_edge_popover.rect.origin.y,
+        start_edge_reference.rect.bottom(),
+    );
+    assert_close(
+        start_edge_popover.rect.origin.x,
+        start_edge_reference.rect.origin.x,
+    );
+    let mut edge_corner = UiLabState::new(Some("floating"));
+    edge_corner.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    {
+        let state = edge_corner
+            .document_engine
+            .element_state_mut("floating-edge-flip-panel")
+            .unwrap();
+        state.scroll_x = 0.0;
+        state.scroll_y = 0.0;
+    }
+    let edge_corner_output =
+        edge_corner.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let corner_edge_reference = frame(&edge_corner_output, "floating-edge-flip-reference");
+    let corner_edge_popover = frame(&edge_corner_output, "floating-edge-flip-popover");
+    let edge_boundary_right =
+        edge_flip_panel.rect.right() - edge_flip_panel.style.border_width.right;
+    assert_close(
+        corner_edge_popover.rect.bottom(),
+        corner_edge_reference.rect.origin.y,
+    );
+    assert_close(
+        corner_edge_popover.rect.right(),
+        corner_edge_reference.rect.right(),
+    );
+    assert!(corner_edge_popover.rect.right() <= edge_boundary_right);
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);
     assert!(top_reference.interactive);

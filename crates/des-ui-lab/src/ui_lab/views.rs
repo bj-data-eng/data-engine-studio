@@ -2283,6 +2283,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
             floating_scroll_attach_specimen(ui);
             floating_vertical_scroll_overlap_specimen(ui);
             floating_vertical_scroll_flip_specimen(ui);
+            floating_edge_flip_specimen(ui);
         },
     );
 }
@@ -2781,6 +2782,52 @@ fn floating_vertical_scroll_flip_specimen(ui: &mut des_ui_document::DocumentBuil
                         },
                     );
                     floating_offset_popover(ui, "floating-vertical-flip-popover");
+                },
+            );
+        },
+    );
+}
+
+fn floating_edge_flip_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-edge-flip-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-centered-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-edge-flip-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Two-axis edge flip",
+            );
+            ui.element(
+                "floating-edge-flip-panel",
+                ElementSpec::new(Element::Div)
+                    .class("floating-edge-flip-panel")
+                    .class("styled-scrollbar"),
+                |ui| {
+                    ui.element(
+                        "floating-edge-flip-track",
+                        ElementSpec::new(Element::Div).class("floating-edge-flip-track"),
+                        |ui| {
+                            floating_offset_reference(ui, "floating-edge-flip-reference", "");
+                        },
+                    );
+                    ui.element(
+                        "floating-edge-flip-popover",
+                        ElementSpec::new(Element::Button)
+                            .class("floating-offset-popover")
+                            .class("floating-edge-flip-popover")
+                            .interactive(),
+                        |ui| {
+                            ui.text_element(
+                                "floating-edge-flip-popover-label",
+                                ElementSpec::new(Element::Text)
+                                    .class("floating-offset-popover-label"),
+                                "I will check cross axis overflow (default)",
+                            );
+                        },
+                    );
                 },
             );
         },
