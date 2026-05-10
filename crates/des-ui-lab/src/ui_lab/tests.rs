@@ -329,6 +329,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
 
     let playground = frame(&output, "floating-playground");
     let specimen = frame(&output, "floating-offset-specimen");
+    let offset_row = frame(&output, "floating-offset-row");
     let zero_reference = frame(&output, "floating-offset-zero-reference");
     let zero_popover = frame(&output, "floating-offset-zero-popover");
     let ten_reference = frame(&output, "floating-offset-ten-reference");
@@ -408,6 +409,24 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         specimen.rect.size.width,
         (playground.rect.size.width - playground.style.padding.horizontal()) * 0.5,
+    );
+    let offset_pair_width =
+        zero_reference.rect.size.width + ten_reference.rect.size.width + offset_row.style.gap;
+    assert_close(
+        zero_reference.rect.origin.x,
+        offset_row.rect.origin.x + (offset_row.rect.size.width - offset_pair_width) * 0.5,
+    );
+    assert_close(
+        ten_reference.rect.origin.x,
+        zero_reference.rect.right() + offset_row.style.gap,
+    );
+    assert_close(
+        zero_reference.rect.origin.y + zero_reference.rect.size.height * 0.5,
+        offset_row.rect.origin.y + offset_row.rect.size.height * 0.5,
+    );
+    assert_close(
+        ten_reference.rect.origin.y + ten_reference.rect.size.height * 0.5,
+        offset_row.rect.origin.y + offset_row.rect.size.height * 0.5,
     );
     assert_close(main_axis_specimen.rect.size.width, specimen.rect.size.width);
     assert_close(main_axis_specimen.rect.origin.x, specimen.rect.right());

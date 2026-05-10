@@ -1676,8 +1676,10 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("floating-offset-row"),
             Style::default()
                 .width_fill()
-                .height(Length::Auto)
+                .height_fill()
                 .flex_direction(FlexDirection::Row)
+                .align_items(AlignItems::Center)
+                .justify_content(JustifyContent::Center)
                 .gap(34.0),
         )
         .rule(
