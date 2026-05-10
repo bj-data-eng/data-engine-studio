@@ -1658,7 +1658,12 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .flex_basis(Length::Percent(0.5))
                 .flex_shrink(0.0)
                 .height(Length::Px(320.0))
-                .padding(Insets::all(18.0))
+                .padding(Insets {
+                    top: 12.0,
+                    right: 18.0,
+                    bottom: 18.0,
+                    left: 18.0,
+                })
                 .gap(14.0)
                 .background(SURFACE_CONTAINER)
                 .border(STROKE)

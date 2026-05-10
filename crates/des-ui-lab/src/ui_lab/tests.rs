@@ -411,6 +411,11 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         specimen.rect.size.width,
         (playground.rect.size.width - playground.style.padding.horizontal()) * 0.5,
     );
+    assert_close(
+        specimen_title.rect.origin.y,
+        specimen.rect.origin.y + specimen.style.border_width.top + specimen.style.padding.top,
+    );
+    assert_close(specimen.style.padding.top, 12.0);
     assert_close(specimen_title.rect.size.height, 18.0);
     let offset_pair_width =
         zero_reference.rect.size.width + ten_reference.rect.size.width + offset_row.style.gap;
