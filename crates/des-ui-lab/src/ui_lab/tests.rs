@@ -5,7 +5,7 @@ use crate::graphics_testing::{
 };
 use des_ui_document::{
     DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, Insets, Length, Point,
-    PointerInput, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
+    PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
     TextWrapMode,
 };
 use des_ui_egui::adapter::EguiTextMeasurer;
@@ -327,11 +327,23 @@ fn clicked_floating_nav_view_matches_directly_seeded_view() {
 fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let output = lab_output("floating");
 
+    let playground = frame(&output, "floating-playground");
+    let specimen = frame(&output, "floating-offset-specimen");
     let zero_reference = frame(&output, "floating-offset-zero-reference");
     let zero_popover = frame(&output, "floating-offset-zero-popover");
     let ten_reference = frame(&output, "floating-offset-ten-reference");
     let ten_popover = frame(&output, "floating-offset-ten-popover");
 
+    assert_eq!(specimen.style.position, Position::Flow);
+    assert_eq!(zero_reference.style.position, Position::Flow);
+    assert_eq!(ten_reference.style.position, Position::Flow);
+    assert_close(
+        specimen.rect.size.width,
+        (playground.rect.size.width - playground.style.padding.horizontal()) * 0.5,
+    );
+    assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
+    assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
+    assert_close(ten_reference.rect.origin.y, zero_reference.rect.origin.y);
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);
     assert_eq!(

@@ -2273,15 +2273,25 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
         "floating-playground",
         ElementSpec::new(Element::Div).class("floating-playground"),
         |ui| {
+            floating_offset_specimen(ui);
+        },
+    );
+}
+
+fn floating_offset_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-offset-specimen",
+        ElementSpec::new(Element::Div).class("floating-specimen-box"),
+        |ui| {
+            ui.text_element(
+                "floating-offset-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Floating offset",
+            );
             ui.element(
-                "floating-offset-specimen",
-                ElementSpec::new(Element::Div).class("floating-specimen-box"),
+                "floating-offset-row",
+                ElementSpec::new(Element::Div).class("floating-offset-row"),
                 |ui| {
-                    ui.text_element(
-                        "floating-offset-specimen-title",
-                        ElementSpec::new(Element::Text).class("card-title"),
-                        "Floating offset",
-                    );
                     floating_offset_reference(ui, "floating-offset-zero-reference", "0px");
                     floating_offset_reference(ui, "floating-offset-ten-reference", "10px");
                     floating_offset_popover(ui, "floating-offset-zero-popover");

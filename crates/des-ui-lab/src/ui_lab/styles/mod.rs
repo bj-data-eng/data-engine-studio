@@ -1644,21 +1644,33 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("floating-playground"),
             Style::default()
                 .width_fill()
-                .height(Length::Px(520.0))
+                .height(Length::Auto)
+                .flex_direction(FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
                 .padding(Insets::all(18.0))
-                .gap(14.0)
+                .gap(0.0)
                 .background(PANEL_ALT),
         )
         .rule(
             StyleSelector::class("floating-specimen-box"),
             Style::default()
-                .width_fill()
+                .width_percent(0.5)
+                .flex_basis(Length::Percent(0.5))
+                .flex_shrink(0.0)
                 .height(Length::Px(320.0))
                 .padding(Insets::all(18.0))
-                .gap(8.0)
+                .gap(14.0)
                 .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-offset-row"),
+            Style::default()
+                .width_fill()
+                .height(Length::Auto)
+                .flex_direction(FlexDirection::Row)
+                .gap(34.0),
         )
         .rule(
             StyleSelector::class("floating-offset-reference"),
@@ -1678,20 +1690,6 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .font_size(23.0)
                 .text_color(Color::rgba(30, 31, 38, 255)),
-        )
-        .rule(
-            StyleSelector::id("floating-offset-zero-reference"),
-            Style::default()
-                .absolute_viewport()
-                .left(Length::Px(452.0))
-                .top(Length::Px(300.0)),
-        )
-        .rule(
-            StyleSelector::id("floating-offset-ten-reference"),
-            Style::default()
-                .absolute_viewport()
-                .left(Length::Px(650.0))
-                .top(Length::Px(300.0)),
         )
         .rule(
             StyleSelector::class("floating-offset-popover"),
