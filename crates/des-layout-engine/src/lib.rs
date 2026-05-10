@@ -67,6 +67,7 @@ extern crate alloc;
 extern crate serde;
 
 pub mod compute;
+pub mod floating;
 pub mod geometry;
 pub mod prelude;
 pub mod style;
@@ -106,6 +107,7 @@ pub use crate::util::print_tree;
 pub use parse::{ParseError, ParseResult};
 
 pub use crate::compute::*;
+pub use crate::floating::*;
 pub use crate::geometry::*;
 pub use crate::style::*;
 pub use crate::tree::*;

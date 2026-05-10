@@ -1,6 +1,11 @@
 //! Commonly used types
 
 pub use crate::{
+    floating::{
+        compute_floating_position, detect_overflow, FloatingAlignment, FloatingBoundary,
+        FloatingOffset, FloatingOptions, FloatingOverflow, FloatingPadding, FloatingPlacement,
+        FloatingPosition, FloatingRect, FloatingShift, FloatingSide,
+    },
     geometry::{Line, Rect, Size},
     style::{
         AlignContent, AlignItems, AlignSelf, AvailableSpace, BoxSizing, CompactLength, Dimension,
