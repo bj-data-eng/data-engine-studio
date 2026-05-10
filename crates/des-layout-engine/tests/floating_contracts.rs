@@ -1,6 +1,7 @@
 use des_layout_engine::floating::{
-    compute_floating_position, detect_overflow, FloatingBoundary, FloatingOptions, FloatingPadding,
-    FloatingPlacement, FloatingRect, FloatingShift, FloatingSide,
+    compute_floating_position, detect_overflow, FloatingArrow, FloatingBoundary, FloatingOptions,
+    FloatingPadding, FloatingPlacement, FloatingRect, FloatingShift, FloatingSide,
+    FloatingVisibility,
 };
 use des_layout_engine::geometry::{Point, Size};
 
@@ -117,4 +118,120 @@ fn floating_position_shifts_into_boundary_without_changing_side() {
 
     assert_eq!(output.placement.side(), FloatingSide::Bottom);
     assert_eq!(output.origin, Point { x: 60.0, y: 52.0 });
+}
+
+#[test]
+fn floating_position_uses_first_fallback_that_fits() {
+    let reference = rect(84.0, 40.0, 12.0, 12.0);
+    let floating = Size {
+        width: 34.0,
+        height: 24.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Right)
+            .boundary(boundary)
+            .fallbacks([FloatingPlacement::Bottom, FloatingPlacement::Left]),
+    );
+
+    assert_eq!(output.placement, FloatingPlacement::Left);
+    assert_eq!(output.origin, Point { x: 50.0, y: 34.0 });
+}
+
+#[test]
+fn floating_position_reports_available_size_for_final_placement() {
+    let reference = rect(40.0, 40.0, 20.0, 20.0);
+    let floating = Size {
+        width: 40.0,
+        height: 90.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Bottom).boundary(boundary),
+    );
+
+    assert_eq!(
+        output.available_size,
+        Size {
+            width: 100.0,
+            height: 40.0
+        }
+    );
+}
+
+#[test]
+fn floating_position_reports_arrow_offset_clamped_to_floating_box() {
+    let reference = rect(90.0, 40.0, 20.0, 20.0);
+    let floating = Size {
+        width: 60.0,
+        height: 24.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .shift(FloatingShift::main_and_cross_axis())
+            .arrow(FloatingArrow::new(Size {
+                width: 10.0,
+                height: 8.0,
+            })),
+    );
+
+    assert_eq!(output.origin, Point { x: 40.0, y: 60.0 });
+    assert_eq!(output.arrow_offset, Some(Point { x: 50.0, y: 0.0 }));
+}
+
+#[test]
+fn floating_position_reports_visibility_state() {
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let hidden = compute_floating_position(
+        rect(140.0, 10.0, 20.0, 20.0),
+        Size {
+            width: 40.0,
+            height: 24.0,
+        },
+        FloatingOptions::new(FloatingPlacement::Bottom).boundary(boundary),
+    );
+    assert_eq!(hidden.visibility, FloatingVisibility::ReferenceHidden);
+
+    let escaped = compute_floating_position(
+        rect(20.0, 20.0, 20.0, 20.0),
+        Size {
+            width: 120.0,
+            height: 24.0,
+        },
+        FloatingOptions::new(FloatingPlacement::BottomStart).boundary(boundary),
+    );
+    assert_eq!(escaped.visibility, FloatingVisibility::FloatingEscaped);
+}
+
+#[test]
+fn floating_position_can_limit_cross_axis_shift() {
+    let reference = rect(102.0, 40.0, 12.0, 12.0);
+    let floating = Size {
+        width: 40.0,
+        height: 20.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::BottomEnd)
+            .boundary(boundary)
+            .shift(FloatingShift::main_and_cross_axis().limit_cross_axis(10.0)),
+    );
+
+    assert_eq!(output.origin, Point { x: 64.0, y: 52.0 });
+    assert_eq!(output.overflow.unwrap().right, 4.0);
 }

@@ -4,7 +4,7 @@
 //! rectangle, such as context menus, popovers, dropdowns, and tooltips.
 
 use crate::geometry::{Point, Size};
-use crate::util::sys::{f32_max, f32_min};
+use crate::util::sys::{f32_max, f32_min, Vec};
 
 /// A rectangle used by floating placement.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -300,13 +300,17 @@ impl FloatingOverflow {
 }
 
 /// Shift behavior after placement is computed.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FloatingShift {
     /// Shift along the main placement axis.
     pub main_axis: bool,
     /// Shift along the cross placement axis.
     pub cross_axis: bool,
+    /// Maximum distance allowed when shifting on the main axis.
+    pub main_axis_limit: Option<f32>,
+    /// Maximum distance allowed when shifting on the cross axis.
+    pub cross_axis_limit: Option<f32>,
 }
 
 impl FloatingShift {
@@ -316,6 +320,8 @@ impl FloatingShift {
         Self {
             main_axis,
             cross_axis,
+            main_axis_limit: None,
+            cross_axis_limit: None,
         }
     }
 
@@ -324,22 +330,77 @@ impl FloatingShift {
     pub const fn main_and_cross_axis() -> Self {
         Self::new(true, true)
     }
+
+    /// Limits main-axis shift distance.
+    #[must_use]
+    pub const fn limit_main_axis(mut self, limit: f32) -> Self {
+        self.main_axis_limit = Some(limit);
+        self
+    }
+
+    /// Limits cross-axis shift distance.
+    #[must_use]
+    pub const fn limit_cross_axis(mut self, limit: f32) -> Self {
+        self.cross_axis_limit = Some(limit);
+        self
+    }
+}
+
+/// Arrow geometry for a floating element.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct FloatingArrow {
+    /// Size of the arrow box.
+    pub size: Size<f32>,
+    /// Minimum distance from either edge of the floating box.
+    pub padding: f32,
+}
+
+impl FloatingArrow {
+    /// Creates an arrow with no edge padding.
+    #[must_use]
+    pub const fn new(size: Size<f32>) -> Self {
+        Self { size, padding: 0.0 }
+    }
+
+    /// Sets arrow edge padding.
+    #[must_use]
+    pub const fn padding(mut self, padding: f32) -> Self {
+        self.padding = padding;
+        self
+    }
+}
+
+/// Visibility state for the reference/floating relationship.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum FloatingVisibility {
+    /// Reference and floating rectangles fit the available boundary.
+    Visible,
+    /// The reference rectangle is fully outside the boundary.
+    ReferenceHidden,
+    /// The floating rectangle overflows the boundary.
+    FloatingEscaped,
 }
 
 /// Options for floating placement.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FloatingOptions {
     /// Preferred placement.
     pub placement: FloatingPlacement,
     /// Optional offset from the preferred placement.
     pub offset: FloatingOffset,
+    /// Ordered fallback placements to try before the opposite side.
+    pub fallbacks: Vec<FloatingPlacement>,
     /// Optional clipping boundary.
     pub boundary: Option<FloatingBoundary>,
     /// Whether to try the opposite side if the preferred side overflows.
     pub flip: bool,
     /// Optional shift behavior inside the clipping boundary.
     pub shift: Option<FloatingShift>,
+    /// Optional arrow geometry.
+    pub arrow: Option<FloatingArrow>,
     /// Whether start/end alignment should invert in right-to-left layout for vertical sides.
     pub rtl: bool,
 }
@@ -354,9 +415,11 @@ impl FloatingOptions {
                 main_axis: 0.0,
                 cross_axis: 0.0,
             },
+            fallbacks: Vec::new(),
             boundary: None,
             flip: false,
             shift: None,
+            arrow: None,
             rtl: false,
         }
     }
@@ -365,6 +428,13 @@ impl FloatingOptions {
     #[must_use]
     pub const fn offset(mut self, main_axis: f32, cross_axis: f32) -> Self {
         self.offset = FloatingOffset::new(main_axis, cross_axis);
+        self
+    }
+
+    /// Sets ordered fallback placements.
+    #[must_use]
+    pub fn fallbacks(mut self, fallbacks: impl Into<Vec<FloatingPlacement>>) -> Self {
+        self.fallbacks = fallbacks.into();
         self
     }
 
@@ -389,6 +459,13 @@ impl FloatingOptions {
         self
     }
 
+    /// Sets arrow geometry.
+    #[must_use]
+    pub const fn arrow(mut self, arrow: FloatingArrow) -> Self {
+        self.arrow = Some(arrow);
+        self
+    }
+
     /// Sets right-to-left alignment behavior.
     #[must_use]
     pub const fn rtl(mut self, rtl: bool) -> Self {
@@ -409,6 +486,12 @@ pub struct FloatingPosition {
     pub rect: FloatingRect,
     /// Overflow after final placement if a boundary was provided.
     pub overflow: Option<FloatingOverflow>,
+    /// Available size on the final placement side.
+    pub available_size: Size<f32>,
+    /// Arrow origin inside the floating rectangle.
+    pub arrow_offset: Option<Point<f32>>,
+    /// Visibility state relative to the boundary.
+    pub visibility: FloatingVisibility,
 }
 
 /// Computes the base coordinates for a floating element.
@@ -498,32 +581,17 @@ pub fn compute_floating_position(
     let mut origin =
         placed_origin_with_offset(reference, floating, placement, options.offset, options.rtl);
 
-    if options.flip {
-        if let Some(boundary) = options.boundary {
-            let overflow = detect_overflow(
-                FloatingRect::new(origin, floating),
-                boundary,
-                FloatingPadding::default(),
+    if let Some(boundary) = options.boundary {
+        let fallback = choose_fallback_placement(reference, floating, &options, boundary);
+        if fallback != placement {
+            placement = fallback;
+            origin = placed_origin_with_offset(
+                reference,
+                floating,
+                placement,
+                options.offset,
+                options.rtl,
             );
-            if overflow.side(placement.side()) > 0.0 {
-                let opposite = placement.opposite();
-                let opposite_origin = placed_origin_with_offset(
-                    reference,
-                    floating,
-                    opposite,
-                    options.offset,
-                    options.rtl,
-                );
-                let opposite_overflow = detect_overflow(
-                    FloatingRect::new(opposite_origin, floating),
-                    boundary,
-                    FloatingPadding::default(),
-                );
-                if opposite_overflow.side(opposite.side()) <= overflow.side(placement.side()) {
-                    placement = opposite;
-                    origin = opposite_origin;
-                }
-            }
         }
     }
 
@@ -535,11 +603,28 @@ pub fn compute_floating_position(
     let overflow = options
         .boundary
         .map(|boundary| detect_overflow(rect, boundary, FloatingPadding::default()));
+    let available_size = options
+        .boundary
+        .map(|boundary| available_size(reference, placement.side(), boundary))
+        .unwrap_or(Size {
+            width: f32::INFINITY,
+            height: f32::INFINITY,
+        });
+    let arrow_offset = options
+        .arrow
+        .map(|arrow| compute_arrow_offset(reference, rect, placement.side(), arrow));
+    let visibility = options
+        .boundary
+        .map(|boundary| visibility_state(reference, rect, boundary))
+        .unwrap_or(FloatingVisibility::Visible);
     FloatingPosition {
         origin,
         placement,
         rect,
         overflow,
+        available_size,
+        arrow_offset,
+        visibility,
     }
 }
 
@@ -574,7 +659,7 @@ pub fn apply_offset(
 /// Shifts an origin inside a clipping boundary.
 #[must_use]
 pub fn shift_origin_into_boundary(
-    mut origin: Point<f32>,
+    origin: Point<f32>,
     floating: Size<f32>,
     side: FloatingSide,
     boundary: FloatingBoundary,
@@ -590,13 +675,18 @@ pub fn shift_origin_into_boundary(
     let clamp_y =
         (side.is_vertical() && shift.main_axis) || (!side.is_vertical() && shift.cross_axis);
 
-    if clamp_x {
-        origin.x = clamp(origin.x, min_x, max_x);
+    Point {
+        x: if clamp_x {
+            limited_clamp(origin.x, min_x, max_x, shift_limit_for_x(side, shift))
+        } else {
+            origin.x
+        },
+        y: if clamp_y {
+            limited_clamp(origin.y, min_y, max_y, shift_limit_for_y(side, shift))
+        } else {
+            origin.y
+        },
     }
-    if clamp_y {
-        origin.y = clamp(origin.y, min_y, max_y);
-    }
-    origin
 }
 
 fn placed_origin_with_offset(
@@ -611,6 +701,153 @@ fn placed_origin_with_offset(
         placement.side(),
         offset,
     )
+}
+
+fn choose_fallback_placement(
+    reference: FloatingRect,
+    floating: Size<f32>,
+    options: &FloatingOptions,
+    boundary: FloatingBoundary,
+) -> FloatingPlacement {
+    let mut candidates = Vec::with_capacity(options.fallbacks.len() + 2);
+    candidates.push(options.placement);
+    candidates.extend(options.fallbacks.iter().copied());
+    if options.flip {
+        candidates.push(options.placement.opposite());
+    }
+
+    let mut best = options.placement;
+    let mut best_score = f32::INFINITY;
+    for candidate in candidates {
+        let origin =
+            placed_origin_with_offset(reference, floating, candidate, options.offset, options.rtl);
+        let overflow = detect_overflow(
+            FloatingRect::new(origin, floating),
+            boundary,
+            FloatingPadding::default(),
+        );
+        if !overflow.has_overflow() {
+            return candidate;
+        }
+        let score = overflow_score(overflow);
+        if score < best_score {
+            best = candidate;
+            best_score = score;
+        }
+    }
+    best
+}
+
+fn overflow_score(overflow: FloatingOverflow) -> f32 {
+    f32_max(overflow.top, 0.0)
+        + f32_max(overflow.right, 0.0)
+        + f32_max(overflow.bottom, 0.0)
+        + f32_max(overflow.left, 0.0)
+}
+
+fn available_size(
+    reference: FloatingRect,
+    side: FloatingSide,
+    boundary: FloatingBoundary,
+) -> Size<f32> {
+    let left = boundary.rect.left() + boundary.padding.left;
+    let right = boundary.rect.right() - boundary.padding.right;
+    let top = boundary.rect.top() + boundary.padding.top;
+    let bottom = boundary.rect.bottom() - boundary.padding.bottom;
+    match side {
+        FloatingSide::Top => Size {
+            width: f32_max(right - left, 0.0),
+            height: f32_max(reference.top() - top, 0.0),
+        },
+        FloatingSide::Right => Size {
+            width: f32_max(right - reference.right(), 0.0),
+            height: f32_max(bottom - top, 0.0),
+        },
+        FloatingSide::Bottom => Size {
+            width: f32_max(right - left, 0.0),
+            height: f32_max(bottom - reference.bottom(), 0.0),
+        },
+        FloatingSide::Left => Size {
+            width: f32_max(reference.left() - left, 0.0),
+            height: f32_max(bottom - top, 0.0),
+        },
+    }
+}
+
+fn compute_arrow_offset(
+    reference: FloatingRect,
+    floating: FloatingRect,
+    side: FloatingSide,
+    arrow: FloatingArrow,
+) -> Point<f32> {
+    if side.is_vertical() {
+        let reference_center = reference.left() + reference.size.width / 2.0;
+        let raw_x = reference_center - floating.left() - arrow.size.width / 2.0;
+        Point {
+            x: clamp(
+                raw_x,
+                arrow.padding,
+                floating.size.width - arrow.size.width - arrow.padding,
+            ),
+            y: 0.0,
+        }
+    } else {
+        let reference_center = reference.top() + reference.size.height / 2.0;
+        let raw_y = reference_center - floating.top() - arrow.size.height / 2.0;
+        Point {
+            x: 0.0,
+            y: clamp(
+                raw_y,
+                arrow.padding,
+                floating.size.height - arrow.size.height - arrow.padding,
+            ),
+        }
+    }
+}
+
+fn visibility_state(
+    reference: FloatingRect,
+    floating: FloatingRect,
+    boundary: FloatingBoundary,
+) -> FloatingVisibility {
+    if reference.right() <= boundary.rect.left()
+        || reference.left() >= boundary.rect.right()
+        || reference.bottom() <= boundary.rect.top()
+        || reference.top() >= boundary.rect.bottom()
+    {
+        return FloatingVisibility::ReferenceHidden;
+    }
+    if detect_overflow(floating, boundary, FloatingPadding::default()).has_overflow() {
+        return FloatingVisibility::FloatingEscaped;
+    }
+    FloatingVisibility::Visible
+}
+
+fn shift_limit_for_x(side: FloatingSide, shift: FloatingShift) -> Option<f32> {
+    if side.is_vertical() {
+        shift.cross_axis_limit
+    } else {
+        shift.main_axis_limit
+    }
+}
+
+fn shift_limit_for_y(side: FloatingSide, shift: FloatingShift) -> Option<f32> {
+    if side.is_vertical() {
+        shift.main_axis_limit
+    } else {
+        shift.cross_axis_limit
+    }
+}
+
+fn limited_clamp(value: f32, min: f32, max: f32, limit: Option<f32>) -> f32 {
+    let clamped = clamp(value, min, max);
+    match limit {
+        Some(limit) => {
+            let distance = clamped - value;
+            value + clamp(distance, -limit, limit)
+        }
+        None => clamped,
+    }
 }
 
 fn update_alignment_axis(origin: &mut Point<f32>, side: FloatingSide, delta: f32) {

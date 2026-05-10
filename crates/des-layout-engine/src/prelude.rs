@@ -2,9 +2,10 @@
 
 pub use crate::{
     floating::{
-        compute_floating_position, detect_overflow, FloatingAlignment, FloatingBoundary,
-        FloatingOffset, FloatingOptions, FloatingOverflow, FloatingPadding, FloatingPlacement,
-        FloatingPosition, FloatingRect, FloatingShift, FloatingSide,
+        compute_floating_position, detect_overflow, FloatingAlignment, FloatingArrow,
+        FloatingBoundary, FloatingOffset, FloatingOptions, FloatingOverflow, FloatingPadding,
+        FloatingPlacement, FloatingPosition, FloatingRect, FloatingShift, FloatingSide,
+        FloatingVisibility,
     },
     geometry::{Line, Rect, Size},
     style::{
