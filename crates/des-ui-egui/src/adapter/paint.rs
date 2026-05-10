@@ -303,8 +303,8 @@ fn paint_segmented_border(
     match style {
         BorderStyle::Solid => {}
         BorderStyle::Dashed => {
-            let dash = (width * 3.0).max(8.0);
-            let gap = (width * 2.0).max(5.0);
+            let dash = (width * 3.0).max(6.0);
+            let gap = (width * 2.0).max(4.0);
             paint_corner_preserved_dashed_border(painter, rect, dash, gap, stroke);
         }
         BorderStyle::Dotted => {
