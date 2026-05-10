@@ -325,7 +325,7 @@ fn paint_corner_preserved_dashed_border(
     let corner_x = dash.min(rect.width() * 0.5);
     let corner_y = dash.min(rect.height() * 0.5);
     paint_dashed_corner_segments(painter, rect, corner_x, corner_y, stroke);
-    paint_dashed_segment(
+    paint_distributed_dashes(
         painter,
         rect.left_top() + egui::vec2(corner_x + gap, 0.0),
         rect.right_top() - egui::vec2(corner_x + gap, 0.0),
@@ -333,7 +333,7 @@ fn paint_corner_preserved_dashed_border(
         gap,
         stroke,
     );
-    paint_dashed_segment(
+    paint_distributed_dashes(
         painter,
         rect.right_top() + egui::vec2(0.0, corner_y + gap),
         rect.right_bottom() - egui::vec2(0.0, corner_y + gap),
@@ -341,7 +341,7 @@ fn paint_corner_preserved_dashed_border(
         gap,
         stroke,
     );
-    paint_dashed_segment(
+    paint_distributed_dashes(
         painter,
         rect.right_bottom() - egui::vec2(corner_x + gap, 0.0),
         rect.left_bottom() + egui::vec2(corner_x + gap, 0.0),
@@ -349,7 +349,7 @@ fn paint_corner_preserved_dashed_border(
         gap,
         stroke,
     );
-    paint_dashed_segment(
+    paint_distributed_dashes(
         painter,
         rect.left_bottom() - egui::vec2(0.0, corner_y + gap),
         rect.left_top() + egui::vec2(0.0, corner_y + gap),
@@ -388,8 +388,10 @@ fn paint_dashed_corner_segments(
             egui::vec2(0.0, -corner_y),
         ),
     ] {
-        painter.line_segment([corner, corner + horizontal], stroke);
-        painter.line_segment([corner, corner + vertical], stroke);
+        painter.add(egui::Shape::line(
+            vec![corner + horizontal, corner, corner + vertical],
+            stroke,
+        ));
     }
 }
 
@@ -443,12 +445,12 @@ fn paint_corner_preserved_dotted_border(
     );
 }
 
-fn paint_dashed_segment(
+fn paint_distributed_dashes(
     painter: &egui::Painter,
     start: egui::Pos2,
     end: egui::Pos2,
-    dash: f32,
-    gap: f32,
+    preferred_dash: f32,
+    preferred_gap: f32,
     stroke: egui::Stroke,
 ) {
     let vector = end - start;
@@ -456,15 +458,59 @@ fn paint_dashed_segment(
     if length <= f32::EPSILON {
         return;
     }
+    let pattern = distributed_dash_pattern(length, preferred_dash, preferred_gap);
     let direction = vector / length;
-    let mut cursor = 0.0;
-    while cursor < length {
-        let segment_end = (cursor + dash).min(length);
+    let mut cursor = pattern.leading_gap;
+    for _ in 0..pattern.count {
         painter.line_segment(
-            [start + direction * cursor, start + direction * segment_end],
+            [
+                start + direction * cursor,
+                start + direction * (cursor + pattern.dash),
+            ],
             stroke,
         );
-        cursor += dash + gap;
+        cursor += pattern.dash + pattern.gap;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct DistributedDashPattern {
+    count: usize,
+    dash: f32,
+    gap: f32,
+    leading_gap: f32,
+}
+
+fn distributed_dash_pattern(
+    length: f32,
+    preferred_dash: f32,
+    preferred_gap: f32,
+) -> DistributedDashPattern {
+    if length <= preferred_dash {
+        return DistributedDashPattern {
+            count: 1,
+            dash: length.max(0.0),
+            gap: 0.0,
+            leading_gap: 0.0,
+        };
+    }
+    let pattern = preferred_dash + preferred_gap;
+    let count = ((length + preferred_gap) / pattern).floor().max(1.0) as usize;
+    if count == 1 {
+        return DistributedDashPattern {
+            count,
+            dash: preferred_dash.min(length),
+            gap: 0.0,
+            leading_gap: ((length - preferred_dash).max(0.0)) * 0.5,
+        };
+    }
+    let used_dash = preferred_dash * count as f32;
+    let remaining = (length - used_dash).max(0.0);
+    DistributedDashPattern {
+        count,
+        dash: preferred_dash,
+        gap: remaining / (count - 1) as f32,
+        leading_gap: 0.0,
     }
 }
 
@@ -842,6 +888,34 @@ mod tests {
         assert!(expanded.points[0].x < arrow.points[0].x);
         assert!(expanded.points[1].x > arrow.points[1].x);
         assert!(expanded.points[2].y < arrow.points[2].y);
+    }
+
+    #[test]
+    fn distributed_dash_pattern_avoids_cutoff_dash() {
+        let pattern = distributed_dash_pattern(52.0, 8.0, 5.0);
+
+        assert_eq!(pattern.count, 4);
+        assert_eq!(pattern.dash, 8.0);
+        assert_eq!(pattern.gap, (52.0 - 32.0) / 3.0);
+        assert_eq!(
+            pattern.dash * pattern.count as f32 + pattern.gap * (pattern.count - 1) as f32,
+            52.0
+        );
+    }
+
+    #[test]
+    fn distributed_dash_pattern_centers_single_dash() {
+        let pattern = distributed_dash_pattern(18.0, 12.0, 8.0);
+
+        assert_eq!(
+            pattern,
+            DistributedDashPattern {
+                count: 1,
+                dash: 12.0,
+                gap: 0.0,
+                leading_gap: 3.0,
+            }
+        );
     }
 }
 
