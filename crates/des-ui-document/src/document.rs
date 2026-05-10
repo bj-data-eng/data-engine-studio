@@ -1439,15 +1439,21 @@ fn anchored_document_rect(
         DocumentRect::new(
             floating.origin.x + style.margin.left,
             floating.origin.y + style.margin.top,
-            measured.width,
-            measured.height,
+            floating.size.width,
+            floating.size.height,
         ),
         Some(ResolvedFloating {
             placement: floating.placement,
             arrow_offset: floating
                 .arrow_offset
                 .map(|offset| Point::new(offset.x, offset.y)),
+            arrow_center_offset: floating.arrow.map(|arrow| arrow.center_offset),
             arrow_size,
+            available_size: Size::new(
+                floating.available_size.width,
+                floating.available_size.height,
+            ),
+            hide: floating.hide,
             visibility: floating.visibility,
         }),
     )

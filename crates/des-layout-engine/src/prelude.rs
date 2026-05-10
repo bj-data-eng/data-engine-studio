@@ -3,9 +3,12 @@
 pub use crate::{
     floating::{
         compute_floating_position, detect_overflow, FloatingAlignment, FloatingArrow,
-        FloatingBoundary, FloatingOffset, FloatingOptions, FloatingOverflow, FloatingPadding,
-        FloatingPlacement, FloatingPosition, FloatingRect, FloatingShift, FloatingSide,
-        FloatingVisibility,
+        FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
+        FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
+        FloatingFlipCrossAxis, FloatingHideData, FloatingHideStrategy, FloatingInline,
+        FloatingOffset, FloatingOptions, FloatingOverflow, FloatingPadding, FloatingPlacement,
+        FloatingPosition, FloatingRect, FloatingShift, FloatingShiftLimiter, FloatingSide,
+        FloatingSize, FloatingVisibility,
     },
     geometry::{Line, Rect, Size},
     style::{

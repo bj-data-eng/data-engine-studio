@@ -11,8 +11,11 @@ pub use layout_engine::prelude::{
 };
 
 pub use layout_engine::floating::{
-    FloatingArrow, FloatingBoundary, FloatingOffset, FloatingOptions, FloatingPlacement,
-    FloatingShift, FloatingVisibility,
+    FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
+    FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
+    FloatingFlipCrossAxis, FloatingHideData, FloatingHideStrategy, FloatingInline, FloatingOffset,
+    FloatingOptions, FloatingPlacement, FloatingShift, FloatingShiftLimiter, FloatingSize,
+    FloatingVisibility,
 };
 
 pub type GridPlacement = layout_engine::prelude::GridPlacement<String>;
@@ -1239,7 +1242,25 @@ impl Style {
         self
     }
 
+    pub fn floating_offset_axes(
+        mut self,
+        main_axis: FloatingAxisOffset,
+        cross_axis: FloatingAxisOffset,
+    ) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.offset = FloatingOffset::from_axes(main_axis, cross_axis);
+        }
+        self
+    }
+
     pub fn floating_alignment_axis(mut self, alignment_axis: f32) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.offset.alignment_axis = Some(FloatingAxisOffset::px(alignment_axis));
+        }
+        self
+    }
+
+    pub fn floating_alignment_axis_offset(mut self, alignment_axis: FloatingAxisOffset) -> Self {
         if let Some(anchor) = &mut self.anchor {
             anchor.options.offset.alignment_axis = Some(alignment_axis);
         }
@@ -1263,9 +1284,31 @@ impl Style {
         self
     }
 
+    pub fn floating_flip_options(mut self, flip: FloatingFlip) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.flip = true;
+            anchor.options.flip_options = flip;
+        }
+        self
+    }
+
+    pub fn floating_auto_placement(mut self, auto_placement: FloatingAutoPlacement) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.auto_placement = Some(auto_placement);
+        }
+        self
+    }
+
     pub fn floating_shift(mut self, shift: FloatingShift) -> Self {
         if let Some(anchor) = &mut self.anchor {
             anchor.options.shift = Some(shift);
+        }
+        self
+    }
+
+    pub fn floating_size(mut self, size: FloatingSize) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.size = Some(size);
         }
         self
     }
@@ -1290,6 +1333,20 @@ impl Style {
                 FloatingArrow::new(layout_engine::geometry::Size { width, height })
                     .padding(padding),
             );
+        }
+        self
+    }
+
+    pub fn floating_hide(mut self, strategy: FloatingHideStrategy) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.hide.push(strategy);
+        }
+        self
+    }
+
+    pub fn floating_inline(mut self, inline: FloatingInline) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.inline = Some(inline);
         }
         self
     }

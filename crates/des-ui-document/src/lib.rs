@@ -38,8 +38,11 @@ pub use state::{
 };
 pub use style::{
     Anchor, AnchorPlacement, BorderStyle, CompoundSelector, ComputedStyle, ContainerQuery,
-    CornerStyle, Display, Easing, EdgeStyle, FloatingArrow, FloatingBoundary, FloatingOffset,
-    FloatingOptions, FloatingPlacement, FloatingShift, FloatingVisibility, GridAutoFlow,
+    CornerStyle, Display, Easing, EdgeStyle, FloatingArrow, FloatingArrowData,
+    FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary, FloatingFallbackAxisSideDirection,
+    FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHideData,
+    FloatingHideStrategy, FloatingInline, FloatingOffset, FloatingOptions, FloatingPlacement,
+    FloatingShift, FloatingShiftLimiter, FloatingSize, FloatingVisibility, GridAutoFlow,
     GridPlacement, GridPlacementLine, GridTemplateArea, GridTemplateComponent,
     GridTemplateRepetition, GridTrack, MaxTrackSizingFunction, MinTrackSizingFunction,
     NthChildFormula, RepetitionCount, Shadow, Style, StyleCondition, StyleRule, StyleSelector,

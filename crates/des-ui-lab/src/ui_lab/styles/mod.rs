@@ -8,8 +8,8 @@ use super::{
 };
 use des_ui_document::{
     AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
-    FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow, Point, Shadow,
-    Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
+    FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
+    Point, Shadow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -1654,10 +1654,10 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("floating-specimen-box"),
             Style::default()
-                .width(Length::calc(0.5, -5.0))
-                .flex_basis(Length::calc(0.5, -5.0))
+                .width(Length::calc(0.33333334, -6.666667))
+                .flex_basis(Length::calc(0.33333334, -6.666667))
                 .flex_shrink(0.0)
-                .height(Length::Px(220.0))
+                .height(Length::Px(160.0))
                 .padding(Insets {
                     top: 8.0,
                     right: 12.0,
@@ -1671,17 +1671,17 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("floating-main-axis-specimen"),
-            Style::default().height(Length::Px(300.0)),
+            Style::default().height(Length::Px(210.0)),
         )
         .rule(
             StyleSelector::class("floating-centered-axis-specimen"),
-            Style::default().height(Length::Px(220.0)),
+            Style::default().height(Length::Px(160.0)),
         )
         .rule(
             StyleSelector::class("floating-offset-row"),
             Style::default()
                 .width_fill()
-                .height_fill()
+                .height(Length::Px(112.0))
                 .flex_direction(FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::Center)
@@ -1831,8 +1831,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("floating-offset-popover"),
             Style::default()
-                .width(Length::Px(64.0))
-                .height(Length::Px(28.0))
+                .width(Length::Px(52.0))
+                .height(Length::Px(22.0))
                 .align_items(AlignItems::Center)
                 .justify_content(JustifyContent::Center)
                 .background(Color::rgba(244, 52, 87, 255))
@@ -1948,7 +1948,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .floating_to("floating-top-start-reference")
                 .floating_placement(FloatingPlacement::TopStart)
-                .floating_alignment_axis(-34.0),
+                .floating_alignment_axis_offset(FloatingAxisOffset::floating_width(-1.0)),
         )
         .rule(
             StyleSelector::id("floating-scroll-shift-reference"),
@@ -1998,8 +1998,6 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id("floating-scroll-shift-popover"),
             Style::default()
-                .width(Length::Px(235.0))
-                .height(Length::Px(28.0))
                 .floating_to("floating-scroll-shift-reference")
                 .floating_placement(FloatingPlacement::Bottom)
                 .floating_boundary_to("floating-scroll-shift-panel")
@@ -2008,16 +2006,12 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id("floating-scroll-attach-popover"),
             Style::default()
-                .width(Length::Px(260.0))
-                .height(Length::Px(28.0))
                 .floating_to("floating-scroll-attach-reference")
                 .floating_placement(FloatingPlacement::Bottom),
         )
         .rule(
             StyleSelector::id("floating-vertical-overlap-popover"),
             Style::default()
-                .width(Length::Px(235.0))
-                .height(Length::Px(28.0))
                 .floating_to("floating-vertical-overlap-reference")
                 .floating_placement(FloatingPlacement::Top)
                 .floating_boundary_to("floating-vertical-overlap-panel")
@@ -2034,8 +2028,6 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id("floating-edge-flip-popover"),
             Style::default()
-                .width(Length::Px(285.0))
-                .height(Length::Px(28.0))
                 .floating_to("floating-edge-flip-reference")
                 .floating_placement(FloatingPlacement::BottomStart)
                 .floating_boundary_to("floating-edge-flip-panel")

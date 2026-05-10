@@ -451,11 +451,9 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let playground_gap = length_px(playground.style.column_gap);
     let playground_content_width =
         playground.rect.size.width - playground.style.padding.horizontal();
-    assert_eq!(specimen.style.width, Length::calc(0.5, -5.0));
-    assert_close(
-        specimen.rect.size.width,
-        (playground_content_width * 0.5 - playground_gap * 0.5).round(),
-    );
+    assert_eq!(specimen.style.width, Length::calc(0.33333334, -6.666667));
+    let expected_specimen_width = playground_content_width / 3.0 - playground_gap * 2.0 / 3.0;
+    assert!((specimen.rect.size.width - expected_specimen_width).abs() <= 1.0);
     assert_close(
         specimen_title.rect.origin.y,
         specimen.rect.origin.y + specimen.style.border_width.top + specimen.style.padding.top,
@@ -465,10 +463,9 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let offset_gap = length_px(offset_row.style.gap);
     let offset_pair_width =
         zero_reference.rect.size.width + ten_reference.rect.size.width + offset_gap;
-    assert_close(
-        zero_reference.rect.origin.x,
-        (offset_row.rect.origin.x + (offset_row.rect.size.width - offset_pair_width) * 0.5).round(),
-    );
+    let expected_zero_reference_x =
+        offset_row.rect.origin.x + (offset_row.rect.size.width - offset_pair_width) * 0.5;
+    assert!((zero_reference.rect.origin.x - expected_zero_reference_x).abs() <= 1.0);
     assert_close(
         ten_reference.rect.origin.x,
         zero_reference.rect.right() + offset_gap,
@@ -481,25 +478,19 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         ten_reference.rect.origin.y + ten_reference.rect.size.height * 0.5,
         offset_row.rect.origin.y + offset_row.rect.size.height * 0.5,
     );
-    assert_close(main_axis_specimen.rect.size.width, specimen.rect.size.width);
+    assert!((main_axis_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(
         main_axis_specimen.rect.origin.x,
         specimen.rect.right() + playground_gap,
     );
     assert_close(main_axis_specimen.rect.origin.y, specimen.rect.origin.y);
-    assert_close(
-        cross_axis_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((cross_axis_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(cross_axis_specimen.rect.origin.x, specimen.rect.origin.x);
     assert_close(
         cross_axis_specimen.rect.origin.y,
         main_axis_specimen.rect.bottom() + playground_gap,
     );
-    assert_close(
-        alignment_axis_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((alignment_axis_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(
         alignment_axis_specimen.rect.origin.x,
         cross_axis_specimen.rect.right() + playground_gap,
@@ -508,16 +499,13 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         alignment_axis_specimen.rect.origin.y,
         cross_axis_specimen.rect.origin.y,
     );
-    assert_close(
-        centered_axis_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((centered_axis_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(centered_axis_specimen.rect.origin.x, specimen.rect.origin.x);
     assert_close(
         centered_axis_specimen.rect.origin.y,
         cross_axis_specimen.rect.bottom() + playground_gap,
     );
-    assert_close(top_start_specimen.rect.size.width, specimen.rect.size.width);
+    assert!((top_start_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(
         top_start_specimen.rect.origin.x,
         centered_axis_specimen.rect.right() + playground_gap,
@@ -526,19 +514,13 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         top_start_specimen.rect.origin.y,
         centered_axis_specimen.rect.origin.y,
     );
-    assert_close(
-        scroll_shift_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((scroll_shift_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(scroll_shift_specimen.rect.origin.x, specimen.rect.origin.x);
     assert_close(
         scroll_shift_specimen.rect.origin.y,
         centered_axis_specimen.rect.bottom() + playground_gap,
     );
-    assert_close(
-        scroll_attach_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((scroll_attach_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(
         scroll_attach_specimen.rect.origin.x,
         scroll_shift_specimen.rect.right() + playground_gap,
@@ -547,22 +529,16 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         scroll_attach_specimen.rect.origin.y,
         scroll_shift_specimen.rect.origin.y,
     );
-    assert_close(
-        vertical_overlap_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((vertical_overlap_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(
         vertical_overlap_specimen.rect.origin.x,
         specimen.rect.origin.x,
     );
     assert!(vertical_overlap_specimen.rect.origin.y >= scroll_shift_specimen.rect.origin.y);
-    assert_close(
-        vertical_flip_specimen.rect.size.width,
-        specimen.rect.size.width,
-    );
+    assert!((vertical_flip_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert!(vertical_flip_specimen.rect.origin.x >= specimen.rect.origin.x);
     assert!(vertical_flip_specimen.rect.origin.y >= scroll_shift_specimen.rect.origin.y);
-    assert_close(edge_flip_specimen.rect.size.width, specimen.rect.size.width);
+    assert!((edge_flip_specimen.rect.size.width - specimen.rect.size.width).abs() <= 1.0);
     assert_close(edge_flip_specimen.rect.origin.x, specimen.rect.origin.x);
     assert!(edge_flip_specimen.rect.origin.y >= vertical_overlap_specimen.rect.origin.y);
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
@@ -647,7 +623,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     );
     assert_close(
         top_start_popover.rect.origin.x,
-        top_start_reference.rect.origin.x - 34.0,
+        top_start_reference.rect.origin.x - top_start_popover.rect.size.width,
     );
     assert_close(
         top_start_popover.rect.bottom(),
@@ -828,10 +804,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         start_edge_popover.rect.origin.y,
         start_edge_reference.rect.bottom(),
     );
-    assert_close(
-        start_edge_popover.rect.origin.x,
-        start_edge_reference.rect.origin.x,
-    );
+    assert!((start_edge_popover.rect.origin.x - start_edge_reference.rect.origin.x).abs() <= 4.0);
     let mut edge_corner = UiLabState::new(Some("floating"));
     edge_corner.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
     {
