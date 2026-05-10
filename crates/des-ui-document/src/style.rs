@@ -443,6 +443,7 @@ pub struct Style {
     pub scrollbar_pressed_handle_border_color: Option<Color>,
     pub scrollbar_pressed_handle_border_width: Option<f32>,
     pub scrollbar_radius: Option<f32>,
+    pub scrollbar_visible: Option<bool>,
     pub position: Option<Position>,
     pub inset: PositionInsets,
     pub anchor: Option<Anchor>,
@@ -953,6 +954,11 @@ impl Style {
         self
     }
 
+    pub fn scrollbar_visible(mut self, visible: bool) -> Self {
+        self.scrollbar_visible = Some(visible);
+        self
+    }
+
     pub fn position(mut self, position: Position) -> Self {
         self.position = Some(position);
         self
@@ -1098,6 +1104,7 @@ pub struct ComputedStyle {
     pub scrollbar_pressed_handle_border_color: Option<Color>,
     pub scrollbar_pressed_handle_border_width: Option<f32>,
     pub scrollbar_radius: f32,
+    pub scrollbar_visible: bool,
     pub position: Position,
     pub inset: PositionInsets,
     pub anchor: Option<Anchor>,
@@ -1171,6 +1178,7 @@ impl Default for ComputedStyle {
             scrollbar_pressed_handle_border_color: None,
             scrollbar_pressed_handle_border_width: None,
             scrollbar_radius: 6.0,
+            scrollbar_visible: false,
             position: Position::Flow,
             inset: PositionInsets::ZERO,
             anchor: None,
@@ -1399,6 +1407,9 @@ impl ComputedStyle {
         }
         if let Some(value) = style.scrollbar_radius {
             self.scrollbar_radius = value.max(0.0);
+        }
+        if let Some(value) = style.scrollbar_visible {
+            self.scrollbar_visible = value;
         }
         if let Some(value) = style.position {
             self.position = value;

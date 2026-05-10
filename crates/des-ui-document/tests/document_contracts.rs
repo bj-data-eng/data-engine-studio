@@ -2650,6 +2650,42 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
 }
 
 #[test]
+fn overflow_scrollbar_can_be_forced_visible_without_hover() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .size(70.0, 70.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_visible(true),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(70.0, 140.0),
+        );
+    let mut document = Document::build(Size::new(180.0, 140.0), |ui| {
+        ui.element("scroll-panel", ElementSpec::new(Element::Div), |ui| {
+            ui.element("content", ElementSpec::new(Element::Div), |_| {});
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let vertical = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .expect("overflowing scroll panel should emit vertical scroll chrome");
+
+    assert!(vertical.visible);
+    assert!(!vertical.hovered);
+    assert!(!vertical.dragged);
+}
+
+#[test]
 fn scrollbar_hover_transition_reuses_layout() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

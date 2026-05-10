@@ -163,6 +163,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .padding(Insets::all(6.0))
                 .gap(5.0)
                 .overflow_y(Overflow::Scroll)
+                .scrollbar_visible(true)
                 .scrollbar_width(2.0)
                 .scrollbar_expanded_width(10.0)
                 .scrollbar_radius(5.0)

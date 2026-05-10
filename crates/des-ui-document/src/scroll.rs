@@ -65,7 +65,8 @@ fn scroll_chrome_for_frame(
     let container_hovered = state.is_some_and(|state| state.hovered);
     let scrollbar_hovered = state.is_some_and(|state| state.scrollbar_hovered_axis == Some(axis));
     let dragged = state.is_some_and(|state| state.scrollbar_dragged_axis == Some(axis));
-    let visible = container_hovered || scrollbar_hovered || dragged;
+    let visible =
+        frame.style.scrollbar_visible || container_hovered || scrollbar_hovered || dragged;
     let expanded = scrollbar_hovered || dragged;
     let compact_visual_width = frame.style.scrollbar_width.max(0.0);
     let expanded_visual_width = frame.style.scrollbar_expanded_width.max(0.0);

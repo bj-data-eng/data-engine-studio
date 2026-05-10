@@ -1088,6 +1088,23 @@ fn draggable_drag_drop_auto_scrolls_opted_in_list_pane() {
 }
 
 #[test]
+fn draggable_scroll_list_keeps_scrollbar_visible_for_testing() {
+    let output = lab_output("draggable");
+    let list = frame(&output, "drag-scroll-list-0");
+    assert!(
+        list.style.scrollbar_visible,
+        "draggable scroll-list scrollbar should stay visible while testing scroll-limit changes"
+    );
+    assert!(
+        output
+            .scroll_chrome
+            .iter()
+            .any(|chrome| { chrome.element_id.as_str() == "drag-scroll-list-0" && chrome.visible }),
+        "draggable scroll-list should emit visible scrollbar chrome without hover"
+    );
+}
+
+#[test]
 fn draggable_drag_drop_uses_snapshot_path_for_drop_targets() {
     let output = lab_output("draggable");
     let cell = frame(&output, "drag-cell-5").rect;
