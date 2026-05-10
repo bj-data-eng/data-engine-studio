@@ -26,6 +26,7 @@ pub enum StyleSelector {
     FirstChild,
     LastChild,
     NthChild(usize),
+    NthChildFormula(NthChildFormula),
     ClassState(ClassName, ElementStateSelector),
     IdState(ElementId, ElementStateSelector),
     Compound(CompoundSelector),
@@ -214,6 +215,43 @@ impl ChildPosition {
     pub fn is_nth(self, nth: usize) -> bool {
         nth > 0 && self.index + 1 == nth
     }
+
+    pub fn matches_nth_formula(self, formula: NthChildFormula) -> bool {
+        formula.matches(self.index + 1)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NthChildFormula {
+    pub step: usize,
+    pub offset: usize,
+}
+
+impl NthChildFormula {
+    pub fn new(step: usize, offset: usize) -> Self {
+        Self { step, offset }
+    }
+
+    pub fn odd() -> Self {
+        Self::new(2, 1)
+    }
+
+    pub fn even() -> Self {
+        Self::new(2, 0)
+    }
+
+    pub fn matches(self, position: usize) -> bool {
+        if position == 0 {
+            return false;
+        }
+        if self.step == 0 {
+            return self.offset > 0 && position == self.offset;
+        }
+        if self.offset == 0 {
+            return position % self.step == 0;
+        }
+        position >= self.offset && (position - self.offset) % self.step == 0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -221,6 +259,7 @@ pub enum ChildPositionSelector {
     First,
     Last,
     Nth(usize),
+    NthFormula(NthChildFormula),
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -265,6 +304,18 @@ impl StyleSelector {
         Self::NthChild(nth)
     }
 
+    pub fn nth_child_formula(step: usize, offset: usize) -> Self {
+        Self::NthChildFormula(NthChildFormula::new(step, offset))
+    }
+
+    pub fn nth_child_odd() -> Self {
+        Self::NthChildFormula(NthChildFormula::odd())
+    }
+
+    pub fn nth_child_even() -> Self {
+        Self::NthChildFormula(NthChildFormula::even())
+    }
+
     pub fn compound() -> CompoundSelector {
         CompoundSelector::default()
     }
@@ -303,6 +354,23 @@ impl CompoundSelector {
 
     pub fn nth_child(mut self, nth: usize) -> Self {
         self.child_position = Some(ChildPositionSelector::Nth(nth));
+        self
+    }
+
+    pub fn nth_child_formula(mut self, step: usize, offset: usize) -> Self {
+        self.child_position = Some(ChildPositionSelector::NthFormula(NthChildFormula::new(
+            step, offset,
+        )));
+        self
+    }
+
+    pub fn nth_child_odd(mut self) -> Self {
+        self.child_position = Some(ChildPositionSelector::NthFormula(NthChildFormula::odd()));
+        self
+    }
+
+    pub fn nth_child_even(mut self) -> Self {
+        self.child_position = Some(ChildPositionSelector::NthFormula(NthChildFormula::even()));
         self
     }
 
@@ -1698,6 +1766,9 @@ fn selector_matches(
         StyleSelector::FirstChild => position.is_some_and(ChildPosition::is_first),
         StyleSelector::LastChild => position.is_some_and(ChildPosition::is_last),
         StyleSelector::NthChild(nth) => position.is_some_and(|position| position.is_nth(*nth)),
+        StyleSelector::NthChildFormula(formula) => {
+            position.is_some_and(|position| position.matches_nth_formula(*formula))
+        }
         StyleSelector::ClassState(class, selector) => {
             element
                 .spec
@@ -1782,6 +1853,7 @@ fn child_position_selector_matches(
         ChildPositionSelector::First => position.is_first(),
         ChildPositionSelector::Last => position.is_last(),
         ChildPositionSelector::Nth(nth) => position.is_nth(nth),
+        ChildPositionSelector::NthFormula(formula) => position.matches_nth_formula(formula),
     }
 }
 

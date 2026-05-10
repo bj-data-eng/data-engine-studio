@@ -3,9 +3,10 @@ use crate::{
     DocumentEventKind, DocumentInput, Element, ElementId, ElementSpec, ElementState,
     ElementStateSelector, FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine,
     GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets,
-    JustifyContent, Length, Overflow, Point, PointerInput, Rect, RepetitionCount, ScrollAxis, Size,
-    Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode, Transition,
+    JustifyContent, Length, NthChildFormula, Overflow, Point, PointerInput, Rect, RepetitionCount,
+    ScrollAxis, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    TextWrapMode, Transition,
 };
 use layout_engine::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, Dimension,
@@ -15,6 +16,20 @@ use layout_engine::prelude::{
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[test]
+fn nth_child_formula_matches_css_like_positions() {
+    assert!(NthChildFormula::odd().matches(1));
+    assert!(!NthChildFormula::odd().matches(2));
+    assert!(NthChildFormula::even().matches(2));
+    assert!(!NthChildFormula::even().matches(3));
+    assert!(NthChildFormula::new(3, 2).matches(5));
+    assert!(!NthChildFormula::new(3, 2).matches(4));
+    assert!(NthChildFormula::new(4, 0).matches(8));
+    assert!(!NthChildFormula::new(4, 0).matches(6));
+    assert!(NthChildFormula::new(0, 3).matches(3));
+    assert!(!NthChildFormula::new(0, 3).matches(4));
+}
 
 #[derive(Default)]
 struct RecordingTextMeasurer {

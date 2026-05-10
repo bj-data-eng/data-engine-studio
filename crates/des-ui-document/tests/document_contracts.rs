@@ -746,6 +746,78 @@ fn structural_selectors_match_first_last_and_nth_children() {
 }
 
 #[test]
+fn nth_child_formula_selectors_match_repeating_child_positions() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Element(Element::Div),
+            Style::default().size(20.0, 20.0),
+        )
+        .rule(
+            StyleSelector::nth_child_odd(),
+            Style::default().background(Color::rgb(10, 20, 30)),
+        )
+        .rule(
+            StyleSelector::compound()
+                .class("item")
+                .nth_child_even()
+                .selector(),
+            Style::default().border(Color::rgb(40, 50, 60)),
+        )
+        .rule(
+            StyleSelector::nth_child_formula(3, 2),
+            Style::default().radius(7.0),
+        );
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("panel", ElementSpec::new(Element::Div), |ui| {
+            for index in 1..=6 {
+                ui.element(
+                    format!("item-{index}"),
+                    ElementSpec::new(Element::Div).class("item"),
+                    |_| {},
+                );
+            }
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    for index in [1, 3, 5] {
+        assert_eq!(
+            output
+                .layout
+                .find(format!("item-{index}").as_str())
+                .unwrap()
+                .style
+                .background,
+            Some(Color::rgb(10, 20, 30))
+        );
+    }
+    for index in [2, 4, 6] {
+        assert_eq!(
+            output
+                .layout
+                .find(format!("item-{index}").as_str())
+                .unwrap()
+                .style
+                .border,
+            Some(Color::rgb(40, 50, 60))
+        );
+    }
+    for index in [2, 5] {
+        assert_eq!(
+            output
+                .layout
+                .find(format!("item-{index}").as_str())
+                .unwrap()
+                .style
+                .radius,
+            CornerRadii::all(7.0)
+        );
+    }
+}
+
+#[test]
 fn border_and_radius_rules_can_target_individual_sides_and_corners() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
