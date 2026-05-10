@@ -447,7 +447,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         assert_close(reference.rect.size.height, 56.0);
     }
     assert_close(zero_reference_label.style.font_size, 9.0);
-    assert_close(zero_popover_label.style.font_size, 7.0);
+    assert_close(zero_popover_label.style.font_size, 9.0);
     let playground_gap = length_px(playground.style.column_gap);
     let playground_content_width =
         playground.rect.size.width - playground.style.padding.horizontal();
@@ -460,7 +460,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         specimen_title.rect.origin.y,
         specimen.rect.origin.y + specimen.style.border_width.top + specimen.style.padding.top,
     );
-    assert_close(specimen.style.padding.top, 10.0);
+    assert_close(specimen.style.padding.top, 8.0);
     assert_close(specimen_title.rect.size.height, 18.0);
     let offset_gap = length_px(offset_row.style.gap);
     let offset_pair_width =
@@ -610,7 +610,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     );
     assert_close(
         alignment_cross_start_popover.rect.origin.x,
-        alignment_cross_start_reference.rect.origin.x + 26.0,
+        alignment_cross_start_reference.rect.origin.x + 8.0,
     );
     assert_close(
         alignment_cross_end_popover.rect.bottom(),
@@ -619,7 +619,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         alignment_cross_end_popover.rect.origin.x,
         alignment_cross_end_reference.rect.right() - alignment_cross_end_popover.rect.size.width
-            + 26.0,
+            + 8.0,
     );
     assert_close(
         alignment_start_popover.rect.bottom(),
@@ -627,7 +627,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     );
     assert_close(
         alignment_start_popover.rect.origin.x,
-        alignment_start_reference.rect.origin.x + 26.0,
+        alignment_start_reference.rect.origin.x + 8.0,
     );
     assert_close(
         alignment_end_popover.rect.bottom(),
@@ -635,7 +635,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     );
     assert_close(
         alignment_end_popover.rect.origin.x,
-        alignment_end_reference.rect.right() - alignment_end_popover.rect.size.width - 26.0,
+        alignment_end_reference.rect.right() - alignment_end_popover.rect.size.width - 8.0,
     );
     assert_close(
         centered_popover.rect.origin.x + centered_popover.rect.size.width * 0.5,
@@ -647,7 +647,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     );
     assert_close(
         top_start_popover.rect.origin.x,
-        top_start_reference.rect.origin.x - 64.0,
+        top_start_reference.rect.origin.x - 34.0,
     );
     assert_close(
         top_start_popover.rect.bottom(),
