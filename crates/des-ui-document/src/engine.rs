@@ -321,6 +321,29 @@ impl DocumentEngine {
         changed
     }
 
+    pub fn scroll_element_to(&mut self, id: &str, scroll: Point) -> bool {
+        let id = ElementId::new(id);
+        let max_scroll = self.scroll_limits.get(&id).copied().unwrap_or_default();
+        let Some(state) = self.states.get_mut(&id) else {
+            return false;
+        };
+
+        let scroll = layout_engine::scroll::clamp_scroll_offset(
+            to_layout_point(scroll),
+            layout_engine::geometry::Size {
+                width: max_scroll.width,
+                height: max_scroll.height,
+            },
+        );
+        let mut changed = false;
+        changed |= set_f32(&mut state.scroll_x, scroll.x);
+        changed |= set_f32(&mut state.scroll_y, scroll.y);
+        if changed {
+            self.cached_layout = None;
+        }
+        changed
+    }
+
     fn cached_document_matches(
         &self,
         document: &Document,
@@ -344,7 +367,19 @@ impl DocumentEngine {
                 changes.retained.push(id.clone());
             } else {
                 changes.created.push(id.clone());
-                self.states.insert(id.clone(), ElementState::default());
+                let initial_scroll = document
+                    .element_spec(id)
+                    .ok()
+                    .and_then(|spec| spec.initial_scroll)
+                    .unwrap_or(Point::ZERO);
+                self.states.insert(
+                    id.clone(),
+                    ElementState {
+                        scroll_x: initial_scroll.x,
+                        scroll_y: initial_scroll.y,
+                        ..ElementState::default()
+                    },
+                );
             }
         }
 

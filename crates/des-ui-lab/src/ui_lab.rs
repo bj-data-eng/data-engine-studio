@@ -251,10 +251,7 @@ impl UiLabState {
         if let Some(scroll) = self.pending_stage_scroll.take() {
             self.document_engine
                 .update(&mut retained.document, &stylesheet);
-            if let Some(stage) = self.document_engine.element_state_mut("stage") {
-                stage.scroll_x = scroll.x.max(0.0);
-                stage.scroll_y = scroll.y.max(0.0);
-            }
+            self.document_engine.scroll_element_to("stage", scroll);
         }
 
         let input = document_input(ui, origin);
@@ -955,9 +952,7 @@ impl UiLabState {
         self.document_engine
             .update(&mut retained.document, &stylesheet);
         self.document_engine
-            .element_state_mut("stage")
-            .unwrap()
-            .scroll_y = scroll_y;
+            .scroll_element_to("stage", Point::new(0.0, scroll_y));
         let output = self
             .document_engine
             .update(&mut retained.document, &stylesheet);

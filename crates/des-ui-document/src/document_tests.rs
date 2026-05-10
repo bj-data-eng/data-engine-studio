@@ -2041,6 +2041,158 @@ fn document_engine_update_with_input_scrolls_overflow_container() {
 }
 
 #[test]
+fn document_engine_applies_initial_scroll_position_on_first_layout() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "scroll",
+            ElementSpec::new(Element::Div)
+                .initial_scroll_x(30.0)
+                .initial_scroll_y(40.0),
+        )
+        .unwrap();
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(300.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    let state = engine.element_state("scroll").unwrap();
+    assert_eq!(state.scroll_x, 30.0);
+    assert_eq!(state.scroll_y, 40.0);
+    assert_eq!(
+        output.layout.find("content").unwrap().rect,
+        Rect::new(-30.0, -40.0, 300.0, 300.0)
+    );
+}
+
+#[test]
+fn document_engine_clamps_initial_scroll_position_to_scroll_range() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "scroll",
+            ElementSpec::new(Element::Div).initial_scroll(Point::new(500.0, 500.0)),
+        )
+        .unwrap();
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(160.0, 180.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    let state = engine.element_state("scroll").unwrap();
+    assert_eq!(state.scroll_x, 60.0);
+    assert_eq!(state.scroll_y, 80.0);
+    assert_eq!(
+        output.layout.find("content").unwrap().rect,
+        Rect::new(-60.0, -80.0, 160.0, 180.0)
+    );
+}
+
+#[test]
+fn document_engine_scroll_element_to_repositions_existing_scroll_state() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "scroll",
+            ElementSpec::new(Element::Div).initial_scroll_y(40.0),
+        )
+        .unwrap();
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update(&mut document, &stylesheet);
+
+    assert!(engine.scroll_element_to("scroll", Point::new(0.0, 500.0)));
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(engine.element_state("scroll").unwrap().scroll_y, 200.0);
+    assert_eq!(
+        output.layout.find("content").unwrap().rect,
+        Rect::new(0.0, -200.0, 100.0, 300.0)
+    );
+}
+
+#[test]
+fn document_engine_initial_scroll_does_not_overwrite_retained_scroll_state() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "scroll",
+            ElementSpec::new(Element::Div).initial_scroll_y(80.0),
+        )
+        .unwrap();
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(100.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update(&mut document, &stylesheet);
+
+    assert!(engine.scroll_element_to("scroll", Point::new(0.0, 20.0)));
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(engine.element_state("scroll").unwrap().scroll_y, 20.0);
+    assert_eq!(
+        output.layout.find("content").unwrap().rect,
+        Rect::new(0.0, -20.0, 100.0, 300.0)
+    );
+}
+
+#[test]
 fn document_engine_update_scroll_only_final_pass_skips_style_resolution() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document

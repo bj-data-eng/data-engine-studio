@@ -207,6 +207,10 @@ impl Document {
         ids
     }
 
+    pub(crate) fn element_spec(&self, id: &ElementId) -> DocumentResult<&ElementSpec> {
+        Ok(&self.element(id)?.spec)
+    }
+
     pub fn append_element(
         &mut self,
         parent: impl Into<ElementId>,

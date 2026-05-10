@@ -1,3 +1,4 @@
+use crate::geometry::Point;
 use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
 
@@ -156,6 +157,7 @@ pub struct ElementSpec {
     pub glyph: Option<Glyph>,
     pub table: Option<TableSpec>,
     pub table_cell: Option<TableCellSpec>,
+    pub initial_scroll: Option<Point>,
 }
 
 impl ElementSpec {
@@ -173,6 +175,7 @@ impl ElementSpec {
             glyph: None,
             table: None,
             table_cell: None,
+            initial_scroll: None,
         }
     }
 
@@ -219,6 +222,23 @@ impl ElementSpec {
 
     pub fn glyph(mut self, glyph: Glyph) -> Self {
         self.glyph = Some(glyph);
+        self
+    }
+
+    pub fn initial_scroll(mut self, scroll: Point) -> Self {
+        self.initial_scroll = Some(Point::new(scroll.x.max(0.0), scroll.y.max(0.0)));
+        self
+    }
+
+    pub fn initial_scroll_x(mut self, scroll_x: f32) -> Self {
+        let scroll = self.initial_scroll.unwrap_or(Point::ZERO);
+        self.initial_scroll = Some(Point::new(scroll_x.max(0.0), scroll.y));
+        self
+    }
+
+    pub fn initial_scroll_y(mut self, scroll_y: f32) -> Self {
+        let scroll = self.initial_scroll.unwrap_or(Point::ZERO);
+        self.initial_scroll = Some(Point::new(scroll.x, scroll_y.max(0.0)));
         self
     }
 
