@@ -2275,6 +2275,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
         |ui| {
             floating_offset_specimen(ui);
             floating_main_axis_specimen(ui);
+            floating_cross_axis_specimen(ui);
         },
     );
 }
@@ -2406,6 +2407,64 @@ fn floating_main_axis_reference(ui: &mut des_ui_document::DocumentBuilder, id: &
                 ElementSpec::new(Element::Text).class("floating-offset-reference-label"),
                 label,
             );
+        },
+    );
+}
+
+fn floating_cross_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-cross-axis-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-main-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-cross-axis-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Cross axis",
+            );
+            ui.element(
+                "floating-cross-axis-stack",
+                ElementSpec::new(Element::Div).class("floating-main-axis-stack"),
+                |ui| {
+                    ui.element(
+                        "floating-cross-axis-row-vertical",
+                        ElementSpec::new(Element::Div).class("floating-main-axis-row"),
+                        |ui| {
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-cross-axis-top-reference",
+                                "top",
+                            );
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-cross-axis-bottom-reference",
+                                "bottom",
+                            );
+                        },
+                    );
+                    ui.element(
+                        "floating-cross-axis-row-horizontal",
+                        ElementSpec::new(Element::Div).class("floating-main-axis-row"),
+                        |ui| {
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-cross-axis-left-reference",
+                                "left",
+                            );
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-cross-axis-right-reference",
+                                "right",
+                            );
+                        },
+                    );
+                },
+            );
+            floating_offset_popover(ui, "floating-cross-axis-top-popover");
+            floating_offset_popover(ui, "floating-cross-axis-bottom-popover");
+            floating_offset_popover(ui, "floating-cross-axis-left-popover");
+            floating_offset_popover(ui, "floating-cross-axis-right-popover");
         },
     );
 }

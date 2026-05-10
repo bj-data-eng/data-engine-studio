@@ -1781,6 +1781,30 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_placement(FloatingPlacement::Right),
         )
         .rule(
+            StyleSelector::id("floating-cross-axis-top-popover"),
+            Style::default()
+                .floating_to("floating-cross-axis-top-reference")
+                .floating_placement(FloatingPlacement::TopEnd),
+        )
+        .rule(
+            StyleSelector::id("floating-cross-axis-bottom-popover"),
+            Style::default()
+                .floating_to("floating-cross-axis-bottom-reference")
+                .floating_placement(FloatingPlacement::BottomEnd),
+        )
+        .rule(
+            StyleSelector::id("floating-cross-axis-left-popover"),
+            Style::default()
+                .floating_to("floating-cross-axis-left-reference")
+                .floating_placement(FloatingPlacement::LeftEnd),
+        )
+        .rule(
+            StyleSelector::id("floating-cross-axis-right-popover"),
+            Style::default()
+                .floating_to("floating-cross-axis-right-reference")
+                .floating_placement(FloatingPlacement::RightEnd),
+        )
+        .rule(
             StyleSelector::class("nest-outer"),
             Style::default()
                 .size(650.0, 430.0)
