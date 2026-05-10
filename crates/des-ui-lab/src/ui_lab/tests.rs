@@ -329,6 +329,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
 
     let playground = frame(&output, "floating-playground");
     let specimen = frame(&output, "floating-offset-specimen");
+    let specimen_title = frame(&output, "floating-offset-specimen-title");
     let offset_row = frame(&output, "floating-offset-row");
     let zero_reference = frame(&output, "floating-offset-zero-reference");
     let zero_popover = frame(&output, "floating-offset-zero-popover");
@@ -410,6 +411,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         specimen.rect.size.width,
         (playground.rect.size.width - playground.style.padding.horizontal()) * 0.5,
     );
+    assert_close(specimen_title.rect.size.height, 18.0);
     let offset_pair_width =
         zero_reference.rect.size.width + ten_reference.rect.size.width + offset_row.style.gap;
     assert_close(

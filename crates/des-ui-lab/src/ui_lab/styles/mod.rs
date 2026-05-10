@@ -2162,7 +2162,11 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("card-title"),
-            Style::default().font_size(16.0).text_color(TEXT),
+            Style::default()
+                .font_size(16.0)
+                .line_height(18.0)
+                .height(Length::Px(18.0))
+                .text_color(TEXT),
         )
         .rule(
             StyleSelector::class("muted"),
