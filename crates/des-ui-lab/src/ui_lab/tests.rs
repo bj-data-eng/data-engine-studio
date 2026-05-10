@@ -380,6 +380,9 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let vertical_overlap_panel = frame(&output, "floating-vertical-overlap-panel");
     let vertical_overlap_reference = frame(&output, "floating-vertical-overlap-reference");
     let vertical_overlap_popover = frame(&output, "floating-vertical-overlap-popover");
+    let vertical_flip_specimen = frame(&output, "floating-vertical-flip-specimen");
+    let vertical_flip_reference = frame(&output, "floating-vertical-flip-reference");
+    let vertical_flip_popover = frame(&output, "floating-vertical-flip-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
@@ -390,6 +393,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_eq!(scroll_shift_specimen.style.position, Position::Flow);
     assert_eq!(scroll_attach_specimen.style.position, Position::Flow);
     assert_eq!(vertical_overlap_specimen.style.position, Position::Flow);
+    assert_eq!(vertical_flip_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -474,6 +478,18 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         vertical_overlap_specimen.rect.origin.y,
         scroll_shift_specimen.rect.bottom(),
+    );
+    assert_close(
+        vertical_flip_specimen.rect.size.width,
+        specimen.rect.size.width,
+    );
+    assert_close(
+        vertical_flip_specimen.rect.origin.x,
+        vertical_overlap_specimen.rect.right(),
+    );
+    assert_close(
+        vertical_flip_specimen.rect.origin.y,
+        vertical_overlap_specimen.rect.origin.y,
     );
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
@@ -583,6 +599,14 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         vertical_overlap_popover.rect.origin.x + vertical_overlap_popover.rect.size.width * 0.5,
         vertical_overlap_reference.rect.origin.x + vertical_overlap_reference.rect.size.width * 0.5,
     );
+    assert_close(
+        vertical_flip_popover.rect.bottom(),
+        vertical_flip_reference.rect.origin.y,
+    );
+    assert_close(
+        vertical_flip_popover.rect.origin.x + vertical_flip_popover.rect.size.width * 0.5,
+        vertical_flip_reference.rect.origin.x + vertical_flip_reference.rect.size.width * 0.5,
+    );
     let scrolled_output = lab_output_with_stage_scroll("floating", 900.0);
     assert!(
         scrolled_output.scroll_chrome.iter().any(|chrome| {
@@ -656,6 +680,29 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
                 && chrome.visible
         }),
         "vertical overlap specimen should expose a visible vertical scrollbar when it is within the stage viewport"
+    );
+    let mut vertical_unflipped = UiLabState::new(Some("floating"));
+    vertical_unflipped.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    vertical_unflipped
+        .document_engine
+        .element_state_mut("floating-vertical-flip-panel")
+        .unwrap()
+        .scroll_y = 170.0;
+    let vertical_unflipped_output =
+        vertical_unflipped.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let unflipped_vertical_reference = frame(
+        &vertical_unflipped_output,
+        "floating-vertical-flip-reference",
+    );
+    let unflipped_vertical_popover =
+        frame(&vertical_unflipped_output, "floating-vertical-flip-popover");
+    assert_close(
+        unflipped_vertical_popover.rect.origin.y,
+        unflipped_vertical_reference.rect.bottom(),
+    );
+    assert!(
+        vertical_flip_popover.rect.bottom() <= vertical_flip_reference.rect.origin.y,
+        "vertical flip should keep the floating element from overlapping its reference"
     );
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);

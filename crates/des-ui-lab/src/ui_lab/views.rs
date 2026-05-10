@@ -2282,6 +2282,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
             floating_scroll_shift_specimen(ui);
             floating_scroll_attach_specimen(ui);
             floating_vertical_scroll_overlap_specimen(ui);
+            floating_vertical_scroll_flip_specimen(ui);
         },
     );
 }
@@ -2748,6 +2749,38 @@ fn floating_vertical_scroll_overlap_specimen(ui: &mut des_ui_document::DocumentB
                             );
                         },
                     );
+                },
+            );
+        },
+    );
+}
+
+fn floating_vertical_scroll_flip_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-vertical-flip-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-centered-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-vertical-flip-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Vertical scroll flip",
+            );
+            ui.element(
+                "floating-vertical-flip-panel",
+                ElementSpec::new(Element::Div)
+                    .class("floating-vertical-flip-panel")
+                    .class("styled-scrollbar"),
+                |ui| {
+                    ui.element(
+                        "floating-vertical-flip-track",
+                        ElementSpec::new(Element::Div).class("floating-vertical-flip-track"),
+                        |ui| {
+                            floating_offset_reference(ui, "floating-vertical-flip-reference", "");
+                        },
+                    );
+                    floating_offset_popover(ui, "floating-vertical-flip-popover");
                 },
             );
         },

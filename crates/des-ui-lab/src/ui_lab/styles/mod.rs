@@ -1747,6 +1747,24 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .flex_shrink(0.0),
         )
         .rule(
+            StyleSelector::class("floating-vertical-flip-panel"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(210.0))
+                .overflow_x(Overflow::Visible)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_visible(true)
+                .border(STROKE)
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-vertical-flip-track"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(520.0))
+                .flex_shrink(0.0),
+        )
+        .rule(
             StyleSelector::class("floating-offset-reference"),
             Style::default()
                 .width(Length::Px(148.0))
@@ -1943,6 +1961,18 @@ pub(super) fn stylesheet() -> StyleSheet {
                 }),
         )
         .rule(
+            StyleSelector::id("floating-vertical-flip-reference"),
+            Style::default()
+                .width(Length::Px(150.0))
+                .height(Length::Px(150.0))
+                .margin(Insets {
+                    top: 170.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 150.0,
+                }),
+        )
+        .rule(
             StyleSelector::id("floating-scroll-shift-popover"),
             Style::default()
                 .width(Length::Px(350.0))
@@ -1969,6 +1999,14 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_placement(FloatingPlacement::Top)
                 .floating_boundary_to("floating-vertical-overlap-panel")
                 .floating_shift(FloatingShift::new(true, false)),
+        )
+        .rule(
+            StyleSelector::id("floating-vertical-flip-popover"),
+            Style::default()
+                .floating_to("floating-vertical-flip-reference")
+                .floating_placement(FloatingPlacement::Bottom)
+                .floating_boundary_to("floating-vertical-flip-panel")
+                .floating_flip(true),
         )
         .rule(
             StyleSelector::class("nest-outer"),
