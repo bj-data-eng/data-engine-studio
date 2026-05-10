@@ -5,7 +5,7 @@ mod views;
 
 use des_ui_egui::adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
-    document_input, paint_frame, paint_scroll_chrome, paint_surface,
+    document_input, paint_frame, paint_scroll_chrome,
 };
 use styles::stylesheet;
 use views::{
@@ -13,14 +13,14 @@ use views::{
 };
 
 use des_ui_document::{
-    Color, CornerRadii, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector, Insets,
-    Length, Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
+    Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
+    DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector, Length,
+    Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
     TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions, VisualElementClone,
 };
 use des_ui_widgets::{
-    AutoScrollOptions, AutoScroller, DropZoneId, SortableDocumentConfig, SortableDropPreview,
-    SortableItemId, SortableModel,
+    AutoScrollOptions, AutoScroller, ContextMenu, DropZoneId, SortableDocumentConfig,
+    SortableDropPreview, SortableItemId, SortableModel,
 };
 use eframe::egui;
 use std::time::{Duration, Instant};
@@ -51,12 +51,8 @@ const ANIMATION_FRAME_TIME: Duration = Duration::from_millis(16);
 const DRAG_ITEM_COUNT: usize = 3;
 const DROP_ZONE_COUNT: usize = 6;
 const SCROLL_LIST_ITEM_COUNT: usize = 14;
-const TEXT_MENU_RADIUS: CornerRadii = CornerRadii {
-    top_left: 6.0,
-    top_right: 6.0,
-    bottom_right: 6.0,
-    bottom_left: 6.0,
-};
+const TEXT_CONTEXT_MENU_ID: &str = "text-context-menu";
+const TEXT_CONTEXT_MENU_COPY_ID: &str = "text-context-menu-copy";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LabView {
@@ -178,6 +174,7 @@ struct LabDocumentKey {
     scroll_list_drop_preview: Option<SortableDropPreview>,
     drag_overlay_active: bool,
     drag_visual_clone: Option<VisualElementClone>,
+    text_context_menu: Option<TextContextMenu>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -294,7 +291,7 @@ impl UiLabState {
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
         }
-        if self.apply_clicked_document_actions(&output) {
+        if self.apply_clicked_document_actions(ui, &output) {
             let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
             let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
@@ -324,7 +321,6 @@ impl UiLabState {
             metrics: output.metrics,
         };
         self.apply_document_events(ui, &output, pointer);
-        self.paint_text_context_menu(ui, origin, &output);
         if output.animating {
             ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
         }
@@ -377,6 +373,7 @@ impl UiLabState {
             scroll_list_drop_preview: self.scroll_list_drop_preview,
             drag_overlay_active: self.active_drag.is_some(),
             drag_visual_clone: self.drag_visual_clone.clone(),
+            text_context_menu: self.text_context_menu.clone(),
         }
     }
 
@@ -387,6 +384,7 @@ impl UiLabState {
         pointer: Option<PointerInput>,
     ) {
         let was_dropdown_open = self.dropdown_open;
+        let was_text_context_menu_open = self.text_context_menu.is_some();
         let primary_clicked = pointer
             .map(|pointer| pointer.primary_clicked)
             .unwrap_or(false);
@@ -404,7 +402,12 @@ impl UiLabState {
                     }
                 }
                 DocumentEventKind::ContextRequested => {
-                    if let Some(pointer) = pointer {
+                    if let Some(pointer) = pointer
+                        && output
+                            .snapshot()
+                            .find(event.target.as_str())
+                            .is_some_and(|frame| frame.selectable_text())
+                    {
                         self.text_context_menu = Some(TextContextMenu {
                             target: event.target.clone(),
                             position: pointer.position,
@@ -425,15 +428,36 @@ impl UiLabState {
             self.dropdown_open = false;
             ui.ctx().request_repaint();
         }
+        if was_text_context_menu_open
+            && self.text_context_menu.is_some()
+            && primary_clicked
+            && !is_text_context_menu_hit(&output.hit_id)
+        {
+            self.text_context_menu = None;
+            ui.ctx().request_repaint();
+        }
     }
 
-    fn apply_clicked_document_actions(&mut self, output: &DocumentOutput) -> bool {
+    fn apply_clicked_document_actions(&mut self, ui: &egui::Ui, output: &DocumentOutput) -> bool {
         let mut changed = false;
         for event in &output.events {
             if event.kind == DocumentEventKind::Clicked
                 && let Some(action) = lab_action_for_id(event.target.as_str())
             {
-                self.apply_lab_action(action);
+                match action {
+                    LabAction::CopyTextSelection => {
+                        if let Some(text) = self
+                            .text_context_menu
+                            .as_ref()
+                            .and_then(|menu| menu.selected_text.clone())
+                            .filter(|text| !text.is_empty())
+                        {
+                            ui.ctx().copy_text(text);
+                        }
+                        self.text_context_menu = None;
+                    }
+                    _ => self.apply_lab_action(action),
+                }
                 changed = true;
             }
         }
@@ -534,85 +558,6 @@ impl UiLabState {
             for id in clone.cloned_ids(&options) {
                 self.document_engine.snap_element_animation(id.as_str());
             }
-        }
-    }
-
-    fn paint_text_context_menu(
-        &mut self,
-        ui: &mut egui::Ui,
-        origin: egui::Pos2,
-        output: &DocumentOutput,
-    ) {
-        let Some(menu) = self.text_context_menu.clone() else {
-            return;
-        };
-        if output
-            .snapshot()
-            .find(menu.target.as_str())
-            .is_none_or(|frame| !frame.selectable_text())
-        {
-            self.text_context_menu = None;
-            return;
-        }
-
-        let selected_text = menu.selected_text.clone();
-        let menu_pos = egui::pos2(origin.x + menu.position.x, origin.y + menu.position.y);
-        let area_response = egui::Area::new(egui::Id::new("text-selection-context-menu"))
-            .order(egui::Order::Foreground)
-            .fixed_pos(menu_pos)
-            .show(ui.ctx(), |ui| {
-                let menu_rect =
-                    egui::Rect::from_min_size(ui.min_rect().min, egui::vec2(142.0, 42.0));
-                paint_surface(
-                    ui,
-                    menu_rect,
-                    TEXT_MENU_RADIUS,
-                    &[
-                        Shadow {
-                            offset: Point::new(0.0, 2.0),
-                            blur: 7.0,
-                            spread: -1.0,
-                            color: Color::rgba(0, 0, 0, 110),
-                        },
-                        Shadow {
-                            offset: Point::new(0.0, 14.0),
-                            blur: 28.0,
-                            spread: -5.0,
-                            color: Color::rgba(0, 0, 0, 78),
-                        },
-                    ],
-                    PANEL,
-                    Some(STROKE),
-                    Insets::all(1.0),
-                );
-                ui.scope_builder(
-                    egui::UiBuilder::new().max_rect(menu_rect.shrink2(egui::vec2(6.0, 5.0))),
-                    |ui| {
-                        let copy_enabled =
-                            selected_text.as_ref().is_some_and(|text| !text.is_empty());
-                        let copy_response = ui.add_sized(
-                            egui::vec2(130.0, 30.0),
-                            egui::Button::new("Copy").frame(false),
-                        );
-                        if copy_response.clicked() && copy_enabled {
-                            if let Some(text) = selected_text.clone() {
-                                ui.ctx().copy_text(text);
-                            }
-                            self.text_context_menu = None;
-                        }
-                    },
-                );
-            });
-        let menu_rect = area_response.response.rect;
-        let clicked_away = ui.input(|input| {
-            input.pointer.primary_clicked()
-                && input
-                    .pointer
-                    .interact_pos()
-                    .is_some_and(|position| !menu_rect.contains(position))
-        });
-        if clicked_away {
-            self.text_context_menu = None;
         }
     }
 
@@ -724,7 +669,10 @@ impl UiLabState {
 
     fn apply_lab_action(&mut self, action: LabAction) {
         match action {
-            LabAction::SelectView(view) => self.view = view,
+            LabAction::SelectView(view) => {
+                self.view = view;
+                self.text_context_menu = None;
+            }
             LabAction::ToggleOptionalCard => self.show_optional_card = !self.show_optional_card,
             LabAction::ToggleDensity => self.dense_mode = !self.dense_mode,
             LabAction::ToggleCheckbox => self.checkbox_enabled = !self.checkbox_enabled,
@@ -744,6 +692,7 @@ impl UiLabState {
             LabAction::ToggleShadowLayer { target, layer } => {
                 self.shadow_tune_mut(target).toggle(layer)
             }
+            LabAction::CopyTextSelection => {}
         }
     }
 
@@ -787,6 +736,7 @@ impl UiLabState {
                         self.active_drag.as_ref().map(|drag| drag.current),
                         self.drag_visual_clone.as_ref(),
                     );
+                    render_text_context_menu(ui, self.text_context_menu.as_ref());
                 },
             );
         });
@@ -834,6 +784,10 @@ impl UiLabState {
                 ),
                 Style::default().shadows(self.shadow_hover_tune.shadows(SHADOW_COLOR)),
             );
+        }
+        if let Some(menu) = self.text_context_menu.as_ref() {
+            let menu = text_context_menu_widget(menu);
+            stylesheet.push_rule(menu.position_selector(), menu.position_style());
         }
         stylesheet
     }
@@ -1065,6 +1019,29 @@ fn scroll_list_config() -> SortableDocumentConfig {
     )
 }
 
+fn text_context_menu_widget(menu: &TextContextMenu) -> ContextMenu {
+    let widget = ContextMenu::new(TEXT_CONTEXT_MENU_ID).at(menu.position);
+    if menu
+        .selected_text
+        .as_ref()
+        .is_some_and(|text| !text.is_empty())
+    {
+        widget.item(TEXT_CONTEXT_MENU_COPY_ID, "Copy")
+    } else {
+        widget.disabled_item(TEXT_CONTEXT_MENU_COPY_ID, "Copy")
+    }
+}
+
+fn render_text_context_menu(
+    ui: &mut des_ui_document::DocumentBuilder,
+    menu: Option<&TextContextMenu>,
+) {
+    let Some(menu) = menu else {
+        return;
+    };
+    text_context_menu_widget(menu).render(ui);
+}
+
 fn active_grid_drag_item(id: &str) -> Option<SortableItemId> {
     sortable_config().item_for_element_id(id)
 }
@@ -1111,6 +1088,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
         "control-dropdown-option-duckdb" => Some(LabAction::SelectDropdown(1)),
         "control-dropdown-option-python" => Some(LabAction::SelectDropdown(2)),
         "loop-action-button" => Some(LabAction::IncrementLoopAction),
+        TEXT_CONTEXT_MENU_COPY_ID => Some(LabAction::CopyTextSelection),
         _ => shadow_tune_action_for_id(id),
     }
 }
@@ -1123,6 +1101,12 @@ fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {
             || id.as_str() == "control-dropdown-chevron"
             || id.as_str() == "control-dropdown-menu"
             || id.as_str().starts_with("control-dropdown-option-")
+    })
+}
+
+fn is_text_context_menu_hit(hit_id: &Option<ElementId>) -> bool {
+    hit_id.as_ref().is_some_and(|id| {
+        id.as_str() == TEXT_CONTEXT_MENU_ID || id.as_str().starts_with("text-context-menu-")
     })
 }
 
@@ -1180,6 +1164,7 @@ enum LabAction {
         target: ShadowTuneTarget,
         layer: usize,
     },
+    CopyTextSelection,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,7 +1,11 @@
 use super::super::{CARD, PANEL_ALT, SHADOW_COLOR, STROKE, STROKE_SELECTED, TEXT_MUTED};
 use des_ui_document::{
-    AlignItems, Color, Insets, JustifyContent, Length, Overflow, Point, Shadow, Style,
-    StyleSelector, StyleSheet, Transition,
+    AlignItems, Color, ElementStateSelector, Insets, JustifyContent, Length, Overflow, Point,
+    Shadow, Style, StyleSelector, StyleSheet, Transition,
+};
+use des_ui_widgets::{
+    CONTEXT_MENU_CLASS, CONTEXT_MENU_ITEM_CLASS, CONTEXT_MENU_LABEL_CLASS,
+    CONTEXT_MENU_SEPARATOR_CLASS, context_menu_surface_style,
 };
 
 pub(super) fn stylesheet() -> StyleSheet {
@@ -175,6 +179,68 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .scrollbar_pressed_handle_border_color(STROKE_SELECTED)
                 .scrollbar_pressed_handle_border_width(1.0)
                 .transition(Transition::ease_out(0.12)),
+        )
+        .rule(
+            StyleSelector::class(CONTEXT_MENU_CLASS),
+            context_menu_surface_style()
+                .background(super::super::PANEL)
+                .border(STROKE)
+                .radius(6.0)
+                .shadows(vec![
+                    Shadow {
+                        offset: Point::new(0.0, 2.0),
+                        blur: 7.0,
+                        spread: -1.0,
+                        color: Color::rgba(0, 0, 0, 110),
+                    },
+                    Shadow {
+                        offset: Point::new(0.0, 14.0),
+                        blur: 28.0,
+                        spread: -5.0,
+                        color: Color::rgba(0, 0, 0, 78),
+                    },
+                ]),
+        )
+        .rule(
+            StyleSelector::class(CONTEXT_MENU_ITEM_CLASS),
+            Style::default()
+                .flex_direction(des_ui_document::FlexDirection::Row)
+                .width_fill()
+                .height(Length::Px(30.0))
+                .padding(Insets::symmetric(8.0, 6.0))
+                .align_items(AlignItems::Center)
+                .background(Color::rgba(0, 0, 0, 0))
+                .border(Color::rgba(0, 0, 0, 0))
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::class_state(CONTEXT_MENU_ITEM_CLASS, ElementStateSelector::Hovered),
+            Style::default().background(super::super::CARD_HOVER),
+        )
+        .rule(
+            StyleSelector::class_state(CONTEXT_MENU_ITEM_CLASS, ElementStateSelector::Pressed),
+            Style::default().background(super::super::CARD_PRESSED),
+        )
+        .rule(
+            StyleSelector::class_state(CONTEXT_MENU_ITEM_CLASS, ElementStateSelector::Disabled),
+            Style::default().text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class(CONTEXT_MENU_LABEL_CLASS),
+            Style::default()
+                .font_size(12.5)
+                .text_color(super::super::TEXT),
+        )
+        .rule(
+            StyleSelector::class_state(CONTEXT_MENU_LABEL_CLASS, ElementStateSelector::Disabled),
+            Style::default().text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class(CONTEXT_MENU_SEPARATOR_CLASS),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(1.0))
+                .background(STROKE),
         )
 }
 

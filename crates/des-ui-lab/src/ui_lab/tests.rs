@@ -1726,6 +1726,29 @@ fn text_context_menu_copy_uses_opened_selection_snapshot() {
 }
 
 #[test]
+fn text_context_menu_renders_document_widget_with_framework_style() {
+    let mut state = UiLabState::new(Some("text"));
+    state.text_context_menu = Some(TextContextMenu {
+        target: ElementId::new("text-wrap-body"),
+        position: Point::new(300.0, 300.0),
+        selected_text: Some("Customer analytics".to_owned()),
+    });
+
+    let output = state_output(&state);
+
+    let menu = frame(&output, "text-context-menu");
+    assert!(has_class(menu, "context-menu"));
+    assert_eq!(menu.style.background, Some(PANEL));
+    assert_eq!(menu.style.border, Some(STROKE));
+    assert_close(menu.rect.origin.x, 300.0);
+    assert_close(menu.rect.origin.y, 300.0);
+
+    let copy = frame(&output, "text-context-menu-copy");
+    assert!(has_class(copy, "context-menu-item"));
+    assert!(copy.interactive);
+}
+
+#[test]
 fn text_context_menu_closes_on_click_away() {
     let mut harness = lab_harness("text");
     harness.state_mut().text_context_menu = Some(TextContextMenu {

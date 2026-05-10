@@ -514,6 +514,13 @@ impl DocumentEngine {
                 .id
                 .clone(),
         );
+        if pointer.secondary_clicked
+            && let Some(hit_id) = &update.hit_id
+        {
+            update
+                .events
+                .push(DocumentEvent::context_requested(hit_id.clone()));
+        }
         if let Some(hit_id) = &update.hit_id
             && let Some(state) = self.states.get_mut(hit_id)
         {

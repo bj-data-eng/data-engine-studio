@@ -1864,6 +1864,45 @@ fn selectable_text_secondary_click_requests_context() {
 }
 
 #[test]
+fn interactive_element_secondary_click_requests_context() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("button"),
+        Style::default().size(100.0, 40.0),
+    );
+    let mut document = Document::build(Size::new(240.0, 120.0), |ui| {
+        ui.element(
+            "button",
+            ElementSpec::new(Element::Button).interactive(),
+            |_| {},
+        );
+    });
+
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(20.0, 20.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: true,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert!(output.events.iter().any(|event| {
+        event.target == ElementId::new("button")
+            && event.kind == DocumentEventKind::ContextRequested
+    }));
+}
+
+#[test]
 fn style_rules_resolve_shadow_as_paint_only_property() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new().rule(
