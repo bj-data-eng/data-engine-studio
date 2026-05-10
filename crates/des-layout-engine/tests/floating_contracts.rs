@@ -1,9 +1,10 @@
 use des_layout_engine::floating::{
     compute_floating_position, detect_overflow, FloatingAlignment, FloatingArrow,
     FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary, FloatingFallbackAxisSideDirection,
-    FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHideStrategy,
-    FloatingInline, FloatingOptions, FloatingPadding, FloatingPlacement, FloatingRect,
-    FloatingShift, FloatingShiftLimiter, FloatingSide, FloatingSize, FloatingVisibility,
+    FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHide,
+    FloatingHideStrategy, FloatingInline, FloatingOptions, FloatingPadding, FloatingPlacement,
+    FloatingRect, FloatingShift, FloatingShiftLimiter, FloatingSide, FloatingSize,
+    FloatingVisibility,
 };
 use des_layout_engine::geometry::{Point, Size};
 
@@ -444,16 +445,37 @@ fn floating_size_reports_and_applies_available_constraints() {
         output.size,
         Size {
             width: 50.0,
-            height: 10.0
+            height: 14.0
         }
     );
     assert_eq!(
         output.available_size,
         Size {
             width: 92.0,
-            height: 10.0
+            height: 14.0
         }
     );
+}
+
+#[test]
+fn floating_size_reports_signed_available_space_before_clamping() {
+    let reference = rect(20.0, 96.0, 50.0, 16.0);
+    let floating = Size {
+        width: 80.0,
+        height: 20.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .size(FloatingSize::new().max_height_to_available()),
+    );
+
+    assert_eq!(output.available_size.height, -12.0);
+    assert_eq!(output.size.height, 0.0);
 }
 
 #[test]
@@ -528,6 +550,54 @@ fn floating_shift_limiter_can_derive_offset_from_rects() {
 }
 
 #[test]
+fn floating_shift_limiter_stops_when_opposite_edges_align() {
+    let reference = rect(20.0, 20.0, 20.0, 20.0);
+    let floating = Size {
+        width: 50.0,
+        height: 20.0,
+    };
+    let boundary = FloatingBoundary::new(rect(50.0, 0.0, 150.0, 100.0));
+
+    let unlimited = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .shift(FloatingShift::new(false, true)),
+    );
+    let limited = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .shift(FloatingShift::new(false, true).limiter(FloatingShiftLimiter::new())),
+    );
+
+    assert_eq!(unlimited.origin.x, 50.0);
+    assert_eq!(limited.origin.x, 40.0);
+}
+
+#[test]
+fn floating_shift_padding_uses_padded_boundary() {
+    let reference = rect(90.0, 40.0, 20.0, 20.0);
+    let floating = Size {
+        width: 60.0,
+        height: 24.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .shift(FloatingShift::main_and_cross_axis().padding(FloatingPadding::all(6.0))),
+    );
+
+    assert_eq!(output.origin.x, 34.0);
+}
+
+#[test]
 fn floating_flip_can_use_perpendicular_axis_fallbacks() {
     let reference = rect(60.0, 42.0, 16.0, 16.0);
     let floating = Size {
@@ -548,6 +618,49 @@ fn floating_flip_can_use_perpendicular_axis_fallbacks() {
     );
 
     assert_eq!(output.placement, FloatingPlacement::Left);
+}
+
+#[test]
+fn floating_flip_perpendicular_fallbacks_try_both_sides_in_order() {
+    let reference = rect(20.0, 10.0, 10.0, 10.0);
+    let floating = Size {
+        width: 40.0,
+        height: 30.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 50.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Right)
+            .boundary(boundary)
+            .flip_options(
+                FloatingFlip::new()
+                    .fallback_axis_side_direction(FloatingFallbackAxisSideDirection::Start),
+            ),
+    );
+
+    assert_eq!(output.placement, FloatingPlacement::Bottom);
+}
+
+#[test]
+fn floating_flip_default_checks_cross_axis_overflow() {
+    let reference = rect(82.0, 44.0, 12.0, 12.0);
+    let floating = Size {
+        width: 40.0,
+        height: 20.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::BottomStart)
+            .boundary(boundary)
+            .flip(true),
+    );
+
+    assert_eq!(output.placement, FloatingPlacement::BottomEnd);
 }
 
 #[test]
@@ -590,4 +703,68 @@ fn floating_flip_can_ignore_cross_axis_overflow() {
     );
 
     assert_eq!(output.placement, FloatingPlacement::BottomStart);
+}
+
+#[test]
+fn floating_hide_strategy_can_use_padding() {
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        rect(-3.0, 10.0, 5.0, 20.0),
+        Size {
+            width: 40.0,
+            height: 24.0,
+        },
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .hide_options(
+                FloatingHide::new(FloatingHideStrategy::ReferenceHidden)
+                    .padding(FloatingPadding::all(4.0)),
+            ),
+    );
+
+    assert!(output.hide.unwrap().reference_hidden);
+}
+
+#[test]
+fn floating_arrow_uses_side_aware_padding() {
+    let reference = rect(10.0, 40.0, 10.0, 20.0);
+    let floating = Size {
+        width: 60.0,
+        height: 24.0,
+    };
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::BottomStart).arrow(
+            FloatingArrow::new(Size {
+                width: 10.0,
+                height: 8.0,
+            })
+            .padding_sides(FloatingPadding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 20.0,
+            }),
+        ),
+    );
+
+    assert_eq!(output.arrow_offset, Some(Point { x: 20.0, y: 0.0 }));
+}
+
+#[test]
+fn floating_collision_strategy_builders_are_mutually_exclusive() {
+    let flip_first = FloatingOptions::new(FloatingPlacement::Bottom)
+        .flip(true)
+        .auto_placement(FloatingAutoPlacement::new());
+    let auto_first = FloatingOptions::new(FloatingPlacement::Bottom)
+        .auto_placement(FloatingAutoPlacement::new())
+        .flip_options(FloatingFlip::new());
+
+    assert!(!flip_first.flip);
+    assert!(flip_first.auto_placement.is_some());
+    assert!(auto_first.flip);
+    assert!(auto_first.auto_placement.is_none());
 }

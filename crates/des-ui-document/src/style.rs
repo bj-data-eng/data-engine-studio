@@ -13,9 +13,9 @@ pub use layout_engine::prelude::{
 pub use layout_engine::floating::{
     FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
     FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
-    FloatingFlipCrossAxis, FloatingHideData, FloatingHideStrategy, FloatingInline, FloatingOffset,
-    FloatingOptions, FloatingPlacement, FloatingShift, FloatingShiftLimiter, FloatingSize,
-    FloatingVisibility,
+    FloatingFlipCrossAxis, FloatingHide, FloatingHideData, FloatingHideStrategy, FloatingInline,
+    FloatingOffset, FloatingOptions, FloatingPlacement, FloatingShift, FloatingShiftLimiter,
+    FloatingSize, FloatingVisibility,
 };
 
 pub type GridPlacement = layout_engine::prelude::GridPlacement<String>;
@@ -478,7 +478,17 @@ impl Anchor {
     }
 
     pub fn flip(mut self, flip: bool) -> Self {
-        self.options.flip = flip;
+        self.options = self.options.flip(flip);
+        self
+    }
+
+    pub fn flip_options(mut self, flip: FloatingFlip) -> Self {
+        self.options = self.options.flip_options(flip);
+        self
+    }
+
+    pub fn auto_placement(mut self, auto_placement: FloatingAutoPlacement) -> Self {
+        self.options = self.options.auto_placement(auto_placement);
         self
     }
 
@@ -487,8 +497,28 @@ impl Anchor {
         self
     }
 
+    pub fn size(mut self, size: FloatingSize) -> Self {
+        self.options.size = Some(size);
+        self
+    }
+
     pub fn arrow(mut self, arrow: FloatingArrow) -> Self {
         self.options.arrow = Some(arrow);
+        self
+    }
+
+    pub fn hide(mut self, strategy: FloatingHideStrategy) -> Self {
+        self.options.hide.push(FloatingHide::new(strategy));
+        self
+    }
+
+    pub fn hide_options(mut self, hide: FloatingHide) -> Self {
+        self.options.hide.push(hide);
+        self
+    }
+
+    pub fn inline(mut self, inline: FloatingInline) -> Self {
+        self.options.inline = Some(inline);
         self
     }
 
@@ -1279,22 +1309,21 @@ impl Style {
 
     pub fn floating_flip(mut self, flip: bool) -> Self {
         if let Some(anchor) = &mut self.anchor {
-            anchor.options.flip = flip;
+            anchor.options = anchor.options.clone().flip(flip);
         }
         self
     }
 
     pub fn floating_flip_options(mut self, flip: FloatingFlip) -> Self {
         if let Some(anchor) = &mut self.anchor {
-            anchor.options.flip = true;
-            anchor.options.flip_options = flip;
+            anchor.options = anchor.options.clone().flip_options(flip);
         }
         self
     }
 
     pub fn floating_auto_placement(mut self, auto_placement: FloatingAutoPlacement) -> Self {
         if let Some(anchor) = &mut self.anchor {
-            anchor.options.auto_placement = Some(auto_placement);
+            anchor.options = anchor.options.clone().auto_placement(auto_placement);
         }
         self
     }
@@ -1339,7 +1368,14 @@ impl Style {
 
     pub fn floating_hide(mut self, strategy: FloatingHideStrategy) -> Self {
         if let Some(anchor) = &mut self.anchor {
-            anchor.options.hide.push(strategy);
+            anchor.options.hide.push(FloatingHide::new(strategy));
+        }
+        self
+    }
+
+    pub fn floating_hide_options(mut self, hide: FloatingHide) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.hide.push(hide);
         }
         self
     }

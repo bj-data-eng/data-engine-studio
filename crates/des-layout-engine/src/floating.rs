@@ -462,7 +462,7 @@ impl FloatingFlip {
     pub const fn new() -> Self {
         Self {
             main_axis: true,
-            cross_axis: FloatingFlipCrossAxis::Alignment,
+            cross_axis: FloatingFlipCrossAxis::All,
             fallback_axis_side_direction: FloatingFallbackAxisSideDirection::None,
             flip_alignment: true,
             fallback_placements: Vec::new(),
@@ -642,6 +642,8 @@ pub struct FloatingShift {
     pub cross_axis_limit: Option<f32>,
     /// Optional rect-aware limiter.
     pub limiter: Option<FloatingShiftLimiter>,
+    /// Overflow padding used for boundary shifting.
+    pub padding: FloatingPadding,
 }
 
 impl FloatingShift {
@@ -654,6 +656,12 @@ impl FloatingShift {
             main_axis_limit: None,
             cross_axis_limit: None,
             limiter: None,
+            padding: FloatingPadding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
         }
     }
 
@@ -681,6 +689,13 @@ impl FloatingShift {
     #[must_use]
     pub const fn limiter(mut self, limiter: FloatingShiftLimiter) -> Self {
         self.limiter = Some(limiter);
+        self
+    }
+
+    /// Sets boundary padding for shift overflow detection.
+    #[must_use]
+    pub const fn padding(mut self, padding: FloatingPadding) -> Self {
+        self.padding = padding;
         self
     }
 }
@@ -898,6 +913,39 @@ pub enum FloatingHideStrategy {
     Escaped,
 }
 
+/// Hide strategy options.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct FloatingHide {
+    /// Hide strategy to report.
+    pub strategy: FloatingHideStrategy,
+    /// Overflow padding for this strategy.
+    pub padding: FloatingPadding,
+}
+
+impl FloatingHide {
+    /// Creates hide options for a strategy.
+    #[must_use]
+    pub const fn new(strategy: FloatingHideStrategy) -> Self {
+        Self {
+            strategy,
+            padding: FloatingPadding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
+        }
+    }
+
+    /// Sets overflow padding.
+    #[must_use]
+    pub const fn padding(mut self, padding: FloatingPadding) -> Self {
+        self.padding = padding;
+        self
+    }
+}
+
 /// Hide data reported by the floating computation.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -974,20 +1022,35 @@ impl Default for FloatingInline {
 pub struct FloatingArrow {
     /// Size of the arrow box.
     pub size: Size<f32>,
-    /// Minimum distance from either edge of the floating box.
-    pub padding: f32,
+    /// Minimum distance from each edge of the floating box.
+    pub padding: FloatingPadding,
 }
 
 impl FloatingArrow {
     /// Creates an arrow with no edge padding.
     #[must_use]
     pub const fn new(size: Size<f32>) -> Self {
-        Self { size, padding: 0.0 }
+        Self {
+            size,
+            padding: FloatingPadding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
+        }
     }
 
     /// Sets arrow edge padding.
     #[must_use]
     pub const fn padding(mut self, padding: f32) -> Self {
+        self.padding = FloatingPadding::all(padding);
+        self
+    }
+
+    /// Sets side-aware arrow edge padding.
+    #[must_use]
+    pub const fn padding_sides(mut self, padding: FloatingPadding) -> Self {
         self.padding = padding;
         self
     }
@@ -1051,7 +1114,7 @@ pub struct FloatingOptions {
     /// Optional arrow geometry.
     pub arrow: Option<FloatingArrow>,
     /// Hide data strategies to report.
-    pub hide: Vec<FloatingHideStrategy>,
+    pub hide: Vec<FloatingHide>,
     /// Optional inline reference fragment selection.
     pub inline: Option<FloatingInline>,
     /// Whether start/end alignment should invert in right-to-left layout for vertical sides.
@@ -1131,8 +1194,11 @@ impl FloatingOptions {
 
     /// Enables or disables flipping.
     #[must_use]
-    pub const fn flip(mut self, flip: bool) -> Self {
+    pub fn flip(mut self, flip: bool) -> Self {
         self.flip = flip;
+        if flip {
+            self.auto_placement = None;
+        }
         self
     }
 
@@ -1141,12 +1207,14 @@ impl FloatingOptions {
     pub fn flip_options(mut self, flip_options: FloatingFlip) -> Self {
         self.flip = true;
         self.flip_options = flip_options;
+        self.auto_placement = None;
         self
     }
 
     /// Sets automatic placement behavior.
     #[must_use]
     pub fn auto_placement(mut self, auto_placement: FloatingAutoPlacement) -> Self {
+        self.flip = false;
         self.auto_placement = Some(auto_placement);
         self
     }
@@ -1175,7 +1243,14 @@ impl FloatingOptions {
     /// Adds a hide data strategy.
     #[must_use]
     pub fn hide(mut self, strategy: FloatingHideStrategy) -> Self {
-        self.hide.push(strategy);
+        self.hide.push(FloatingHide::new(strategy));
+        self
+    }
+
+    /// Adds hide data options.
+    #[must_use]
+    pub fn hide_options(mut self, hide: FloatingHide) -> Self {
+        self.hide.push(hide);
         self
     }
 
@@ -1476,10 +1551,12 @@ pub fn shift_origin_into_boundary(
     boundary: FloatingBoundary,
     shift: FloatingShift,
 ) -> Point<f32> {
-    let min_x = boundary.rect.left() + boundary.padding.left;
-    let max_x = boundary.rect.right() - boundary.padding.right - floating.width;
-    let min_y = boundary.rect.top() + boundary.padding.top;
-    let max_y = boundary.rect.bottom() - boundary.padding.bottom - floating.height;
+    let min_x = boundary.rect.left() + boundary.padding.left + shift.padding.left;
+    let max_x =
+        boundary.rect.right() - boundary.padding.right - shift.padding.right - floating.width;
+    let min_y = boundary.rect.top() + boundary.padding.top + shift.padding.top;
+    let max_y =
+        boundary.rect.bottom() - boundary.padding.bottom - shift.padding.bottom - floating.height;
 
     let clamp_x =
         (side.is_vertical() && shift.cross_axis) || (!side.is_vertical() && shift.main_axis);
@@ -1488,21 +1565,23 @@ pub fn shift_origin_into_boundary(
 
     Point {
         x: if clamp_x {
-            limited_clamp(
+            shift_axis_origin(
                 origin.x,
                 min_x,
                 max_x,
-                shift_limit_for_x(side, shift, reference, floating),
+                limit_shift_bounds_x(side, shift, reference, floating),
+                shift_distance_limit_for_x(side, shift),
             )
         } else {
             origin.x
         },
         y: if clamp_y {
-            limited_clamp(
+            shift_axis_origin(
                 origin.y,
                 min_y,
                 max_y,
-                shift_limit_for_y(side, shift, reference, floating),
+                limit_shift_bounds_y(side, shift, reference, floating),
+                shift_distance_limit_for_y(side, shift),
             )
         } else {
             origin.y
@@ -1722,6 +1801,7 @@ fn choose_fallback_placement(
         candidates.extend(perpendicular_fallbacks(
             options.placement,
             flip.fallback_axis_side_direction,
+            options.rtl,
         ));
     }
 
@@ -1757,23 +1837,34 @@ fn choose_fallback_placement(
 fn perpendicular_fallbacks(
     placement: FloatingPlacement,
     direction: FloatingFallbackAxisSideDirection,
+    rtl: bool,
 ) -> Vec<FloatingPlacement> {
     if matches!(direction, FloatingFallbackAxisSideDirection::None) {
         return Vec::new();
     }
     let side = placement.side();
     let alignment = placement.alignment();
-    let fallback_side = match (side.is_vertical(), direction) {
-        (true, FloatingFallbackAxisSideDirection::Start) => FloatingSide::Left,
-        (true, FloatingFallbackAxisSideDirection::End) => FloatingSide::Right,
-        (false, FloatingFallbackAxisSideDirection::Start) => FloatingSide::Top,
-        (false, FloatingFallbackAxisSideDirection::End) => FloatingSide::Bottom,
-        (_, FloatingFallbackAxisSideDirection::None) => return Vec::new(),
+    let (first, second) = match (side.is_vertical(), direction, rtl) {
+        (true, FloatingFallbackAxisSideDirection::Start, false)
+        | (true, FloatingFallbackAxisSideDirection::End, true) => {
+            (FloatingSide::Left, FloatingSide::Right)
+        }
+        (true, FloatingFallbackAxisSideDirection::End, false)
+        | (true, FloatingFallbackAxisSideDirection::Start, true) => {
+            (FloatingSide::Right, FloatingSide::Left)
+        }
+        (false, FloatingFallbackAxisSideDirection::Start, _) => {
+            (FloatingSide::Top, FloatingSide::Bottom)
+        }
+        (false, FloatingFallbackAxisSideDirection::End, _) => {
+            (FloatingSide::Bottom, FloatingSide::Top)
+        }
+        (_, FloatingFallbackAxisSideDirection::None, _) => return Vec::new(),
     };
-    vec![FloatingPlacement::from_side_alignment(
-        fallback_side,
-        alignment,
-    )]
+    vec![
+        FloatingPlacement::from_side_alignment(first, alignment),
+        FloatingPlacement::from_side_alignment(second, alignment),
+    ]
 }
 
 fn flip_relevant_overflow(
@@ -1821,32 +1912,26 @@ fn available_size_with_padding(
     boundary: FloatingBoundary,
     padding: FloatingPadding,
 ) -> Size<f32> {
-    let left = boundary.rect.left() + boundary.padding.left;
-    let right = boundary.rect.right() - boundary.padding.right;
-    let top = boundary.rect.top() + boundary.padding.top;
-    let bottom = boundary.rect.bottom() - boundary.padding.bottom;
+    let left = boundary.rect.left() + boundary.padding.left + padding.left;
+    let right = boundary.rect.right() - boundary.padding.right - padding.right;
+    let top = boundary.rect.top() + boundary.padding.top + padding.top;
+    let bottom = boundary.rect.bottom() - boundary.padding.bottom - padding.bottom;
     match side {
         FloatingSide::Top => Size {
-            width: f32_max(right - left - padding.left - padding.right, 0.0),
-            height: f32_max(reference.top() - top - padding.top - padding.bottom, 0.0),
+            width: right - left,
+            height: reference.top() - top,
         },
         FloatingSide::Right => Size {
-            width: f32_max(
-                right - reference.right() - padding.left - padding.right,
-                0.0,
-            ),
-            height: f32_max(bottom - top - padding.top - padding.bottom, 0.0),
+            width: right - reference.right(),
+            height: bottom - top,
         },
         FloatingSide::Bottom => Size {
-            width: f32_max(right - left - padding.left - padding.right, 0.0),
-            height: f32_max(
-                bottom - reference.bottom() - padding.top - padding.bottom,
-                0.0,
-            ),
+            width: right - left,
+            height: bottom - reference.bottom(),
         },
         FloatingSide::Left => Size {
-            width: f32_max(reference.left() - left - padding.left - padding.right, 0.0),
-            height: f32_max(bottom - top - padding.top - padding.bottom, 0.0),
+            width: reference.left() - left,
+            height: bottom - top,
         },
     }
 }
@@ -1862,8 +1947,8 @@ fn compute_arrow_data(
         let raw_x = reference_center - floating.left() - arrow.size.width / 2.0;
         let x = clamp(
             raw_x,
-            arrow.padding,
-            floating.size.width - arrow.size.width - arrow.padding,
+            arrow.padding.left,
+            floating.size.width - arrow.size.width - arrow.padding.right,
         );
         FloatingArrowData {
             offset: Point { x, y: 0.0 },
@@ -1874,8 +1959,8 @@ fn compute_arrow_data(
         let raw_y = reference_center - floating.top() - arrow.size.height / 2.0;
         let y = clamp(
             raw_y,
-            arrow.padding,
-            floating.size.height - arrow.size.height - arrow.padding,
+            arrow.padding.top,
+            floating.size.height - arrow.size.height - arrow.padding.bottom,
         );
         FloatingArrowData {
             offset: Point { x: 0.0, y },
@@ -1906,24 +1991,25 @@ fn hide_data(
     reference: FloatingRect,
     floating: FloatingRect,
     boundary: FloatingBoundary,
-    strategies: &[FloatingHideStrategy],
+    strategies: &[FloatingHide],
 ) -> Option<FloatingHideData> {
     if strategies.is_empty() {
         return None;
     }
     let mut data = FloatingHideData::default();
-    for strategy in strategies {
-        match strategy {
+    for hide in strategies {
+        match hide.strategy {
             FloatingHideStrategy::ReferenceHidden => {
-                let offsets = detect_overflow(reference, boundary, FloatingPadding::default());
-                data.reference_hidden = reference.right() <= boundary.rect.left()
-                    || reference.left() >= boundary.rect.right()
-                    || reference.bottom() <= boundary.rect.top()
-                    || reference.top() >= boundary.rect.bottom();
+                let offsets = detect_overflow(reference, boundary, hide.padding);
+                data.reference_hidden = reference.right()
+                    <= boundary.rect.left() + hide.padding.left
+                    || reference.left() >= boundary.rect.right() - hide.padding.right
+                    || reference.bottom() <= boundary.rect.top() + hide.padding.top
+                    || reference.top() >= boundary.rect.bottom() - hide.padding.bottom;
                 data.reference_hidden_offsets = Some(offsets);
             }
             FloatingHideStrategy::Escaped => {
-                let offsets = detect_overflow(floating, boundary, FloatingPadding::default());
+                let offsets = detect_overflow(floating, boundary, hide.padding);
                 data.escaped = offsets.has_overflow();
                 data.escaped_offsets = Some(offsets);
             }
@@ -1932,20 +2018,12 @@ fn hide_data(
     Some(data)
 }
 
-fn shift_limit_for_x(
+fn limit_shift_bounds_x(
     side: FloatingSide,
     shift: FloatingShift,
     reference: FloatingRect,
     floating: Size<f32>,
-) -> Option<f32> {
-    let limit = if side.is_vertical() {
-        shift.cross_axis_limit
-    } else {
-        shift.main_axis_limit
-    };
-    if limit.is_some() {
-        return limit;
-    }
+) -> Option<(f32, f32)> {
     let Some(limiter) = shift.limiter else {
         return None;
     };
@@ -1954,27 +2032,22 @@ fn shift_limit_for_x(
     } else {
         limiter.main_axis
     };
-    if applies {
-        Some(limiter.offset.resolve(reference, floating).abs())
-    } else {
-        None
+    if !applies {
+        return None;
     }
+    let offset = limiter.offset.resolve(reference, floating);
+    Some((
+        reference.left() - floating.width + offset,
+        reference.right() - offset,
+    ))
 }
 
-fn shift_limit_for_y(
+fn limit_shift_bounds_y(
     side: FloatingSide,
     shift: FloatingShift,
     reference: FloatingRect,
     floating: Size<f32>,
-) -> Option<f32> {
-    let limit = if side.is_vertical() {
-        shift.main_axis_limit
-    } else {
-        shift.cross_axis_limit
-    };
-    if limit.is_some() {
-        return limit;
-    }
+) -> Option<(f32, f32)> {
     let Some(limiter) = shift.limiter else {
         return None;
     };
@@ -1983,16 +2056,47 @@ fn shift_limit_for_y(
     } else {
         limiter.cross_axis
     };
-    if applies {
-        Some(limiter.offset.resolve(reference, floating).abs())
+    if !applies {
+        return None;
+    }
+    let offset = limiter.offset.resolve(reference, floating);
+    Some((
+        reference.top() - floating.height + offset,
+        reference.bottom() - offset,
+    ))
+}
+
+fn shift_distance_limit_for_x(side: FloatingSide, shift: FloatingShift) -> Option<f32> {
+    if side.is_vertical() {
+        shift.cross_axis_limit
     } else {
-        None
+        shift.main_axis_limit
     }
 }
 
-fn limited_clamp(value: f32, min: f32, max: f32, limit: Option<f32>) -> f32 {
-    let clamped = clamp(value, min, max);
-    match limit {
+fn shift_distance_limit_for_y(side: FloatingSide, shift: FloatingShift) -> Option<f32> {
+    if side.is_vertical() {
+        shift.main_axis_limit
+    } else {
+        shift.cross_axis_limit
+    }
+}
+
+fn shift_axis_origin(
+    value: f32,
+    min: f32,
+    max: f32,
+    limiter_bounds: Option<(f32, f32)>,
+    distance_limit: Option<f32>,
+) -> f32 {
+    let mut clamped = clamp(value, min, max);
+    if clamped == value {
+        return value;
+    }
+    if let Some((limiter_min, limiter_max)) = limiter_bounds {
+        clamped = clamp(clamped, limiter_min, limiter_max);
+    }
+    match distance_limit {
         Some(limit) => {
             let distance = clamped - value;
             value + clamp(distance, -limit, limit)

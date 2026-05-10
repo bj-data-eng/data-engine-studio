@@ -40,7 +40,7 @@ pub use style::{
     Anchor, AnchorPlacement, BorderStyle, CompoundSelector, ComputedStyle, ContainerQuery,
     CornerStyle, Display, Easing, EdgeStyle, FloatingArrow, FloatingArrowData,
     FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary, FloatingFallbackAxisSideDirection,
-    FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHideData,
+    FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHide, FloatingHideData,
     FloatingHideStrategy, FloatingInline, FloatingOffset, FloatingOptions, FloatingPlacement,
     FloatingShift, FloatingShiftLimiter, FloatingSize, FloatingVisibility, GridAutoFlow,
     GridPlacement, GridPlacementLine, GridTemplateArea, GridTemplateComponent,
