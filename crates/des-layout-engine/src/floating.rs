@@ -1785,7 +1785,7 @@ fn choose_fallback_placement(
     let mut candidates = Vec::with_capacity(options.fallbacks.len() + 6);
     candidates.push(options.placement);
     let use_legacy_fallback_scoring = !options.flip && !options.fallbacks.is_empty();
-    if !flip.fallback_placements.is_empty() {
+    if options.flip && !flip.fallback_placements.is_empty() {
         candidates.extend(flip.fallback_placements.iter().copied());
     } else {
         candidates.extend(options.fallbacks.iter().copied());
@@ -1802,10 +1802,11 @@ fn choose_fallback_placement(
             options.placement,
             flip.fallback_axis_side_direction,
             options.rtl,
+            flip.flip_alignment,
         ));
     }
 
-    if !options.flip && options.fallbacks.is_empty() && flip.fallback_placements.is_empty() {
+    if !options.flip && options.fallbacks.is_empty() {
         return options.placement;
     }
     let mut best = options.placement;
@@ -1838,6 +1839,7 @@ fn perpendicular_fallbacks(
     placement: FloatingPlacement,
     direction: FloatingFallbackAxisSideDirection,
     rtl: bool,
+    flip_alignment: bool,
 ) -> Vec<FloatingPlacement> {
     if matches!(direction, FloatingFallbackAxisSideDirection::None) {
         return Vec::new();
@@ -1861,10 +1863,18 @@ fn perpendicular_fallbacks(
         }
         (_, FloatingFallbackAxisSideDirection::None, _) => return Vec::new(),
     };
-    vec![
+    let mut placements = vec![
         FloatingPlacement::from_side_alignment(first, alignment),
         FloatingPlacement::from_side_alignment(second, alignment),
-    ]
+    ];
+    if flip_alignment {
+        if let Some(alignment) = alignment {
+            let opposite = Some(alignment.opposite());
+            placements.push(FloatingPlacement::from_side_alignment(first, opposite));
+            placements.push(FloatingPlacement::from_side_alignment(second, opposite));
+        }
+    }
+    placements
 }
 
 fn flip_relevant_overflow(
@@ -2001,11 +2011,16 @@ fn hide_data(
         match hide.strategy {
             FloatingHideStrategy::ReferenceHidden => {
                 let offsets = detect_overflow(reference, boundary, hide.padding);
-                data.reference_hidden = reference.right()
-                    <= boundary.rect.left() + hide.padding.left
-                    || reference.left() >= boundary.rect.right() - hide.padding.right
-                    || reference.bottom() <= boundary.rect.top() + hide.padding.top
-                    || reference.top() >= boundary.rect.bottom() - hide.padding.bottom;
+                let padding = FloatingPadding {
+                    top: boundary.padding.top + hide.padding.top,
+                    right: boundary.padding.right + hide.padding.right,
+                    bottom: boundary.padding.bottom + hide.padding.bottom,
+                    left: boundary.padding.left + hide.padding.left,
+                };
+                data.reference_hidden = reference.right() <= boundary.rect.left() + padding.left
+                    || reference.left() >= boundary.rect.right() - padding.right
+                    || reference.bottom() <= boundary.rect.top() + padding.top
+                    || reference.top() >= boundary.rect.bottom() - padding.bottom;
                 data.reference_hidden_offsets = Some(offsets);
             }
             FloatingHideStrategy::Escaped => {
@@ -2118,4 +2133,45 @@ fn clamp(value: f32, min: f32, max: f32) -> f32 {
         return min;
     }
     f32_min(f32_max(value, min), max)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{perpendicular_fallbacks, FloatingFallbackAxisSideDirection, FloatingPlacement};
+
+    #[test]
+    fn perpendicular_fallbacks_include_opposite_alignments() {
+        assert_eq!(
+            perpendicular_fallbacks(
+                FloatingPlacement::BottomStart,
+                FloatingFallbackAxisSideDirection::Start,
+                false,
+                true,
+            ),
+            vec![
+                FloatingPlacement::LeftStart,
+                FloatingPlacement::RightStart,
+                FloatingPlacement::LeftEnd,
+                FloatingPlacement::RightEnd,
+            ]
+        );
+    }
+
+    #[test]
+    fn perpendicular_fallbacks_respect_rtl_side_order() {
+        assert_eq!(
+            perpendicular_fallbacks(
+                FloatingPlacement::BottomStart,
+                FloatingFallbackAxisSideDirection::Start,
+                true,
+                true,
+            ),
+            vec![
+                FloatingPlacement::RightStart,
+                FloatingPlacement::LeftStart,
+                FloatingPlacement::RightEnd,
+                FloatingPlacement::LeftEnd,
+            ]
+        );
+    }
 }

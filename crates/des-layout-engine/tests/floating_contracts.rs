@@ -269,6 +269,29 @@ fn floating_position_uses_first_fallback_that_fits() {
 }
 
 #[test]
+fn floating_flip_false_ignores_flip_fallback_placements() {
+    let reference = rect(84.0, 40.0, 12.0, 12.0);
+    let floating = Size {
+        width: 34.0,
+        height: 24.0,
+    };
+    let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0));
+
+    let output = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Right)
+            .boundary(boundary)
+            .flip_options(FloatingFlip::new().fallback_placements([FloatingPlacement::Left]))
+            .flip(false),
+    );
+
+    assert_eq!(output.placement, FloatingPlacement::Right);
+    assert_eq!(output.origin, Point { x: 96.0, y: 34.0 });
+    assert!(output.overflow.unwrap().right > 0.0);
+}
+
+#[test]
 fn floating_position_reports_available_size_for_final_placement() {
     let reference = rect(40.0, 40.0, 20.0, 20.0);
     let floating = Size {
@@ -724,6 +747,27 @@ fn floating_hide_strategy_can_use_padding() {
     );
 
     assert!(output.hide.unwrap().reference_hidden);
+}
+
+#[test]
+fn floating_hide_strategy_combines_boundary_and_strategy_padding() {
+    let boundary =
+        FloatingBoundary::new(rect(0.0, 0.0, 100.0, 100.0)).padding(FloatingPadding::all(4.0));
+
+    let output = compute_floating_position(
+        rect(-1.0, 10.0, 3.0, 20.0),
+        Size {
+            width: 40.0,
+            height: 24.0,
+        },
+        FloatingOptions::new(FloatingPlacement::Bottom)
+            .boundary(boundary)
+            .hide_options(FloatingHide::new(FloatingHideStrategy::ReferenceHidden)),
+    );
+
+    let hide = output.hide.unwrap();
+    assert!(hide.reference_hidden);
+    assert_eq!(hide.reference_hidden_offsets.unwrap().left, 5.0);
 }
 
 #[test]
