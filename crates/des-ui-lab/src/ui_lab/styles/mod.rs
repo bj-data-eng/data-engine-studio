@@ -8,8 +8,8 @@ use super::{
 };
 use des_ui_document::{
     AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
-    FloatingPlacement, Insets, JustifyContent, Length, Overflow, Point, Shadow, Style,
-    StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
+    FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow, Point, Shadow,
+    Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -1711,6 +1711,24 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .justify_content(JustifyContent::Center),
         )
         .rule(
+            StyleSelector::class("floating-scroll-shift-panel"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(210.0))
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible)
+                .scrollbar_visible(true)
+                .border(STROKE)
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-scroll-shift-track"),
+            Style::default()
+                .width(Length::Px(780.0))
+                .height(Length::Px(170.0))
+                .flex_shrink(0.0),
+        )
+        .rule(
             StyleSelector::class("floating-offset-reference"),
             Style::default()
                 .width(Length::Px(148.0))
@@ -1875,6 +1893,25 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_to("floating-top-start-reference")
                 .floating_placement(FloatingPlacement::TopStart)
                 .floating_alignment_axis(-88.0),
+        )
+        .rule(
+            StyleSelector::id("floating-scroll-shift-reference"),
+            Style::default().margin(Insets {
+                top: 88.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 560.0,
+            }),
+        )
+        .rule(
+            StyleSelector::id("floating-scroll-shift-popover"),
+            Style::default()
+                .width(Length::Px(350.0))
+                .height(Length::Px(44.0))
+                .floating_to("floating-scroll-shift-reference")
+                .floating_placement(FloatingPlacement::Bottom)
+                .floating_boundary_to("floating-scroll-shift-panel")
+                .floating_shift(FloatingShift::new(false, true)),
         )
         .rule(
             StyleSelector::class("nest-outer"),

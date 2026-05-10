@@ -369,6 +369,10 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let top_start_specimen = frame(&output, "floating-top-start-specimen");
     let top_start_reference = frame(&output, "floating-top-start-reference");
     let top_start_popover = frame(&output, "floating-top-start-popover");
+    let scroll_shift_specimen = frame(&output, "floating-scroll-shift-specimen");
+    let scroll_shift_panel = frame(&output, "floating-scroll-shift-panel");
+    let scroll_shift_reference = frame(&output, "floating-scroll-shift-reference");
+    let scroll_shift_popover = frame(&output, "floating-scroll-shift-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
@@ -376,6 +380,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_eq!(alignment_axis_specimen.style.position, Position::Flow);
     assert_eq!(centered_axis_specimen.style.position, Position::Flow);
     assert_eq!(top_start_specimen.style.position, Position::Flow);
+    assert_eq!(scroll_shift_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -427,6 +432,15 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         top_start_specimen.rect.origin.y,
         centered_axis_specimen.rect.origin.y,
+    );
+    assert_close(
+        scroll_shift_specimen.rect.size.width,
+        specimen.rect.size.width,
+    );
+    assert_close(scroll_shift_specimen.rect.origin.x, specimen.rect.origin.x);
+    assert_close(
+        scroll_shift_specimen.rect.origin.y,
+        centered_axis_specimen.rect.bottom(),
     );
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
@@ -515,6 +529,19 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         top_start_popover.rect.bottom(),
         top_start_reference.rect.origin.y,
+    );
+    let scroll_boundary_right =
+        scroll_shift_panel.rect.right() - scroll_shift_panel.style.border_width.right;
+    assert!(scroll_shift_reference.rect.origin.x > scroll_boundary_right);
+    assert_close(scroll_shift_popover.rect.right(), scroll_boundary_right);
+    let scrolled_output = lab_output_with_stage_scroll("floating", 900.0);
+    assert!(
+        scrolled_output.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id.as_str() == "floating-scroll-shift-panel"
+                && chrome.axis == ScrollAxis::Horizontal
+                && chrome.visible
+        }),
+        "floating scroll boundary specimen should expose a visible horizontal scrollbar when it is within the stage viewport"
     );
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);

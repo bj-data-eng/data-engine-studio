@@ -2329,6 +2329,67 @@ fn floating_arrow_is_style_opt_in_metadata() {
 }
 
 #[test]
+fn floating_anchor_can_shift_inside_scroll_container_boundary() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .size(120.0, 80.0)
+                .border_width(4.0)
+                .overflow_x(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("track"),
+            Style::default()
+                .width(Length::Px(360.0))
+                .height(Length::Px(70.0)),
+        )
+        .rule(
+            StyleSelector::id("anchor"),
+            Style::default().size(40.0, 40.0).margin(Insets {
+                top: 16.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 210.0,
+            }),
+        )
+        .rule(
+            StyleSelector::id("popover"),
+            Style::default()
+                .size(70.0, 32.0)
+                .floating_to("anchor")
+                .floating_placement(des_ui_document::FloatingPlacement::Bottom)
+                .floating_boundary_to("scroll-panel")
+                .floating_shift(des_ui_document::FloatingShift::new(false, true)),
+        );
+    let mut document = Document::build(Size::new(260.0, 140.0), |ui| {
+        ui.element("scroll-panel", ElementSpec::new(Element::Div), |ui| {
+            ui.element("track", ElementSpec::new(Element::Div), |ui| {
+                ui.element("anchor", ElementSpec::new(Element::Div), |_| {});
+            });
+            ui.element("popover", ElementSpec::new(Element::Div), |_| {});
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let panel = output.layout.find("scroll-panel").unwrap();
+    let anchor = output.layout.find("anchor").unwrap();
+    let popover = output.layout.find("popover").unwrap();
+    let boundary_left = panel.rect.origin.x + 4.0;
+    let boundary_right = panel.rect.right() - 4.0;
+    assert!(anchor.rect.origin.x > boundary_right);
+    assert_close(popover.rect.right(), boundary_right);
+
+    engine.element_state_mut("scroll-panel").unwrap().scroll_x = 256.0;
+    let output = engine.update(&mut document, &stylesheet);
+    let anchor = output.layout.find("anchor").unwrap();
+    let popover = output.layout.find("popover").unwrap();
+    assert!(anchor.rect.origin.x < boundary_left);
+    assert_close(popover.rect.origin.x, boundary_left);
+}
+
+#[test]
 fn absolute_viewport_position_uses_window_rect() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

@@ -556,12 +556,14 @@ impl Document {
         text_measurer: &mut dyn TextMeasurer,
     ) -> DocumentResult<ResolvedElement> {
         let mut anchors = HashMap::new();
+        let mut boundaries = HashMap::new();
         self.resolved_element(
             &self.root,
             Point::ZERO,
             Point::ZERO,
             text_measurer,
             &mut anchors,
+            &mut boundaries,
         )
     }
 
@@ -754,6 +756,7 @@ impl Document {
         parent_scroll_offset: Point,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
+        boundaries: &mut HashMap<ElementId, DocumentRect>,
     ) -> DocumentResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
@@ -764,14 +767,25 @@ impl Document {
             parent_origin,
             parent_scroll_offset,
             anchors,
+            boundaries,
         );
         let text_layout = element
             .text
             .as_deref()
             .map(|text| measure_text(text, &element.computed_style, rect, text_measurer));
         anchors.insert(element.id.clone(), rect);
-        let children =
-            self.resolved_children(id, rect, element.scroll_offset, text_measurer, anchors)?;
+        boundaries.insert(
+            element.id.clone(),
+            rect.inset(element.computed_style.border_width),
+        );
+        let children = self.resolved_children(
+            id,
+            rect,
+            element.scroll_offset,
+            text_measurer,
+            anchors,
+            boundaries,
+        )?;
 
         Ok(ResolvedElement {
             id: element.id.clone(),
@@ -800,6 +814,7 @@ impl Document {
         parent_scroll_offset: Point,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
+        boundaries: &mut HashMap<ElementId, DocumentRect>,
     ) -> DocumentResult<Vec<ResolvedElement>> {
         let children = self.children(id.clone())?;
         let mut resolved = vec![None; children.len()];
@@ -818,6 +833,7 @@ impl Document {
                 parent_scroll_offset,
                 text_measurer,
                 anchors,
+                boundaries,
             )?);
         }
 
@@ -835,6 +851,7 @@ impl Document {
                 parent_scroll_offset,
                 text_measurer,
                 anchors,
+                boundaries,
             )?);
         }
 
@@ -1292,10 +1309,17 @@ fn resolved_document_rect(
     parent_origin: Point,
     parent_scroll_offset: Point,
     anchors: &HashMap<ElementId, DocumentRect>,
+    boundaries: &HashMap<ElementId, DocumentRect>,
 ) -> (DocumentRect, Option<ResolvedFloating>) {
     if let Some(anchor) = &style.anchor {
         if let Some(anchor_rect) = anchors.get(&anchor.target) {
-            return anchored_document_rect(style, *anchor_rect, raw_rect.size, viewport);
+            return anchored_document_rect(
+                style,
+                *anchor_rect,
+                raw_rect.size,
+                viewport,
+                boundaries,
+            );
         }
     }
 
@@ -1339,6 +1363,7 @@ fn anchored_document_rect(
     anchor_rect: DocumentRect,
     measured: Size,
     viewport: Size,
+    boundaries: &HashMap<ElementId, DocumentRect>,
 ) -> (DocumentRect, Option<ResolvedFloating>) {
     let anchor = style
         .anchor
@@ -1349,15 +1374,21 @@ fn anchored_document_rect(
         .arrow
         .map(|arrow| Size::new(arrow.size.width, arrow.size.height));
     let mut options = anchor.options.clone();
-    options.boundary = options.boundary.or_else(|| {
-        Some(FloatingBoundary::new(FloatingRect::new(
-            LayoutPoint { x: 0.0, y: 0.0 },
-            FloatingSize {
-                width: viewport.width,
-                height: viewport.height,
-            },
-        )))
-    });
+    options.boundary = anchor
+        .boundary_target
+        .as_ref()
+        .and_then(|target| boundaries.get(target).copied())
+        .map(floating_boundary_from_document_rect)
+        .or(options.boundary)
+        .or_else(|| {
+            Some(FloatingBoundary::new(FloatingRect::new(
+                LayoutPoint { x: 0.0, y: 0.0 },
+                FloatingSize {
+                    width: viewport.width,
+                    height: viewport.height,
+                },
+            )))
+        });
     let floating = compute_floating_position(
         FloatingRect::new(
             LayoutPoint {
@@ -1392,6 +1423,19 @@ fn anchored_document_rect(
             visibility: floating.visibility,
         }),
     )
+}
+
+fn floating_boundary_from_document_rect(rect: DocumentRect) -> FloatingBoundary {
+    FloatingBoundary::new(FloatingRect::new(
+        LayoutPoint {
+            x: rect.origin.x,
+            y: rect.origin.y,
+        },
+        FloatingSize {
+            width: rect.size.width,
+            height: rect.size.height,
+        },
+    ))
 }
 
 fn viewport_axis_position(

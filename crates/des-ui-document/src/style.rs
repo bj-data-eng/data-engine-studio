@@ -428,6 +428,7 @@ pub type AnchorPlacement = FloatingPlacement;
 pub struct Anchor {
     pub target: ElementId,
     pub options: FloatingOptions,
+    pub boundary_target: Option<ElementId>,
 }
 
 impl Anchor {
@@ -438,6 +439,7 @@ impl Anchor {
                 legacy_main_axis_offset(placement, offset),
                 legacy_cross_axis_offset(placement, offset),
             ),
+            boundary_target: None,
         }
     }
 
@@ -445,6 +447,7 @@ impl Anchor {
         Self {
             target: target.into(),
             options: FloatingOptions::new(FloatingPlacement::BottomStart),
+            boundary_target: None,
         }
     }
 
@@ -452,6 +455,7 @@ impl Anchor {
         Self {
             target: target.into(),
             options,
+            boundary_target: None,
         }
     }
 
@@ -482,6 +486,11 @@ impl Anchor {
 
     pub fn arrow(mut self, arrow: FloatingArrow) -> Self {
         self.options.arrow = Some(arrow);
+        self
+    }
+
+    pub fn boundary_to(mut self, boundary_target: impl Into<ElementId>) -> Self {
+        self.boundary_target = Some(boundary_target.into());
         self
     }
 
@@ -1228,6 +1237,13 @@ impl Style {
     pub fn floating_shift(mut self, shift: FloatingShift) -> Self {
         if let Some(anchor) = &mut self.anchor {
             anchor.options.shift = Some(shift);
+        }
+        self
+    }
+
+    pub fn floating_boundary_to(mut self, boundary_target: impl Into<ElementId>) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.boundary_target = Some(boundary_target.into());
         }
         self
     }
