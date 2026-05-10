@@ -532,9 +532,9 @@ pub struct Style {
     pub justify_items: Option<AlignItems>,
     pub justify_self: Option<AlignSelf>,
     pub justify_content: Option<JustifyContent>,
-    pub gap: Option<f32>,
-    pub row_gap: Option<f32>,
-    pub column_gap: Option<f32>,
+    pub gap: Option<Length>,
+    pub row_gap: Option<Length>,
+    pub column_gap: Option<Length>,
     pub grid_template_rows: Option<Vec<GridTemplateComponent>>,
     pub grid_template_columns: Option<Vec<GridTemplateComponent>>,
     pub grid_auto_rows: Option<Vec<GridTrack>>,
@@ -741,20 +741,49 @@ impl Style {
     }
 
     pub fn gap(mut self, gap: f32) -> Self {
+        self.gap = Some(Length::Px(gap));
+        self.row_gap = Some(Length::Px(gap));
+        self.column_gap = Some(Length::Px(gap));
+        self
+    }
+
+    pub fn gap_length(mut self, gap: Length) -> Self {
         self.gap = Some(gap);
         self.row_gap = Some(gap);
         self.column_gap = Some(gap);
         self
     }
 
+    pub fn gap_percent(self, factor: f32) -> Self {
+        self.gap_length(Length::Percent(factor))
+    }
+
     pub fn row_gap(mut self, row_gap: f32) -> Self {
+        self.row_gap = Some(Length::Px(row_gap));
+        self
+    }
+
+    pub fn row_gap_length(mut self, row_gap: Length) -> Self {
         self.row_gap = Some(row_gap);
         self
     }
 
+    pub fn row_gap_percent(self, factor: f32) -> Self {
+        self.row_gap_length(Length::Percent(factor))
+    }
+
     pub fn column_gap(mut self, column_gap: f32) -> Self {
+        self.column_gap = Some(Length::Px(column_gap));
+        self
+    }
+
+    pub fn column_gap_length(mut self, column_gap: Length) -> Self {
         self.column_gap = Some(column_gap);
         self
+    }
+
+    pub fn column_gap_percent(self, factor: f32) -> Self {
+        self.column_gap_length(Length::Percent(factor))
     }
 
     pub fn grid_template_rows(mut self, grid_template_rows: Vec<GridTemplateComponent>) -> Self {
@@ -1311,9 +1340,9 @@ pub struct ComputedStyle {
     pub justify_items: Option<AlignItems>,
     pub justify_self: Option<AlignSelf>,
     pub justify_content: JustifyContent,
-    pub gap: f32,
-    pub row_gap: f32,
-    pub column_gap: f32,
+    pub gap: Length,
+    pub row_gap: Length,
+    pub column_gap: Length,
     pub grid_template_rows: Vec<GridTemplateComponent>,
     pub grid_template_columns: Vec<GridTemplateComponent>,
     pub grid_auto_rows: Vec<GridTrack>,
@@ -1386,9 +1415,9 @@ impl Default for ComputedStyle {
             justify_items: None,
             justify_self: None,
             justify_content: JustifyContent::Start,
-            gap: 0.0,
-            row_gap: 0.0,
-            column_gap: 0.0,
+            gap: Length::Px(0.0),
+            row_gap: Length::Px(0.0),
+            column_gap: Length::Px(0.0),
             grid_template_rows: Vec::new(),
             grid_template_columns: Vec::new(),
             grid_auto_rows: Vec::new(),

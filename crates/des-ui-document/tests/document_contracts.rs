@@ -1130,7 +1130,7 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
     assert_eq!(card.style.max_size, Size::new(190.0, 130.0));
     assert_eq!(card.style.padding, Insets::all(6.0));
     assert_eq!(card.style.margin, Insets::all(4.0));
-    assert_eq!(card.style.gap, 8.0);
+    assert_eq!(card.style.gap, Length::Px(8.0));
     assert_eq!(card.style.border_width, Insets::all(4.0));
     assert_eq!(card.style.radius, CornerRadii::all(8.0));
     assert_eq!(card.style.font_size, 14.0);

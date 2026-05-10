@@ -104,15 +104,28 @@ impl core::fmt::Display for LayoutError {
 impl std::error::Error for LayoutError {}
 
 /// Global configuration values for a LayoutTree instance
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct LayoutConfig {
     /// Whether to round layout values
     pub(crate) use_rounding: bool,
+    /// Resolver for opaque calc handles stored in length values.
+    pub(crate) calc_resolver: fn(*const (), f32) -> f32,
 }
 
 impl Default for LayoutConfig {
     fn default() -> Self {
-        Self { use_rounding: true }
+        Self {
+            use_rounding: true,
+            calc_resolver: |_, _| 0.0,
+        }
+    }
+}
+
+impl core::fmt::Debug for LayoutConfig {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LayoutConfig")
+            .field("use_rounding", &self.use_rounding)
+            .finish_non_exhaustive()
     }
 }
 
@@ -452,7 +465,7 @@ where
 
     #[inline(always)]
     fn resolve_calc_value(&self, _val: *const (), _basis: f32) -> f32 {
-        0.0
+        (self.tree.config.calc_resolver)(_val, _basis)
     }
 
     #[inline(always)]
@@ -658,6 +671,11 @@ impl<NodeContext> LayoutTree<NodeContext> {
     /// Disable rounding of layout values. Rounding is enabled by default.
     pub fn disable_rounding(&mut self) {
         self.config.use_rounding = false;
+    }
+
+    /// Sets the resolver used for opaque `calc()` length handles.
+    pub fn set_calc_resolver(&mut self, resolver: fn(*const (), f32) -> f32) {
+        self.config.calc_resolver = resolver;
     }
 
     /// Creates and adds a new unattached leaf node to the tree, and returns the node of the new node

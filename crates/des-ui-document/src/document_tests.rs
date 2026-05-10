@@ -165,9 +165,9 @@ fn document_applies_document_style_to_existing_layout_node() {
     style.justify_items = Some(AlignItems::Center);
     style.justify_self = Some(AlignItems::End);
     style.justify_content = JustifyContent::SpaceEvenly;
-    style.gap = 12.0;
-    style.row_gap = 10.0;
-    style.column_gap = 14.0;
+    style.gap = Length::Px(12.0);
+    style.row_gap = Length::Px(10.0);
+    style.column_gap = Length::Px(14.0);
     style.grid_template_rows = vec![GridTemplateComponent::Repeat(GridTemplateRepetition {
         count: RepetitionCount::Count(2),
         tracks: vec![fr::<_, GridTrack>(1.0)],
@@ -1169,7 +1169,7 @@ fn document_engine_update_eases_full_box_model_layout_styles() {
     assert_eq!(card.style.max_size, Size::new(190.0, 130.0));
     assert_eq!(card.style.padding, Insets::all(6.0));
     assert_eq!(card.style.margin, Insets::all(4.0));
-    assert_eq!(card.style.gap, 8.0);
+    assert_eq!(card.style.gap, Length::Px(8.0));
     assert_eq!(card.style.border_width, Insets::all(4.0));
     assert_eq!(card.style.radius, CornerRadii::all(8.0));
     assert_eq!(card.style.font_size, 14.0);
@@ -1738,6 +1738,124 @@ fn document_engine_update_wraps_row_children_and_expands_height() {
     assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
     assert_eq!(item_1.rect.origin, Point::new(60.0, 0.0));
     assert_eq!(item_2.rect.origin, Point::new(0.0, 30.0));
+}
+
+#[test]
+fn document_engine_resolves_percent_column_gap_against_flex_container_width() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "row", ElementSpec::new(Element::Div))
+        .unwrap();
+    for index in 0..2 {
+        document
+            .append_element(
+                "row",
+                format!("item-{index}"),
+                ElementSpec::new(Element::Div).class("item"),
+            )
+            .unwrap();
+    }
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .flex_direction(FlexDirection::Row)
+                .width(Length::Px(200.0))
+                .height(Length::Auto)
+                .column_gap_percent(0.05),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default().size(50.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+    let item_0 = output.layout.find("item-0").unwrap();
+    let item_1 = output.layout.find("item-1").unwrap();
+
+    assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
+    assert_eq!(item_1.rect.origin, Point::new(60.0, 0.0));
+}
+
+#[test]
+fn document_engine_resolves_percent_row_gap_against_flex_container_height() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "column", ElementSpec::new(Element::Div))
+        .unwrap();
+    for index in 0..2 {
+        document
+            .append_element(
+                "column",
+                format!("item-{index}"),
+                ElementSpec::new(Element::Div).class("item"),
+            )
+            .unwrap();
+    }
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("column"),
+            Style::default()
+                .flex_direction(FlexDirection::Column)
+                .width(Length::Px(200.0))
+                .height(Length::Px(200.0))
+                .row_gap_percent(0.05),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default().size(50.0, 20.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+    let item_0 = output.layout.find("item-0").unwrap();
+    let item_1 = output.layout.find("item-1").unwrap();
+
+    assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
+    assert_eq!(item_1.rect.origin, Point::new(0.0, 30.0));
+}
+
+#[test]
+fn document_engine_resolves_calc_width_with_fixed_gap() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "row", ElementSpec::new(Element::Div))
+        .unwrap();
+    for index in 0..2 {
+        document
+            .append_element(
+                "row",
+                format!("item-{index}"),
+                ElementSpec::new(Element::Div).class("item"),
+            )
+            .unwrap();
+    }
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .flex_direction(FlexDirection::Row)
+                .width(Length::Px(200.0))
+                .height(Length::Auto)
+                .column_gap(10.0),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default()
+                .width(Length::calc(0.5, -5.0))
+                .height(Length::Px(20.0)),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+    let item_0 = output.layout.find("item-0").unwrap();
+    let item_1 = output.layout.find("item-1").unwrap();
+
+    assert_eq!(item_0.rect.size, Size::new(95.0, 20.0));
+    assert_eq!(item_0.rect.origin, Point::new(0.0, 0.0));
+    assert_eq!(item_1.rect.size, Size::new(95.0, 20.0));
+    assert_eq!(item_1.rect.origin, Point::new(105.0, 0.0));
 }
 
 #[test]

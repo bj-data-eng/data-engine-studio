@@ -161,14 +161,14 @@ fn eased_style(
         next.text_selection_color = target.text_selection_color;
     }
 
-    next.gap = ease_f32(current.gap, target.gap, amount, snap_epsilon);
-    animating |= (next.gap - target.gap).abs() > snap_epsilon;
+    next.gap = ease_length(current.gap, target.gap, amount, snap_epsilon);
+    animating |= next.gap != target.gap;
 
-    next.row_gap = ease_f32(current.row_gap, target.row_gap, amount, snap_epsilon);
-    animating |= (next.row_gap - target.row_gap).abs() > snap_epsilon;
+    next.row_gap = ease_length(current.row_gap, target.row_gap, amount, snap_epsilon);
+    animating |= next.row_gap != target.row_gap;
 
-    next.column_gap = ease_f32(current.column_gap, target.column_gap, amount, snap_epsilon);
-    animating |= (next.column_gap - target.column_gap).abs() > snap_epsilon;
+    next.column_gap = ease_length(current.column_gap, target.column_gap, amount, snap_epsilon);
+    animating |= next.column_gap != target.column_gap;
 
     next.flex_basis = ease_length(current.flex_basis, target.flex_basis, amount, snap_epsilon);
     animating |= next.flex_basis != target.flex_basis;
@@ -526,6 +526,19 @@ fn ease_length(current: Length, target: Length, amount: f32, snap_epsilon: f32) 
         (Length::Percent(current), Length::Percent(target)) => {
             Length::Percent(ease_f32(current, target, amount, snap_epsilon))
         }
+        (
+            Length::Calc {
+                percent: current_percent,
+                px: current_px,
+            },
+            Length::Calc {
+                percent: target_percent,
+                px: target_px,
+            },
+        ) => Length::Calc {
+            percent: ease_f32(current_percent, target_percent, amount, snap_epsilon),
+            px: ease_f32(current_px, target_px, amount, snap_epsilon),
+        },
         _ => target,
     }
 }

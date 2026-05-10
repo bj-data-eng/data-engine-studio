@@ -271,15 +271,21 @@ pub enum Length {
     Px(f32),
     Fill,
     Percent(f32),
+    Calc { percent: f32, px: f32 },
 }
 
 impl Length {
+    pub const fn calc(percent: f32, px: f32) -> Self {
+        Self::Calc { percent, px }
+    }
+
     pub(crate) fn resolve(self, available: f32, auto: f32) -> f32 {
         match self {
             Self::Auto => auto,
             Self::Px(value) => value,
             Self::Fill => available,
             Self::Percent(factor) => available * factor,
+            Self::Calc { percent, px } => available * percent + px,
         }
         .max(0.0)
     }

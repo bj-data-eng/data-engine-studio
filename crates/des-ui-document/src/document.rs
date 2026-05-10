@@ -90,9 +90,41 @@ pub struct Document {
     viewport: Size,
     revision: u64,
     layout: LayoutTree<DocumentLayoutNode>,
+    calc_lengths: HashMap<CalcLengthKey, Box<LayoutCalcLength>>,
     elements: HashMap<ElementId, DocumentElement>,
     layout_to_element: HashMap<NodeId, ElementId>,
     root: ElementId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct CalcLengthKey {
+    percent: u32,
+    px: u32,
+}
+
+impl CalcLengthKey {
+    fn new(percent: f32, px: f32) -> Self {
+        Self {
+            percent: percent.to_bits(),
+            px: px.to_bits(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LayoutCalcLength {
+    percent: f32,
+    px: f32,
+}
+
+fn resolve_layout_calc_length(value: *const (), basis: f32) -> f32 {
+    if value.is_null() {
+        return 0.0;
+    }
+    // SAFETY: calc handles are interned `LayoutCalcLength` boxes owned by the document for
+    // at least as long as the layout tree can resolve them.
+    let calc = unsafe { &*(value.cast::<LayoutCalcLength>()) };
+    basis * calc.percent + calc.px
 }
 
 impl Document {
@@ -110,6 +142,7 @@ impl Document {
 
     pub fn new(viewport: Size) -> Self {
         let mut layout = LayoutTree::new();
+        layout.set_calc_resolver(resolve_layout_calc_length);
         let root = ElementId::new("root");
         let root_node = layout
             .new_leaf_with_context(
@@ -143,6 +176,7 @@ impl Document {
             viewport,
             revision: 0,
             layout,
+            calc_lengths: HashMap::new(),
             elements,
             layout_to_element,
             root,
@@ -391,8 +425,8 @@ impl Document {
     ) -> DocumentResult<bool> {
         let id = id.into();
         let node = self.element(&id)?.layout_node;
-        let layout_changed =
-            self.set_layout_style_if_changed(node, layout_style_from_computed(style))?;
+        let layout_style = self.layout_style_from_computed(style);
+        let layout_changed = self.set_layout_style_if_changed(node, layout_style)?;
         self.element_mut(&id)?.computed_style = style.clone();
         Ok(layout_changed)
     }
@@ -1499,89 +1533,127 @@ fn measure_text_with_wrap_width(
     })
 }
 
-fn layout_style_from_computed(style: &ComputedStyle) -> LayoutStyle {
-    LayoutStyle {
-        display: style.display,
-        overflow: layout_overflow(style.overflow_x, style.overflow_y),
-        scrollbar_width: style.scrollbar_width,
-        position: layout_position(style.position),
-        inset: LayoutRect {
-            left: style.inset.left.map_or_else(
-                LengthPercentageAuto::auto,
-                length_percentage_auto_from_document,
-            ),
-            right: style.inset.right.map_or_else(
-                LengthPercentageAuto::auto,
-                length_percentage_auto_from_document,
-            ),
-            top: style.inset.top.map_or_else(
-                LengthPercentageAuto::auto,
-                length_percentage_auto_from_document,
-            ),
-            bottom: style.inset.bottom.map_or_else(
-                LengthPercentageAuto::auto,
-                length_percentage_auto_from_document,
-            ),
-        },
-        size: LayoutSize {
-            width: dimension_from_document(style.width),
-            height: dimension_from_document(style.height),
-        },
-        min_size: LayoutSize {
-            width: layout_bound(style.min_size.width),
-            height: layout_bound(style.min_size.height),
-        },
-        max_size: LayoutSize {
-            width: layout_bound(style.max_size.width),
-            height: layout_bound(style.max_size.height),
-        },
-        margin: layout_auto_rect(style.margin),
-        padding: layout_rect(style.padding),
-        border: layout_rect(style.border_width),
-        align_items: Some(layout_align_items(style.align_items)),
-        align_self: style.align_self.map(layout_align_items),
-        align_content: Some(layout_align_content(style.align_content)),
-        justify_items: style.justify_items.map(layout_align_items),
-        justify_self: style.justify_self.map(layout_align_items),
-        justify_content: Some(layout_justify_content(style.justify_content)),
-        gap: LayoutSize {
-            width: length(style.column_gap),
-            height: length(style.row_gap),
-        },
-        flex_direction: layout_flex_direction(style.flex_direction),
-        flex_wrap: layout_flex_wrap(style.flex_wrap),
-        flex_basis: dimension_from_document(style.flex_basis),
-        flex_grow: style.flex_grow,
-        flex_shrink: style.flex_shrink,
-        grid_template_rows: style.grid_template_rows.clone(),
-        grid_template_columns: style.grid_template_columns.clone(),
-        grid_auto_rows: style.grid_auto_rows.clone(),
-        grid_auto_columns: style.grid_auto_columns.clone(),
-        grid_auto_flow: style.grid_auto_flow,
-        grid_template_areas: style.grid_template_areas.clone(),
-        grid_template_column_names: style.grid_template_column_names.clone(),
-        grid_template_row_names: style.grid_template_row_names.clone(),
-        grid_row: style.grid_row.clone(),
-        grid_column: style.grid_column.clone(),
-        ..Default::default()
+impl Document {
+    fn layout_style_from_computed(&mut self, style: &ComputedStyle) -> LayoutStyle {
+        LayoutStyle {
+            display: style.display,
+            overflow: layout_overflow(style.overflow_x, style.overflow_y),
+            scrollbar_width: style.scrollbar_width,
+            position: layout_position(style.position),
+            inset: LayoutRect {
+                left: style
+                    .inset
+                    .left
+                    .map_or_else(LengthPercentageAuto::auto, |length| {
+                        self.length_percentage_auto_from_document(length)
+                    }),
+                right: style
+                    .inset
+                    .right
+                    .map_or_else(LengthPercentageAuto::auto, |length| {
+                        self.length_percentage_auto_from_document(length)
+                    }),
+                top: style
+                    .inset
+                    .top
+                    .map_or_else(LengthPercentageAuto::auto, |length| {
+                        self.length_percentage_auto_from_document(length)
+                    }),
+                bottom: style
+                    .inset
+                    .bottom
+                    .map_or_else(LengthPercentageAuto::auto, |length| {
+                        self.length_percentage_auto_from_document(length)
+                    }),
+            },
+            size: LayoutSize {
+                width: self.dimension_from_document(style.width),
+                height: self.dimension_from_document(style.height),
+            },
+            min_size: LayoutSize {
+                width: layout_bound(style.min_size.width),
+                height: layout_bound(style.min_size.height),
+            },
+            max_size: LayoutSize {
+                width: layout_bound(style.max_size.width),
+                height: layout_bound(style.max_size.height),
+            },
+            margin: layout_auto_rect(style.margin),
+            padding: layout_rect(style.padding),
+            border: layout_rect(style.border_width),
+            align_items: Some(layout_align_items(style.align_items)),
+            align_self: style.align_self.map(layout_align_items),
+            align_content: Some(layout_align_content(style.align_content)),
+            justify_items: style.justify_items.map(layout_align_items),
+            justify_self: style.justify_self.map(layout_align_items),
+            justify_content: Some(layout_justify_content(style.justify_content)),
+            gap: LayoutSize {
+                width: self.length_percentage_from_document(style.column_gap),
+                height: self.length_percentage_from_document(style.row_gap),
+            },
+            flex_direction: layout_flex_direction(style.flex_direction),
+            flex_wrap: layout_flex_wrap(style.flex_wrap),
+            flex_basis: self.dimension_from_document(style.flex_basis),
+            flex_grow: style.flex_grow,
+            flex_shrink: style.flex_shrink,
+            grid_template_rows: style.grid_template_rows.clone(),
+            grid_template_columns: style.grid_template_columns.clone(),
+            grid_auto_rows: style.grid_auto_rows.clone(),
+            grid_auto_columns: style.grid_auto_columns.clone(),
+            grid_auto_flow: style.grid_auto_flow,
+            grid_template_areas: style.grid_template_areas.clone(),
+            grid_template_column_names: style.grid_template_column_names.clone(),
+            grid_template_row_names: style.grid_template_row_names.clone(),
+            grid_row: style.grid_row.clone(),
+            grid_column: style.grid_column.clone(),
+            ..Default::default()
+        }
     }
-}
 
-fn dimension_from_document(length_value: Length) -> Dimension {
-    match length_value {
-        Length::Auto => Dimension::auto(),
-        Length::Px(value) => length(value),
-        Length::Fill => percent(1.0),
-        Length::Percent(value) => percent(value),
+    fn intern_calc_length(&mut self, percent: f32, px: f32) -> *const () {
+        let key = CalcLengthKey::new(percent, px);
+        let value = self
+            .calc_lengths
+            .entry(key)
+            .or_insert_with(|| Box::new(LayoutCalcLength { percent, px }));
+        (&**value as *const LayoutCalcLength).cast::<()>()
     }
-}
 
-fn length_percentage_auto_from_document(length_value: Length) -> LengthPercentageAuto {
-    match length_value {
-        Length::Auto => LengthPercentageAuto::auto(),
-        Length::Px(value) => length(value),
-        Length::Fill => LengthPercentageAuto::auto(),
-        Length::Percent(value) => percent(value),
+    fn dimension_from_document(&mut self, length_value: Length) -> Dimension {
+        match length_value {
+            Length::Auto => Dimension::auto(),
+            Length::Px(value) => length(value),
+            Length::Fill => percent(1.0),
+            Length::Percent(value) => percent(value),
+            Length::Calc { percent, px } => Dimension::calc(self.intern_calc_length(percent, px)),
+        }
+    }
+
+    fn length_percentage_from_document(&mut self, length_value: Length) -> LengthPercentage {
+        match length_value {
+            Length::Auto => length(0.0),
+            Length::Px(value) => length(value),
+            Length::Fill => percent(1.0),
+            Length::Percent(value) => percent(value),
+            Length::Calc { percent, px } => {
+                LengthPercentage::calc(self.intern_calc_length(percent, px))
+            }
+        }
+    }
+
+    fn length_percentage_auto_from_document(
+        &mut self,
+        length_value: Length,
+    ) -> LengthPercentageAuto {
+        match length_value {
+            Length::Auto => LengthPercentageAuto::auto(),
+            Length::Px(value) => length(value),
+            Length::Fill => LengthPercentageAuto::auto(),
+            Length::Percent(value) => percent(value),
+            Length::Calc { percent, px } => {
+                LengthPercentageAuto::calc(self.intern_calc_length(percent, px))
+            }
+        }
     }
 }
 
