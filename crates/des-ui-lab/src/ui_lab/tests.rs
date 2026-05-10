@@ -376,6 +376,10 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let scroll_attach_specimen = frame(&output, "floating-scroll-attach-specimen");
     let scroll_attach_reference = frame(&output, "floating-scroll-attach-reference");
     let scroll_attach_popover = frame(&output, "floating-scroll-attach-popover");
+    let vertical_overlap_specimen = frame(&output, "floating-vertical-overlap-specimen");
+    let vertical_overlap_panel = frame(&output, "floating-vertical-overlap-panel");
+    let vertical_overlap_reference = frame(&output, "floating-vertical-overlap-reference");
+    let vertical_overlap_popover = frame(&output, "floating-vertical-overlap-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
@@ -385,6 +389,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_eq!(top_start_specimen.style.position, Position::Flow);
     assert_eq!(scroll_shift_specimen.style.position, Position::Flow);
     assert_eq!(scroll_attach_specimen.style.position, Position::Flow);
+    assert_eq!(vertical_overlap_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -457,6 +462,18 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         scroll_attach_specimen.rect.origin.y,
         scroll_shift_specimen.rect.origin.y,
+    );
+    assert_close(
+        vertical_overlap_specimen.rect.size.width,
+        specimen.rect.size.width,
+    );
+    assert_close(
+        vertical_overlap_specimen.rect.origin.x,
+        specimen.rect.origin.x,
+    );
+    assert_close(
+        vertical_overlap_specimen.rect.origin.y,
+        scroll_shift_specimen.rect.bottom(),
     );
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
@@ -558,6 +575,14 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
         scroll_attach_popover.rect.origin.x + scroll_attach_popover.rect.size.width * 0.5,
         scroll_attach_reference.rect.origin.x + scroll_attach_reference.rect.size.width * 0.5,
     );
+    assert_close(
+        vertical_overlap_popover.rect.bottom(),
+        vertical_overlap_reference.rect.origin.y,
+    );
+    assert_close(
+        vertical_overlap_popover.rect.origin.x + vertical_overlap_popover.rect.size.width * 0.5,
+        vertical_overlap_reference.rect.origin.x + vertical_overlap_reference.rect.size.width * 0.5,
+    );
     let scrolled_output = lab_output_with_stage_scroll("floating", 900.0);
     assert!(
         scrolled_output.scroll_chrome.iter().any(|chrome| {
@@ -595,6 +620,42 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert!(
         inner_scrolled_attach_popover.rect.origin.x < scroll_attach_popover.rect.origin.x,
         "attached popover should continue moving with horizontally scrolled content"
+    );
+    let mut vertical_scrolled = UiLabState::new(Some("floating"));
+    vertical_scrolled.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    vertical_scrolled
+        .document_engine
+        .element_state_mut("floating-vertical-overlap-panel")
+        .unwrap()
+        .scroll_y = 96.0;
+    let vertical_scrolled_output =
+        vertical_scrolled.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let scrolled_vertical_reference = frame(
+        &vertical_scrolled_output,
+        "floating-vertical-overlap-reference",
+    );
+    let scrolled_vertical_popover = frame(
+        &vertical_scrolled_output,
+        "floating-vertical-overlap-popover",
+    );
+    let vertical_boundary_top =
+        vertical_overlap_panel.rect.origin.y + vertical_overlap_panel.style.border_width.top;
+    assert_close(
+        scrolled_vertical_popover.rect.origin.y,
+        vertical_boundary_top,
+    );
+    assert!(
+        scrolled_vertical_popover.rect.bottom() > scrolled_vertical_reference.rect.origin.y,
+        "vertical boundary shift should allow the floating element to overlap its reference"
+    );
+    let vertical_scrolled_stage = lab_output_with_stage_scroll("floating", 1200.0);
+    assert!(
+        vertical_scrolled_stage.scroll_chrome.iter().any(|chrome| {
+            chrome.element_id.as_str() == "floating-vertical-overlap-panel"
+                && chrome.axis == ScrollAxis::Vertical
+                && chrome.visible
+        }),
+        "vertical overlap specimen should expose a visible vertical scrollbar when it is within the stage viewport"
     );
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);

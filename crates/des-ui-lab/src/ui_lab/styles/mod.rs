@@ -1729,6 +1729,24 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .flex_shrink(0.0),
         )
         .rule(
+            StyleSelector::class("floating-vertical-overlap-panel"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(210.0))
+                .overflow_x(Overflow::Visible)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_visible(true)
+                .border(STROKE)
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-vertical-overlap-track"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(520.0))
+                .flex_shrink(0.0),
+        )
+        .rule(
             StyleSelector::class("floating-offset-reference"),
             Style::default()
                 .width(Length::Px(148.0))
@@ -1913,6 +1931,18 @@ pub(super) fn stylesheet() -> StyleSheet {
             }),
         )
         .rule(
+            StyleSelector::id("floating-vertical-overlap-reference"),
+            Style::default()
+                .width(Length::Px(150.0))
+                .height(Length::Px(150.0))
+                .margin(Insets {
+                    top: 120.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 150.0,
+                }),
+        )
+        .rule(
             StyleSelector::id("floating-scroll-shift-popover"),
             Style::default()
                 .width(Length::Px(350.0))
@@ -1929,6 +1959,16 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Px(44.0))
                 .floating_to("floating-scroll-attach-reference")
                 .floating_placement(FloatingPlacement::Bottom),
+        )
+        .rule(
+            StyleSelector::id("floating-vertical-overlap-popover"),
+            Style::default()
+                .width(Length::Px(320.0))
+                .height(Length::Px(44.0))
+                .floating_to("floating-vertical-overlap-reference")
+                .floating_placement(FloatingPlacement::Top)
+                .floating_boundary_to("floating-vertical-overlap-panel")
+                .floating_shift(FloatingShift::new(true, false)),
         )
         .rule(
             StyleSelector::class("nest-outer"),

@@ -2281,6 +2281,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
             floating_top_start_specimen(ui);
             floating_scroll_shift_specimen(ui);
             floating_scroll_attach_specimen(ui);
+            floating_vertical_scroll_overlap_specimen(ui);
         },
     );
 }
@@ -2694,6 +2695,56 @@ fn floating_scroll_attach_specimen(ui: &mut des_ui_document::DocumentBuilder) {
                                 ElementSpec::new(Element::Text)
                                     .class("floating-offset-popover-label"),
                                 "A floating element that does not shift along the x-axis",
+                            );
+                        },
+                    );
+                },
+            );
+        },
+    );
+}
+
+fn floating_vertical_scroll_overlap_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-vertical-overlap-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-centered-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-vertical-overlap-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Vertical scroll boundary",
+            );
+            ui.element(
+                "floating-vertical-overlap-panel",
+                ElementSpec::new(Element::Div)
+                    .class("floating-vertical-overlap-panel")
+                    .class("styled-scrollbar"),
+                |ui| {
+                    ui.element(
+                        "floating-vertical-overlap-track",
+                        ElementSpec::new(Element::Div).class("floating-vertical-overlap-track"),
+                        |ui| {
+                            floating_offset_reference(
+                                ui,
+                                "floating-vertical-overlap-reference",
+                                "",
+                            );
+                        },
+                    );
+                    ui.element(
+                        "floating-vertical-overlap-popover",
+                        ElementSpec::new(Element::Button)
+                            .class("floating-offset-popover")
+                            .class("floating-vertical-overlap-popover")
+                            .interactive(),
+                        |ui| {
+                            ui.text_element(
+                                "floating-vertical-overlap-popover-label",
+                                ElementSpec::new(Element::Text)
+                                    .class("floating-offset-popover-label"),
+                                "I can overlap my reference element",
                             );
                         },
                     );
