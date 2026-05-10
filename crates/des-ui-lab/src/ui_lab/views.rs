@@ -43,6 +43,7 @@ pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: La
                 LabView::Styling,
                 LabView::Animation,
                 LabView::Scrolling,
+                LabView::Floating,
                 LabView::Table,
                 LabView::Text,
                 LabView::Nesting,
@@ -80,6 +81,7 @@ fn view_hint(view: LabView) -> &'static str {
         LabView::Styling => "elements, classes, states, ids",
         LabView::Animation => "state transitions and easing",
         LabView::Scrolling => "document scroll ownership",
+        LabView::Floating => "anchors, fallbacks, arrows",
         LabView::Table => "columns, rows, headers, cells",
         LabView::Text => "wrap, truncate, and measured lines",
         LabView::Nesting => "relative nested boxes",
@@ -137,6 +139,7 @@ pub(super) fn render_stage(
             LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
             LabView::Animation => render_animation_view(ui),
             LabView::Scrolling => render_scrolling_view(ui),
+            LabView::Floating => render_floating_view(ui),
             LabView::Table => render_table_view(ui),
             LabView::Text => render_text_view(ui),
             LabView::Nesting => render_nesting_view(ui),
@@ -2253,6 +2256,87 @@ fn render_table_view(ui: &mut des_ui_document::DocumentBuilder) {
             );
         },
     );
+}
+
+fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.text_element(
+        "floating-heading",
+        ElementSpec::new(Element::Text).class("heading"),
+        "Floating Layout",
+    );
+    ui.text_element(
+        "floating-copy",
+        ElementSpec::new(Element::Text).class("muted"),
+        "Anchored surfaces use document styles for placement, fallback, shift, and optional arrow geometry.",
+    );
+    ui.element(
+        "floating-playground",
+        ElementSpec::new(Element::Div).class("floating-playground"),
+        |ui| {
+            floating_anchor(ui, "floating-anchor-edge", "Edge anchor");
+            floating_anchor(ui, "floating-anchor-arrow", "Arrow anchor");
+            floating_anchor(ui, "floating-anchor-plain", "Plain anchor");
+
+            floating_popover(
+                ui,
+                "floating-shift-popover",
+                "Fallback + shift",
+                "Prefers right, falls back left near the viewport edge.",
+                "floating-popover",
+            );
+            floating_popover(
+                ui,
+                "floating-arrow-popover",
+                "Arrow surface",
+                "Arrow is opt-in and painted with the surface shadow.",
+                "floating-popover",
+            );
+            floating_popover(
+                ui,
+                "floating-plain-popover",
+                "No arrow",
+                "Same floating contract with rectangular painting.",
+                "floating-popover",
+            );
+        },
+    );
+}
+
+fn floating_anchor(ui: &mut des_ui_document::DocumentBuilder, id: &str, label: &str) {
+    ui.element(
+        id,
+        ElementSpec::new(Element::Button)
+            .class("floating-anchor")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(Element::Text).class("card-title"),
+                label,
+            );
+        },
+    );
+}
+
+fn floating_popover(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &str,
+    title: &str,
+    copy: &str,
+    class: &str,
+) {
+    ui.element(id, ElementSpec::new(Element::Div).class(class), |ui| {
+        ui.text_element(
+            format!("{id}-title"),
+            ElementSpec::new(Element::Text).class("card-title"),
+            title,
+        );
+        ui.text_element(
+            format!("{id}-copy"),
+            ElementSpec::new(Element::Text).class("muted"),
+            copy,
+        );
+    });
 }
 
 fn render_text_view(ui: &mut des_ui_document::DocumentBuilder) {

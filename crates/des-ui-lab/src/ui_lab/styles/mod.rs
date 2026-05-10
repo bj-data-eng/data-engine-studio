@@ -7,9 +7,9 @@ use super::{
     TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
 use des_ui_document::{
-    AlignItems, Color, Element, ElementStateSelector, FlexDirection, FlexWrap, Insets,
-    JustifyContent, Length, Overflow, Point, Shadow, Style, StyleSelector, StyleSheet,
-    TextWrapMode, Transition, ViewportQuery,
+    AlignItems, Color, Element, ElementStateSelector, FlexDirection, FlexWrap, FloatingPlacement,
+    FloatingShift, Insets, JustifyContent, Length, Overflow, Point, Shadow, Style, StyleSelector,
+    StyleSheet, TextWrapMode, Transition, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -1639,6 +1639,89 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .background(CARD_HOVER)
                 .border(STROKE_SELECTED),
+        )
+        .rule(
+            StyleSelector::class("floating-playground"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(420.0))
+                .padding(Insets::all(18.0))
+                .gap(10.0)
+                .background(SURFACE_CONTAINER)
+                .border(STROKE)
+                .radius(8.0),
+        )
+        .rule(
+            StyleSelector::class("floating-anchor"),
+            Style::default()
+                .width(Length::Px(128.0))
+                .height(Length::Px(42.0))
+                .padding(Insets::symmetric(12.0, 9.0))
+                .background(CARD)
+                .border(STROKE_SELECTED)
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::id("floating-anchor-edge"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(1158.0))
+                .top(Length::Px(202.0)),
+        )
+        .rule(
+            StyleSelector::id("floating-anchor-arrow"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(1158.0))
+                .top(Length::Px(296.0)),
+        )
+        .rule(
+            StyleSelector::id("floating-anchor-plain"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(350.0))
+                .top(Length::Px(388.0)),
+        )
+        .rule(
+            StyleSelector::class("floating-popover"),
+            Style::default()
+                .width(Length::Px(180.0))
+                .height(Length::Auto)
+                .padding(Insets::symmetric(12.0, 10.0))
+                .gap(5.0)
+                .background(PANEL)
+                .border(STROKE)
+                .border_width(1.0)
+                .radius(7.0)
+                .z_index(2200)
+                .shadows(web_elevation(2, SHADOW_COLOR)),
+        )
+        .rule(
+            StyleSelector::id("floating-shift-popover"),
+            Style::default()
+                .floating_to("floating-anchor-edge")
+                .floating_placement(FloatingPlacement::Right)
+                .floating_fallbacks([FloatingPlacement::Left, FloatingPlacement::Bottom])
+                .floating_shift(FloatingShift::main_and_cross_axis())
+                .floating_offset(10.0, 0.0),
+        )
+        .rule(
+            StyleSelector::id("floating-arrow-popover"),
+            Style::default()
+                .floating_to("floating-anchor-arrow")
+                .floating_placement(FloatingPlacement::Right)
+                .floating_fallbacks([FloatingPlacement::Left, FloatingPlacement::Top])
+                .floating_shift(FloatingShift::main_and_cross_axis())
+                .floating_offset(12.0, 0.0)
+                .floating_arrow_size(14.0, 8.0, 10.0),
+        )
+        .rule(
+            StyleSelector::id("floating-plain-popover"),
+            Style::default()
+                .floating_to("floating-anchor-plain")
+                .floating_placement(FloatingPlacement::BottomStart)
+                .floating_shift(FloatingShift::main_and_cross_axis())
+                .floating_offset(10.0, 0.0),
         )
         .rule(
             StyleSelector::class("nest-outer"),

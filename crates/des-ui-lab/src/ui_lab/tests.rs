@@ -308,6 +308,39 @@ fn clicked_text_nav_view_matches_directly_seeded_view() {
 }
 
 #[test]
+fn clicked_floating_nav_view_matches_directly_seeded_view() {
+    let mut clicked = lab_harness("layout");
+    let floating_nav_item = center(lab_rect("view-floating"));
+
+    clicked.hover_at(floating_nav_item);
+    clicked.drag_at(floating_nav_item);
+    clicked.drop_at(floating_nav_item);
+    clicked.run();
+
+    let clicked_image = render_harness(&mut clicked);
+    let direct_image = lab_image("floating");
+
+    assert_exact_image_match(&clicked_image, &direct_image);
+}
+
+#[test]
+fn floating_view_exercises_fallback_shift_and_optional_arrow() {
+    let output = lab_output("floating");
+
+    let plain = frame(&output, "floating-shift-popover");
+    let arrow = frame(&output, "floating-arrow-popover");
+
+    assert!(frame(&output, "floating-anchor-edge").interactive);
+    assert!(plain.floating.is_some());
+    assert_eq!(plain.floating.unwrap().arrow_size, None);
+    assert!(arrow.floating.unwrap().arrow_size.is_some());
+    assert_ne!(
+        arrow.floating.unwrap().placement,
+        des_ui_document::FloatingPlacement::Right
+    );
+}
+
+#[test]
 fn nav_uses_explicit_card_spacing_and_styled_scrollbar() {
     let output = lab_output("text");
     let nav = frame(&output, "nav");
