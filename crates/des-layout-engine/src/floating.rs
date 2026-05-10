@@ -193,6 +193,11 @@ pub struct FloatingOffset {
     pub main_axis: f32,
     /// Distance along the perpendicular alignment axis.
     pub cross_axis: f32,
+    /// Distance along the alignment axis for start/end placements.
+    ///
+    /// When set, this overrides `cross_axis` for aligned placements and reverses
+    /// direction for end alignment.
+    pub alignment_axis: Option<f32>,
 }
 
 impl FloatingOffset {
@@ -202,7 +207,15 @@ impl FloatingOffset {
         Self {
             main_axis,
             cross_axis,
+            alignment_axis: None,
         }
+    }
+
+    /// Sets the aligned placement offset.
+    #[must_use]
+    pub const fn alignment_axis(mut self, alignment_axis: f32) -> Self {
+        self.alignment_axis = Some(alignment_axis);
+        self
     }
 }
 
@@ -414,6 +427,7 @@ impl FloatingOptions {
             offset: FloatingOffset {
                 main_axis: 0.0,
                 cross_axis: 0.0,
+                alignment_axis: None,
             },
             fallbacks: Vec::new(),
             boundary: None,
@@ -428,6 +442,13 @@ impl FloatingOptions {
     #[must_use]
     pub const fn offset(mut self, main_axis: f32, cross_axis: f32) -> Self {
         self.offset = FloatingOffset::new(main_axis, cross_axis);
+        self
+    }
+
+    /// Sets an aligned placement offset.
+    #[must_use]
+    pub const fn alignment_axis(mut self, alignment_axis: f32) -> Self {
+        self.offset.alignment_axis = Some(alignment_axis);
         self
     }
 
@@ -632,25 +653,34 @@ pub fn compute_floating_position(
 #[must_use]
 pub fn apply_offset(
     mut origin: Point<f32>,
-    side: FloatingSide,
+    placement: FloatingPlacement,
     offset: FloatingOffset,
 ) -> Point<f32> {
+    let side = placement.side();
+    let cross_axis = offset
+        .alignment_axis
+        .and_then(|alignment_axis| match placement.alignment() {
+            Some(FloatingAlignment::Start) => Some(alignment_axis),
+            Some(FloatingAlignment::End) => Some(-alignment_axis),
+            None => None,
+        })
+        .unwrap_or(offset.cross_axis);
     match side {
         FloatingSide::Top => {
             origin.y -= offset.main_axis;
-            origin.x += offset.cross_axis;
+            origin.x += cross_axis;
         }
         FloatingSide::Right => {
             origin.x += offset.main_axis;
-            origin.y += offset.cross_axis;
+            origin.y += cross_axis;
         }
         FloatingSide::Bottom => {
             origin.y += offset.main_axis;
-            origin.x += offset.cross_axis;
+            origin.x += cross_axis;
         }
         FloatingSide::Left => {
             origin.x -= offset.main_axis;
-            origin.y += offset.cross_axis;
+            origin.y += cross_axis;
         }
     }
     origin
@@ -698,7 +728,7 @@ fn placed_origin_with_offset(
 ) -> Point<f32> {
     apply_offset(
         compute_coords_from_placement(reference, floating, placement, rtl),
-        placement.side(),
+        placement,
         offset,
     )
 }

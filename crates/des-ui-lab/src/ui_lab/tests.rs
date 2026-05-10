@@ -351,10 +351,23 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let cross_left_popover = frame(&output, "floating-cross-axis-left-popover");
     let cross_right_reference = frame(&output, "floating-cross-axis-right-reference");
     let cross_right_popover = frame(&output, "floating-cross-axis-right-popover");
+    let alignment_axis_specimen = frame(&output, "floating-alignment-axis-specimen");
+    let alignment_cross_start_reference =
+        frame(&output, "floating-alignment-axis-cross-start-reference");
+    let alignment_cross_start_popover =
+        frame(&output, "floating-alignment-axis-cross-start-popover");
+    let alignment_cross_end_reference =
+        frame(&output, "floating-alignment-axis-cross-end-reference");
+    let alignment_cross_end_popover = frame(&output, "floating-alignment-axis-cross-end-popover");
+    let alignment_start_reference = frame(&output, "floating-alignment-axis-start-reference");
+    let alignment_start_popover = frame(&output, "floating-alignment-axis-start-popover");
+    let alignment_end_reference = frame(&output, "floating-alignment-axis-end-reference");
+    let alignment_end_popover = frame(&output, "floating-alignment-axis-end-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
     assert_eq!(cross_axis_specimen.style.position, Position::Flow);
+    assert_eq!(alignment_axis_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -376,6 +389,18 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         cross_axis_specimen.rect.origin.y,
         main_axis_specimen.rect.bottom(),
+    );
+    assert_close(
+        alignment_axis_specimen.rect.size.width,
+        specimen.rect.size.width,
+    );
+    assert_close(
+        alignment_axis_specimen.rect.origin.x,
+        cross_axis_specimen.rect.right(),
+    );
+    assert_close(
+        alignment_axis_specimen.rect.origin.y,
+        cross_axis_specimen.rect.origin.y,
     );
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
@@ -415,6 +440,39 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         cross_right_popover.rect.bottom(),
         cross_right_reference.rect.bottom(),
+    );
+    assert_close(
+        alignment_cross_start_popover.rect.bottom(),
+        alignment_cross_start_reference.rect.origin.y,
+    );
+    assert_close(
+        alignment_cross_start_popover.rect.origin.x,
+        alignment_cross_start_reference.rect.origin.x + 34.0,
+    );
+    assert_close(
+        alignment_cross_end_popover.rect.bottom(),
+        alignment_cross_end_reference.rect.origin.y,
+    );
+    assert_close(
+        alignment_cross_end_popover.rect.origin.x,
+        alignment_cross_end_reference.rect.right() - alignment_cross_end_popover.rect.size.width
+            + 34.0,
+    );
+    assert_close(
+        alignment_start_popover.rect.bottom(),
+        alignment_start_reference.rect.origin.y,
+    );
+    assert_close(
+        alignment_start_popover.rect.origin.x,
+        alignment_start_reference.rect.origin.x + 34.0,
+    );
+    assert_close(
+        alignment_end_popover.rect.bottom(),
+        alignment_end_reference.rect.origin.y,
+    );
+    assert_close(
+        alignment_end_popover.rect.origin.x,
+        alignment_end_reference.rect.right() - alignment_end_popover.rect.size.width - 34.0,
     );
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);

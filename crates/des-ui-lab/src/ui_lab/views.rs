@@ -2276,6 +2276,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
             floating_offset_specimen(ui);
             floating_main_axis_specimen(ui);
             floating_cross_axis_specimen(ui);
+            floating_alignment_axis_specimen(ui);
         },
     );
 }
@@ -2465,6 +2466,95 @@ fn floating_cross_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
             floating_offset_popover(ui, "floating-cross-axis-bottom-popover");
             floating_offset_popover(ui, "floating-cross-axis-left-popover");
             floating_offset_popover(ui, "floating-cross-axis-right-popover");
+        },
+    );
+}
+
+fn floating_alignment_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-alignment-axis-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-main-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-alignment-axis-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Alignment axis",
+            );
+            ui.element(
+                "floating-alignment-axis-stack",
+                ElementSpec::new(Element::Div).class("floating-main-axis-stack"),
+                |ui| {
+                    ui.element(
+                        "floating-alignment-axis-cross-row",
+                        ElementSpec::new(Element::Div).class("floating-main-axis-row"),
+                        |ui| {
+                            floating_alignment_axis_reference(
+                                ui,
+                                "floating-alignment-axis-cross-start-reference",
+                                "top-start",
+                                "cross_axis",
+                            );
+                            floating_alignment_axis_reference(
+                                ui,
+                                "floating-alignment-axis-cross-end-reference",
+                                "top-end",
+                                "cross_axis",
+                            );
+                        },
+                    );
+                    ui.element(
+                        "floating-alignment-axis-aligned-row",
+                        ElementSpec::new(Element::Div).class("floating-main-axis-row"),
+                        |ui| {
+                            floating_alignment_axis_reference(
+                                ui,
+                                "floating-alignment-axis-start-reference",
+                                "top-start",
+                                "alignment_axis",
+                            );
+                            floating_alignment_axis_reference(
+                                ui,
+                                "floating-alignment-axis-end-reference",
+                                "top-end",
+                                "alignment_axis",
+                            );
+                        },
+                    );
+                },
+            );
+            floating_offset_popover(ui, "floating-alignment-axis-cross-start-popover");
+            floating_offset_popover(ui, "floating-alignment-axis-cross-end-popover");
+            floating_offset_popover(ui, "floating-alignment-axis-start-popover");
+            floating_offset_popover(ui, "floating-alignment-axis-end-popover");
+        },
+    );
+}
+
+fn floating_alignment_axis_reference(
+    ui: &mut des_ui_document::DocumentBuilder,
+    id: &str,
+    placement: &str,
+    axis: &str,
+) {
+    ui.element(
+        id,
+        ElementSpec::new(Element::Button)
+            .class("floating-offset-reference")
+            .class("floating-alignment-axis-reference")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-placement"),
+                ElementSpec::new(Element::Text).class("floating-alignment-axis-placement-label"),
+                placement,
+            );
+            ui.text_element(
+                format!("{id}-axis"),
+                ElementSpec::new(Element::Text).class("floating-alignment-axis-axis-label"),
+                axis,
+            );
         },
     );
 }

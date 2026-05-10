@@ -1201,6 +1201,13 @@ impl Style {
         self
     }
 
+    pub fn floating_alignment_axis(mut self, alignment_axis: f32) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.offset.alignment_axis = Some(alignment_axis);
+        }
+        self
+    }
+
     pub fn floating_fallbacks(
         mut self,
         fallbacks: impl IntoIterator<Item = FloatingPlacement>,

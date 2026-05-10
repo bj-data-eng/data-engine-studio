@@ -64,6 +64,35 @@ fn floating_position_applies_main_and_cross_axis_offsets() {
 }
 
 #[test]
+fn floating_position_applies_alignment_axis_to_aligned_placements() {
+    let reference = rect(20.0, 30.0, 100.0, 80.0);
+    let floating = Size {
+        width: 50.0,
+        height: 40.0,
+    };
+
+    let start = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::TopStart).alignment_axis(12.0),
+    );
+    let end = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::TopEnd).alignment_axis(12.0),
+    );
+    let centered = compute_floating_position(
+        reference,
+        floating,
+        FloatingOptions::new(FloatingPlacement::Top).alignment_axis(12.0),
+    );
+
+    assert_eq!(start.origin, Point { x: 32.0, y: -10.0 });
+    assert_eq!(end.origin, Point { x: 58.0, y: -10.0 });
+    assert_eq!(centered.origin, Point { x: 45.0, y: -10.0 });
+}
+
+#[test]
 fn floating_overflow_reports_signed_distance_from_boundary() {
     let boundary = FloatingBoundary::new(rect(0.0, 0.0, 100.0, 80.0));
     let overflow = detect_overflow(

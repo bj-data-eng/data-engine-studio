@@ -1718,9 +1718,28 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Px(118.0)),
         )
         .rule(
+            StyleSelector::class("floating-alignment-axis-reference"),
+            Style::default()
+                .width(Length::Px(170.0))
+                .height(Length::Px(112.0))
+                .gap(8.0),
+        )
+        .rule(
             StyleSelector::class("floating-offset-reference-label"),
             Style::default()
                 .font_size(23.0)
+                .text_color(Color::rgba(30, 31, 38, 255)),
+        )
+        .rule(
+            StyleSelector::class("floating-alignment-axis-placement-label"),
+            Style::default()
+                .font_size(20.0)
+                .text_color(Color::rgba(30, 31, 38, 255)),
+        )
+        .rule(
+            StyleSelector::class("floating-alignment-axis-axis-label"),
+            Style::default()
+                .font_size(17.0)
                 .text_color(Color::rgba(30, 31, 38, 255)),
         )
         .rule(
@@ -1803,6 +1822,34 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .floating_to("floating-cross-axis-right-reference")
                 .floating_placement(FloatingPlacement::RightEnd),
+        )
+        .rule(
+            StyleSelector::id("floating-alignment-axis-cross-start-popover"),
+            Style::default()
+                .floating_to("floating-alignment-axis-cross-start-reference")
+                .floating_placement(FloatingPlacement::TopStart)
+                .floating_offset(0.0, 34.0),
+        )
+        .rule(
+            StyleSelector::id("floating-alignment-axis-cross-end-popover"),
+            Style::default()
+                .floating_to("floating-alignment-axis-cross-end-reference")
+                .floating_placement(FloatingPlacement::TopEnd)
+                .floating_offset(0.0, 34.0),
+        )
+        .rule(
+            StyleSelector::id("floating-alignment-axis-start-popover"),
+            Style::default()
+                .floating_to("floating-alignment-axis-start-reference")
+                .floating_placement(FloatingPlacement::TopStart)
+                .floating_alignment_axis(34.0),
+        )
+        .rule(
+            StyleSelector::id("floating-alignment-axis-end-popover"),
+            Style::default()
+                .floating_to("floating-alignment-axis-end-reference")
+                .floating_placement(FloatingPlacement::TopEnd)
+                .floating_alignment_axis(34.0),
         )
         .rule(
             StyleSelector::class("nest-outer"),
