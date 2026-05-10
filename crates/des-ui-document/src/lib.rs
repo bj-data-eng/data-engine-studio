@@ -37,8 +37,8 @@ pub use state::{
     ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
-    Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, CornerStyle, Display, Easing,
-    EdgeStyle, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
+    Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, ContainerQuery, CornerStyle, Display,
+    Easing, EdgeStyle, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
     GridTemplateComponent, GridTemplateRepetition, GridTrack, MaxTrackSizingFunction,
     MinTrackSizingFunction, RepetitionCount, Shadow, Style, StyleCondition, StyleRule,
     StyleSelector, StyleSheet, TrackSizingFunction, Transition, ViewportQuery,

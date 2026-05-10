@@ -139,7 +139,7 @@ impl DocumentEngine {
             )
         } else {
             let input_style_report = document
-                .apply_stylesheet(stylesheet, &self.states)
+                .apply_stylesheet_without_container_queries(stylesheet, &self.states)
                 .expect("document styles can be resolved");
             if text_measurer_changed {
                 document
@@ -156,13 +156,25 @@ impl DocumentEngine {
                     .compute_layout_with_text_measurer(text_measurer)
                     .expect("document layout can be computed");
             }
+            let mut style_nodes_visited = input_style_report.visited;
+            if stylesheet.has_container_rules() {
+                let container_style_report = document
+                    .apply_stylesheet(stylesheet, &self.states)
+                    .expect("document container styles can be resolved");
+                style_nodes_visited += container_style_report.visited;
+                if container_style_report.layout_changed {
+                    document
+                        .compute_layout_with_text_measurer(text_measurer)
+                        .expect("document layout can be computed after container styles");
+                }
+            }
             let input_layout = document
                 .resolved_layout_with_text_measurer(text_measurer)
                 .expect("document layout can be resolved");
             self.scroll_limits = document
                 .scroll_limits()
                 .expect("document scroll limits can be resolved");
-            (input_layout, input_style_report.visited)
+            (input_layout, style_nodes_visited)
         };
         let input_scroll_chrome = scroll_chrome(&input_layout, &self.states, &self.scroll_limits);
         let input_update =
@@ -802,6 +814,7 @@ impl DocumentEngine {
             &mut self.states,
             SNAP_EPSILON,
             document.viewport(),
+            &|id| document.parent_container_size(id).ok().flatten(),
         )
     }
 

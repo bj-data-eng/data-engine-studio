@@ -400,6 +400,23 @@ impl Document {
         stylesheet: &StyleSheet,
         states: &HashMap<ElementId, ElementState>,
     ) -> DocumentResult<StyleResolutionReport> {
+        self.apply_stylesheet_with_container_queries(stylesheet, states, true)
+    }
+
+    pub(crate) fn apply_stylesheet_without_container_queries(
+        &mut self,
+        stylesheet: &StyleSheet,
+        states: &HashMap<ElementId, ElementState>,
+    ) -> DocumentResult<StyleResolutionReport> {
+        self.apply_stylesheet_with_container_queries(stylesheet, states, false)
+    }
+
+    fn apply_stylesheet_with_container_queries(
+        &mut self,
+        stylesheet: &StyleSheet,
+        states: &HashMap<ElementId, ElementState>,
+        resolve_container_queries: bool,
+    ) -> DocumentResult<StyleResolutionReport> {
         let mut positions = Vec::new();
         self.collect_positions(self.root.clone(), None, &mut positions)?;
         let mut report = StyleResolutionReport {
@@ -415,6 +432,11 @@ impl Document {
                 states.get(&id),
                 position,
                 self.viewport,
+                if resolve_container_queries {
+                    self.parent_container_size(&id)?
+                } else {
+                    None
+                },
             );
             let computed = if id == self.root {
                 root_sized_style(computed, self.viewport)
@@ -447,6 +469,18 @@ impl Document {
         report.layout_changed |= self.apply_table_grid_styles()?;
 
         Ok(report)
+    }
+
+    pub(crate) fn parent_container_size(&self, id: &ElementId) -> DocumentResult<Option<Size>> {
+        let Some(parent_id) = self.parent(id.clone())? else {
+            return Ok(None);
+        };
+        let parent = self.element(&parent_id)?;
+        let layout = self
+            .layout
+            .layout(parent.layout_node)
+            .map_err(layout_error)?;
+        Ok(Some(Size::new(layout.size.width, layout.size.height)))
     }
 
     pub(crate) fn apply_scroll_offsets(&mut self, states: &HashMap<ElementId, ElementState>) {

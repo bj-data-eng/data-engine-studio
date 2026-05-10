@@ -26,8 +26,17 @@ pub(crate) fn update_element_style_animation(
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
     viewport: Size,
+    container_size: &dyn Fn(&ElementId) -> Option<Size>,
 ) -> AnimationUpdate {
-    update_element_style_animation_at(element, stylesheet, states, snap_epsilon, None, viewport)
+    update_element_style_animation_at(
+        element,
+        stylesheet,
+        states,
+        snap_epsilon,
+        None,
+        viewport,
+        container_size,
+    )
 }
 
 fn update_element_style_animation_at(
@@ -37,6 +46,7 @@ fn update_element_style_animation_at(
     snap_epsilon: f32,
     position: Option<ChildPosition>,
     viewport: Size,
+    container_size: &dyn Fn(&ElementId) -> Option<Size>,
 ) -> AnimationUpdate {
     let target_style = resolve_style_with_position(
         element,
@@ -44,6 +54,7 @@ fn update_element_style_animation_at(
         states.get(&element.id),
         position,
         viewport,
+        container_size(&element.id),
     );
     let mut update = AnimationUpdate::default();
 
@@ -72,6 +83,7 @@ fn update_element_style_animation_at(
             snap_epsilon,
             Some(ChildPosition::new(index, element.children.len())),
             viewport,
+            container_size,
         );
     }
 

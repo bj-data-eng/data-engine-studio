@@ -517,6 +517,118 @@ fn viewport_rule_can_match_width_and_height_ranges() {
 }
 
 #[test]
+fn container_max_width_rule_applies_from_parent_resolved_width() {
+    let mut document = Document::build(Size::new(800.0, 320.0), |ui| {
+        ui.element(
+            "container",
+            ElementSpec::new(Element::Div).class("container"),
+            |ui| {
+                ui.element(
+                    "panel",
+                    ElementSpec::new(Element::Div).class("panel"),
+                    |_| {},
+                );
+            },
+        );
+    });
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("container"),
+            Style::default().size(360.0, 120.0),
+        )
+        .rule(
+            StyleSelector::class("panel"),
+            Style::default().size(320.0, 48.0),
+        )
+        .container_max_width(
+            420.0,
+            StyleSelector::class("panel"),
+            Style::default().size(180.0, 48.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 180.0);
+}
+
+#[test]
+fn container_max_width_rule_is_ignored_when_parent_is_wider() {
+    let mut document = Document::build(Size::new(800.0, 320.0), |ui| {
+        ui.element(
+            "container",
+            ElementSpec::new(Element::Div).class("container"),
+            |ui| {
+                ui.element(
+                    "panel",
+                    ElementSpec::new(Element::Div).class("panel"),
+                    |_| {},
+                );
+            },
+        );
+    });
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("container"),
+            Style::default().size(520.0, 120.0),
+        )
+        .rule(
+            StyleSelector::class("panel"),
+            Style::default().size(320.0, 48.0),
+        )
+        .container_max_width(
+            420.0,
+            StyleSelector::class("panel"),
+            Style::default().size(180.0, 48.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 320.0);
+}
+
+#[test]
+fn container_rule_can_match_width_and_height_ranges() {
+    let mut document = Document::build(Size::new(800.0, 420.0), |ui| {
+        ui.element(
+            "container",
+            ElementSpec::new(Element::Div).class("container"),
+            |ui| {
+                ui.element(
+                    "panel",
+                    ElementSpec::new(Element::Div).class("panel"),
+                    |_| {},
+                );
+            },
+        );
+    });
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("container"),
+            Style::default().size(480.0, 220.0),
+        )
+        .rule(
+            StyleSelector::class("panel"),
+            Style::default().size(320.0, 48.0),
+        )
+        .container_rule(
+            des_ui_document::ContainerQuery::min_width(460.0)
+                .with_max_width(500.0)
+                .with_min_height(200.0)
+                .with_max_height(240.0),
+            StyleSelector::class("panel"),
+            Style::default().size(240.0, 72.0),
+        );
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 240.0);
+    assert_eq!(output.layout.find("panel").unwrap().rect.size.height, 72.0);
+}
+
+#[test]
 fn compound_selectors_require_all_parts_without_specificity_weighting() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
