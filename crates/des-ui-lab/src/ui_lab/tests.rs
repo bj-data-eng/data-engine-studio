@@ -81,6 +81,33 @@ fn state_output_with_egui_text(state: &UiLabState, ctx: &egui::Context) -> Docum
     state.lab_document_output_with_text_measurer_for_test(viewport, &mut text_measurer)
 }
 
+fn state_output_with_current_engine_and_egui_text(
+    state: &UiLabState,
+    ctx: &egui::Context,
+) -> DocumentOutput {
+    let viewport = state_viewport(state);
+    let scroll_y = state
+        .document_engine
+        .element_state("drag-scroll-list-0")
+        .map(|state| state.scroll_y);
+    let mut retained_state = state.clone_for_retained_test();
+    let mut text_measurer = EguiTextMeasurer::new(ctx);
+    let stylesheet = retained_state.active_stylesheet();
+    let mut retained = retained_state.take_lab_document(viewport, false);
+    retained_state
+        .document_engine
+        .update(&mut retained.document, &stylesheet);
+    if let Some(scroll_y) = scroll_y
+        && let Some(scroll_state) = retained_state
+            .document_engine
+            .element_state_mut("drag-scroll-list-0")
+    {
+        scroll_state.scroll_y = scroll_y;
+    }
+    retained_state.lab_document = Some(retained);
+    retained_state.lab_document_output_with_text_measurer_for_test(viewport, &mut text_measurer)
+}
+
 fn state_rect_with_egui_text(
     state: &UiLabState,
     ctx: &egui::Context,
@@ -1113,13 +1140,59 @@ fn draggable_scroll_list_can_drop_after_last_visible_card() {
     harness.hover_at(destination);
     harness.run_steps(4);
 
-    assert_eq!(
-        harness.state().scroll_list_drop_preview,
-        Some(SortableDropPreview {
-            zone: DropZoneId(0),
-            nearest_item: Some(SortableItemId(3)),
-            edge: des_ui_widgets::DropEdge::After,
-        })
+    let preview = harness
+        .state()
+        .scroll_list_drop_preview
+        .expect("dragging below the visible tail should produce a drop preview");
+    assert_eq!(preview.zone, DropZoneId(0));
+    assert_eq!(preview.edge, des_ui_widgets::DropEdge::After);
+    assert!(
+        preview.nearest_item.is_some_and(|item| item.0 >= 3),
+        "autoscrolled tail preview should remain after a visible tail item"
+    );
+}
+
+#[test]
+fn draggable_scroll_list_tail_preview_opens_visible_space() {
+    let mut harness = lab_harness("draggable");
+    harness.run();
+
+    let start = center(state_rect_with_egui_text(
+        harness.state(),
+        &harness.ctx,
+        "drag-scroll-handle-0",
+    ));
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(egui::pos2(start.x + 8.0, start.y));
+    harness.run();
+
+    let output = state_output_with_egui_text(harness.state(), &harness.ctx);
+    let list = frame(&output, "drag-scroll-list-0").rect;
+    let last_visible = frame(&output, "drag-scroll-item-3").rect;
+    let destination = egui::pos2(
+        last_visible.origin.x + last_visible.size.width / 2.0,
+        (last_visible.bottom() + 12.0).min(list.bottom() - 2.0),
+    );
+
+    harness.hover_at(destination);
+    harness.run_steps(1);
+
+    let output = state_output_with_current_engine_and_egui_text(harness.state(), &harness.ctx);
+    let list = frame(&output, "drag-scroll-list-0").rect;
+    let last_visible = frame(&output, "drag-scroll-item-3").rect;
+    let scroll_y = harness
+        .state()
+        .document_engine
+        .element_state("drag-scroll-list-0")
+        .unwrap()
+        .scroll_y;
+    assert!(
+        last_visible.bottom() <= list.bottom() - 24.0,
+        "tail preview should shift the last visible card up enough to expose a visible drop slot; list bottom {}, item bottom {}, scroll_y {}",
+        list.bottom(),
+        last_visible.bottom(),
+        scroll_y
     );
 }
 
