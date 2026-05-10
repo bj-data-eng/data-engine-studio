@@ -366,12 +366,16 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let centered_axis_specimen = frame(&output, "floating-centered-axis-specimen");
     let centered_reference = frame(&output, "floating-centered-axis-reference");
     let centered_popover = frame(&output, "floating-centered-axis-popover");
+    let top_start_specimen = frame(&output, "floating-top-start-specimen");
+    let top_start_reference = frame(&output, "floating-top-start-reference");
+    let top_start_popover = frame(&output, "floating-top-start-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
     assert_eq!(cross_axis_specimen.style.position, Position::Flow);
     assert_eq!(alignment_axis_specimen.style.position, Position::Flow);
     assert_eq!(centered_axis_specimen.style.position, Position::Flow);
+    assert_eq!(top_start_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
     assert_eq!(top_reference.style.position, Position::Flow);
@@ -414,6 +418,15 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         centered_axis_specimen.rect.origin.y,
         cross_axis_specimen.rect.bottom(),
+    );
+    assert_close(top_start_specimen.rect.size.width, specimen.rect.size.width);
+    assert_close(
+        top_start_specimen.rect.origin.x,
+        centered_axis_specimen.rect.right(),
+    );
+    assert_close(
+        top_start_specimen.rect.origin.y,
+        centered_axis_specimen.rect.origin.y,
     );
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
@@ -494,6 +507,14 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         centered_popover.rect.origin.y + centered_popover.rect.size.height * 0.5,
         centered_reference.rect.origin.y + centered_reference.rect.size.height * 0.5,
+    );
+    assert_close(
+        top_start_popover.rect.right(),
+        top_start_reference.rect.origin.x,
+    );
+    assert_close(
+        top_start_popover.rect.bottom(),
+        top_start_reference.rect.origin.y,
     );
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);

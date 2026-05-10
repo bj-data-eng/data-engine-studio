@@ -1870,6 +1870,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_placement(FloatingPlacement::Center),
         )
         .rule(
+            StyleSelector::id("floating-top-start-popover"),
+            Style::default()
+                .floating_to("floating-top-start-reference")
+                .floating_placement(FloatingPlacement::TopStart)
+                .floating_alignment_axis(-88.0),
+        )
+        .rule(
             StyleSelector::class("nest-outer"),
             Style::default()
                 .size(650.0, 430.0)
