@@ -38,10 +38,12 @@ pub use state::{
 };
 pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, ContainerQuery, CornerStyle, Display,
-    Easing, EdgeStyle, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
-    GridTemplateComponent, GridTemplateRepetition, GridTrack, MaxTrackSizingFunction,
-    MinTrackSizingFunction, NthChildFormula, RepetitionCount, Shadow, Style, StyleCondition,
-    StyleRule, StyleSelector, StyleSheet, TrackSizingFunction, Transition, ViewportQuery,
+    Easing, EdgeStyle, FloatingArrow, FloatingBoundary, FloatingOffset, FloatingOptions,
+    FloatingPlacement, FloatingShift, GridAutoFlow, GridPlacement, GridPlacementLine,
+    GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack,
+    MaxTrackSizingFunction, MinTrackSizingFunction, NthChildFormula, RepetitionCount, Shadow,
+    Style, StyleCondition, StyleRule, StyleSelector, StyleSheet, TrackSizingFunction, Transition,
+    ViewportQuery,
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{

@@ -2196,6 +2196,39 @@ fn absolute_anchor_positions_against_resolved_element_rect() {
 }
 
 #[test]
+fn floating_anchor_uses_fallbacks_and_viewport_shift() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("anchor"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(84.0))
+                .top(Length::Px(40.0))
+                .size(12.0, 12.0),
+        )
+        .rule(
+            StyleSelector::id("popover"),
+            Style::default()
+                .floating_to("anchor")
+                .floating_placement(des_ui_document::FloatingPlacement::Right)
+                .floating_fallbacks([des_ui_document::FloatingPlacement::Left])
+                .floating_shift(des_ui_document::FloatingShift::main_and_cross_axis())
+                .size(34.0, 24.0),
+        );
+    let mut document = Document::build(Size::new(100.0, 100.0), |ui| {
+        ui.element("anchor", ElementSpec::new(Element::Div), |_| {});
+        ui.element("popover", ElementSpec::new(Element::Div), |_| {});
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let popover = output.layout.find("popover").unwrap();
+
+    assert_eq!(popover.rect.origin, Point::new(50.0, 34.0));
+    assert_eq!(popover.rect.size, Size::new(34.0, 24.0));
+}
+
+#[test]
 fn absolute_viewport_position_uses_window_rect() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

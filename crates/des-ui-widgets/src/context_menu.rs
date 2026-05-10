@@ -1,5 +1,6 @@
 use des_ui_document::{
-    DocumentBuilder, Element, ElementId, ElementSpec, Insets, Length, Point, Style, StyleSelector,
+    DocumentBuilder, Element, ElementId, ElementSpec, FloatingPlacement, FloatingShift, Insets,
+    Length, Point, Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -10,8 +11,16 @@ pub const CONTEXT_MENU_SEPARATOR_CLASS: &str = "context-menu-separator";
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContextMenu {
     id: ElementId,
-    position: Point,
+    anchor: ContextMenuAnchor,
+    placement: FloatingPlacement,
+    offset: Point,
     entries: Vec<ContextMenuEntry>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum ContextMenuAnchor {
+    Point(Point),
+    Element(ElementId),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -32,13 +41,30 @@ impl ContextMenu {
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
-            position: Point::ZERO,
+            anchor: ContextMenuAnchor::Point(Point::ZERO),
+            placement: FloatingPlacement::BottomStart,
+            offset: Point::ZERO,
             entries: Vec::new(),
         }
     }
 
     pub fn at(mut self, position: Point) -> Self {
-        self.position = position;
+        self.anchor = ContextMenuAnchor::Point(position);
+        self
+    }
+
+    pub fn anchored_to(mut self, target: impl Into<ElementId>) -> Self {
+        self.anchor = ContextMenuAnchor::Element(target.into());
+        self
+    }
+
+    pub fn floating_placement(mut self, placement: FloatingPlacement) -> Self {
+        self.placement = placement;
+        self
+    }
+
+    pub fn floating_offset(mut self, main_axis: f32, cross_axis: f32) -> Self {
+        self.offset = Point::new(main_axis, cross_axis);
         self
     }
 
@@ -66,7 +92,10 @@ impl ContextMenu {
     }
 
     pub fn position(&self) -> Point {
-        self.position
+        match &self.anchor {
+            ContextMenuAnchor::Point(position) => *position,
+            ContextMenuAnchor::Element(_) => Point::ZERO,
+        }
     }
 
     pub fn position_selector(&self) -> StyleSelector {
@@ -75,12 +104,45 @@ impl ContextMenu {
 
     pub fn position_style(&self) -> Style {
         Style::default()
-            .absolute_viewport()
-            .left(Length::Px(self.position.x))
-            .top(Length::Px(self.position.y))
+            .floating_to(self.anchor_id())
+            .floating_placement(self.placement)
+            .floating_offset(self.offset.x, self.offset.y)
+            .floating_flip(true)
+            .floating_shift(FloatingShift::main_and_cross_axis())
+    }
+
+    pub fn anchor_selector(&self) -> Option<StyleSelector> {
+        match self.anchor {
+            ContextMenuAnchor::Point(_) => Some(StyleSelector::id(self.anchor_id().as_str())),
+            ContextMenuAnchor::Element(_) => None,
+        }
+    }
+
+    pub fn anchor_style(&self) -> Option<Style> {
+        match self.anchor {
+            ContextMenuAnchor::Point(position) => Some(
+                Style::default()
+                    .absolute_viewport()
+                    .left(Length::Px(position.x))
+                    .top(Length::Px(position.y))
+                    .size(0.0, 0.0),
+            ),
+            ContextMenuAnchor::Element(_) => None,
+        }
+    }
+
+    pub fn push_styles(&self, stylesheet: &mut StyleSheet) {
+        if let (Some(selector), Some(style)) = (self.anchor_selector(), self.anchor_style()) {
+            stylesheet.push_rule(selector, style);
+        }
+        stylesheet.push_rule(self.position_selector(), self.position_style());
     }
 
     pub fn render(&self, ui: &mut DocumentBuilder) {
+        if matches!(self.anchor, ContextMenuAnchor::Point(_)) {
+            let anchor_id = self.anchor_id();
+            ui.element(anchor_id.as_str(), ElementSpec::new(Element::Div), |_| {});
+        }
         ui.element(
             self.id.as_str(),
             ElementSpec::new(Element::Div)
@@ -101,6 +163,13 @@ impl ContextMenu {
                 }
             },
         );
+    }
+
+    fn anchor_id(&self) -> ElementId {
+        match &self.anchor {
+            ContextMenuAnchor::Point(_) => ElementId::new(format!("{}-anchor", self.id.as_str())),
+            ContextMenuAnchor::Element(id) => id.clone(),
+        }
     }
 }
 
@@ -157,7 +226,7 @@ pub fn context_menu_surface_style() -> Style {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_ui_document::{Document, DocumentEngine, Size, StyleSheet};
+    use des_ui_document::{Document, DocumentEngine, FloatingPlacement, Size, StyleSheet};
 
     #[test]
     fn context_menu_renders_menu_items_and_separators() {
@@ -188,5 +257,25 @@ mod tests {
                 .unwrap()
                 .has_class("context-menu-separator")
         );
+    }
+
+    #[test]
+    fn context_menu_pushes_floating_styles_for_point_anchor() {
+        let menu = ContextMenu::new("text-context-menu")
+            .at(Point::new(40.0, 24.0))
+            .floating_placement(FloatingPlacement::BottomStart)
+            .floating_offset(4.0, 0.0)
+            .item("copy", "Copy");
+        let mut stylesheet = StyleSheet::new();
+        menu.push_styles(&mut stylesheet);
+        let mut document = Document::build(Size::new(240.0, 140.0), |ui| menu.render(ui));
+
+        let output = DocumentEngine::default().update(&mut document, &stylesheet);
+
+        let anchor = output.layout.find("text-context-menu-anchor").unwrap();
+        assert_eq!(anchor.rect.origin, Point::new(40.0, 24.0));
+
+        let menu_frame = output.layout.find("text-context-menu").unwrap();
+        assert_eq!(menu_frame.rect.origin, Point::new(40.0, 28.0));
     }
 }

@@ -787,7 +787,7 @@ impl UiLabState {
         }
         if let Some(menu) = self.text_context_menu.as_ref() {
             let menu = text_context_menu_widget(menu);
-            stylesheet.push_rule(menu.position_selector(), menu.position_style());
+            menu.push_styles(&mut stylesheet);
         }
         stylesheet
     }

@@ -10,6 +10,11 @@ pub use layout_engine::prelude::{
     TrackSizingFunction,
 };
 
+pub use layout_engine::floating::{
+    FloatingArrow, FloatingBoundary, FloatingOffset, FloatingOptions, FloatingPlacement,
+    FloatingShift,
+};
+
 pub type GridPlacement = layout_engine::prelude::GridPlacement<String>;
 pub type GridPlacementLine = layout_engine::geometry::Line<GridPlacement>;
 pub type GridTemplateArea = layout_engine::style::GridTemplateArea<String>;
@@ -417,32 +422,90 @@ impl Transition {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AnchorPlacement {
-    TopStart,
-    TopEnd,
-    BottomStart,
-    BottomEnd,
-    LeftStart,
-    LeftEnd,
-    RightStart,
-    RightEnd,
-}
+pub type AnchorPlacement = FloatingPlacement;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Anchor {
     pub target: ElementId,
-    pub placement: AnchorPlacement,
-    pub offset: Point,
+    pub options: FloatingOptions,
 }
 
 impl Anchor {
     pub fn new(target: impl Into<ElementId>, placement: AnchorPlacement, offset: Point) -> Self {
         Self {
             target: target.into(),
-            placement,
-            offset,
+            options: FloatingOptions::new(placement).offset(
+                legacy_main_axis_offset(placement, offset),
+                legacy_cross_axis_offset(placement, offset),
+            ),
         }
+    }
+
+    pub fn floating(target: impl Into<ElementId>) -> Self {
+        Self {
+            target: target.into(),
+            options: FloatingOptions::new(FloatingPlacement::BottomStart),
+        }
+    }
+
+    pub fn with_options(target: impl Into<ElementId>, options: FloatingOptions) -> Self {
+        Self {
+            target: target.into(),
+            options,
+        }
+    }
+
+    pub fn placement(mut self, placement: FloatingPlacement) -> Self {
+        self.options.placement = placement;
+        self
+    }
+
+    pub fn offset(mut self, main_axis: f32, cross_axis: f32) -> Self {
+        self.options.offset = FloatingOffset::new(main_axis, cross_axis);
+        self
+    }
+
+    pub fn fallbacks(mut self, fallbacks: impl Into<Vec<FloatingPlacement>>) -> Self {
+        self.options.fallbacks = fallbacks.into();
+        self
+    }
+
+    pub fn flip(mut self, flip: bool) -> Self {
+        self.options.flip = flip;
+        self
+    }
+
+    pub fn shift(mut self, shift: FloatingShift) -> Self {
+        self.options.shift = Some(shift);
+        self
+    }
+
+    pub fn arrow(mut self, arrow: FloatingArrow) -> Self {
+        self.options.arrow = Some(arrow);
+        self
+    }
+
+    pub fn rtl(mut self, rtl: bool) -> Self {
+        self.options.rtl = rtl;
+        self
+    }
+}
+
+fn legacy_main_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
+    match placement.side() {
+        layout_engine::floating::FloatingSide::Top => -offset.y,
+        layout_engine::floating::FloatingSide::Right => offset.x,
+        layout_engine::floating::FloatingSide::Bottom => offset.y,
+        layout_engine::floating::FloatingSide::Left => -offset.x,
+    }
+}
+
+fn legacy_cross_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
+    match placement.side() {
+        layout_engine::floating::FloatingSide::Top
+        | layout_engine::floating::FloatingSide::Bottom => offset.x,
+        layout_engine::floating::FloatingSide::Right
+        | layout_engine::floating::FloatingSide::Left => offset.y,
     }
 }
 
@@ -1079,6 +1142,74 @@ impl Style {
 
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = Some(anchor);
+        self
+    }
+
+    pub fn floating_to(mut self, target: impl Into<ElementId>) -> Self {
+        self.position = Some(Position::AbsoluteViewport);
+        self.anchor = Some(Anchor::floating(target));
+        self
+    }
+
+    pub fn floating_options(
+        mut self,
+        target: impl Into<ElementId>,
+        options: FloatingOptions,
+    ) -> Self {
+        self.position = Some(Position::AbsoluteViewport);
+        self.anchor = Some(Anchor::with_options(target, options));
+        self
+    }
+
+    pub fn floating_placement(mut self, placement: FloatingPlacement) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.placement = placement;
+        }
+        self
+    }
+
+    pub fn floating_offset(mut self, main_axis: f32, cross_axis: f32) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.offset = FloatingOffset::new(main_axis, cross_axis);
+        }
+        self
+    }
+
+    pub fn floating_fallbacks(
+        mut self,
+        fallbacks: impl IntoIterator<Item = FloatingPlacement>,
+    ) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.fallbacks = fallbacks.into_iter().collect();
+        }
+        self
+    }
+
+    pub fn floating_flip(mut self, flip: bool) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.flip = flip;
+        }
+        self
+    }
+
+    pub fn floating_shift(mut self, shift: FloatingShift) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.shift = Some(shift);
+        }
+        self
+    }
+
+    pub fn floating_arrow(mut self, arrow: FloatingArrow) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.arrow = Some(arrow);
+        }
+        self
+    }
+
+    pub fn floating_rtl(mut self, rtl: bool) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.rtl = rtl;
+        }
         self
     }
 

@@ -8,13 +8,15 @@ use crate::geometry::{
 };
 use crate::state::{ElementState, ResolvedElement};
 use crate::style::{
-    AnchorPlacement, ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
+    ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
     resolve_style_with_position,
 };
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 #[cfg(test)]
 use crate::text::FallbackTextMeasurer;
 use crate::text::{TextLayoutRequest, TextMeasurer, TextWrapMode};
+use layout_engine::floating::{FloatingBoundary, FloatingRect, compute_floating_position};
+use layout_engine::geometry::{Point as LayoutPoint, Size as FloatingSize};
 use layout_engine::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, AvailableSpace, Dimension,
     Display, FlexDirection as LayoutFlexDirection, FlexWrap as LayoutFlexWrap, GridPlacement,
@@ -1292,7 +1294,7 @@ fn resolved_document_rect(
 ) -> DocumentRect {
     if let Some(anchor) = &style.anchor {
         if let Some(anchor_rect) = anchors.get(&anchor.target) {
-            return anchored_document_rect(style, *anchor_rect, raw_rect.size);
+            return anchored_document_rect(style, *anchor_rect, raw_rect.size, viewport);
         }
     }
 
@@ -1329,31 +1331,43 @@ fn anchored_document_rect(
     style: &ComputedStyle,
     anchor_rect: DocumentRect,
     measured: Size,
+    viewport: Size,
 ) -> DocumentRect {
     let anchor = style
         .anchor
         .as_ref()
         .expect("anchored document rect requires an anchor style");
-    let (x, y) = match anchor.placement {
-        AnchorPlacement::TopStart => (anchor_rect.origin.x, anchor_rect.origin.y - measured.height),
-        AnchorPlacement::TopEnd => (
-            anchor_rect.right() - measured.width,
-            anchor_rect.origin.y - measured.height,
+    let mut options = anchor.options.clone();
+    options.boundary = options.boundary.or_else(|| {
+        Some(FloatingBoundary::new(FloatingRect::new(
+            LayoutPoint { x: 0.0, y: 0.0 },
+            FloatingSize {
+                width: viewport.width,
+                height: viewport.height,
+            },
+        )))
+    });
+    let floating = compute_floating_position(
+        FloatingRect::new(
+            LayoutPoint {
+                x: anchor_rect.origin.x,
+                y: anchor_rect.origin.y,
+            },
+            FloatingSize {
+                width: anchor_rect.size.width,
+                height: anchor_rect.size.height,
+            },
         ),
-        AnchorPlacement::BottomStart => (anchor_rect.origin.x, anchor_rect.bottom()),
-        AnchorPlacement::BottomEnd => (anchor_rect.right() - measured.width, anchor_rect.bottom()),
-        AnchorPlacement::LeftStart => (anchor_rect.origin.x - measured.width, anchor_rect.origin.y),
-        AnchorPlacement::LeftEnd => (
-            anchor_rect.origin.x - measured.width,
-            anchor_rect.bottom() - measured.height,
-        ),
-        AnchorPlacement::RightStart => (anchor_rect.right(), anchor_rect.origin.y),
-        AnchorPlacement::RightEnd => (anchor_rect.right(), anchor_rect.bottom() - measured.height),
-    };
+        FloatingSize {
+            width: measured.width,
+            height: measured.height,
+        },
+        options,
+    );
 
     DocumentRect::new(
-        x + anchor.offset.x + style.margin.left,
-        y + anchor.offset.y + style.margin.top,
+        floating.origin.x + style.margin.left,
+        floating.origin.y + style.margin.top,
         measured.width,
         measured.height,
     )
