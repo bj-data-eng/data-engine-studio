@@ -146,7 +146,9 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("drag-scroll-list-card"),
             Style::default()
-                .width(Length::Px(410.0))
+                .width(Length::Px(0.0))
+                .flex_basis(Length::Px(0.0))
+                .flex_grow(1.0)
                 .padding(Insets::all(10.0))
                 .gap(8.0)
                 .background(PANEL_ALT)

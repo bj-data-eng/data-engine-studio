@@ -1128,6 +1128,7 @@ fn draggable_drag_drop_cells_expand_to_fit_stacked_items() {
 #[test]
 fn draggable_workbench_wraps_panels_when_stage_narrows() {
     let output = lab_output_with_size("draggable", Size::new(1080.0, 720.0));
+    let workbench = frame(&output, "drag-workbench");
     let list_card = frame(&output, "drag-scroll-list-card");
     let drag_grid = frame(&output, "drag-grid");
 
@@ -1136,6 +1137,8 @@ fn draggable_workbench_wraps_panels_when_stage_narrows() {
         "drag grid should wrap below the scroll list card when the stage cannot fit both panels"
     );
     assert_eq!(drag_grid.rect.origin.x, list_card.rect.origin.x);
+    assert_close(list_card.rect.size.width, workbench.rect.size.width);
+    assert_close(drag_grid.rect.size.width, workbench.rect.size.width);
 }
 
 #[test]
@@ -1150,6 +1153,7 @@ fn draggable_workbench_keeps_panels_side_by_side_at_default_width() {
         drag_grid.rect.origin.x > list_card.rect.right(),
         "drag grid should remain beside the scroll list card at the default lab width"
     );
+    assert_close(list_card.rect.size.width, drag_grid.rect.size.width);
 }
 
 #[test]

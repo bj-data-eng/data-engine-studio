@@ -9,8 +9,10 @@ use super::{
 use des_ui_document::{
     AlignItems, Color, Element, ElementStateSelector, FlexDirection, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, Shadow, Style, StyleSelector, StyleSheet,
-    TextWrapMode, Transition,
+    TextWrapMode, Transition, ViewportQuery,
 };
+
+const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
 
 pub(super) fn stylesheet() -> StyleSheet {
     let mut stylesheet = StyleSheet::new()
@@ -814,9 +816,11 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .flex_direction(FlexDirection::Row)
                 .flex_wrap(FlexWrap::Wrap)
-                .width(Length::Px(520.0))
+                .width(Length::Px(0.0))
                 .height(Length::Auto)
-                .padding(Insets::all(8.0))
+                .flex_basis(Length::Px(0.0))
+                .flex_grow(1.0)
+                .padding(Insets::all(10.0))
                 .gap(8.0)
                 .background(PANEL)
                 .border(STROKE)
@@ -1769,6 +1773,21 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border(PURPLE),
         );
     stylesheet.extend(framework::stylesheet());
+    stylesheet.push_viewport_rule(
+        ViewportQuery::max_width(DRAGGABLE_STACK_VIEWPORT_WIDTH),
+        StyleSelector::class("drag-workbench"),
+        Style::default().flex_direction(FlexDirection::Column),
+    );
+    stylesheet.push_viewport_rule(
+        ViewportQuery::max_width(DRAGGABLE_STACK_VIEWPORT_WIDTH),
+        StyleSelector::class("drag-scroll-list-card"),
+        Style::default().width_fill(),
+    );
+    stylesheet.push_viewport_rule(
+        ViewportQuery::max_width(DRAGGABLE_STACK_VIEWPORT_WIDTH),
+        StyleSelector::class("drag-grid"),
+        Style::default().width_fill(),
+    );
     stylesheet
 }
 
