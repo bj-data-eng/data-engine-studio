@@ -1105,6 +1105,42 @@ fn draggable_scroll_list_keeps_scrollbar_visible_for_testing() {
 }
 
 #[test]
+fn draggable_scroll_list_preview_margin_updates_scrollbar_range() {
+    let base_output = lab_output("draggable");
+    let base_scroll = base_output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id.as_str() == "drag-scroll-list-0"
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .expect("draggable scroll-list should emit vertical scroll chrome")
+        .max_scroll;
+
+    let mut state = UiLabState::new(Some("draggable"));
+    state.scroll_list_drop_preview = Some(SortableDropPreview {
+        zone: DropZoneId(0),
+        nearest_item: Some(SortableItemId(3)),
+        edge: des_ui_widgets::DropEdge::After,
+    });
+    let preview_output = state_output(&state);
+    let preview_scroll = preview_output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id.as_str() == "drag-scroll-list-0"
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .expect("preview margin should keep vertical scroll chrome")
+        .max_scroll;
+
+    assert!(
+        preview_scroll >= base_scroll + 30.0,
+        "preview margin should expand scrollbar range before the drop; base {base_scroll}, preview {preview_scroll}"
+    );
+}
+
+#[test]
 fn draggable_drag_drop_uses_snapshot_path_for_drop_targets() {
     let output = lab_output("draggable");
     let cell = frame(&output, "drag-cell-5").rect;

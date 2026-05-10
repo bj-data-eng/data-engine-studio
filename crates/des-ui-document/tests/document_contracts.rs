@@ -2686,6 +2686,49 @@ fn overflow_scrollbar_can_be_forced_visible_without_hover() {
 }
 
 #[test]
+fn scroll_limits_include_child_margin_overflow() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .size(100.0, 80.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::class("row"),
+            Style::default().size(100.0, 40.0),
+        )
+        .rule(
+            StyleSelector::id("tail"),
+            Style::default().margin(Insets {
+                top: 0.0,
+                right: 0.0,
+                bottom: 30.0,
+                left: 0.0,
+            }),
+        );
+    let mut document = Document::build(Size::new(140.0, 120.0), |ui| {
+        ui.element("scroll-panel", ElementSpec::new(Element::Div), |ui| {
+            ui.element("head", ElementSpec::new(Element::Div).class("row"), |_| {});
+            ui.element("tail", ElementSpec::new(Element::Div).class("row"), |_| {});
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let vertical = output
+        .scroll_chrome
+        .iter()
+        .find(|chrome| {
+            chrome.element_id == ElementId::new("scroll-panel")
+                && chrome.axis == ScrollAxis::Vertical
+        })
+        .expect("child margin overflow should emit scroll chrome");
+
+    assert_eq!(vertical.max_scroll, 30.0);
+}
+
+#[test]
 fn scrollbar_hover_transition_reuses_layout() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

@@ -576,14 +576,15 @@ impl Document {
                 .layout
                 .layout(element.layout_node)
                 .map_err(layout_error)?;
+            let content_size = self.scroll_content_size(element)?;
             let max_scroll = Size::new(
                 scroll_limit_for_axis(
-                    layout.content_size.width,
+                    content_size.width,
                     layout.size.width,
                     style.border_width.right,
                 ),
                 scroll_limit_for_axis(
-                    layout.content_size.height,
+                    content_size.height,
                     layout.size.height,
                     style.border_width.bottom,
                 ),
@@ -593,6 +594,36 @@ impl Document {
             }
         }
         Ok(limits)
+    }
+
+    fn scroll_content_size(&self, element: &DocumentElement) -> DocumentResult<Size> {
+        let layout = self
+            .layout
+            .layout(element.layout_node)
+            .map_err(layout_error)?;
+        let mut content_size = Size::new(layout.content_size.width, layout.content_size.height);
+        for child_node in self
+            .layout
+            .children(element.layout_node)
+            .map_err(layout_error)?
+        {
+            let Some(child_id) = self.layout_to_element.get(&child_node) else {
+                continue;
+            };
+            let child = self.element(child_id)?;
+            let child_layout = self.layout.layout(child_node).map_err(layout_error)?;
+            content_size.width = content_size.width.max(
+                child_layout.location.x
+                    + child_layout.size.width
+                    + child.computed_style.margin.right,
+            );
+            content_size.height = content_size.height.max(
+                child_layout.location.y
+                    + child_layout.size.height
+                    + child.computed_style.margin.bottom,
+            );
+        }
+        Ok(content_size)
     }
 
     #[cfg(test)]
