@@ -2274,52 +2274,19 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
         ElementSpec::new(Element::Div).class("floating-playground"),
         |ui| {
             ui.element(
-                "floating-offset-window",
-                ElementSpec::new(Element::Div).class("floating-offset-window"),
+                "floating-offset-specimen",
+                ElementSpec::new(Element::Div).class("floating-specimen-box"),
                 |ui| {
-                    ui.element(
-                        "floating-offset-titlebar",
-                        ElementSpec::new(Element::Div).class("floating-offset-titlebar"),
-                        |ui| {
-                            for index in 0..3 {
-                                ui.element(
-                                    format!("floating-offset-dot-{index}"),
-                                    ElementSpec::new(Element::Div).class("floating-offset-dot"),
-                                    |_| {},
-                                );
-                            }
-                        },
+                    ui.text_element(
+                        "floating-offset-specimen-title",
+                        ElementSpec::new(Element::Text).class("card-title"),
+                        "Floating offset",
                     );
                     floating_offset_reference(ui, "floating-offset-zero-reference", "0px");
                     floating_offset_reference(ui, "floating-offset-ten-reference", "10px");
                     floating_offset_popover(ui, "floating-offset-zero-popover");
                     floating_offset_popover(ui, "floating-offset-ten-popover");
                 },
-            );
-            floating_anchor(ui, "floating-anchor-edge", "Edge anchor");
-            floating_anchor(ui, "floating-anchor-arrow", "Arrow anchor");
-            floating_anchor(ui, "floating-anchor-plain", "Plain anchor");
-
-            floating_popover(
-                ui,
-                "floating-shift-popover",
-                "Fallback + shift",
-                "Prefers right, falls back left near the viewport edge.",
-                "floating-popover",
-            );
-            floating_popover(
-                ui,
-                "floating-arrow-popover",
-                "Arrow surface",
-                "Arrow is opt-in and painted with the surface shadow.",
-                "floating-popover",
-            );
-            floating_popover(
-                ui,
-                "floating-plain-popover",
-                "No arrow",
-                "Same floating contract with rectangular painting.",
-                "floating-popover",
             );
         },
     );
@@ -2355,43 +2322,6 @@ fn floating_offset_popover(ui: &mut des_ui_document::DocumentBuilder, id: &str) 
             );
         },
     );
-}
-
-fn floating_anchor(ui: &mut des_ui_document::DocumentBuilder, id: &str, label: &str) {
-    ui.element(
-        id,
-        ElementSpec::new(Element::Button)
-            .class("floating-anchor")
-            .interactive(),
-        |ui| {
-            ui.text_element(
-                format!("{id}-label"),
-                ElementSpec::new(Element::Text).class("card-title"),
-                label,
-            );
-        },
-    );
-}
-
-fn floating_popover(
-    ui: &mut des_ui_document::DocumentBuilder,
-    id: &str,
-    title: &str,
-    copy: &str,
-    class: &str,
-) {
-    ui.element(id, ElementSpec::new(Element::Div).class(class), |ui| {
-        ui.text_element(
-            format!("{id}-title"),
-            ElementSpec::new(Element::Text).class("card-title"),
-            title,
-        );
-        ui.text_element(
-            format!("{id}-copy"),
-            ElementSpec::new(Element::Text).class("muted"),
-            copy,
-        );
-    });
 }
 
 fn render_text_view(ui: &mut des_ui_document::DocumentBuilder) {

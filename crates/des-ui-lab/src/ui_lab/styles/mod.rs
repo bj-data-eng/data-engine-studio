@@ -8,8 +8,8 @@ use super::{
 };
 use des_ui_document::{
     AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
-    FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow, Point, Shadow,
-    Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
+    FloatingPlacement, Insets, JustifyContent, Length, Overflow, Point, Shadow, Style,
+    StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -1644,49 +1644,21 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("floating-playground"),
             Style::default()
                 .width_fill()
-                .height(Length::Px(760.0))
+                .height(Length::Px(520.0))
                 .padding(Insets::all(18.0))
-                .gap(10.0)
+                .gap(14.0)
+                .background(PANEL_ALT),
+        )
+        .rule(
+            StyleSelector::class("floating-specimen-box"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(320.0))
+                .padding(Insets::all(18.0))
+                .gap(8.0)
                 .background(SURFACE_CONTAINER)
                 .border(STROKE)
                 .radius(8.0),
-        )
-        .rule(
-            StyleSelector::class("floating-offset-window"),
-            Style::default()
-                .width(Length::Px(760.0))
-                .height(Length::Px(360.0))
-                .background(PANEL)
-                .border(STROKE)
-                .radius(8.0)
-                .shadows(web_elevation(1, SHADOW_COLOR)),
-        )
-        .rule(
-            StyleSelector::class("floating-offset-titlebar"),
-            Style::default()
-                .flex_direction(FlexDirection::Row)
-                .width_fill()
-                .height(Length::Px(52.0))
-                .padding(Insets::symmetric(18.0, 15.0))
-                .gap(10.0)
-                .background(Color::rgba(67, 68, 82, 255))
-                .top_left_radius(8.0)
-                .top_right_radius(8.0),
-        )
-        .rule(
-            StyleSelector::class("floating-offset-dot"),
-            Style::default()
-                .size(13.0, 13.0)
-                .radius(6.5)
-                .background(Color::rgba(246, 73, 89, 255)),
-        )
-        .rule(
-            StyleSelector::id("floating-offset-dot-1"),
-            Style::default().background(Color::rgba(245, 181, 64, 255)),
-        )
-        .rule(
-            StyleSelector::id("floating-offset-dot-2"),
-            Style::default().background(Color::rgba(85, 202, 84, 255)),
         )
         .rule(
             StyleSelector::class("floating-offset-reference"),
@@ -1711,15 +1683,15 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::id("floating-offset-zero-reference"),
             Style::default()
                 .absolute_viewport()
-                .left(Length::Px(410.0))
-                .top(Length::Px(252.0)),
+                .left(Length::Px(452.0))
+                .top(Length::Px(300.0)),
         )
         .rule(
             StyleSelector::id("floating-offset-ten-reference"),
             Style::default()
                 .absolute_viewport()
-                .left(Length::Px(588.0))
-                .top(Length::Px(252.0)),
+                .left(Length::Px(650.0))
+                .top(Length::Px(300.0)),
         )
         .rule(
             StyleSelector::class("floating-offset-popover"),
@@ -1752,78 +1724,6 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .floating_to("floating-offset-ten-reference")
                 .floating_placement(FloatingPlacement::Bottom)
-                .floating_offset(10.0, 0.0),
-        )
-        .rule(
-            StyleSelector::class("floating-anchor"),
-            Style::default()
-                .width(Length::Px(128.0))
-                .height(Length::Px(42.0))
-                .padding(Insets::symmetric(12.0, 9.0))
-                .background(CARD)
-                .border(STROKE_SELECTED)
-                .radius(6.0),
-        )
-        .rule(
-            StyleSelector::id("floating-anchor-edge"),
-            Style::default()
-                .absolute_viewport()
-                .left(Length::Px(1158.0))
-                .top(Length::Px(202.0)),
-        )
-        .rule(
-            StyleSelector::id("floating-anchor-arrow"),
-            Style::default()
-                .absolute_viewport()
-                .left(Length::Px(1158.0))
-                .top(Length::Px(296.0)),
-        )
-        .rule(
-            StyleSelector::id("floating-anchor-plain"),
-            Style::default()
-                .absolute_viewport()
-                .left(Length::Px(350.0))
-                .top(Length::Px(388.0)),
-        )
-        .rule(
-            StyleSelector::class("floating-popover"),
-            Style::default()
-                .width(Length::Px(180.0))
-                .height(Length::Auto)
-                .padding(Insets::symmetric(12.0, 10.0))
-                .gap(5.0)
-                .background(PANEL)
-                .border(STROKE)
-                .border_width(1.0)
-                .radius(7.0)
-                .z_index(2200)
-                .shadows(web_elevation(2, SHADOW_COLOR)),
-        )
-        .rule(
-            StyleSelector::id("floating-shift-popover"),
-            Style::default()
-                .floating_to("floating-anchor-edge")
-                .floating_placement(FloatingPlacement::Right)
-                .floating_fallbacks([FloatingPlacement::Left, FloatingPlacement::Bottom])
-                .floating_shift(FloatingShift::main_and_cross_axis())
-                .floating_offset(10.0, 0.0),
-        )
-        .rule(
-            StyleSelector::id("floating-arrow-popover"),
-            Style::default()
-                .floating_to("floating-anchor-arrow")
-                .floating_placement(FloatingPlacement::Right)
-                .floating_fallbacks([FloatingPlacement::Left, FloatingPlacement::Top])
-                .floating_shift(FloatingShift::main_and_cross_axis())
-                .floating_offset(12.0, 0.0)
-                .floating_arrow_size(14.0, 8.0, 10.0),
-        )
-        .rule(
-            StyleSelector::id("floating-plain-popover"),
-            Style::default()
-                .floating_to("floating-anchor-plain")
-                .floating_placement(FloatingPlacement::BottomStart)
-                .floating_shift(FloatingShift::main_and_cross_axis())
                 .floating_offset(10.0, 0.0),
         )
         .rule(

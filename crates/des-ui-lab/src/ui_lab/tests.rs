@@ -327,14 +327,11 @@ fn clicked_floating_nav_view_matches_directly_seeded_view() {
 fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let output = lab_output("floating");
 
-    let plain = frame(&output, "floating-shift-popover");
-    let arrow = frame(&output, "floating-arrow-popover");
     let zero_reference = frame(&output, "floating-offset-zero-reference");
     let zero_popover = frame(&output, "floating-offset-zero-popover");
     let ten_reference = frame(&output, "floating-offset-ten-reference");
     let ten_popover = frame(&output, "floating-offset-ten-popover");
 
-    assert!(frame(&output, "floating-anchor-edge").interactive);
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);
     assert_eq!(
@@ -345,13 +342,6 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert_close(
         ten_popover.rect.origin.y - ten_reference.rect.bottom(),
         10.0,
-    );
-    assert!(plain.floating.is_some());
-    assert_eq!(plain.floating.unwrap().arrow_size, None);
-    assert!(arrow.floating.unwrap().arrow_size.is_some());
-    assert_ne!(
-        arrow.floating.unwrap().placement,
-        des_ui_document::FloatingPlacement::Right
     );
 }
 
