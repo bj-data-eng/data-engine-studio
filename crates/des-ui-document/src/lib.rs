@@ -34,13 +34,13 @@ pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
     DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,
-    ScrollChrome, TextSelectionGranularity,
+    ResolvedFloating, ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
     Anchor, AnchorPlacement, CompoundSelector, ComputedStyle, ContainerQuery, CornerStyle, Display,
     Easing, EdgeStyle, FloatingArrow, FloatingBoundary, FloatingOffset, FloatingOptions,
-    FloatingPlacement, FloatingShift, GridAutoFlow, GridPlacement, GridPlacementLine,
-    GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack,
+    FloatingPlacement, FloatingShift, FloatingVisibility, GridAutoFlow, GridPlacement,
+    GridPlacementLine, GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack,
     MaxTrackSizingFunction, MinTrackSizingFunction, NthChildFormula, RepetitionCount, Shadow,
     Style, StyleCondition, StyleRule, StyleSelector, StyleSheet, TrackSizingFunction, Transition,
     ViewportQuery,

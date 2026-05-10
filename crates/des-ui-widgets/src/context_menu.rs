@@ -14,6 +14,7 @@ pub struct ContextMenu {
     anchor: ContextMenuAnchor,
     placement: FloatingPlacement,
     offset: Point,
+    arrow: Option<ContextMenuArrow>,
     entries: Vec<ContextMenuEntry>,
 }
 
@@ -21,6 +22,13 @@ pub struct ContextMenu {
 enum ContextMenuAnchor {
     Point(Point),
     Element(ElementId),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ContextMenuArrow {
+    width: f32,
+    height: f32,
+    padding: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -44,6 +52,7 @@ impl ContextMenu {
             anchor: ContextMenuAnchor::Point(Point::ZERO),
             placement: FloatingPlacement::BottomStart,
             offset: Point::ZERO,
+            arrow: None,
             entries: Vec::new(),
         }
     }
@@ -65,6 +74,15 @@ impl ContextMenu {
 
     pub fn floating_offset(mut self, main_axis: f32, cross_axis: f32) -> Self {
         self.offset = Point::new(main_axis, cross_axis);
+        self
+    }
+
+    pub fn floating_arrow(mut self, width: f32, height: f32, padding: f32) -> Self {
+        self.arrow = Some(ContextMenuArrow {
+            width,
+            height,
+            padding,
+        });
         self
     }
 
@@ -103,12 +121,16 @@ impl ContextMenu {
     }
 
     pub fn position_style(&self) -> Style {
-        Style::default()
+        let mut style = Style::default()
             .floating_to(self.anchor_id())
             .floating_placement(self.placement)
             .floating_offset(self.offset.x, self.offset.y)
             .floating_flip(true)
-            .floating_shift(FloatingShift::main_and_cross_axis())
+            .floating_shift(FloatingShift::main_and_cross_axis());
+        if let Some(arrow) = self.arrow {
+            style = style.floating_arrow_size(arrow.width, arrow.height, arrow.padding);
+        }
+        style
     }
 
     pub fn anchor_selector(&self) -> Option<StyleSelector> {
@@ -277,5 +299,43 @@ mod tests {
 
         let menu_frame = output.layout.find("text-context-menu").unwrap();
         assert_eq!(menu_frame.rect.origin, Point::new(40.0, 28.0));
+    }
+
+    #[test]
+    fn context_menu_arrow_is_opt_in() {
+        let plain = ContextMenu::new("plain-menu").at(Point::new(40.0, 24.0));
+        let with_arrow = ContextMenu::new("arrow-menu")
+            .at(Point::new(40.0, 24.0))
+            .floating_arrow(12.0, 6.0, 3.0);
+        let mut stylesheet = StyleSheet::new();
+        plain.push_styles(&mut stylesheet);
+        with_arrow.push_styles(&mut stylesheet);
+        let mut document = Document::build(Size::new(240.0, 140.0), |ui| {
+            plain.render(ui);
+            with_arrow.render(ui);
+        });
+
+        let output = DocumentEngine::default().update(&mut document, &stylesheet);
+
+        assert_eq!(
+            output
+                .snapshot()
+                .find("plain-menu")
+                .unwrap()
+                .floating()
+                .unwrap()
+                .arrow_size,
+            None
+        );
+        assert_eq!(
+            output
+                .snapshot()
+                .find("arrow-menu")
+                .unwrap()
+                .floating()
+                .unwrap()
+                .arrow_size,
+            Some(Size::new(12.0, 6.0))
+        );
     }
 }

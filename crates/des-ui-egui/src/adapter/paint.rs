@@ -1,7 +1,7 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_ui_document::{
-    Color, CornerRadii, DocumentTextSelection, Glyph, Insets, Overflow, Rect, ResolvedElement,
-    ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
+    Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph, Insets, Overflow, Rect,
+    ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
 };
 use eframe::egui;
 pub fn paint_frame(
@@ -24,24 +24,28 @@ fn paint_frame_clipped(
     if frame.id.as_str() != "root" {
         let rect = frame_rect(origin, frame);
 
-        paint_shadows(&painter, rect, frame.style.radius, &frame.style.shadows);
+        if let Some(arrow) = floating_arrow(frame, rect) {
+            paint_floating_surface(&painter, rect, frame, arrow);
+        } else {
+            paint_shadows(&painter, rect, frame.style.radius, &frame.style.shadows);
 
-        if let Some(color) = frame.style.background {
-            painter.rect_filled(
-                rect,
-                to_egui_radius(frame.style.radius),
-                to_egui_color(color),
-            );
-        }
+            if let Some(color) = frame.style.background {
+                painter.rect_filled(
+                    rect,
+                    to_egui_radius(frame.style.radius),
+                    to_egui_color(color),
+                );
+            }
 
-        if let Some(color) = frame.style.border {
-            paint_border(
-                &painter,
-                rect,
-                frame.style.radius,
-                frame.style.border_width,
-                color,
-            );
+            if let Some(color) = frame.style.border {
+                paint_border(
+                    &painter,
+                    rect,
+                    frame.style.radius,
+                    frame.style.border_width,
+                    color,
+                );
+            }
         }
 
         if let Some(text) = &frame.text {
@@ -278,6 +282,214 @@ fn paint_shadows(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FloatingArrowPaint {
+    points: [egui::Pos2; 3],
+}
+
+fn floating_arrow(frame: &ResolvedElement, rect: egui::Rect) -> Option<FloatingArrowPaint> {
+    let floating = frame.floating?;
+    let offset = floating.arrow_offset?;
+    let size = floating.arrow_size?;
+    Some(FloatingArrowPaint {
+        points: floating_arrow_points(
+            rect,
+            floating.placement,
+            offset.x,
+            offset.y,
+            size.width,
+            size.height,
+        ),
+    })
+}
+
+fn floating_arrow_points(
+    rect: egui::Rect,
+    placement: FloatingPlacement,
+    offset_x: f32,
+    offset_y: f32,
+    width: f32,
+    height: f32,
+) -> [egui::Pos2; 3] {
+    match placement {
+        FloatingPlacement::Bottom
+        | FloatingPlacement::BottomStart
+        | FloatingPlacement::BottomEnd => {
+            let left = rect.left() + offset_x;
+            let center = left + width * 0.5;
+            [
+                egui::pos2(left, rect.top()),
+                egui::pos2(left + width, rect.top()),
+                egui::pos2(center, rect.top() - height),
+            ]
+        }
+        FloatingPlacement::Top | FloatingPlacement::TopStart | FloatingPlacement::TopEnd => {
+            let left = rect.left() + offset_x;
+            let center = left + width * 0.5;
+            [
+                egui::pos2(left + width, rect.bottom()),
+                egui::pos2(left, rect.bottom()),
+                egui::pos2(center, rect.bottom() + height),
+            ]
+        }
+        FloatingPlacement::Right | FloatingPlacement::RightStart | FloatingPlacement::RightEnd => {
+            let top = rect.top() + offset_y;
+            let center = top + height * 0.5;
+            [
+                egui::pos2(rect.left(), top + height),
+                egui::pos2(rect.left(), top),
+                egui::pos2(rect.left() - width, center),
+            ]
+        }
+        FloatingPlacement::Left | FloatingPlacement::LeftStart | FloatingPlacement::LeftEnd => {
+            let top = rect.top() + offset_y;
+            let center = top + height * 0.5;
+            [
+                egui::pos2(rect.right(), top),
+                egui::pos2(rect.right(), top + height),
+                egui::pos2(rect.right() + width, center),
+            ]
+        }
+    }
+}
+
+fn paint_floating_surface(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    frame: &ResolvedElement,
+    arrow: FloatingArrowPaint,
+) {
+    paint_shadows_with_arrow(
+        painter,
+        rect,
+        frame.style.radius,
+        &frame.style.shadows,
+        arrow,
+    );
+    if let Some(color) = frame.style.background {
+        painter.rect_filled(
+            rect,
+            to_egui_radius(frame.style.radius),
+            to_egui_color(color),
+        );
+        painter.add(egui::Shape::convex_polygon(
+            arrow.points.to_vec(),
+            to_egui_color(color),
+            egui::Stroke::NONE,
+        ));
+    }
+    if let Some(color) = frame.style.border {
+        paint_border(
+            painter,
+            rect,
+            frame.style.radius,
+            frame.style.border_width,
+            color,
+        );
+        paint_arrow_border(painter, arrow, frame.style.border_width, color);
+    }
+}
+
+fn paint_shadows_with_arrow(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    radius: CornerRadii,
+    shadows: &[Shadow],
+    arrow: FloatingArrowPaint,
+) {
+    for shadow in shadows.iter().rev().copied() {
+        paint_shadow(painter, rect, radius, shadow);
+        paint_arrow_shadow(painter, arrow, shadow);
+    }
+}
+
+fn paint_arrow_shadow(painter: &egui::Painter, arrow: FloatingArrowPaint, shadow: Shadow) {
+    if shadow.color.a == 0 {
+        return;
+    }
+    let translated = translate_arrow(arrow, shadow.offset.x, shadow.offset.y);
+    if shadow.blur <= 0.0 {
+        painter.add(egui::Shape::convex_polygon(
+            expanded_arrow(translated, shadow.spread).points.to_vec(),
+            to_egui_color(shadow.color),
+            egui::Stroke::NONE,
+        ));
+        return;
+    }
+
+    let sigma = shadow.blur * 0.5;
+    let max_blur_extent = sigma * 3.0;
+    let steps = max_blur_extent.ceil().clamp(10.0, 36.0) as usize;
+    for step in (0..steps).rev() {
+        let outer_distance = max_blur_extent * (step + 1) as f32 / steps as f32;
+        let inner_distance = max_blur_extent * step as f32 / steps as f32;
+        let outer_alpha = gaussian_alpha(outer_distance, sigma);
+        let inner_alpha = gaussian_alpha(inner_distance, sigma);
+        let alpha_portion = (inner_alpha - outer_alpha).max(0.0);
+        let alpha = (shadow.color.a as f32 * alpha_portion * 0.86)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        if alpha == 0 {
+            continue;
+        }
+        let color = Color {
+            a: alpha,
+            ..shadow.color
+        };
+        painter.add(egui::Shape::convex_polygon(
+            expanded_arrow(translated, shadow.spread + outer_distance)
+                .points
+                .to_vec(),
+            to_egui_color(color),
+            egui::Stroke::NONE,
+        ));
+    }
+}
+
+fn translate_arrow(arrow: FloatingArrowPaint, x: f32, y: f32) -> FloatingArrowPaint {
+    FloatingArrowPaint {
+        points: arrow.points.map(|point| point + egui::vec2(x, y)),
+    }
+}
+
+fn expanded_arrow(arrow: FloatingArrowPaint, amount: f32) -> FloatingArrowPaint {
+    let center = egui::pos2(
+        (arrow.points[0].x + arrow.points[1].x + arrow.points[2].x) / 3.0,
+        (arrow.points[0].y + arrow.points[1].y + arrow.points[2].y) / 3.0,
+    );
+    FloatingArrowPaint {
+        points: arrow.points.map(|point| {
+            let vector = point - center;
+            let length = vector.length();
+            if length <= f32::EPSILON {
+                point
+            } else {
+                center + vector * ((length + amount).max(0.0) / length)
+            }
+        }),
+    }
+}
+
+fn paint_arrow_border(
+    painter: &egui::Painter,
+    arrow: FloatingArrowPaint,
+    widths: Insets,
+    color: Color,
+) {
+    let width = widths
+        .top
+        .max(widths.right)
+        .max(widths.bottom)
+        .max(widths.left);
+    if width <= 0.0 {
+        return;
+    }
+    painter.add(egui::Shape::closed_line(
+        arrow.points.to_vec(),
+        egui::Stroke::new(width, to_egui_color(color)),
+    ));
+}
+
 fn paint_shadow(painter: &egui::Painter, rect: egui::Rect, radius: CornerRadii, shadow: Shadow) {
     if shadow.color.a == 0 {
         return;
@@ -374,6 +586,43 @@ pub fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[Scr
                 egui::StrokeKind::Inside,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn floating_arrow_points_attach_to_opposite_side_of_placement() {
+        let rect = egui::Rect::from_min_size(egui::pos2(20.0, 30.0), egui::vec2(80.0, 40.0));
+
+        let bottom = floating_arrow_points(rect, FloatingPlacement::Bottom, 30.0, 0.0, 12.0, 6.0);
+        assert_eq!(bottom[0], egui::pos2(50.0, 30.0));
+        assert_eq!(bottom[1], egui::pos2(62.0, 30.0));
+        assert_eq!(bottom[2], egui::pos2(56.0, 24.0));
+
+        let right = floating_arrow_points(rect, FloatingPlacement::Right, 0.0, 10.0, 6.0, 12.0);
+        assert_eq!(right[0], egui::pos2(20.0, 52.0));
+        assert_eq!(right[1], egui::pos2(20.0, 40.0));
+        assert_eq!(right[2], egui::pos2(14.0, 46.0));
+    }
+
+    #[test]
+    fn expanded_arrow_keeps_center_and_moves_points_outward() {
+        let arrow = FloatingArrowPaint {
+            points: [
+                egui::pos2(0.0, 0.0),
+                egui::pos2(10.0, 0.0),
+                egui::pos2(5.0, -5.0),
+            ],
+        };
+
+        let expanded = expanded_arrow(arrow, 2.0);
+
+        assert!(expanded.points[0].x < arrow.points[0].x);
+        assert!(expanded.points[1].x > arrow.points[1].x);
+        assert!(expanded.points[2].y < arrow.points[2].y);
     }
 }
 

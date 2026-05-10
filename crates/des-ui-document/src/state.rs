@@ -1,7 +1,7 @@
 use crate::element::{ClassName, Color, Element, ElementId, Glyph};
-use crate::geometry::{Point, Rect, ScrollAxis};
+use crate::geometry::{Point, Rect, ScrollAxis, Size};
 use crate::query::DocumentSnapshot;
-use crate::style::{ComputedStyle, Transition};
+use crate::style::{ComputedStyle, FloatingPlacement, FloatingVisibility, Transition};
 use crate::text::TextLayoutResult;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -41,7 +41,16 @@ pub struct ResolvedElement {
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub interactive: bool,
+    pub floating: Option<ResolvedFloating>,
     pub children: Vec<ResolvedElement>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResolvedFloating {
+    pub placement: FloatingPlacement,
+    pub arrow_offset: Option<Point>,
+    pub arrow_size: Option<Size>,
+    pub visibility: FloatingVisibility,
 }
 
 impl ResolvedElement {

@@ -6,7 +6,7 @@ use crate::geometry::{
     AlignContent, AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
     Point, Position, Rect as DocumentRect, Size,
 };
-use crate::state::{ElementState, ResolvedElement};
+use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
     ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
     resolve_style_with_position,
@@ -757,7 +757,7 @@ impl Document {
     ) -> DocumentResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
-        let rect = resolved_document_rect(
+        let (rect, floating) = resolved_document_rect(
             raw_rect,
             &element.computed_style,
             self.viewport,
@@ -788,6 +788,7 @@ impl Document {
             value: element.spec.value.clone(),
             glyph: element.spec.glyph,
             interactive: element.spec.interactive && !element.spec.disabled,
+            floating,
             children,
         })
     }
@@ -1291,7 +1292,7 @@ fn resolved_document_rect(
     parent_origin: Point,
     parent_scroll_offset: Point,
     anchors: &HashMap<ElementId, DocumentRect>,
-) -> DocumentRect {
+) -> (DocumentRect, Option<ResolvedFloating>) {
     if let Some(anchor) = &style.anchor {
         if let Some(anchor_rect) = anchors.get(&anchor.target) {
             return anchored_document_rect(style, *anchor_rect, raw_rect.size, viewport);
@@ -1299,31 +1300,37 @@ fn resolved_document_rect(
     }
 
     if style.position != Position::AbsoluteViewport {
-        return DocumentRect::new(
-            parent_origin.x + raw_rect.origin.x - parent_scroll_offset.x,
-            parent_origin.y + raw_rect.origin.y - parent_scroll_offset.y,
-            raw_rect.size.width,
-            raw_rect.size.height,
+        return (
+            DocumentRect::new(
+                parent_origin.x + raw_rect.origin.x - parent_scroll_offset.x,
+                parent_origin.y + raw_rect.origin.y - parent_scroll_offset.y,
+                raw_rect.size.width,
+                raw_rect.size.height,
+            ),
+            None,
         );
     }
 
-    DocumentRect::new(
-        viewport_axis_position(
-            raw_rect.origin.x,
+    (
+        DocumentRect::new(
+            viewport_axis_position(
+                raw_rect.origin.x,
+                raw_rect.size.width,
+                viewport.width,
+                style.inset.left,
+                style.inset.right,
+            ),
+            viewport_axis_position(
+                raw_rect.origin.y,
+                raw_rect.size.height,
+                viewport.height,
+                style.inset.top,
+                style.inset.bottom,
+            ),
             raw_rect.size.width,
-            viewport.width,
-            style.inset.left,
-            style.inset.right,
-        ),
-        viewport_axis_position(
-            raw_rect.origin.y,
             raw_rect.size.height,
-            viewport.height,
-            style.inset.top,
-            style.inset.bottom,
         ),
-        raw_rect.size.width,
-        raw_rect.size.height,
+        None,
     )
 }
 
@@ -1332,11 +1339,15 @@ fn anchored_document_rect(
     anchor_rect: DocumentRect,
     measured: Size,
     viewport: Size,
-) -> DocumentRect {
+) -> (DocumentRect, Option<ResolvedFloating>) {
     let anchor = style
         .anchor
         .as_ref()
         .expect("anchored document rect requires an anchor style");
+    let arrow_size = anchor
+        .options
+        .arrow
+        .map(|arrow| Size::new(arrow.size.width, arrow.size.height));
     let mut options = anchor.options.clone();
     options.boundary = options.boundary.or_else(|| {
         Some(FloatingBoundary::new(FloatingRect::new(
@@ -1365,11 +1376,21 @@ fn anchored_document_rect(
         options,
     );
 
-    DocumentRect::new(
-        floating.origin.x + style.margin.left,
-        floating.origin.y + style.margin.top,
-        measured.width,
-        measured.height,
+    (
+        DocumentRect::new(
+            floating.origin.x + style.margin.left,
+            floating.origin.y + style.margin.top,
+            measured.width,
+            measured.height,
+        ),
+        Some(ResolvedFloating {
+            placement: floating.placement,
+            arrow_offset: floating
+                .arrow_offset
+                .map(|offset| Point::new(offset.x, offset.y)),
+            arrow_size,
+            visibility: floating.visibility,
+        }),
     )
 }
 

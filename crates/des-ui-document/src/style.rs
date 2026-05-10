@@ -12,7 +12,7 @@ pub use layout_engine::prelude::{
 
 pub use layout_engine::floating::{
     FloatingArrow, FloatingBoundary, FloatingOffset, FloatingOptions, FloatingPlacement,
-    FloatingShift,
+    FloatingShift, FloatingVisibility,
 };
 
 pub type GridPlacement = layout_engine::prelude::GridPlacement<String>;
@@ -1202,6 +1202,16 @@ impl Style {
     pub fn floating_arrow(mut self, arrow: FloatingArrow) -> Self {
         if let Some(anchor) = &mut self.anchor {
             anchor.options.arrow = Some(arrow);
+        }
+        self
+    }
+
+    pub fn floating_arrow_size(mut self, width: f32, height: f32, padding: f32) -> Self {
+        if let Some(anchor) = &mut self.anchor {
+            anchor.options.arrow = Some(
+                FloatingArrow::new(layout_engine::geometry::Size { width, height })
+                    .padding(padding),
+            );
         }
         self
     }

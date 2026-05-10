@@ -116,6 +116,10 @@ impl<'a> ElementSnapshot<'a> {
         self.element.interactive
     }
 
+    pub fn floating(&self) -> Option<crate::ResolvedFloating> {
+        self.element.floating
+    }
+
     pub fn visual_clone(&self) -> VisualElementClone {
         VisualElementClone::from_resolved(self.element)
     }

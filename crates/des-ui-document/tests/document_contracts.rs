@@ -2229,6 +2229,56 @@ fn floating_anchor_uses_fallbacks_and_viewport_shift() {
 }
 
 #[test]
+fn floating_arrow_is_style_opt_in_metadata() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("anchor"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(40.0))
+                .top(Length::Px(40.0))
+                .size(20.0, 10.0),
+        )
+        .rule(
+            StyleSelector::id("plain-popover"),
+            Style::default()
+                .floating_to("anchor")
+                .floating_placement(des_ui_document::FloatingPlacement::Bottom)
+                .size(60.0, 20.0),
+        )
+        .rule(
+            StyleSelector::id("arrow-popover"),
+            Style::default()
+                .floating_to("anchor")
+                .floating_placement(des_ui_document::FloatingPlacement::Bottom)
+                .floating_offset(24.0, 0.0)
+                .floating_arrow_size(12.0, 6.0, 3.0)
+                .size(60.0, 20.0),
+        );
+    let mut document = Document::build(Size::new(140.0, 120.0), |ui| {
+        ui.element("anchor", ElementSpec::new(Element::Div), |_| {});
+        ui.element("plain-popover", ElementSpec::new(Element::Div), |_| {});
+        ui.element("arrow-popover", ElementSpec::new(Element::Div), |_| {});
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let plain = output.snapshot().find("plain-popover").unwrap();
+    let arrow = output.snapshot().find("arrow-popover").unwrap();
+
+    assert_eq!(plain.floating().unwrap().arrow_offset, None);
+    assert_eq!(plain.floating().unwrap().arrow_size, None);
+    assert_eq!(
+        arrow.floating().unwrap().arrow_offset,
+        Some(Point::new(24.0, 0.0))
+    );
+    assert_eq!(
+        arrow.floating().unwrap().arrow_size,
+        Some(Size::new(12.0, 6.0))
+    );
+}
+
+#[test]
 fn absolute_viewport_position_uses_window_rect() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
