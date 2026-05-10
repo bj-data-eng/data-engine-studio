@@ -278,6 +278,11 @@ impl DocumentEngine {
         self.states.get_mut(&ElementId::new(id))
     }
 
+    pub fn scroll_position(&self, id: &str) -> Option<Point> {
+        let state = self.states.get(&ElementId::new(id))?;
+        Some(Point::new(state.scroll_x, state.scroll_y))
+    }
+
     pub fn text_selection(&self) -> Option<&DocumentTextSelection> {
         self.text_selection.as_ref()
     }

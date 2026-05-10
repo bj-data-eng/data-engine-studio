@@ -2156,6 +2156,39 @@ fn document_engine_scroll_element_to_repositions_existing_scroll_state() {
 }
 
 #[test]
+fn document_engine_reports_current_scroll_position() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element("root", "scroll", ElementSpec::new(Element::Div))
+        .unwrap();
+    document
+        .append_element("scroll", "content", ElementSpec::new(Element::Div))
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll"),
+            Style::default()
+                .size(100.0, 100.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("content"),
+            Style::default().size(300.0, 300.0),
+        );
+    let mut engine = DocumentEngine::default();
+    engine.update(&mut document, &stylesheet);
+
+    assert!(engine.scroll_element_to("scroll", Point::new(24.0, 48.0)));
+
+    assert_eq!(
+        engine.scroll_position("scroll"),
+        Some(Point::new(24.0, 48.0))
+    );
+    assert_eq!(engine.scroll_position("missing"), None);
+}
+
+#[test]
 fn document_engine_initial_scroll_does_not_overwrite_retained_scroll_state() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document
