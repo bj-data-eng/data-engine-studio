@@ -1139,6 +1139,13 @@ fn draggable_workbench_wraps_panels_when_stage_narrows() {
     assert_eq!(drag_grid.rect.origin.x, list_card.rect.origin.x);
     assert_close(list_card.rect.size.width, workbench.rect.size.width);
     assert_close(drag_grid.rect.size.width, workbench.rect.size.width);
+    for cell in 0..6 {
+        let cell = frame(&output, &format!("drag-cell-{cell}"));
+        assert!(
+            drag_grid.rect.bottom() >= cell.rect.bottom(),
+            "stacked drag grid should expand around all rows"
+        );
+    }
 }
 
 #[test]
@@ -1154,6 +1161,27 @@ fn draggable_workbench_keeps_panels_side_by_side_at_default_width() {
         "drag grid should remain beside the scroll list card at the default lab width"
     );
     assert_close(list_card.rect.size.width, drag_grid.rect.size.width);
+}
+
+#[test]
+fn draggable_grid_cells_fill_rows_and_remain_inside_grid() {
+    let output = lab_output_with_size("draggable", Size::new(1500.0, 780.0));
+    let grid = frame(&output, "drag-grid");
+    let left = frame(&output, "drag-cell-0");
+    let right = frame(&output, "drag-cell-1");
+
+    assert_eq!(left.rect.origin.y, right.rect.origin.y);
+    assert!(
+        right.rect.right() > grid.rect.right() - 40.0,
+        "right drag cell should fluidly fill the row"
+    );
+    for cell in 0..6 {
+        let cell = frame(&output, &format!("drag-cell-{cell}"));
+        assert!(
+            grid.rect.bottom() >= cell.rect.bottom(),
+            "drag grid should expand around all rows"
+        );
+    }
 }
 
 #[test]

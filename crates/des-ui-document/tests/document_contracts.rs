@@ -1201,6 +1201,57 @@ fn wrapped_row_layout_rearranges_children_and_expands_container_height() {
 }
 
 #[test]
+fn wrapped_fluid_row_layout_expands_around_variable_height_rows() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("row"),
+            Style::default()
+                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_wrap(FlexWrap::Wrap)
+                .width(Length::Px(756.0))
+                .height(Length::Auto)
+                .padding(Insets::all(10.0))
+                .gap(8.0),
+        )
+        .rule(
+            StyleSelector::class("item"),
+            Style::default()
+                .width_percent(0.48)
+                .flex_basis(Length::Percent(0.48))
+                .flex_grow(1.0)
+                .height(Length::Px(70.0)),
+        )
+        .rule(
+            StyleSelector::class("tall"),
+            Style::default().height(Length::Px(73.0)),
+        );
+    let mut document = Document::build(Size::new(900.0, 520.0), |ui| {
+        ui.element("row", ElementSpec::new(Element::Div), |ui| {
+            for index in 0..6 {
+                let spec = if index % 2 == 0 {
+                    ElementSpec::new(Element::Div).class("item").class("tall")
+                } else {
+                    ElementSpec::new(Element::Div).class("item")
+                };
+                ui.element(format!("item-{index}"), spec, |_| {});
+            }
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let row = output.layout.find("row").unwrap();
+
+    for index in 0..6 {
+        let item = output.layout.find(&format!("item-{index}")).unwrap();
+        assert!(
+            row.rect.bottom() >= item.rect.bottom(),
+            "wrapped parent should contain item {index}"
+        );
+    }
+}
+
+#[test]
 fn table_layout_resolves_shared_column_tracks_for_header_and_body_cells() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()

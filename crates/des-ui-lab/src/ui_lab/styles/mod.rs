@@ -830,8 +830,10 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("drag-cell"),
             Style::default()
-                .width(Length::Px(244.0))
+                .width_percent(0.45)
                 .height(Length::Auto)
+                .flex_basis(Length::Percent(0.45))
+                .flex_grow(1.0)
                 .min_size(0.0, 70.0)
                 .padding(Insets::all(7.0))
                 .gap(5.0)
@@ -1781,12 +1783,18 @@ pub(super) fn stylesheet() -> StyleSheet {
     stylesheet.push_viewport_rule(
         ViewportQuery::max_width(DRAGGABLE_STACK_VIEWPORT_WIDTH),
         StyleSelector::class("drag-scroll-list-card"),
-        Style::default().width_fill(),
+        Style::default()
+            .width_fill()
+            .flex_basis(Length::Auto)
+            .flex_grow(0.0),
     );
     stylesheet.push_viewport_rule(
         ViewportQuery::max_width(DRAGGABLE_STACK_VIEWPORT_WIDTH),
         StyleSelector::class("drag-grid"),
-        Style::default().width_fill(),
+        Style::default()
+            .width_fill()
+            .flex_basis(Length::Auto)
+            .flex_grow(0.0),
     );
     stylesheet
 }
