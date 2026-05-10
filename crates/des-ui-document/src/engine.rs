@@ -3,7 +3,7 @@ use crate::document::{Document, StyleResolutionReport};
 use crate::element::ElementId;
 use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
 use crate::layout::hit_path;
-use crate::scroll::scroll_chrome;
+use crate::scroll::{layout_scroll_axis, layout_scroll_point, layout_scroll_rect, scroll_chrome};
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
     DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
@@ -302,11 +302,19 @@ impl DocumentEngine {
             return false;
         };
 
-        let scroll_x = (state.scroll_x + delta.x).clamp(0.0, max_scroll.width);
-        let scroll_y = (state.scroll_y + delta.y).clamp(0.0, max_scroll.height);
+        let scroll = layout_engine::scroll::clamp_scroll_offset(
+            layout_scroll_point(Point::new(
+                state.scroll_x + delta.x,
+                state.scroll_y + delta.y,
+            )),
+            layout_engine::geometry::Size {
+                width: max_scroll.width,
+                height: max_scroll.height,
+            },
+        );
         let mut changed = false;
-        changed |= set_f32(&mut state.scroll_x, scroll_x);
-        changed |= set_f32(&mut state.scroll_y, scroll_y);
+        changed |= set_f32(&mut state.scroll_x, scroll.x);
+        changed |= set_f32(&mut state.scroll_y, scroll.y);
         if changed {
             self.cached_layout = None;
         }
@@ -470,12 +478,17 @@ impl DocumentEngine {
                 .copied()
                 .unwrap_or_default();
             if scroll_frame.style.overflow_x == Overflow::Scroll {
-                let scroll_x = (state.scroll_x - input.scroll_delta.x).clamp(0.0, max_scroll.width);
+                let scroll_x = layout_engine::scroll::clamp_scroll_value(
+                    state.scroll_x - input.scroll_delta.x,
+                    max_scroll.width,
+                );
                 update.changed |= set_f32(&mut state.scroll_x, scroll_x);
             }
             if scroll_frame.style.overflow_y == Overflow::Scroll {
-                let scroll_y =
-                    (state.scroll_y - input.scroll_delta.y).clamp(0.0, max_scroll.height);
+                let scroll_y = layout_engine::scroll::clamp_scroll_value(
+                    state.scroll_y - input.scroll_delta.y,
+                    max_scroll.height,
+                );
                 update.changed |= set_f32(&mut state.scroll_y, scroll_y);
             }
         }
@@ -747,9 +760,11 @@ impl DocumentEngine {
             .as_ref()
             .is_none_or(|drag| drag.element_id != chrome.element_id || drag.axis != chrome.axis)
         {
-            let pointer_main = pointer_axis_position(pointer.position, chrome.axis);
-            let handle_start = rect_axis_origin(chrome.handle_rect, chrome.axis);
-            let handle_length = rect_axis_length(chrome.handle_rect, chrome.axis);
+            let axis = layout_scroll_axis(chrome.axis);
+            let pointer_main = axis.position(layout_scroll_point(pointer.position));
+            let handle_rect = layout_scroll_rect(chrome.handle_rect);
+            let handle_start = axis.rect_origin(handle_rect);
+            let handle_length = axis.rect_length(handle_rect);
             let offset = if chrome.handle_rect.contains(pointer.position) {
                 pointer_main - handle_start
             } else {
@@ -766,25 +781,18 @@ impl DocumentEngine {
         let Some(drag) = &self.active_scroll_drag else {
             return changed;
         };
-        let track_travel = (rect_axis_length(chrome.track_rect, chrome.axis)
-            - rect_axis_length(chrome.handle_rect, chrome.axis))
-        .max(0.0);
-        let handle_start = pointer_axis_position(pointer.position, chrome.axis)
-            - drag.pointer_offset_from_handle_start;
-        let handle_progress = if track_travel <= f32::EPSILON {
-            0.0
-        } else {
-            ((handle_start - rect_axis_origin(chrome.track_rect, chrome.axis)) / track_travel)
-                .clamp(0.0, 1.0)
-        };
+        let scroll_offset = layout_engine::scroll::scroll_offset_from_handle_drag(
+            layout_scroll_axis(chrome.axis),
+            layout_scroll_rect(chrome.track_rect),
+            layout_scroll_rect(chrome.handle_rect),
+            layout_scroll_point(pointer.position),
+            drag.pointer_offset_from_handle_start,
+            chrome.max_scroll,
+        );
         if let Some(state) = self.states.get_mut(&chrome.element_id) {
             match chrome.axis {
-                ScrollAxis::Horizontal => {
-                    changed |= set_f32(&mut state.scroll_x, handle_progress * chrome.max_scroll)
-                }
-                ScrollAxis::Vertical => {
-                    changed |= set_f32(&mut state.scroll_y, handle_progress * chrome.max_scroll)
-                }
+                ScrollAxis::Horizontal => changed |= set_f32(&mut state.scroll_x, scroll_offset),
+                ScrollAxis::Vertical => changed |= set_f32(&mut state.scroll_y, scroll_offset),
             }
             if state.scrollbar_dragged_axis != Some(chrome.axis) {
                 state.scrollbar_dragged_axis = Some(chrome.axis);
@@ -798,10 +806,15 @@ impl DocumentEngine {
         let mut changed = false;
         for (id, state) in &mut self.states {
             let max_scroll = self.scroll_limits.get(id).copied().unwrap_or_default();
-            let scroll_x = state.scroll_x.clamp(0.0, max_scroll.width);
-            let scroll_y = state.scroll_y.clamp(0.0, max_scroll.height);
-            changed |= set_f32(&mut state.scroll_x, scroll_x);
-            changed |= set_f32(&mut state.scroll_y, scroll_y);
+            let scroll = layout_engine::scroll::clamp_scroll_offset(
+                layout_scroll_point(Point::new(state.scroll_x, state.scroll_y)),
+                layout_engine::geometry::Size {
+                    width: max_scroll.width,
+                    height: max_scroll.height,
+                },
+            );
+            changed |= set_f32(&mut state.scroll_x, scroll.x);
+            changed |= set_f32(&mut state.scroll_y, scroll.y);
         }
         changed
     }
@@ -1185,27 +1198,6 @@ fn selector_state_changed(
                 || state.scrollbar_dragged_axis != previous.scrollbar_dragged_axis
         })
     })
-}
-
-fn pointer_axis_position(point: crate::geometry::Point, axis: ScrollAxis) -> f32 {
-    match axis {
-        ScrollAxis::Horizontal => point.x,
-        ScrollAxis::Vertical => point.y,
-    }
-}
-
-fn rect_axis_origin(rect: Rect, axis: ScrollAxis) -> f32 {
-    match axis {
-        ScrollAxis::Horizontal => rect.origin.x,
-        ScrollAxis::Vertical => rect.origin.y,
-    }
-}
-
-fn rect_axis_length(rect: Rect, axis: ScrollAxis) -> f32 {
-    match axis {
-        ScrollAxis::Horizontal => rect.size.width,
-        ScrollAxis::Vertical => rect.size.height,
-    }
 }
 
 fn ease_f32(current: f32, target: f32, amount: f32, snap_epsilon: f32) -> f32 {

@@ -24,6 +24,7 @@ use layout_engine::prelude::{
     LengthPercentageAuto, NodeId, Position as LayoutPosition, Rect as LayoutRect,
     Size as LayoutSize, Style as LayoutStyle, fr, length, percent,
 };
+use layout_engine::scroll as layout_scroll;
 use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -615,18 +616,15 @@ impl Document {
                 .layout(element.layout_node)
                 .map_err(layout_error)?;
             let content_size = self.scroll_content_size(element)?;
-            let max_scroll = Size::new(
-                scroll_limit_for_axis(
-                    content_size.width,
-                    layout.size.width,
-                    style.border_width.right,
-                ),
-                scroll_limit_for_axis(
-                    content_size.height,
-                    layout.size.height,
-                    style.border_width.bottom,
-                ),
+            let max_scroll = layout_scroll::scroll_limits(
+                layout_scroll_size(content_size),
+                layout_engine::geometry::Size {
+                    width: layout.size.width,
+                    height: layout.size.height,
+                },
+                layout_scroll_insets(style.border_width),
             );
+            let max_scroll = Size::new(max_scroll.width, max_scroll.height);
             if max_scroll.width > 0.0 || max_scroll.height > 0.0 {
                 limits.insert(id, max_scroll);
             }
@@ -1312,12 +1310,19 @@ fn clamp_table_column_width(width: f32, min_width: f32, max_width: Option<f32>) 
     max_width.map_or(width, |max_width| width.min(max_width.max(min_width)))
 }
 
-fn scroll_limit_for_axis(content_size: f32, outer_size: f32, trailing_border_width: f32) -> f32 {
-    let overflow = content_size - outer_size;
-    if overflow > 0.0 {
-        overflow + trailing_border_width
-    } else {
-        0.0
+fn layout_scroll_size(size: Size) -> layout_engine::geometry::Size<f32> {
+    layout_engine::geometry::Size {
+        width: size.width,
+        height: size.height,
+    }
+}
+
+fn layout_scroll_insets(insets: Insets) -> LayoutRect<f32> {
+    LayoutRect {
+        left: insets.left,
+        right: insets.right,
+        top: insets.top,
+        bottom: insets.bottom,
     }
 }
 

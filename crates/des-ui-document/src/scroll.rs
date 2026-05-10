@@ -1,6 +1,11 @@
 use crate::element::ElementId;
-use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
+use crate::geometry::{Insets, Overflow, Point, Rect, ScrollAxis, Size};
 use crate::state::{ElementState, ResolvedElement, ScrollChrome};
+use layout_engine::geometry::{Point as LayoutPoint, Rect as LayoutInsets, Size as LayoutSize};
+use layout_engine::scroll::{
+    self as layout_scroll, ScrollAxis as LayoutScrollAxis, ScrollRect, ScrollbarGeometryInput,
+};
+use layout_engine::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 
 pub(crate) fn scroll_chrome(
@@ -82,92 +87,26 @@ fn scroll_chrome_for_frame(
         })
         .unwrap_or(target_visual_width)
         .max(0.0);
-    let viewport_rect = frame
-        .rect
-        .inset(frame.style.border_width)
-        .inset(frame.style.padding);
-    let viewport_main = match axis {
-        ScrollAxis::Horizontal => viewport_rect.size.width,
-        ScrollAxis::Vertical => viewport_rect.size.height,
-    };
-    let content_main = viewport_main + max_scroll;
-    let handle_length = if content_main <= f32::EPSILON {
-        viewport_main
-    } else {
-        (viewport_main / content_main * viewport_main)
-            .max(MIN_HANDLE_LENGTH)
-            .min(viewport_main)
-    };
     let state_scroll = state
         .map(|state| match axis {
             ScrollAxis::Horizontal => state.scroll_x,
             ScrollAxis::Vertical => state.scroll_y,
         })
         .unwrap_or_default();
-    let track_travel = (viewport_main - handle_length).max(0.0);
-    let handle_start = if max_scroll <= f32::EPSILON {
-        match axis {
-            ScrollAxis::Horizontal => viewport_rect.origin.x,
-            ScrollAxis::Vertical => viewport_rect.origin.y,
-        }
-    } else {
-        let origin = match axis {
-            ScrollAxis::Horizontal => viewport_rect.origin.x,
-            ScrollAxis::Vertical => viewport_rect.origin.y,
-        };
-        origin + (state_scroll / max_scroll).clamp(0.0, 1.0) * track_travel
-    };
-    let (track_rect, hit_rect, handle_rect) = match axis {
-        ScrollAxis::Horizontal => (
-            Rect::new(
-                viewport_rect.origin.x,
-                viewport_rect.bottom() - visual_width,
-                viewport_rect.size.width,
-                visual_width,
-            ),
-            Rect::new(
-                viewport_rect.origin.x,
-                viewport_rect.bottom() - HIT_WIDTH,
-                viewport_rect.size.width,
-                HIT_WIDTH,
-            ),
-            Rect::new(
-                handle_start,
-                viewport_rect.bottom() - visual_width,
-                handle_length,
-                visual_width,
-            ),
+    let geometry = layout_scroll::scrollbar_geometry(ScrollbarGeometryInput {
+        axis: layout_scroll_axis(axis),
+        viewport_rect: layout_scroll::viewport_rect(
+            layout_scroll_rect(frame.rect),
+            layout_scroll_insets(frame.style.border_width),
+            layout_scroll_insets(frame.style.padding),
         ),
-        ScrollAxis::Vertical => (
-            Rect::new(
-                viewport_rect.right() - visual_width,
-                viewport_rect.origin.y,
-                visual_width,
-                viewport_rect.size.height,
-            ),
-            Rect::new(
-                viewport_rect.right() - HIT_WIDTH,
-                viewport_rect.origin.y,
-                HIT_WIDTH,
-                viewport_rect.size.height,
-            ),
-            Rect::new(
-                viewport_rect.right() - visual_width,
-                handle_start,
-                visual_width,
-                handle_length,
-            ),
-        ),
-    };
-    let (track_rect, hit_rect, handle_rect) = if let Some(clip_rect) = clip_rect {
-        (
-            track_rect.intersect(clip_rect)?,
-            hit_rect.intersect(clip_rect)?,
-            handle_rect.intersect(clip_rect)?,
-        )
-    } else {
-        (track_rect, hit_rect, handle_rect)
-    };
+        max_scroll,
+        scroll_offset: state_scroll,
+        visual_width,
+        hit_width: HIT_WIDTH,
+        min_handle_length: MIN_HANDLE_LENGTH,
+        clip_rect: clip_rect.map(layout_scroll_rect),
+    })?;
     let handle_color = if dragged {
         frame
             .style
@@ -224,9 +163,9 @@ fn scroll_chrome_for_frame(
     Some(ScrollChrome {
         element_id: frame.id.clone(),
         axis,
-        track_rect,
-        hit_rect,
-        handle_rect,
+        track_rect: document_rect(geometry.track_rect),
+        hit_rect: document_rect(geometry.hit_rect),
+        handle_rect: document_rect(geometry.handle_rect),
         handle_color,
         track_color,
         handle_border_color,
@@ -244,37 +183,62 @@ fn scroll_chrome_for_frame(
 }
 
 fn child_clip_rect(frame: &ResolvedElement, parent_clip: Option<Rect>) -> Option<Rect> {
-    if frame.style.overflow_x != Overflow::Scroll && frame.style.overflow_y != Overflow::Scroll {
-        return parent_clip;
+    layout_scroll::child_clip_rect(
+        layout_scroll_rect(frame.rect),
+        layout_scroll_insets(frame.style.border_width),
+        layout_scroll_insets(frame.style.padding),
+        layout_overflow(frame.style.overflow_x),
+        layout_overflow(frame.style.overflow_y),
+        parent_clip.map(layout_scroll_rect),
+    )
+    .map(document_rect)
+}
+
+pub(crate) fn layout_scroll_axis(axis: ScrollAxis) -> LayoutScrollAxis {
+    match axis {
+        ScrollAxis::Horizontal => LayoutScrollAxis::Horizontal,
+        ScrollAxis::Vertical => LayoutScrollAxis::Vertical,
     }
+}
 
-    let viewport_rect = frame
-        .rect
-        .inset(frame.style.border_width)
-        .inset(frame.style.padding);
-    let left = if frame.style.overflow_x == Overflow::Scroll {
-        viewport_rect.origin.x
-    } else {
-        parent_clip.map_or(f32::NEG_INFINITY, |clip| clip.origin.x)
-    };
-    let right = if frame.style.overflow_x == Overflow::Scroll {
-        viewport_rect.right()
-    } else {
-        parent_clip.map_or(f32::INFINITY, Rect::right)
-    };
-    let top = if frame.style.overflow_y == Overflow::Scroll {
-        viewport_rect.origin.y
-    } else {
-        parent_clip.map_or(f32::NEG_INFINITY, |clip| clip.origin.y)
-    };
-    let bottom = if frame.style.overflow_y == Overflow::Scroll {
-        viewport_rect.bottom()
-    } else {
-        parent_clip.map_or(f32::INFINITY, Rect::bottom)
-    };
+pub(crate) fn layout_scroll_point(point: Point) -> LayoutPoint<f32> {
+    LayoutPoint {
+        x: point.x,
+        y: point.y,
+    }
+}
 
-    let scroll_clip = Rect::new(left, top, right - left, bottom - top);
-    parent_clip
-        .and_then(|clip| clip.intersect(scroll_clip))
-        .or(Some(scroll_clip))
+pub(crate) fn layout_scroll_rect(rect: Rect) -> ScrollRect {
+    ScrollRect::new(
+        layout_scroll_point(rect.origin),
+        LayoutSize {
+            width: rect.size.width,
+            height: rect.size.height,
+        },
+    )
+}
+
+fn layout_scroll_insets(insets: Insets) -> LayoutInsets<f32> {
+    LayoutInsets {
+        left: insets.left,
+        right: insets.right,
+        top: insets.top,
+        bottom: insets.bottom,
+    }
+}
+
+fn layout_overflow(overflow: Overflow) -> LayoutOverflow {
+    match overflow {
+        Overflow::Visible => LayoutOverflow::Visible,
+        Overflow::Scroll => LayoutOverflow::Scroll,
+    }
+}
+
+pub(crate) fn document_rect(rect: ScrollRect) -> Rect {
+    Rect::new(
+        rect.origin.x,
+        rect.origin.y,
+        rect.size.width,
+        rect.size.height,
+    )
 }
