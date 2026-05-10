@@ -2274,6 +2274,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
         ElementSpec::new(Element::Div).class("floating-playground"),
         |ui| {
             floating_offset_specimen(ui);
+            floating_main_axis_specimen(ui);
         },
     );
 }
@@ -2329,6 +2330,81 @@ fn floating_offset_popover(ui: &mut des_ui_document::DocumentBuilder, id: &str) 
                 format!("{id}-label"),
                 ElementSpec::new(Element::Text).class("floating-offset-popover-label"),
                 "Floating",
+            );
+        },
+    );
+}
+
+fn floating_main_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+    ui.element(
+        "floating-main-axis-specimen",
+        ElementSpec::new(Element::Div)
+            .class("floating-specimen-box")
+            .class("floating-main-axis-specimen"),
+        |ui| {
+            ui.text_element(
+                "floating-main-axis-specimen-title",
+                ElementSpec::new(Element::Text).class("card-title"),
+                "Main axis",
+            );
+            ui.element(
+                "floating-main-axis-stack",
+                ElementSpec::new(Element::Div).class("floating-main-axis-stack"),
+                |ui| {
+                    ui.element(
+                        "floating-main-axis-row-vertical",
+                        ElementSpec::new(Element::Div).class("floating-main-axis-row"),
+                        |ui| {
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-main-axis-top-reference",
+                                "top",
+                            );
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-main-axis-bottom-reference",
+                                "bottom",
+                            );
+                        },
+                    );
+                    ui.element(
+                        "floating-main-axis-row-horizontal",
+                        ElementSpec::new(Element::Div).class("floating-main-axis-row"),
+                        |ui| {
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-main-axis-left-reference",
+                                "left",
+                            );
+                            floating_main_axis_reference(
+                                ui,
+                                "floating-main-axis-right-reference",
+                                "right",
+                            );
+                        },
+                    );
+                },
+            );
+            floating_offset_popover(ui, "floating-main-axis-top-popover");
+            floating_offset_popover(ui, "floating-main-axis-bottom-popover");
+            floating_offset_popover(ui, "floating-main-axis-left-popover");
+            floating_offset_popover(ui, "floating-main-axis-right-popover");
+        },
+    );
+}
+
+fn floating_main_axis_reference(ui: &mut des_ui_document::DocumentBuilder, id: &str, label: &str) {
+    ui.element(
+        id,
+        ElementSpec::new(Element::Button)
+            .class("floating-offset-reference")
+            .class("floating-main-axis-reference")
+            .interactive(),
+        |ui| {
+            ui.text_element(
+                format!("{id}-label"),
+                ElementSpec::new(Element::Text).class("floating-offset-reference-label"),
+                label,
             );
         },
     );

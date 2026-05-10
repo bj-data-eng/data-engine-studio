@@ -333,19 +333,42 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     let zero_popover = frame(&output, "floating-offset-zero-popover");
     let ten_reference = frame(&output, "floating-offset-ten-reference");
     let ten_popover = frame(&output, "floating-offset-ten-popover");
+    let main_axis_specimen = frame(&output, "floating-main-axis-specimen");
+    let top_reference = frame(&output, "floating-main-axis-top-reference");
+    let top_popover = frame(&output, "floating-main-axis-top-popover");
+    let bottom_reference = frame(&output, "floating-main-axis-bottom-reference");
+    let bottom_popover = frame(&output, "floating-main-axis-bottom-popover");
+    let left_reference = frame(&output, "floating-main-axis-left-reference");
+    let left_popover = frame(&output, "floating-main-axis-left-popover");
+    let right_reference = frame(&output, "floating-main-axis-right-reference");
+    let right_popover = frame(&output, "floating-main-axis-right-popover");
 
     assert_eq!(specimen.style.position, Position::Flow);
+    assert_eq!(main_axis_specimen.style.position, Position::Flow);
     assert_eq!(zero_reference.style.position, Position::Flow);
     assert_eq!(ten_reference.style.position, Position::Flow);
+    assert_eq!(top_reference.style.position, Position::Flow);
+    assert_eq!(bottom_reference.style.position, Position::Flow);
+    assert_eq!(left_reference.style.position, Position::Flow);
+    assert_eq!(right_reference.style.position, Position::Flow);
     assert_close(
         specimen.rect.size.width,
         (playground.rect.size.width - playground.style.padding.horizontal()) * 0.5,
     );
+    assert_close(main_axis_specimen.rect.size.width, specimen.rect.size.width);
+    assert_close(main_axis_specimen.rect.origin.x, specimen.rect.right());
+    assert_close(main_axis_specimen.rect.origin.y, specimen.rect.origin.y);
     assert!(zero_reference.rect.origin.x >= specimen.rect.origin.x);
     assert!(ten_reference.rect.origin.x > zero_reference.rect.origin.x);
     assert_close(ten_reference.rect.origin.y, zero_reference.rect.origin.y);
+    assert_close(top_popover.rect.bottom(), top_reference.rect.origin.y);
+    assert_close(bottom_popover.rect.origin.y, bottom_reference.rect.bottom());
+    assert_close(left_popover.rect.right(), left_reference.rect.origin.x);
+    assert_close(right_popover.rect.origin.x, right_reference.rect.right());
     assert!(zero_reference.interactive);
     assert!(zero_popover.interactive);
+    assert!(top_reference.interactive);
+    assert!(top_popover.interactive);
     assert_eq!(
         zero_reference.style.border_style,
         des_ui_document::BorderStyle::Dashed

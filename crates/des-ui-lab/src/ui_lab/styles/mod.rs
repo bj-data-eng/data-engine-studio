@@ -1665,12 +1665,38 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .radius(8.0),
         )
         .rule(
+            StyleSelector::class("floating-main-axis-specimen"),
+            Style::default().height(Length::Px(440.0)),
+        )
+        .rule(
             StyleSelector::class("floating-offset-row"),
             Style::default()
                 .width_fill()
                 .height(Length::Auto)
                 .flex_direction(FlexDirection::Row)
                 .gap(34.0),
+        )
+        .rule(
+            StyleSelector::class("floating-main-axis-stack"),
+            Style::default()
+                .width_fill()
+                .height(Length::Auto)
+                .padding(Insets {
+                    top: 42.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 0.0,
+                })
+                .gap(78.0),
+        )
+        .rule(
+            StyleSelector::class("floating-main-axis-row"),
+            Style::default()
+                .width_fill()
+                .height(Length::Auto)
+                .flex_direction(FlexDirection::Row)
+                .justify_content(JustifyContent::Center)
+                .gap(28.0),
         )
         .rule(
             StyleSelector::class("floating-offset-reference"),
@@ -1684,6 +1710,12 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .border_width(2.0)
                 .border_style(BorderStyle::Dashed)
                 .radius(0.0),
+        )
+        .rule(
+            StyleSelector::class("floating-main-axis-reference"),
+            Style::default()
+                .width(Length::Px(118.0))
+                .height(Length::Px(118.0)),
         )
         .rule(
             StyleSelector::class("floating-offset-reference-label"),
@@ -1723,6 +1755,30 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .floating_to("floating-offset-ten-reference")
                 .floating_placement(FloatingPlacement::Bottom)
                 .floating_offset(10.0, 0.0),
+        )
+        .rule(
+            StyleSelector::id("floating-main-axis-top-popover"),
+            Style::default()
+                .floating_to("floating-main-axis-top-reference")
+                .floating_placement(FloatingPlacement::Top),
+        )
+        .rule(
+            StyleSelector::id("floating-main-axis-bottom-popover"),
+            Style::default()
+                .floating_to("floating-main-axis-bottom-reference")
+                .floating_placement(FloatingPlacement::Bottom),
+        )
+        .rule(
+            StyleSelector::id("floating-main-axis-left-popover"),
+            Style::default()
+                .floating_to("floating-main-axis-left-reference")
+                .floating_placement(FloatingPlacement::Left),
+        )
+        .rule(
+            StyleSelector::id("floating-main-axis-right-popover"),
+            Style::default()
+                .floating_to("floating-main-axis-right-reference")
+                .floating_placement(FloatingPlacement::Right),
         )
         .rule(
             StyleSelector::class("nest-outer"),
