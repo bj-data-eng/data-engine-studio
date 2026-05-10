@@ -96,12 +96,6 @@ impl SortableDocumentConfig {
         active_item: Option<SortableItemId>,
     ) -> Option<SortableDropPreview> {
         let zone = self.drop_zone_at(output, point)?;
-        let zone_rect = output
-            .snapshot()
-            .elements_with_class(self.zone_class.as_str())
-            .into_iter()
-            .find(|element| self.zone_for_element_id(element.id().as_str()) == Some(zone))?
-            .rect();
         let nearest = output
             .snapshot()
             .elements_with_class(self.item_class.as_str())
@@ -116,9 +110,6 @@ impl SortableDocumentConfig {
                 }
                 let rect = element.rect();
                 let center_y = rect.origin.y + rect.size.height / 2.0;
-                if center_y < zone_rect.origin.y || center_y > zone_rect.bottom() {
-                    return None;
-                }
                 Some((item, center_y, (point.y - center_y).abs()))
             })
             .min_by(|left, right| left.2.total_cmp(&right.2));
@@ -155,45 +146,6 @@ impl SortableDocumentConfig {
                 format!("{}{}", self.item_id_prefix, nearest_item.0).as_str(),
             );
         }
-    }
-
-    pub fn scroll_preview_into_view(
-        &self,
-        engine: &mut DocumentEngine,
-        output: &DocumentOutput,
-        preview: SortableDropPreview,
-        visible_gap: f32,
-    ) -> bool {
-        let Some(nearest_item) = preview.nearest_item else {
-            return false;
-        };
-        let Some(zone) = output
-            .snapshot()
-            .elements_with_class(self.zone_class.as_str())
-            .into_iter()
-            .find(|element| self.zone_for_element_id(element.id().as_str()) == Some(preview.zone))
-        else {
-            return false;
-        };
-        let Some(item) = output
-            .snapshot()
-            .find(format!("{}{}", self.item_id_prefix, nearest_item.0).as_str())
-        else {
-            return false;
-        };
-
-        let zone_rect = zone.rect();
-        let item_rect = item.rect();
-        let visible_gap = visible_gap.max(0.0);
-        let delta_y = match preview.edge {
-            DropEdge::Before => (item_rect.origin.y - (zone_rect.origin.y + visible_gap)).min(0.0),
-            DropEdge::After => (item_rect.bottom() - (zone_rect.bottom() - visible_gap)).max(0.0),
-        };
-        if delta_y.abs() <= f32::EPSILON {
-            return false;
-        }
-
-        engine.scroll_element_by(zone.id().as_str(), Point::new(0.0, delta_y))
     }
 }
 

@@ -73,7 +73,7 @@ impl AutoScroller {
             let Some(element) = output.snapshot().find(chrome.element_id.as_str()) else {
                 continue;
             };
-            if !contains_with_tolerance(element.rect(), pointer, self.options.tolerance) {
+            if !element.rect().contains(pointer) {
                 continue;
             }
             if let Some(action) =
@@ -138,14 +138,6 @@ impl AutoScroller {
 
         None
     }
-}
-
-fn contains_with_tolerance(rect: Rect, point: Point, tolerance: f32) -> bool {
-    let tolerance = tolerance.max(0.0);
-    point.x >= rect.origin.x - tolerance
-        && point.x <= rect.right() + tolerance
-        && point.y >= rect.origin.y - tolerance
-        && point.y <= rect.bottom() + tolerance
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -319,42 +311,5 @@ mod tests {
 
         assert!(action.is_none());
         assert_eq!(engine.element_state("scroll-parent").unwrap().scroll_y, 0.0);
-    }
-
-    #[test]
-    fn auto_scroller_scrolls_when_drag_moves_just_past_container_edge() {
-        let mut engine = DocumentEngine::default();
-        let stylesheet = StyleSheet::new()
-            .rule(
-                StyleSelector::id("scroll-parent"),
-                Style::default()
-                    .size(120.0, 80.0)
-                    .overflow_y(Overflow::Scroll),
-            )
-            .rule(
-                StyleSelector::class("row"),
-                Style::default().size(100.0, 32.0),
-            );
-        let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
-            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
-                for index in 0..8 {
-                    ui.element(
-                        format!("row-{index}"),
-                        ElementSpec::new(Element::Div).class("row"),
-                        |_| {},
-                    );
-                }
-            });
-        });
-        let output = engine.update(&mut document, &stylesheet);
-        let pointer = Point::new(40.0, 86.0);
-
-        let action = AutoScroller::new(AutoScrollOptions::default())
-            .scroll_drag(&mut engine, &output, pointer)
-            .expect("pointer just past the bottom edge should still auto-scroll");
-
-        assert_eq!(action.element_id, ElementId::new("scroll-parent"));
-        assert!(action.delta.y > 0.0);
-        assert!(engine.element_state("scroll-parent").unwrap().scroll_y > 0.0);
     }
 }

@@ -481,16 +481,6 @@ impl UiLabState {
                     });
             }
         }
-        if let Some(preview) = self.scroll_list_drop_preview
-            && scroll_list_config().scroll_preview_into_view(
-                &mut self.document_engine,
-                output,
-                preview,
-                40.0,
-            )
-        {
-            ui.ctx().request_repaint_after(ANIMATION_FRAME_TIME);
-        }
         if let Some(drag) = &self.active_drag
             && AutoScroller::new(AutoScrollOptions {
                 threshold_x: 0.0,
