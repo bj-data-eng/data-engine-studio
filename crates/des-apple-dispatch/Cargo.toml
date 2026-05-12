@@ -1,0 +1,10 @@
+[package]
+name = "dispatch"
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+description = "Data Engine Studio's minimal audited shim for Apple's main dispatch queue."
+repository = "https://github.com/bj-data-eng/data-engine-studio"
+
+[lib]
+path = "src/lib.rs"
