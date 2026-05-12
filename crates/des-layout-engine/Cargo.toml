@@ -8,11 +8,11 @@ repository.workspace = true
 description = "Data Engine Studio layout engine"
 
 [dependencies]
-arrayvec = { version = "0.7", default-features = false }
-document-features = { version = "0.2.7", optional = true }
-grid = { version = "1.0.0", default-features = false, optional = true }
-serde = { version = "1.0", default-features = false, optional = true, features = ["serde_derive"] }
-slotmap = { version = "1.0.6", default-features = false, optional = true }
+arrayvec = { version = "=0.7.6", default-features = false }
+document-features = { version = "=0.2.12", optional = true }
+grid = { version = "=1.0.1", default-features = false, optional = true }
+serde = { version = "=1.0.228", default-features = false, optional = true, features = ["serde_derive"] }
+slotmap = { version = "=1.1.1", default-features = false, optional = true }
 
 [features]
 default = [
