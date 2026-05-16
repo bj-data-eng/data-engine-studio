@@ -317,6 +317,60 @@ fn compiled_template_compile_options_reject_excessive_nesting() {
 }
 
 #[test]
+fn compiled_template_source_limit_handles_utf8_boundary() {
+    let err = CompiledTemplate::compile_with_options(
+        "éé",
+        &CompileOptions::new().with_limits(TemplateCompileLimits {
+            max_source_bytes: 1,
+            ..TemplateCompileLimits::default()
+        }),
+    )
+    .expect_err("source limit should return an error instead of panicking");
+
+    assert!(err.to_string().contains("compile source byte limit"));
+}
+
+#[test]
+fn compiled_template_compile_options_limit_inline_conditional_depth() {
+    let source = "<text>{if flag}{if flag}nested{/if}{/if}</text>";
+
+    let err = CompiledTemplate::compile_with_options(
+        source,
+        &CompileOptions::new().with_limits(TemplateCompileLimits {
+            max_depth: 1,
+            ..TemplateCompileLimits::default()
+        }),
+    )
+    .expect_err("nested inline conditional should exceed configured depth");
+
+    assert!(err.to_string().contains("compile depth limit"));
+}
+
+#[test]
+fn compiled_template_loop_limit_is_checked_before_rendering_items() {
+    let template = CompiledTemplate::compile("{for row in rows}<text>{row.missing}</text>{/for}")
+        .expect("template should compile");
+
+    let mut row = BTreeMap::new();
+    row.insert("payload".to_owned(), Value::string("large".repeat(1_000)));
+
+    let mut context = BTreeMap::new();
+    context.insert("rows".to_owned(), Value::list([Value::object(row)]));
+
+    let err = template
+        .render_with_options(
+            &context,
+            &RenderOptions::new().with_limits(TemplateLimits {
+                max_loop_iterations: 0,
+                ..TemplateLimits::default()
+            }),
+        )
+        .expect_err("loop limit should fail before rendering row body");
+
+    assert!(err.to_string().contains("loop iteration limit"));
+}
+
+#[test]
 fn template_file_hot_reload_detects_same_mtime_content_changes() {
     let path = std::env::temp_dir().join(format!(
         "des-template-hot-reload-fingerprint-{}.xml",
@@ -502,4 +556,27 @@ fn compiled_template_reports_absolute_line_and_column_for_sliced_errors() {
         message.contains("3:13"),
         "expected absolute line/column in error, got {message}"
     );
+}
+
+#[test]
+fn compiled_template_reports_trimmed_expression_line_and_column() {
+    let err = CompiledTemplate::compile("<text>{   row..customer}</text>")
+        .expect_err("malformed path should fail");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("1:14"),
+        "expected trimmed expression column in error, got {message}"
+    );
+}
+
+#[test]
+fn compiled_template_renders_large_integer_like_numbers_without_saturating() {
+    let template = CompiledTemplate::compile("<text>{n}</text>").expect("template should compile");
+    let mut context = BTreeMap::new();
+    context.insert("n".to_owned(), Value::number(1e20));
+
+    let rendered = template.render(&context).expect("template should render");
+
+    assert_eq!(rendered[0].text.as_deref(), Some("100000000000000000000"));
 }

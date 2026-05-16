@@ -120,7 +120,11 @@ impl Value {
             Self::Null => Ok(String::new()),
             Self::Bool(value) => Ok(value.to_string()),
             Self::Number(value) => {
-                if value.fract() == 0.0 {
+                if value.is_finite()
+                    && value.fract() == 0.0
+                    && *value >= i64::MIN as f64
+                    && *value <= i64::MAX as f64
+                {
                     Ok((*value as i64).to_string())
                 } else {
                     Ok(value.to_string())
@@ -260,7 +264,7 @@ impl Default for TemplateCompileLimits {
         Self {
             max_source_bytes: 1_000_000,
             max_nodes: 100_000,
-            max_depth: 1_024,
+            max_depth: 256,
             max_text_parts: 100_000,
         }
     }
@@ -574,7 +578,9 @@ struct PathExpr {
 
 impl PathExpr {
     fn parse(raw: &str, base_offset: usize, source: &str) -> TemplateResult<Self> {
-        let raw = raw.trim();
+        let trimmed_start = raw.trim_start();
+        let base_offset = base_offset + raw.len().saturating_sub(trimmed_start.len());
+        let raw = trimmed_start.trim_end();
         if raw.is_empty() {
             return Err(parse_error_at(source, base_offset, "empty expression"));
         }
@@ -758,6 +764,17 @@ impl RenderContext {
         }
         Ok(())
     }
+
+    fn check_loop_capacity(&self, additional_iterations: usize) -> TemplateResult<()> {
+        let requested = self.loop_iterations.saturating_add(additional_iterations);
+        if requested > self.limits.max_loop_iterations {
+            return Err(TemplateError::Render(format!(
+                "loop iteration limit exceeded: {} > {}",
+                requested, self.limits.max_loop_iterations
+            )));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -835,7 +852,10 @@ fn render_nodes(
                 body,
             } => {
                 let values = match scope.resolve(source)? {
-                    Value::List(values) => values.clone(),
+                    Value::List(values) => {
+                        render_context.check_loop_capacity(values.len())?;
+                        values.clone()
+                    }
                     _ => {
                         return Err(TemplateError::Render(format!(
                             "`{}` is not iterable",
@@ -889,7 +909,10 @@ fn render_nodes_into_sink<S: TemplateSink>(
                 body,
             } => {
                 let values = match scope.resolve(source)? {
-                    Value::List(values) => values.clone(),
+                    Value::List(values) => {
+                        render_context.check_loop_capacity(values.len())?;
+                        values.clone()
+                    }
                     _ => {
                         return Err(TemplateError::Render(format!(
                             "`{}` is not iterable",
@@ -1189,6 +1212,7 @@ impl<'a> Parser<'a> {
                         self.source,
                         self.compile_context.limits,
                         &mut self.compile_context.text_parts,
+                        0,
                     )?)];
                     return Ok(ElementNode {
                         tag,
@@ -1230,6 +1254,7 @@ impl<'a> Parser<'a> {
                 self.source,
                 self.compile_context.limits,
                 &mut self.compile_context.text_parts,
+                0,
             )?,
         })
     }
@@ -1293,6 +1318,7 @@ impl<'a> Parser<'a> {
             self.source,
             self.compile_context.limits,
             &mut self.compile_context.text_parts,
+            0,
         )
     }
 
@@ -1373,6 +1399,7 @@ fn parse_text_parts(
     source: &str,
     limits: TemplateCompileLimits,
     text_parts: &mut usize,
+    depth: usize,
 ) -> TemplateResult<Vec<TextPart>> {
     let mut parts = Vec::new();
     let mut cursor = 0;
@@ -1397,6 +1424,13 @@ fn parse_text_parts(
         let close = open + relative_close;
         let directive = raw[open + 1..close].trim();
         if let Some(condition) = directive.strip_prefix("if ") {
+            if depth + 1 > limits.max_depth {
+                return Err(parse_error_at(
+                    source,
+                    base_offset + open,
+                    "compile depth limit exceeded",
+                ));
+            }
             let (relative_else, body_end) =
                 find_inline_if_bounds(raw, close + 1, source, base_offset + open)?;
             let body_start = close + 1;
@@ -1419,6 +1453,7 @@ fn parse_text_parts(
                     source,
                     limits,
                     text_parts,
+                    depth + 1,
                 )?,
                 else_parts: parse_text_parts(
                     else_raw,
@@ -1426,6 +1461,7 @@ fn parse_text_parts(
                     source,
                     limits,
                     text_parts,
+                    depth + 1,
                 )?,
             });
             cursor = body_end + "{/if}".len();
@@ -1653,7 +1689,10 @@ fn parse_error_at(source: &str, offset: usize, message: &str) -> TemplateError {
 fn line_column(source: &str, offset: usize) -> (usize, usize) {
     let mut line = 1;
     let mut column = 1;
-    for ch in source[..offset.min(source.len())].chars() {
+    for (index, ch) in source.char_indices() {
+        if index >= offset {
+            break;
+        }
         if ch == '\n' {
             line += 1;
             column = 1;
