@@ -1,6 +1,6 @@
 use des_template::{
-    CompiledTemplate, RenderOptions, RenderedNode, TemplateFile, TemplateLimits, TemplateSet,
-    TemplateSink, Value,
+    CompileOptions, CompiledTemplate, RenderOptions, RenderedNode, TemplateCompileLimits,
+    TemplateFile, TemplateLimits, TemplateSet, TemplateSink, Value,
 };
 use std::collections::BTreeMap;
 use std::fs;
@@ -254,6 +254,69 @@ fn compiled_template_can_render_into_a_sink() {
 }
 
 #[test]
+fn compiled_template_render_into_stops_when_sink_errors() {
+    #[derive(Default)]
+    struct StopSink;
+
+    impl TemplateSink for StopSink {
+        type Output = ();
+
+        fn element(&mut self, _node: RenderedNode) -> des_template::TemplateResult<()> {
+            Err(des_template::TemplateError::Render(
+                "sink stopped".to_owned(),
+            ))
+        }
+
+        fn finish(self) -> Self::Output {}
+    }
+
+    let template = CompiledTemplate::compile("<text>First</text><text>{missing}</text>")
+        .expect("template should compile");
+
+    let err = template
+        .render_into(&BTreeMap::new(), StopSink)
+        .expect_err("sink error should stop before second node renders");
+
+    assert!(err.to_string().contains("sink stopped"));
+}
+
+#[test]
+fn compiled_template_rejects_oversized_attribute_before_element_is_emitted() {
+    let template = CompiledTemplate::compile("<panel class=\"{class_name}\"/>")
+        .expect("template should compile");
+    let mut context = BTreeMap::new();
+    context.insert("class_name".to_owned(), Value::string("x".repeat(16)));
+
+    let err = template
+        .render_with_options(
+            &context,
+            &RenderOptions::new().with_limits(TemplateLimits {
+                max_attribute_bytes: 4,
+                ..TemplateLimits::default()
+            }),
+        )
+        .expect_err("attribute should exceed configured limit");
+
+    assert!(err.to_string().contains("attribute byte limit"));
+}
+
+#[test]
+fn compiled_template_compile_options_reject_excessive_nesting() {
+    let source = "<a><b><c/></b></a>";
+
+    let err = CompiledTemplate::compile_with_options(
+        source,
+        &CompileOptions::new().with_limits(TemplateCompileLimits {
+            max_depth: 1,
+            ..TemplateCompileLimits::default()
+        }),
+    )
+    .expect_err("nested element compile should exceed configured depth");
+
+    assert!(err.to_string().contains("compile depth limit"));
+}
+
+#[test]
 fn template_file_hot_reload_detects_same_mtime_content_changes() {
     let path = std::env::temp_dir().join(format!(
         "des-template-hot-reload-fingerprint-{}.xml",
@@ -342,4 +405,101 @@ fn template_set_manages_named_compiled_and_file_backed_templates() {
     );
 
     let _ = fs::remove_file(path);
+}
+
+#[test]
+fn template_set_reload_changed_is_atomic_when_a_reload_fails() {
+    let valid_path = std::env::temp_dir().join(format!(
+        "des-template-set-valid-{}.xml",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after epoch")
+            .as_nanos()
+    ));
+    let invalid_path = std::env::temp_dir().join(format!(
+        "des-template-set-invalid-{}.xml",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after epoch")
+            .as_nanos()
+    ));
+
+    fs::write(&valid_path, "<text>Before</text>").expect("valid fixture should be writable");
+    fs::write(&invalid_path, "<text>Still valid</text>")
+        .expect("invalid fixture should start valid");
+
+    let mut set = TemplateSet::new();
+    set.add_file("valid", &valid_path)
+        .expect("valid file should load");
+    set.add_file("invalid", &invalid_path)
+        .expect("invalid file should initially load");
+
+    fs::write(&valid_path, "<text>After</text>").expect("valid fixture should update");
+    fs::write(&invalid_path, "<text>Broken").expect("invalid fixture should update");
+
+    let err = set
+        .reload_changed()
+        .expect_err("one broken template should fail the reload batch");
+    assert!(err.to_string().contains("missing closing tag"));
+
+    assert_eq!(
+        set.render("valid", &BTreeMap::new())
+            .expect("previous valid template should remain active")[0]
+            .text
+            .as_deref(),
+        Some("Before")
+    );
+
+    let _ = fs::remove_file(valid_path);
+    let _ = fs::remove_file(invalid_path);
+}
+
+#[test]
+fn compiled_template_rejects_malformed_paths() {
+    for source in [
+        "<text>{.title}</text>",
+        "<text>{row..customer}</text>",
+        "<text>{row.}</text>",
+        "<text>{items.[0]}</text>",
+    ] {
+        let err = CompiledTemplate::compile(source).expect_err("path should be rejected");
+        assert!(
+            err.to_string().contains("path"),
+            "unexpected error for {source}: {err}"
+        );
+    }
+}
+
+#[test]
+fn compiled_template_renders_nested_inline_conditionals() {
+    let template = CompiledTemplate::compile(
+        r#"<text>{if enabled}{if selected}selected{else}enabled{/if}{else}disabled{/if}</text>"#,
+    )
+    .expect("template should compile");
+
+    let mut context = BTreeMap::new();
+    context.insert("enabled".to_owned(), Value::bool(true));
+    context.insert("selected".to_owned(), Value::bool(false));
+
+    let rendered = template.render(&context).expect("template should render");
+
+    assert_eq!(rendered[0].text.as_deref(), Some("enabled"));
+}
+
+#[test]
+fn compiled_template_reports_absolute_line_and_column_for_sliced_errors() {
+    let err = CompiledTemplate::compile(
+        r#"
+<panel>
+  <text>{row..customer}</text>
+</panel>
+"#,
+    )
+    .expect_err("malformed nested path should fail");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("3:13"),
+        "expected absolute line/column in error, got {message}"
+    );
 }
