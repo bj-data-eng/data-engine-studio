@@ -7,8 +7,10 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -19,7 +21,12 @@ pub type TemplateResult<T> = Result<T, TemplateError>;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TemplateError {
     /// The template source is syntactically invalid.
-    Parse { offset: usize, message: String },
+    Parse {
+        offset: usize,
+        line: usize,
+        column: usize,
+        message: String,
+    },
     /// Rendering referenced data that does not exist or has the wrong shape.
     Render(String),
     /// The template file could not be read or inspected.
@@ -29,8 +36,16 @@ pub enum TemplateError {
 impl fmt::Display for TemplateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Parse { offset, message } => {
-                write!(f, "template parse error at {offset}: {message}")
+            Self::Parse {
+                offset,
+                line,
+                column,
+                message,
+            } => {
+                write!(
+                    f,
+                    "template parse error at {line}:{column} (offset {offset}): {message}"
+                )
             }
             Self::Render(message) => write!(f, "template render error: {message}"),
             Self::Io(message) => write!(f, "template io error: {message}"),
@@ -144,9 +159,111 @@ impl CompiledTemplate {
 
     /// Renders the compiled template against an explicit context.
     pub fn render(&self, context: &TemplateContext) -> TemplateResult<Vec<RenderedNode>> {
-        let mut scope = Scope::new(context);
-        render_nodes(&self.ast.nodes, &mut scope)
+        self.render_with_options(context, &RenderOptions::default())
     }
+
+    /// Renders the compiled template with explicit render options.
+    pub fn render_with_options(
+        &self,
+        context: &TemplateContext,
+        options: &RenderOptions,
+    ) -> TemplateResult<Vec<RenderedNode>> {
+        let mut scope = Scope::new(context);
+        let mut render_context = RenderContext::new(options.limits);
+        render_nodes(&self.ast.nodes, &mut scope, &mut render_context, 0)
+    }
+
+    /// Renders the compiled template into a caller-provided sink.
+    pub fn render_into<S: TemplateSink>(
+        &self,
+        context: &TemplateContext,
+        mut sink: S,
+    ) -> TemplateResult<S::Output> {
+        for node in self.render(context)? {
+            sink.element(node)?;
+        }
+        Ok(sink.finish())
+    }
+
+    /// Renders the compiled template into a sink with explicit options.
+    pub fn render_into_with_options<S: TemplateSink>(
+        &self,
+        context: &TemplateContext,
+        options: &RenderOptions,
+        mut sink: S,
+    ) -> TemplateResult<S::Output> {
+        for node in self.render_with_options(context, options)? {
+            sink.element(node)?;
+        }
+        Ok(sink.finish())
+    }
+}
+
+/// Options that control template rendering.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RenderOptions {
+    /// Resource limits enforced during rendering.
+    pub limits: TemplateLimits,
+}
+
+impl RenderOptions {
+    /// Creates render options with default limits.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns options with updated limits.
+    pub fn with_limits(mut self, limits: TemplateLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+}
+
+impl Default for RenderOptions {
+    fn default() -> Self {
+        Self {
+            limits: TemplateLimits::default(),
+        }
+    }
+}
+
+/// Resource limits that keep template rendering bounded.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TemplateLimits {
+    /// Maximum number of rendered element nodes.
+    pub max_nodes: usize,
+    /// Maximum number of loop iterations across a render.
+    pub max_loop_iterations: usize,
+    /// Maximum nested render depth.
+    pub max_depth: usize,
+    /// Maximum text bytes produced for a single element text value.
+    pub max_text_bytes: usize,
+    /// Maximum bytes produced for a single attribute value.
+    pub max_attribute_bytes: usize,
+}
+
+impl Default for TemplateLimits {
+    fn default() -> Self {
+        Self {
+            max_nodes: 100_000,
+            max_loop_iterations: 100_000,
+            max_depth: 1_024,
+            max_text_bytes: 1_000_000,
+            max_attribute_bytes: 64_000,
+        }
+    }
+}
+
+/// Consumer for rendered template nodes.
+pub trait TemplateSink {
+    /// Final sink output.
+    type Output;
+
+    /// Receives one top-level rendered node.
+    fn element(&mut self, node: RenderedNode) -> TemplateResult<()>;
+
+    /// Completes the sink and returns its output.
+    fn finish(self) -> Self::Output;
 }
 
 /// A rendered element tree.
@@ -176,6 +293,7 @@ pub struct ReloadStatus {
 pub struct TemplateFile {
     path: PathBuf,
     modified: Option<SystemTime>,
+    fingerprint: TemplateFingerprint,
     compiled: CompiledTemplate,
 }
 
@@ -185,9 +303,11 @@ impl TemplateFile {
         let path = path.as_ref().to_path_buf();
         let source = fs::read_to_string(&path)?;
         let metadata = fs::metadata(&path)?;
+        let fingerprint = TemplateFingerprint::new(&source);
         Ok(Self {
             path,
             modified: metadata.modified().ok(),
+            fingerprint,
             compiled: CompiledTemplate::compile(&source)?,
         })
     }
@@ -199,16 +319,123 @@ impl TemplateFile {
 
     /// Re-reads and recompiles the template if the file modification time changed.
     pub fn reload_if_changed(&mut self) -> TemplateResult<ReloadStatus> {
+        let source = fs::read_to_string(&self.path)?;
         let metadata = fs::metadata(&self.path)?;
         let modified = metadata.modified().ok();
-        if modified == self.modified {
+        let fingerprint = TemplateFingerprint::new(&source);
+        if modified == self.modified && fingerprint == self.fingerprint {
             return Ok(ReloadStatus { changed: false });
         }
 
-        let source = fs::read_to_string(&self.path)?;
         self.compiled = CompiledTemplate::compile(&source)?;
         self.modified = modified;
+        self.fingerprint = fingerprint;
         Ok(ReloadStatus { changed: true })
+    }
+}
+
+/// Collection of named templates for compiled and hot-reloaded modes.
+#[derive(Clone, Debug, Default)]
+pub struct TemplateSet {
+    templates: BTreeMap<String, TemplateEntry>,
+}
+
+impl TemplateSet {
+    /// Creates an empty template set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds or replaces an inline compiled template.
+    pub fn add_template(&mut self, name: impl Into<String>, source: &str) -> TemplateResult<()> {
+        self.templates.insert(
+            name.into(),
+            TemplateEntry::Inline(CompiledTemplate::compile(source)?),
+        );
+        Ok(())
+    }
+
+    /// Adds or replaces a file-backed template.
+    pub fn add_file(
+        &mut self,
+        name: impl Into<String>,
+        path: impl AsRef<Path>,
+    ) -> TemplateResult<()> {
+        self.templates
+            .insert(name.into(), TemplateEntry::File(TemplateFile::load(path)?));
+        Ok(())
+    }
+
+    /// Returns a named compiled template.
+    pub fn get(&self, name: &str) -> TemplateResult<&CompiledTemplate> {
+        self.templates
+            .get(name)
+            .map(TemplateEntry::compiled)
+            .ok_or_else(|| TemplateError::Render(format!("missing template `{name}`")))
+    }
+
+    /// Renders a named template.
+    pub fn render(
+        &self,
+        name: &str,
+        context: &TemplateContext,
+    ) -> TemplateResult<Vec<RenderedNode>> {
+        self.get(name)?.render(context)
+    }
+
+    /// Renders a named template with explicit options.
+    pub fn render_with_options(
+        &self,
+        name: &str,
+        context: &TemplateContext,
+        options: &RenderOptions,
+    ) -> TemplateResult<Vec<RenderedNode>> {
+        self.get(name)?.render_with_options(context, options)
+    }
+
+    /// Re-reads file-backed templates and returns names that changed.
+    pub fn reload_changed(&mut self) -> TemplateResult<Vec<String>> {
+        let mut changed = Vec::new();
+        for (name, entry) in &mut self.templates {
+            if let TemplateEntry::File(file) = entry
+                && file.reload_if_changed()?.changed
+            {
+                changed.push(name.clone());
+            }
+        }
+        Ok(changed)
+    }
+}
+
+#[derive(Clone, Debug)]
+enum TemplateEntry {
+    Inline(CompiledTemplate),
+    File(TemplateFile),
+}
+
+impl TemplateEntry {
+    fn compiled(&self) -> &CompiledTemplate {
+        match self {
+            Self::Inline(template) => template,
+            Self::File(file) => file.compiled(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TemplateFingerprint {
+    len: usize,
+    hash: u64,
+}
+
+impl TemplateFingerprint {
+    fn new(source: &str) -> Self {
+        let mut hasher = DefaultHasher::new();
+        source.hash(&mut hasher);
+        Self {
+            len: source.len(),
+            hash: hasher.finish(),
+        }
     }
 }
 
@@ -245,29 +472,68 @@ struct AttributeNode {
 enum TextPart {
     Literal(String),
     Expr(PathExpr),
+    If {
+        condition: PathExpr,
+        then_parts: Vec<TextPart>,
+        else_parts: Vec<TextPart>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct PathExpr {
-    segments: Vec<String>,
+    root: PathRoot,
+    segments: Vec<PathSegment>,
 }
 
 impl PathExpr {
-    fn parse(raw: &str) -> TemplateResult<Self> {
+    fn parse(raw: &str, base_offset: usize) -> TemplateResult<Self> {
         let raw = raw.trim();
         if raw.is_empty() {
-            return Err(TemplateError::Parse {
-                offset: 0,
-                message: "empty expression".to_owned(),
-            });
+            return Err(parse_error_at("", base_offset, "empty expression"));
         }
-        let segments = raw
-            .split('.')
-            .map(str::trim)
-            .map(validate_identifier)
-            .collect::<TemplateResult<Vec<_>>>()?;
-        Ok(Self { segments })
+        let (root, body) = if let Some(rest) = raw.strip_prefix("@root.") {
+            (PathRoot::Document, rest)
+        } else if raw == "@root" {
+            (PathRoot::Document, "")
+        } else {
+            (PathRoot::Scope, raw)
+        };
+        let segments = parse_path_segments(body, base_offset)?;
+        if segments.is_empty() {
+            return Err(parse_error_at("", base_offset, "empty expression"));
+        }
+        Ok(Self { root, segments })
     }
+
+    fn display(&self) -> String {
+        let mut rendered = match self.root {
+            PathRoot::Scope => String::new(),
+            PathRoot::Document => "@root".to_owned(),
+        };
+        for segment in &self.segments {
+            match segment {
+                PathSegment::Field(field) if rendered.is_empty() => rendered.push_str(field),
+                PathSegment::Field(field) => {
+                    rendered.push('.');
+                    rendered.push_str(field);
+                }
+                PathSegment::Index(index) => rendered.push_str(&format!("[{index}]")),
+            }
+        }
+        rendered
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PathRoot {
+    Scope,
+    Document,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum PathSegment {
+    Field(String),
+    Index(usize),
 }
 
 struct Scope<'a> {
@@ -296,22 +562,57 @@ impl<'a> Scope<'a> {
             return Err(TemplateError::Render("empty expression".to_owned()));
         };
 
-        let mut value = self
-            .locals
-            .iter()
-            .rev()
-            .find_map(|(name, value)| (name == first).then_some(value))
-            .or_else(|| self.root.get(first))
-            .ok_or_else(|| TemplateError::Render(format!("missing value `{first}`")))?;
+        let PathSegment::Field(first) = first else {
+            return Err(TemplateError::Render(format!(
+                "`{}` cannot start with an index",
+                path.display()
+            )));
+        };
+
+        let mut value = match path.root {
+            PathRoot::Scope => self
+                .locals
+                .iter()
+                .rev()
+                .find_map(|(name, value)| (name == first).then_some(value))
+                .or_else(|| self.root.get(first)),
+            PathRoot::Document => self.root.get(first),
+        }
+        .ok_or_else(|| TemplateError::Render(format!("missing value `{first}`")))?;
 
         for segment in path.segments.iter().skip(1) {
-            value = match value {
-                Value::Object(object) => object.get(segment).ok_or_else(|| {
-                    TemplateError::Render(format!("missing field `{segment}` in `{first}`"))
-                })?,
-                _ => {
+            value = match (value, segment) {
+                (Value::Object(object), PathSegment::Field(field)) => {
+                    object.get(field).ok_or_else(|| {
+                        TemplateError::Render(format!("missing field `{field}` in `{first}`"))
+                    })?
+                }
+                (Value::List(list), PathSegment::Index(index)) => {
+                    list.get(*index).ok_or_else(|| {
+                        TemplateError::Render(format!(
+                            "index `{index}` is out of bounds in `{}`",
+                            path.display()
+                        ))
+                    })?
+                }
+                (Value::List(_), PathSegment::Field(field)) => {
                     return Err(TemplateError::Render(format!(
-                        "cannot access field `{segment}` on non-object `{first}`"
+                        "cannot access field `{field}` on list `{first}`"
+                    )));
+                }
+                (Value::Object(_), PathSegment::Index(index)) => {
+                    return Err(TemplateError::Render(format!(
+                        "cannot access index `{index}` on object `{first}`"
+                    )));
+                }
+                (_, PathSegment::Field(field)) => {
+                    return Err(TemplateError::Render(format!(
+                        "cannot access field `{field}` on scalar `{first}`"
+                    )));
+                }
+                (_, PathSegment::Index(index)) => {
+                    return Err(TemplateError::Render(format!(
+                        "cannot access index `{index}` on scalar `{first}`"
                     )));
                 }
             };
@@ -320,11 +621,89 @@ impl<'a> Scope<'a> {
     }
 }
 
-fn render_nodes(nodes: &[AstNode], scope: &mut Scope<'_>) -> TemplateResult<Vec<RenderedNode>> {
+struct RenderContext {
+    limits: TemplateLimits,
+    nodes: usize,
+    loop_iterations: usize,
+}
+
+impl RenderContext {
+    fn new(limits: TemplateLimits) -> Self {
+        Self {
+            limits,
+            nodes: 0,
+            loop_iterations: 0,
+        }
+    }
+
+    fn enter_depth(&self, depth: usize) -> TemplateResult<()> {
+        if depth > self.limits.max_depth {
+            return Err(TemplateError::Render(format!(
+                "template depth limit exceeded: {} > {}",
+                depth, self.limits.max_depth
+            )));
+        }
+        Ok(())
+    }
+
+    fn track_node(&mut self) -> TemplateResult<()> {
+        self.nodes += 1;
+        if self.nodes > self.limits.max_nodes {
+            return Err(TemplateError::Render(format!(
+                "node limit exceeded: {} > {}",
+                self.nodes, self.limits.max_nodes
+            )));
+        }
+        Ok(())
+    }
+
+    fn track_loop_iteration(&mut self) -> TemplateResult<()> {
+        self.loop_iterations += 1;
+        if self.loop_iterations > self.limits.max_loop_iterations {
+            return Err(TemplateError::Render(format!(
+                "loop iteration limit exceeded: {} > {}",
+                self.loop_iterations, self.limits.max_loop_iterations
+            )));
+        }
+        Ok(())
+    }
+
+    fn check_text(&self, value: &str) -> TemplateResult<()> {
+        if value.len() > self.limits.max_text_bytes {
+            return Err(TemplateError::Render(format!(
+                "text byte limit exceeded: {} > {}",
+                value.len(),
+                self.limits.max_text_bytes
+            )));
+        }
+        Ok(())
+    }
+
+    fn check_attribute(&self, value: &str) -> TemplateResult<()> {
+        if value.len() > self.limits.max_attribute_bytes {
+            return Err(TemplateError::Render(format!(
+                "attribute byte limit exceeded: {} > {}",
+                value.len(),
+                self.limits.max_attribute_bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn render_nodes(
+    nodes: &[AstNode],
+    scope: &mut Scope<'_>,
+    render_context: &mut RenderContext,
+    depth: usize,
+) -> TemplateResult<Vec<RenderedNode>> {
+    render_context.enter_depth(depth)?;
     let mut rendered = Vec::new();
     for node in nodes {
         match node {
-            AstNode::Element(element) => rendered.push(render_element(element, scope)?),
+            AstNode::Element(element) => {
+                rendered.push(render_element(element, scope, render_context, depth)?)
+            }
             AstNode::Text(_) => {}
             AstNode::For {
                 binding,
@@ -336,13 +715,17 @@ fn render_nodes(nodes: &[AstNode], scope: &mut Scope<'_>) -> TemplateResult<Vec<
                     _ => {
                         return Err(TemplateError::Render(format!(
                             "`{}` is not iterable",
-                            source.segments.join(".")
+                            source.display()
                         )));
                     }
                 };
-                for value in values {
+                let len = values.len();
+                for (index, value) in values.into_iter().enumerate() {
+                    render_context.track_loop_iteration()?;
                     scope.push(binding.clone(), value);
-                    rendered.extend(render_nodes(body, scope)?);
+                    scope.push("loop".to_owned(), loop_value(index, len));
+                    rendered.extend(render_nodes(body, scope, render_context, depth)?);
+                    scope.pop();
                     scope.pop();
                 }
             }
@@ -352,9 +735,9 @@ fn render_nodes(nodes: &[AstNode], scope: &mut Scope<'_>) -> TemplateResult<Vec<
                 else_body,
             } => {
                 if scope.resolve(condition)?.truthy() {
-                    rendered.extend(render_nodes(then_body, scope)?);
+                    rendered.extend(render_nodes(then_body, scope, render_context, depth)?);
                 } else {
-                    rendered.extend(render_nodes(else_body, scope)?);
+                    rendered.extend(render_nodes(else_body, scope, render_context, depth)?);
                 }
             }
         }
@@ -362,12 +745,19 @@ fn render_nodes(nodes: &[AstNode], scope: &mut Scope<'_>) -> TemplateResult<Vec<
     Ok(rendered)
 }
 
-fn render_element(element: &ElementNode, scope: &mut Scope<'_>) -> TemplateResult<RenderedNode> {
+fn render_element(
+    element: &ElementNode,
+    scope: &mut Scope<'_>,
+    render_context: &mut RenderContext,
+    depth: usize,
+) -> TemplateResult<RenderedNode> {
+    render_context.track_node()?;
     let mut attributes = BTreeMap::new();
     let mut classes = Vec::new();
 
     for attribute in &element.attributes {
         let value = render_text_parts(&attribute.value, scope)?;
+        render_context.check_attribute(&value)?;
         if attribute.name == "class" {
             classes.extend(value.split_whitespace().map(str::to_owned));
         } else {
@@ -381,13 +771,19 @@ fn render_element(element: &ElementNode, scope: &mut Scope<'_>) -> TemplateResul
         match child {
             AstNode::Text(parts) => text.push_str(&render_text_parts(parts, scope)?),
             AstNode::Element(_) | AstNode::For { .. } | AstNode::If { .. } => {
-                children.extend(render_nodes(std::slice::from_ref(child), scope)?);
+                children.extend(render_nodes(
+                    std::slice::from_ref(child),
+                    scope,
+                    render_context,
+                    depth + 1,
+                )?);
             }
         }
     }
 
     let text = if children.is_empty() {
         let trimmed = text.trim();
+        render_context.check_text(trimmed)?;
         (!trimmed.is_empty()).then(|| trimmed.to_owned())
     } else {
         None
@@ -408,9 +804,30 @@ fn render_text_parts(parts: &[TextPart], scope: &Scope<'_>) -> TemplateResult<St
         match part {
             TextPart::Literal(value) => rendered.push_str(value),
             TextPart::Expr(path) => rendered.push_str(&scope.resolve(path)?.render_scalar()?),
+            TextPart::If {
+                condition,
+                then_parts,
+                else_parts,
+            } => {
+                if scope.resolve(condition)?.truthy() {
+                    rendered.push_str(&render_text_parts(then_parts, scope)?);
+                } else {
+                    rendered.push_str(&render_text_parts(else_parts, scope)?);
+                }
+            }
         }
     }
     Ok(rendered)
+}
+
+fn loop_value(index: usize, len: usize) -> Value {
+    let mut value = BTreeMap::new();
+    value.insert("index0".to_owned(), Value::number(index as f64));
+    value.insert("index".to_owned(), Value::number((index + 1) as f64));
+    value.insert("len".to_owned(), Value::number(len as f64));
+    value.insert("first".to_owned(), Value::bool(index == 0));
+    value.insert("last".to_owned(), Value::bool(index + 1 == len));
+    Value::object(value)
 }
 
 struct Parser<'a> {
@@ -466,7 +883,7 @@ impl<'a> Parser<'a> {
                 let text = self.parse_text()?;
                 if text.iter().any(|part| match part {
                     TextPart::Literal(value) => !value.trim().is_empty(),
-                    TextPart::Expr(_) => true,
+                    TextPart::Expr(_) | TextPart::If { .. } => true,
                 }) {
                     nodes.push(AstNode::Text(text));
                 }
@@ -530,7 +947,7 @@ impl<'a> Parser<'a> {
             return self.error("expected `{for item in items}`");
         }
         let binding = validate_identifier(parts[0])?;
-        let source = PathExpr::parse(parts[2])?;
+        let source = PathExpr::parse(parts[2], self.offset.saturating_sub(directive.len() + 1))?;
         let body = self.parse_nodes(None)?;
         self.expect("{/for}")?;
         Ok(AstNode::For {
@@ -542,7 +959,8 @@ impl<'a> Parser<'a> {
 
     fn parse_if(&mut self) -> TemplateResult<AstNode> {
         self.expect("{if ")?;
-        let condition = PathExpr::parse(self.read_until("}")?)?;
+        let start = self.offset;
+        let condition = PathExpr::parse(self.read_until("}")?, start)?;
         let then_body = self.parse_nodes(None)?;
         let else_body = if self.starts_with("{else}") {
             self.expect("{else}")?;
@@ -640,10 +1058,7 @@ impl<'a> Parser<'a> {
     }
 
     fn error<T>(&self, message: &str) -> TemplateResult<T> {
-        Err(TemplateError::Parse {
-            offset: self.offset,
-            message: message.to_owned(),
-        })
+        Err(parse_error_at(self.source, self.offset, message))
     }
 }
 
@@ -660,37 +1075,154 @@ fn parse_text_parts(raw: &str, base_offset: usize) -> TemplateResult<Vec<TextPar
             parts.push(TextPart::Literal(raw[cursor..open].to_owned()));
         }
         let Some(relative_close) = raw[open..].find('}') else {
-            return Err(TemplateError::Parse {
-                offset: base_offset + open,
-                message: "unterminated interpolation".to_owned(),
-            });
+            return Err(parse_error_at(
+                raw,
+                base_offset + open,
+                "unterminated interpolation",
+            ));
         };
         let close = open + relative_close;
-        parts.push(TextPart::Expr(PathExpr::parse(&raw[open + 1..close])?));
-        cursor = close + 1;
+        let directive = raw[open + 1..close].trim();
+        if let Some(condition) = directive.strip_prefix("if ") {
+            let Some(relative_end) = raw[close + 1..].find("{/if}") else {
+                return Err(parse_error_at(raw, base_offset + open, "missing `{/if}`"));
+            };
+            let body_start = close + 1;
+            let body_end = body_start + relative_end;
+            let body = &raw[body_start..body_end];
+            let (then_raw, else_raw) = if let Some(relative_else) = body.find("{else}") {
+                (
+                    &body[..relative_else],
+                    &body[relative_else + "{else}".len()..],
+                )
+            } else {
+                (body, "")
+            };
+            parts.push(TextPart::If {
+                condition: PathExpr::parse(condition, base_offset + open + 1)?,
+                then_parts: parse_text_parts(then_raw, base_offset + body_start)?,
+                else_parts: parse_text_parts(
+                    else_raw,
+                    base_offset + body_start + body.len().saturating_sub(else_raw.len()),
+                )?,
+            });
+            cursor = body_end + "{/if}".len();
+        } else {
+            parts.push(TextPart::Expr(PathExpr::parse(
+                &raw[open + 1..close],
+                base_offset + open + 1,
+            )?));
+            cursor = close + 1;
+        }
     }
     Ok(parts)
 }
 
+fn parse_path_segments(raw: &str, base_offset: usize) -> TemplateResult<Vec<PathSegment>> {
+    let mut segments = Vec::new();
+    let mut cursor = 0;
+    while cursor < raw.len() {
+        if raw[cursor..].starts_with('.') {
+            cursor += 1;
+            continue;
+        }
+        if raw[cursor..].starts_with('[') {
+            let Some(relative_close) = raw[cursor..].find(']') else {
+                return Err(parse_error_at(raw, base_offset + cursor, "missing `]`"));
+            };
+            let close = cursor + relative_close;
+            let index = raw[cursor + 1..close]
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| {
+                    parse_error_at(raw, base_offset + cursor, "expected numeric list index")
+                })?;
+            segments.push(PathSegment::Index(index));
+            cursor = close + 1;
+            continue;
+        }
+
+        let start = cursor;
+        while cursor < raw.len() {
+            let Some(ch) = raw[cursor..].chars().next() else {
+                break;
+            };
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                cursor += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if start == cursor {
+            return Err(parse_error_at(
+                raw,
+                base_offset + cursor,
+                "expected path segment",
+            ));
+        }
+        segments.push(PathSegment::Field(validate_identifier_at(
+            &raw[start..cursor],
+            base_offset + start,
+        )?));
+
+        if cursor < raw.len() && !raw[cursor..].starts_with('.') && !raw[cursor..].starts_with('[')
+        {
+            return Err(parse_error_at(
+                raw,
+                base_offset + cursor,
+                "expected `.` or `[` in path expression",
+            ));
+        }
+    }
+    Ok(segments)
+}
+
 fn validate_identifier(value: &str) -> TemplateResult<String> {
+    validate_identifier_at(value, 0)
+}
+
+fn validate_identifier_at(value: &str, offset: usize) -> TemplateResult<String> {
     let mut chars = value.chars();
     let Some(first) = chars.next() else {
-        return Err(TemplateError::Parse {
-            offset: 0,
-            message: "empty identifier".to_owned(),
-        });
+        return Err(parse_error_at("", offset, "empty identifier"));
     };
     if !(first.is_ascii_alphabetic() || first == '_') {
-        return Err(TemplateError::Parse {
-            offset: 0,
-            message: format!("invalid identifier `{value}`"),
-        });
+        return Err(parse_error_at(
+            "",
+            offset,
+            &format!("invalid identifier `{value}`"),
+        ));
     }
     if chars.any(|ch| !(ch.is_ascii_alphanumeric() || ch == '_')) {
-        return Err(TemplateError::Parse {
-            offset: 0,
-            message: format!("invalid identifier `{value}`"),
-        });
+        return Err(parse_error_at(
+            "",
+            offset,
+            &format!("invalid identifier `{value}`"),
+        ));
     }
     Ok(value.to_owned())
+}
+
+fn parse_error_at(source: &str, offset: usize, message: &str) -> TemplateError {
+    let (line, column) = line_column(source, offset.min(source.len()));
+    TemplateError::Parse {
+        offset,
+        line,
+        column,
+        message: message.to_owned(),
+    }
+}
+
+fn line_column(source: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut column = 1;
+    for ch in source[..offset.min(source.len())].chars() {
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
 }

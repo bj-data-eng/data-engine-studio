@@ -8,3 +8,6 @@ description = "Runtime and compiled template language for Data Engine Studio doc
 
 [dependencies]
 serde.workspace = true
+
+[dev-dependencies]
+filetime.workspace = true
