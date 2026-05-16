@@ -749,6 +749,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-template"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "des-ui-document"
 version = "0.1.0"
 dependencies = [
