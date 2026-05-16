@@ -10,6 +10,7 @@ members = [
     "crates/des-ui-egui",
     "crates/des-ui-lab",
     "crates/des-ui-render",
+    "crates/des-ui-text",
     "crates/des-ui-widgets",
 ]
 exclude = ["crates/des-apple-dispatch"]
@@ -31,11 +32,13 @@ des-ui-document = { path = "crates/des-ui-document" }
 des-ui-egui = { path = "crates/des-ui-egui" }
 des-ui-lab = { path = "crates/des-ui-lab" }
 des-ui-render = { path = "crates/des-ui-render" }
+des-ui-text = { path = "crates/des-ui-text" }
 des-ui-widgets = { path = "crates/des-ui-widgets" }
 eframe = { version = "=0.34.1", default-features = true }
 egui = "=0.34.1"
 iconflow = { version = "=1.0.0", default-features = false }
 layout-rs = "=0.1.3"
+parley = { version = "=0.9.0", default-features = true }
 filetime = "=0.2.29"
 pyo3 = { version = "=0.27.2", features = ["extension-module", "abi3-py311"] }
 serde = { version = "=1.0.228", features = ["derive"] }
