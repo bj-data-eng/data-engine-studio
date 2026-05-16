@@ -32,21 +32,63 @@ impl DisplayList {
 pub enum PaintCommand {
     PushClip(Rect),
     PopClip,
-    Surface(SurfacePaint),
+    FillRect(FillRectPaint),
+    StrokeRect(StrokeRectPaint),
+    StrokeLine(StrokeLinePaint),
+    StrokePath(StrokePathPaint),
+    FillCircle(FillCirclePaint),
+    FillPolygon(FillPolygonPaint),
     Text(TextPaint),
-    Glyph(GlyphPaint),
-    ScrollChrome(ScrollChromePaint),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SurfacePaint {
+pub struct FillRectPaint {
     pub element_id: ElementId,
     pub rect: Rect,
     pub radius: CornerRadii,
-    pub shadows: Vec<Shadow>,
-    pub background: Option<Color>,
-    pub border: Option<BorderPaint>,
-    pub floating_arrow: Option<FloatingArrowPaint>,
+    pub color: Color,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StrokeRectPaint {
+    pub element_id: ElementId,
+    pub rect: Rect,
+    pub radius: CornerRadii,
+    pub width: f32,
+    pub color: Color,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StrokeLinePaint {
+    pub element_id: ElementId,
+    pub from: Point,
+    pub to: Point,
+    pub width: f32,
+    pub color: Color,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StrokePathPaint {
+    pub element_id: ElementId,
+    pub points: Vec<Point>,
+    pub width: f32,
+    pub color: Color,
+    pub closed: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FillCirclePaint {
+    pub element_id: ElementId,
+    pub center: Point,
+    pub radius: f32,
+    pub color: Color,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FillPolygonPaint {
+    pub element_id: ElementId,
+    pub points: Vec<Point>,
+    pub color: Color,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,15 +126,6 @@ pub struct TextSelectionPaint {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct GlyphPaint {
-    pub element_id: ElementId,
-    pub rect: Rect,
-    pub glyph: Glyph,
-    pub color: Color,
-    pub size: f32,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct ScrollChromePaint {
     pub element_id: ElementId,
     pub axis: ScrollAxis,
@@ -122,7 +155,7 @@ impl PaintPlanner {
         let mut list = DisplayList::new();
         self.plan_element(&mut list, &output.layout, None, output);
         for chrome in &output.scroll_chrome {
-            list.push(PaintCommand::ScrollChrome(ScrollChromePaint::from(chrome)));
+            append_scroll_chrome_commands(&mut list, &ScrollChromePaint::from(chrome));
         }
         list
     }
@@ -135,20 +168,21 @@ impl PaintPlanner {
         output: &DocumentOutput,
     ) {
         if frame.id.as_str() != "root" {
-            list.push(PaintCommand::Surface(surface_paint(frame)));
+            append_surface_commands(list, frame);
 
             if let Some(text) = &frame.text {
                 list.push(PaintCommand::Text(text_paint(frame, text, output)));
             }
 
             if let Some(glyph) = frame.glyph {
-                list.push(PaintCommand::Glyph(GlyphPaint {
-                    element_id: frame.id.clone(),
-                    rect: frame.rect,
+                append_glyph_commands(
+                    list,
+                    frame.id.clone(),
+                    frame.rect,
                     glyph,
-                    color: frame.style.text_color,
-                    size: frame.style.font_size,
-                }));
+                    frame.style.text_color,
+                    frame.style.font_size,
+                );
             }
         }
 
@@ -185,19 +219,47 @@ pub fn content_rect(frame: &ResolvedElement) -> Rect {
     })
 }
 
-fn surface_paint(frame: &ResolvedElement) -> SurfacePaint {
-    SurfacePaint {
-        element_id: frame.id.clone(),
-        rect: frame.rect,
-        radius: frame.style.radius,
-        shadows: frame.style.shadows.clone(),
-        background: frame.style.background,
-        border: frame.style.border.map(|color| BorderPaint {
+fn append_surface_commands(list: &mut DisplayList, frame: &ResolvedElement) {
+    let arrow = floating_arrow(frame);
+    append_shadow_commands(
+        list,
+        frame.id.clone(),
+        frame.rect,
+        frame.style.radius,
+        &frame.style.shadows,
+        arrow,
+    );
+    if let Some(color) = frame.style.background {
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: frame.id.clone(),
+            rect: frame.rect,
+            radius: frame.style.radius,
+            color,
+        }));
+        if let Some(arrow) = arrow {
+            list.push(PaintCommand::FillPolygon(FillPolygonPaint {
+                element_id: frame.id.clone(),
+                points: arrow.points.to_vec(),
+                color,
+            }));
+        }
+    }
+    if let Some(color) = frame.style.border {
+        let border = BorderPaint {
             color,
             widths: frame.style.border_width,
             style: frame.style.border_style,
-        }),
-        floating_arrow: floating_arrow(frame),
+        };
+        append_border_commands(
+            list,
+            frame.id.clone(),
+            frame.rect,
+            frame.style.radius,
+            border,
+        );
+        if let Some(arrow) = arrow {
+            append_arrow_border_command(list, frame.id.clone(), arrow, border);
+        }
     }
 }
 
@@ -339,6 +401,711 @@ pub fn floating_arrow_points(
     }
 }
 
+fn append_border_commands(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    radius: CornerRadii,
+    border: BorderPaint,
+) {
+    let width = max_inset(border.widths);
+    if width <= 0.0 {
+        return;
+    }
+    if border.style != BorderStyle::Solid {
+        append_segmented_border_commands(list, element_id, rect, border.style, width, border.color);
+        return;
+    }
+    if border.widths.is_uniform() {
+        list.push(PaintCommand::StrokeRect(StrokeRectPaint {
+            element_id,
+            rect,
+            radius,
+            width: border.widths.top,
+            color: border.color,
+        }));
+        return;
+    }
+    let color = border.color;
+    for fill in [
+        (
+            border.widths.top,
+            Rect::new(
+                rect.origin.x,
+                rect.origin.y,
+                rect.size.width,
+                border.widths.top,
+            ),
+        ),
+        (
+            border.widths.right,
+            Rect::new(
+                rect.right() - border.widths.right,
+                rect.origin.y,
+                border.widths.right,
+                rect.size.height,
+            ),
+        ),
+        (
+            border.widths.bottom,
+            Rect::new(
+                rect.origin.x,
+                rect.bottom() - border.widths.bottom,
+                rect.size.width,
+                border.widths.bottom,
+            ),
+        ),
+        (
+            border.widths.left,
+            Rect::new(
+                rect.origin.x,
+                rect.origin.y,
+                border.widths.left,
+                rect.size.height,
+            ),
+        ),
+    ] {
+        if fill.0 > 0.0 {
+            list.push(PaintCommand::FillRect(FillRectPaint {
+                element_id: element_id.clone(),
+                rect: fill.1,
+                radius: CornerRadii::ZERO,
+                color,
+            }));
+        }
+    }
+}
+
+fn append_segmented_border_commands(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    style: BorderStyle,
+    width: f32,
+    color: Color,
+) {
+    match style {
+        BorderStyle::Solid => {}
+        BorderStyle::Dashed => {
+            let dash = (width * 3.0).max(6.0);
+            let gap = (width * 2.0).max(4.0);
+            append_corner_preserved_dashed_border(list, element_id, rect, dash, gap, width, color);
+        }
+        BorderStyle::Dotted => {
+            let radius = (width * 0.5).max(1.0);
+            let gap = (width * 3.0).max(6.0);
+            append_corner_preserved_dotted_border(list, element_id, rect, radius, gap, color);
+        }
+    }
+}
+
+fn append_corner_preserved_dashed_border(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    dash: f32,
+    gap: f32,
+    width: f32,
+    color: Color,
+) {
+    let corner_x = dash.min(rect.size.width * 0.5);
+    let corner_y = dash.min(rect.size.height * 0.5);
+    for (corner, horizontal, vertical) in [
+        (
+            rect.origin,
+            Point::new(corner_x, 0.0),
+            Point::new(0.0, corner_y),
+        ),
+        (
+            Point::new(rect.right(), rect.origin.y),
+            Point::new(-corner_x, 0.0),
+            Point::new(0.0, corner_y),
+        ),
+        (
+            Point::new(rect.right(), rect.bottom()),
+            Point::new(-corner_x, 0.0),
+            Point::new(0.0, -corner_y),
+        ),
+        (
+            Point::new(rect.origin.x, rect.bottom()),
+            Point::new(corner_x, 0.0),
+            Point::new(0.0, -corner_y),
+        ),
+    ] {
+        list.push(PaintCommand::StrokePath(StrokePathPaint {
+            element_id: element_id.clone(),
+            points: vec![
+                add_points(corner, horizontal),
+                corner,
+                add_points(corner, vertical),
+            ],
+            width,
+            color,
+            closed: false,
+        }));
+    }
+    append_distributed_dashes(
+        list,
+        element_id.clone(),
+        Point::new(rect.origin.x + corner_x + gap, rect.origin.y),
+        Point::new(rect.right() - corner_x - gap, rect.origin.y),
+        dash,
+        gap,
+        width,
+        color,
+    );
+    append_distributed_dashes(
+        list,
+        element_id.clone(),
+        Point::new(rect.right(), rect.origin.y + corner_y + gap),
+        Point::new(rect.right(), rect.bottom() - corner_y - gap),
+        dash,
+        gap,
+        width,
+        color,
+    );
+    append_distributed_dashes(
+        list,
+        element_id.clone(),
+        Point::new(rect.right() - corner_x - gap, rect.bottom()),
+        Point::new(rect.origin.x + corner_x + gap, rect.bottom()),
+        dash,
+        gap,
+        width,
+        color,
+    );
+    append_distributed_dashes(
+        list,
+        element_id,
+        Point::new(rect.origin.x, rect.bottom() - corner_y - gap),
+        Point::new(rect.origin.x, rect.origin.y + corner_y + gap),
+        dash,
+        gap,
+        width,
+        color,
+    );
+}
+
+fn append_corner_preserved_dotted_border(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    radius: f32,
+    gap: f32,
+    color: Color,
+) {
+    for center in [
+        rect.origin,
+        Point::new(rect.right(), rect.origin.y),
+        Point::new(rect.right(), rect.bottom()),
+        Point::new(rect.origin.x, rect.bottom()),
+    ] {
+        list.push(PaintCommand::FillCircle(FillCirclePaint {
+            element_id: element_id.clone(),
+            center,
+            radius,
+            color,
+        }));
+    }
+    let corner_gap = gap.max(radius * 3.0);
+    append_dotted_segment(
+        list,
+        element_id.clone(),
+        Point::new(rect.origin.x + corner_gap, rect.origin.y),
+        Point::new(rect.right() - corner_gap, rect.origin.y),
+        radius,
+        gap,
+        color,
+    );
+    append_dotted_segment(
+        list,
+        element_id.clone(),
+        Point::new(rect.right(), rect.origin.y + corner_gap),
+        Point::new(rect.right(), rect.bottom() - corner_gap),
+        radius,
+        gap,
+        color,
+    );
+    append_dotted_segment(
+        list,
+        element_id.clone(),
+        Point::new(rect.right() - corner_gap, rect.bottom()),
+        Point::new(rect.origin.x + corner_gap, rect.bottom()),
+        radius,
+        gap,
+        color,
+    );
+    append_dotted_segment(
+        list,
+        element_id,
+        Point::new(rect.origin.x, rect.bottom() - corner_gap),
+        Point::new(rect.origin.x, rect.origin.y + corner_gap),
+        radius,
+        gap,
+        color,
+    );
+}
+
+fn append_distributed_dashes(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    start: Point,
+    end: Point,
+    preferred_dash: f32,
+    preferred_gap: f32,
+    width: f32,
+    color: Color,
+) {
+    let vector = sub_points(end, start);
+    let length = point_length(vector);
+    if length <= f32::EPSILON {
+        return;
+    }
+    let pattern = distributed_dash_pattern(length, preferred_dash, preferred_gap);
+    let direction = scale_point(vector, 1.0 / length);
+    let mut cursor = pattern.leading_gap;
+    for _ in 0..pattern.count {
+        list.push(PaintCommand::StrokeLine(StrokeLinePaint {
+            element_id: element_id.clone(),
+            from: add_points(start, scale_point(direction, cursor)),
+            to: add_points(start, scale_point(direction, cursor + pattern.dash)),
+            width,
+            color,
+        }));
+        cursor += pattern.dash + pattern.gap;
+    }
+}
+
+fn append_dotted_segment(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    start: Point,
+    end: Point,
+    radius: f32,
+    gap: f32,
+    color: Color,
+) {
+    let vector = sub_points(end, start);
+    let length = point_length(vector);
+    if length <= f32::EPSILON {
+        return;
+    }
+    let direction = scale_point(vector, 1.0 / length);
+    let mut cursor = 0.0;
+    while cursor <= length {
+        list.push(PaintCommand::FillCircle(FillCirclePaint {
+            element_id: element_id.clone(),
+            center: add_points(start, scale_point(direction, cursor)),
+            radius,
+            color,
+        }));
+        cursor += gap;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DistributedDashPattern {
+    pub count: usize,
+    pub dash: f32,
+    pub gap: f32,
+    pub leading_gap: f32,
+}
+
+pub fn distributed_dash_pattern(
+    length: f32,
+    preferred_dash: f32,
+    preferred_gap: f32,
+) -> DistributedDashPattern {
+    if length <= preferred_dash {
+        return DistributedDashPattern {
+            count: 1,
+            dash: length.max(0.0),
+            gap: 0.0,
+            leading_gap: 0.0,
+        };
+    }
+    let pattern = preferred_dash + preferred_gap;
+    let count = ((length + preferred_gap) / pattern).floor().max(1.0) as usize;
+    if count == 1 {
+        return DistributedDashPattern {
+            count,
+            dash: preferred_dash.min(length),
+            gap: 0.0,
+            leading_gap: ((length - preferred_dash).max(0.0)) * 0.5,
+        };
+    }
+    let used_dash = preferred_dash * count as f32;
+    let remaining = (length - used_dash).max(0.0);
+    DistributedDashPattern {
+        count,
+        dash: preferred_dash,
+        gap: remaining / (count - 1) as f32,
+        leading_gap: 0.0,
+    }
+}
+
+fn append_shadow_commands(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    radius: CornerRadii,
+    shadows: &[Shadow],
+    arrow: Option<FloatingArrowPaint>,
+) {
+    for shadow in shadows.iter().rev().copied() {
+        append_shadow_command(list, element_id.clone(), rect, radius, shadow);
+        if let Some(arrow) = arrow {
+            append_arrow_shadow_command(list, element_id.clone(), arrow, shadow);
+        }
+    }
+}
+
+fn append_shadow_command(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    radius: CornerRadii,
+    shadow: Shadow,
+) {
+    if shadow.color.a == 0 {
+        return;
+    }
+    let translated = translate_rect(rect, shadow.offset);
+    if shadow.blur <= 0.0 {
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id,
+            rect: expand_rect_safely(translated, shadow.spread),
+            radius: expand_radius(radius, shadow.spread),
+            color: shadow.color,
+        }));
+        return;
+    }
+    let sigma = shadow.blur * 0.5;
+    let max_blur_extent = sigma * 3.0;
+    let steps = max_blur_extent.ceil().clamp(10.0, 36.0) as usize;
+    for step in (0..steps).rev() {
+        let outer_distance = max_blur_extent * (step + 1) as f32 / steps as f32;
+        let inner_distance = max_blur_extent * step as f32 / steps as f32;
+        let alpha = shadow_alpha(shadow.color.a, outer_distance, inner_distance, sigma);
+        if alpha == 0 {
+            continue;
+        }
+        let expansion = shadow.spread + outer_distance;
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: element_id.clone(),
+            rect: expand_rect_safely(translated, expansion),
+            radius: expand_radius(radius, expansion),
+            color: Color {
+                a: alpha,
+                ..shadow.color
+            },
+        }));
+    }
+}
+
+fn append_arrow_shadow_command(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    arrow: FloatingArrowPaint,
+    shadow: Shadow,
+) {
+    if shadow.color.a == 0 {
+        return;
+    }
+    let translated = translate_arrow(arrow, shadow.offset);
+    if shadow.blur <= 0.0 {
+        list.push(PaintCommand::FillPolygon(FillPolygonPaint {
+            element_id,
+            points: expanded_arrow(translated, shadow.spread).points.to_vec(),
+            color: shadow.color,
+        }));
+        return;
+    }
+    let sigma = shadow.blur * 0.5;
+    let max_blur_extent = sigma * 3.0;
+    let steps = max_blur_extent.ceil().clamp(10.0, 36.0) as usize;
+    for step in (0..steps).rev() {
+        let outer_distance = max_blur_extent * (step + 1) as f32 / steps as f32;
+        let inner_distance = max_blur_extent * step as f32 / steps as f32;
+        let alpha = shadow_alpha(shadow.color.a, outer_distance, inner_distance, sigma);
+        if alpha == 0 {
+            continue;
+        }
+        list.push(PaintCommand::FillPolygon(FillPolygonPaint {
+            element_id: element_id.clone(),
+            points: expanded_arrow(translated, shadow.spread + outer_distance)
+                .points
+                .to_vec(),
+            color: Color {
+                a: alpha,
+                ..shadow.color
+            },
+        }));
+    }
+}
+
+fn append_arrow_border_command(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    arrow: FloatingArrowPaint,
+    border: BorderPaint,
+) {
+    let width = max_inset(border.widths);
+    if width <= 0.0 {
+        return;
+    }
+    list.push(PaintCommand::StrokePath(StrokePathPaint {
+        element_id,
+        points: arrow.points.to_vec(),
+        width,
+        color: border.color,
+        closed: true,
+    }));
+}
+
+fn append_glyph_commands(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    rect: Rect,
+    glyph: Glyph,
+    color: Color,
+    size: f32,
+) {
+    let center = Point::new(
+        rect.origin.x + rect.size.width * 0.5,
+        rect.origin.y + rect.size.height * 0.5,
+    );
+    let half = (size.min(rect.size.width).min(rect.size.height) / 2.0).max(1.0);
+    let width = (size / 8.0).clamp(1.25, 2.5);
+    match glyph {
+        Glyph::Check => {
+            append_glyph_line(
+                list,
+                element_id.clone(),
+                Point::new(center.x - half * 0.55, center.y - half * 0.05),
+                Point::new(center.x - half * 0.15, center.y + half * 0.38),
+                width,
+                color,
+            );
+            append_glyph_line(
+                list,
+                element_id,
+                Point::new(center.x - half * 0.15, center.y + half * 0.38),
+                Point::new(center.x + half * 0.58, center.y - half * 0.42),
+                width,
+                color,
+            );
+        }
+        Glyph::ChevronDown => {
+            append_glyph_line(
+                list,
+                element_id.clone(),
+                Point::new(center.x - half * 0.5, center.y - half * 0.2),
+                Point::new(center.x, center.y + half * 0.32),
+                width,
+                color,
+            );
+            append_glyph_line(
+                list,
+                element_id,
+                Point::new(center.x, center.y + half * 0.32),
+                Point::new(center.x + half * 0.5, center.y - half * 0.2),
+                width,
+                color,
+            );
+        }
+        Glyph::ChevronUp => {
+            append_glyph_line(
+                list,
+                element_id.clone(),
+                Point::new(center.x - half * 0.5, center.y + half * 0.2),
+                Point::new(center.x, center.y - half * 0.32),
+                width,
+                color,
+            );
+            append_glyph_line(
+                list,
+                element_id,
+                Point::new(center.x, center.y - half * 0.32),
+                Point::new(center.x + half * 0.5, center.y + half * 0.2),
+                width,
+                color,
+            );
+        }
+        Glyph::DragHandle => {
+            let radius = (size / 18.0).clamp(1.0, 1.7);
+            let spacing_x = (size * 0.18).max(3.0);
+            let spacing_y = (size * 0.24).max(4.0);
+            for column in [-0.5_f32, 0.5] {
+                for row in [-1.0_f32, 0.0, 1.0] {
+                    list.push(PaintCommand::FillCircle(FillCirclePaint {
+                        element_id: element_id.clone(),
+                        center: Point::new(
+                            center.x + spacing_x * column,
+                            center.y + spacing_y * row,
+                        ),
+                        radius,
+                        color,
+                    }));
+                }
+            }
+        }
+    }
+}
+
+fn append_glyph_line(
+    list: &mut DisplayList,
+    element_id: ElementId,
+    from: Point,
+    to: Point,
+    width: f32,
+    color: Color,
+) {
+    list.push(PaintCommand::StrokeLine(StrokeLinePaint {
+        element_id,
+        from,
+        to,
+        width,
+        color,
+    }));
+}
+
+fn append_scroll_chrome_commands(list: &mut DisplayList, chrome: &ScrollChromePaint) {
+    if !chrome.visible {
+        return;
+    }
+    if let Some(track_color) = chrome.track_color {
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: chrome.element_id.clone(),
+            rect: chrome.track_rect,
+            radius: CornerRadii::all(chrome.radius),
+            color: track_color,
+        }));
+    }
+    list.push(PaintCommand::FillRect(FillRectPaint {
+        element_id: chrome.element_id.clone(),
+        rect: chrome.handle_rect,
+        radius: CornerRadii::all(chrome.radius),
+        color: chrome.handle_color,
+    }));
+    if let Some(color) = chrome.handle_border_color
+        && chrome.handle_border_width > 0.0
+    {
+        list.push(PaintCommand::StrokeRect(StrokeRectPaint {
+            element_id: chrome.element_id.clone(),
+            rect: chrome.handle_rect,
+            radius: CornerRadii::all(chrome.radius),
+            width: chrome.handle_border_width,
+            color,
+        }));
+    }
+}
+
+fn translate_rect(rect: Rect, offset: Point) -> Rect {
+    Rect::new(
+        rect.origin.x + offset.x,
+        rect.origin.y + offset.y,
+        rect.size.width,
+        rect.size.height,
+    )
+}
+
+fn expand_rect_safely(rect: Rect, amount: f32) -> Rect {
+    if amount >= 0.0 {
+        return Rect::new(
+            rect.origin.x - amount,
+            rect.origin.y - amount,
+            rect.size.width + amount * 2.0,
+            rect.size.height + amount * 2.0,
+        );
+    }
+    let inset = (-amount)
+        .min(rect.size.width * 0.5)
+        .min(rect.size.height * 0.5);
+    Rect::new(
+        rect.origin.x + inset,
+        rect.origin.y + inset,
+        rect.size.width - inset * 2.0,
+        rect.size.height - inset * 2.0,
+    )
+}
+
+fn expand_radius(radius: CornerRadii, amount: f32) -> CornerRadii {
+    CornerRadii {
+        top_left: (radius.top_left + amount).max(0.0),
+        top_right: (radius.top_right + amount).max(0.0),
+        bottom_right: (radius.bottom_right + amount).max(0.0),
+        bottom_left: (radius.bottom_left + amount).max(0.0),
+    }
+}
+
+fn translate_arrow(arrow: FloatingArrowPaint, offset: Point) -> FloatingArrowPaint {
+    FloatingArrowPaint {
+        points: arrow.points.map(|point| add_points(point, offset)),
+    }
+}
+
+pub fn expanded_arrow(arrow: FloatingArrowPaint, amount: f32) -> FloatingArrowPaint {
+    let center = Point::new(
+        (arrow.points[0].x + arrow.points[1].x + arrow.points[2].x) / 3.0,
+        (arrow.points[0].y + arrow.points[1].y + arrow.points[2].y) / 3.0,
+    );
+    FloatingArrowPaint {
+        points: arrow.points.map(|point| {
+            let vector = sub_points(point, center);
+            let length = point_length(vector);
+            if length <= f32::EPSILON {
+                point
+            } else {
+                add_points(
+                    center,
+                    scale_point(vector, (length + amount).max(0.0) / length),
+                )
+            }
+        }),
+    }
+}
+
+fn shadow_alpha(base_alpha: u8, outer_distance: f32, inner_distance: f32, sigma: f32) -> u8 {
+    let outer_alpha = gaussian_alpha(outer_distance, sigma);
+    let inner_alpha = gaussian_alpha(inner_distance, sigma);
+    let alpha_portion = (inner_alpha - outer_alpha).max(0.0);
+    (base_alpha as f32 * alpha_portion * 0.86)
+        .round()
+        .clamp(0.0, 255.0) as u8
+}
+
+fn gaussian_alpha(distance: f32, sigma: f32) -> f32 {
+    if sigma <= 0.0 {
+        return 1.0;
+    }
+    (-0.5 * (distance / sigma).powi(2)).exp()
+}
+
+fn max_inset(insets: Insets) -> f32 {
+    insets
+        .top
+        .max(insets.right)
+        .max(insets.bottom)
+        .max(insets.left)
+}
+
+fn add_points(lhs: Point, rhs: Point) -> Point {
+    Point::new(lhs.x + rhs.x, lhs.y + rhs.y)
+}
+
+fn sub_points(lhs: Point, rhs: Point) -> Point {
+    Point::new(lhs.x - rhs.x, lhs.y - rhs.y)
+}
+
+fn scale_point(point: Point, scale: f32) -> Point {
+    Point::new(point.x * scale, point.y * scale)
+}
+
+fn point_length(point: Point) -> f32 {
+    (point.x * point.x + point.y * point.y).sqrt()
+}
+
 impl From<&ScrollChrome> for ScrollChromePaint {
     fn from(chrome: &ScrollChrome) -> Self {
         Self {
@@ -392,13 +1159,13 @@ mod tests {
             .commands
             .iter()
             .filter_map(|command| match command {
-                PaintCommand::Surface(surface) => Some(surface.element_id.as_str().to_owned()),
+                PaintCommand::FillRect(fill) => Some(fill.element_id.as_str().to_owned()),
                 PaintCommand::Text(text) => Some(text.element_id.as_str().to_owned()),
                 _ => None,
             })
             .collect();
 
-        assert_eq!(ids, vec!["label", "label", "lower"]);
+        assert_eq!(ids, vec!["label", "lower"]);
     }
 
     #[test]
@@ -438,5 +1205,52 @@ mod tests {
                 Point::new(46.0, 12.0),
             ]
         );
+    }
+
+    #[test]
+    fn distributed_dash_pattern_avoids_cutoff_dash() {
+        let pattern = distributed_dash_pattern(52.0, 8.0, 5.0);
+
+        assert_eq!(pattern.count, 4);
+        assert_eq!(pattern.dash, 8.0);
+        assert_eq!(pattern.gap, (52.0 - 32.0) / 3.0);
+        assert_eq!(
+            pattern.dash * pattern.count as f32 + pattern.gap * (pattern.count - 1) as f32,
+            52.0
+        );
+    }
+
+    #[test]
+    fn expanded_arrow_keeps_center_and_moves_points_outward() {
+        let arrow = FloatingArrowPaint {
+            points: [
+                Point::new(0.0, 0.0),
+                Point::new(10.0, 0.0),
+                Point::new(5.0, -5.0),
+            ],
+        };
+
+        let expanded = expanded_arrow(arrow, 2.0);
+
+        assert!(expanded.points[0].x < arrow.points[0].x);
+        assert!(expanded.points[1].x > arrow.points[1].x);
+        assert!(expanded.points[2].y < arrow.points[2].y);
+    }
+
+    #[test]
+    fn glyph_planning_emits_primitive_commands() {
+        let mut list = DisplayList::new();
+        append_glyph_commands(
+            &mut list,
+            "check".into(),
+            Rect::new(0.0, 0.0, 20.0, 20.0),
+            Glyph::Check,
+            Color::rgb(1, 2, 3),
+            12.0,
+        );
+
+        assert!(matches!(list.commands[0], PaintCommand::StrokeLine(_)));
+        assert!(matches!(list.commands[1], PaintCommand::StrokeLine(_)));
+        assert_eq!(list.commands.len(), 2);
     }
 }
