@@ -792,6 +792,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-ui-render"
+version = "0.1.0"
+dependencies = [
+ "des-ui-document",
+]
+
+[[package]]
 name = "des-ui-widgets"
 version = "0.1.0"
 dependencies = [

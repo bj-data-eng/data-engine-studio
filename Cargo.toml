@@ -9,6 +9,7 @@ members = [
     "crates/des-ui-document",
     "crates/des-ui-egui",
     "crates/des-ui-lab",
+    "crates/des-ui-render",
     "crates/des-ui-widgets",
 ]
 exclude = ["crates/des-apple-dispatch"]
@@ -29,6 +30,7 @@ des-template = { path = "crates/des-template" }
 des-ui-document = { path = "crates/des-ui-document" }
 des-ui-egui = { path = "crates/des-ui-egui" }
 des-ui-lab = { path = "crates/des-ui-lab" }
+des-ui-render = { path = "crates/des-ui-render" }
 des-ui-widgets = { path = "crates/des-ui-widgets" }
 eframe = { version = "=0.34.1", default-features = true }
 egui = "=0.34.1"
