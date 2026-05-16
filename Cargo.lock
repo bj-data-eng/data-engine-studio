@@ -769,6 +769,7 @@ version = "0.1.0"
 dependencies = [
  "des-core",
  "des-ui-document",
+ "des-ui-render",
  "eframe",
  "egui",
  "iconflow",

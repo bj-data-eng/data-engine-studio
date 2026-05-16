@@ -5,7 +5,7 @@ mod views;
 
 use des_ui_egui::adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
-    document_input, paint_frame, paint_scroll_chrome,
+    document_input, paint_output,
 };
 use styles::stylesheet;
 use views::{
@@ -312,8 +312,7 @@ impl UiLabState {
         apply_cursor_icon(ui, &output);
 
         let paint_start = Instant::now();
-        paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
-        paint_scroll_chrome(ui, origin, &output.scroll_chrome);
+        paint_output(ui, origin, &output);
         let paint_time = paint_start.elapsed();
         self.last_perf = UiLabPerf {
             document_time,
@@ -823,7 +822,7 @@ impl UiLabState {
             DocumentInput::default(),
             &mut text_measurer,
         );
-        paint_frame(ui, origin, &output.layout, None);
+        paint_output(ui, origin, &output);
     }
 
     fn apply_interaction_document_state(&self, document: &mut Document) {

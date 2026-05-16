@@ -1,140 +1,146 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_ui_document::{
-    BorderStyle, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph, Insets,
-    Overflow, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
+    BorderStyle, Color, CornerRadii, DocumentOutput, Glyph, Insets, Point, Rect, Shadow,
+    TextLayoutRequest,
+};
+use des_ui_render::{
+    BorderPaint, DisplayList, FloatingArrowPaint, GlyphPaint, PaintCommand, ScrollChromePaint,
+    SurfacePaint, TextPaint, plan_paint,
 };
 use eframe::egui;
-pub fn paint_frame(
-    ui: &mut egui::Ui,
-    origin: egui::Pos2,
-    frame: &ResolvedElement,
-    text_selection: Option<&DocumentTextSelection>,
-) {
-    paint_frame_clipped(ui, origin, frame, ui.clip_rect(), text_selection);
+
+pub fn paint_output(ui: &mut egui::Ui, origin: egui::Pos2, output: &DocumentOutput) {
+    let display_list = plan_paint(output);
+    paint_display_list(ui, origin, &display_list);
 }
 
-fn paint_frame_clipped(
-    ui: &mut egui::Ui,
-    origin: egui::Pos2,
-    frame: &ResolvedElement,
-    clip_rect: egui::Rect,
-    text_selection: Option<&DocumentTextSelection>,
-) {
-    let painter = ui.painter().with_clip_rect(clip_rect);
-    if frame.id.as_str() != "root" {
-        let rect = frame_rect(origin, frame);
-
-        if let Some(arrow) = floating_arrow(frame, rect) {
-            paint_floating_surface(&painter, rect, frame, arrow);
-        } else {
-            paint_shadows(&painter, rect, frame.style.radius, &frame.style.shadows);
-
-            if let Some(color) = frame.style.background {
-                painter.rect_filled(
-                    rect,
-                    to_egui_radius(frame.style.radius),
-                    to_egui_color(color),
-                );
+pub fn paint_display_list(ui: &mut egui::Ui, origin: egui::Pos2, display_list: &DisplayList) {
+    let mut clip_stack = vec![ui.clip_rect()];
+    for command in &display_list.commands {
+        match command {
+            PaintCommand::PushClip(rect) => {
+                let clip = document_rect_to_egui(origin, *rect);
+                let current = *clip_stack.last().expect("clip stack is never empty");
+                clip_stack.push(current.intersect(clip));
             }
-
-            if let Some(color) = frame.style.border {
-                paint_border(
-                    &painter,
-                    rect,
-                    frame.style.radius,
-                    frame.style.border_width,
-                    frame.style.border_style,
-                    color,
-                );
+            PaintCommand::PopClip => {
+                if clip_stack.len() > 1 {
+                    clip_stack.pop();
+                }
             }
-        }
-
-        if let Some(text) = &frame.text {
-            let text_rect = frame_content_rect(rect, frame);
-            let request = TextLayoutRequest {
-                text,
-                font_size: frame.style.font_size,
-                wrap_width: match frame.style.text_wrap {
-                    TextWrapMode::Extend => f32::INFINITY,
-                    TextWrapMode::Wrap | TextWrapMode::Truncate => text_rect.width(),
-                },
-                wrap_mode: frame.style.text_wrap,
-                max_lines: frame.style.max_lines,
-                line_height: frame.style.line_height,
-            };
-            let color = to_egui_color(frame.style.text_color);
-            let mut galley = painter.layout_job(layout_job(request, color));
-            if frame.selectable_text
-                && let Some(selection) = text_selection
-                && selection.target == frame.id
-            {
-                let cursor_range = egui::text_selection::CCursorRange::two(
-                    egui::text::CCursor::new(selection.anchor_index),
-                    egui::text::CCursor::new(selection.focus_index),
-                );
-                paint_document_text_selection(
-                    &mut galley,
-                    &cursor_range,
-                    frame.style.text_selection_background,
-                    frame.style.text_selection_color,
-                );
+            PaintCommand::Surface(surface) => {
+                let painter = ui
+                    .painter()
+                    .with_clip_rect(*clip_stack.last().expect("clip stack is never empty"));
+                paint_surface_command(&painter, origin, surface);
             }
-            painter.galley(text_rect.min, galley, color);
-        }
-
-        if let Some(glyph) = frame.glyph {
-            paint_glyph(
-                &painter,
-                rect,
-                glyph,
-                frame.style.text_color,
-                frame.style.font_size,
-            );
+            PaintCommand::Text(text) => {
+                let painter = ui
+                    .painter()
+                    .with_clip_rect(*clip_stack.last().expect("clip stack is never empty"));
+                paint_text_command(&painter, origin, text);
+            }
+            PaintCommand::Glyph(glyph) => {
+                let painter = ui
+                    .painter()
+                    .with_clip_rect(*clip_stack.last().expect("clip stack is never empty"));
+                paint_glyph_command(&painter, origin, glyph);
+            }
+            PaintCommand::ScrollChrome(chrome) => {
+                let painter = ui
+                    .painter()
+                    .with_clip_rect(*clip_stack.last().expect("clip stack is never empty"));
+                paint_scroll_chrome_command(&painter, origin, chrome);
+            }
         }
     }
+}
 
-    let mut children: Vec<_> = frame.children.iter().collect();
-    children.sort_by_key(|child| child.style.z_index);
-    let next_clip = if frame.style.overflow_x == Overflow::Scroll
-        || frame.style.overflow_y == Overflow::Scroll
-    {
-        let rect = frame_rect(origin, frame);
-        let content_rect = frame_content_rect(rect, frame);
-        let min = egui::pos2(
-            if frame.style.overflow_x == Overflow::Scroll {
-                content_rect.left()
-            } else {
-                clip_rect.left()
-            },
-            if frame.style.overflow_y == Overflow::Scroll {
-                content_rect.top()
-            } else {
-                clip_rect.top()
-            },
+fn paint_surface_command(painter: &egui::Painter, origin: egui::Pos2, surface: &SurfacePaint) {
+    let rect = document_rect_to_egui(origin, surface.rect);
+    if let Some(arrow) = surface.floating_arrow {
+        paint_floating_surface(painter, rect, surface, egui_arrow(arrow));
+        return;
+    }
+
+    paint_shadows(painter, rect, surface.radius, &surface.shadows);
+    if let Some(color) = surface.background {
+        painter.rect_filled(rect, to_egui_radius(surface.radius), to_egui_color(color));
+    }
+    if let Some(border) = surface.border {
+        paint_border(
+            painter,
+            rect,
+            surface.radius,
+            border.widths,
+            border.style,
+            border.color,
         );
-        let max = egui::pos2(
-            if frame.style.overflow_x == Overflow::Scroll {
-                content_rect.right()
-            } else {
-                clip_rect.right()
-            },
-            if frame.style.overflow_y == Overflow::Scroll {
-                content_rect.bottom()
-            } else {
-                clip_rect.bottom()
-            },
-        );
-        clip_rect.intersect(egui::Rect::from_min_max(min, max))
-    } else {
-        clip_rect
+    }
+}
+
+fn paint_text_command(painter: &egui::Painter, origin: egui::Pos2, text: &TextPaint) {
+    let rect = document_rect_to_egui(origin, text.rect);
+    let request = TextLayoutRequest {
+        text: &text.text,
+        font_size: text.font_size,
+        wrap_width: text.wrap_width,
+        wrap_mode: text.wrap_mode,
+        max_lines: text.max_lines,
+        line_height: text.line_height,
     };
-    for child in children {
-        paint_frame_clipped(ui, origin, child, next_clip, text_selection);
+    let color = to_egui_color(text.color);
+    let mut galley = painter.layout_job(layout_job(request, color));
+    if let Some(selection) = text.selection {
+        let cursor_range = egui::text_selection::CCursorRange::two(
+            egui::text::CCursor::new(selection.anchor_index),
+            egui::text::CCursor::new(selection.focus_index),
+        );
+        paint_document_text_selection(
+            &mut galley,
+            &cursor_range,
+            selection.background,
+            selection.color,
+        );
     }
+    painter.galley(rect.min, galley, color);
 }
 
-fn frame_rect(origin: egui::Pos2, frame: &ResolvedElement) -> egui::Rect {
-    document_rect_to_egui(origin, frame.rect)
+fn paint_glyph_command(painter: &egui::Painter, origin: egui::Pos2, glyph: &GlyphPaint) {
+    paint_glyph(
+        painter,
+        document_rect_to_egui(origin, glyph.rect),
+        glyph.glyph,
+        glyph.color,
+        glyph.size,
+    );
+}
+
+fn paint_scroll_chrome_command(
+    painter: &egui::Painter,
+    origin: egui::Pos2,
+    chrome: &ScrollChromePaint,
+) {
+    if !chrome.visible {
+        return;
+    }
+
+    let track = document_rect_to_egui(origin, chrome.track_rect);
+    let handle = document_rect_to_egui(origin, chrome.handle_rect);
+    if let Some(track_color) = chrome.track_color {
+        painter.rect_filled(track, chrome.radius, to_egui_color(track_color));
+    }
+    painter.rect_filled(handle, chrome.radius, to_egui_color(chrome.handle_color));
+    if let Some(border_color) = chrome.handle_border_color
+        && chrome.handle_border_width > 0.0
+    {
+        painter.rect_stroke(
+            handle,
+            chrome.radius,
+            egui::Stroke::new(chrome.handle_border_width, to_egui_color(border_color)),
+            egui::StrokeKind::Inside,
+        );
+    }
 }
 
 pub fn paint_surface(
@@ -159,18 +165,6 @@ pub fn paint_surface(
             border,
         );
     }
-}
-
-fn frame_content_rect(rect: egui::Rect, frame: &ResolvedElement) -> egui::Rect {
-    let min = egui::pos2(
-        rect.left() + frame.style.border_width.left + frame.style.padding.left,
-        rect.top() + frame.style.border_width.top + frame.style.padding.top,
-    );
-    let max = egui::pos2(
-        (rect.right() - frame.style.border_width.right - frame.style.padding.right).max(min.x),
-        (rect.bottom() - frame.style.border_width.bottom - frame.style.padding.bottom).max(min.y),
-    );
-    egui::Rect::from_min_max(min, max)
 }
 
 fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, glyph: Glyph, color: Color, size: f32) {
@@ -547,115 +541,41 @@ fn paint_shadows(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct FloatingArrowPaint {
+struct EguiFloatingArrowPaint {
     points: [egui::Pos2; 3],
 }
 
-fn floating_arrow(frame: &ResolvedElement, rect: egui::Rect) -> Option<FloatingArrowPaint> {
-    let floating = frame.floating?;
-    let offset = floating.arrow_offset?;
-    let size = floating.arrow_size?;
-    Some(FloatingArrowPaint {
-        points: floating_arrow_points(
-            rect,
-            floating.placement,
-            offset.x,
-            offset.y,
-            size.width,
-            size.height,
-        ),
-    })
-}
-
-fn floating_arrow_points(
-    rect: egui::Rect,
-    placement: FloatingPlacement,
-    offset_x: f32,
-    offset_y: f32,
-    width: f32,
-    height: f32,
-) -> [egui::Pos2; 3] {
-    match placement {
-        FloatingPlacement::Center => {
-            let center = rect.center();
-            [center, center, center]
-        }
-        FloatingPlacement::Bottom
-        | FloatingPlacement::BottomStart
-        | FloatingPlacement::BottomEnd => {
-            let left = rect.left() + offset_x;
-            let center = left + width * 0.5;
-            [
-                egui::pos2(left, rect.top()),
-                egui::pos2(left + width, rect.top()),
-                egui::pos2(center, rect.top() - height),
-            ]
-        }
-        FloatingPlacement::Top | FloatingPlacement::TopStart | FloatingPlacement::TopEnd => {
-            let left = rect.left() + offset_x;
-            let center = left + width * 0.5;
-            [
-                egui::pos2(left + width, rect.bottom()),
-                egui::pos2(left, rect.bottom()),
-                egui::pos2(center, rect.bottom() + height),
-            ]
-        }
-        FloatingPlacement::Right | FloatingPlacement::RightStart | FloatingPlacement::RightEnd => {
-            let top = rect.top() + offset_y;
-            let center = top + height * 0.5;
-            [
-                egui::pos2(rect.left(), top + height),
-                egui::pos2(rect.left(), top),
-                egui::pos2(rect.left() - width, center),
-            ]
-        }
-        FloatingPlacement::Left | FloatingPlacement::LeftStart | FloatingPlacement::LeftEnd => {
-            let top = rect.top() + offset_y;
-            let center = top + height * 0.5;
-            [
-                egui::pos2(rect.right(), top),
-                egui::pos2(rect.right(), top + height),
-                egui::pos2(rect.right() + width, center),
-            ]
-        }
+fn egui_arrow(arrow: FloatingArrowPaint) -> EguiFloatingArrowPaint {
+    EguiFloatingArrowPaint {
+        points: arrow.points.map(point_to_egui),
     }
 }
 
 fn paint_floating_surface(
     painter: &egui::Painter,
     rect: egui::Rect,
-    frame: &ResolvedElement,
-    arrow: FloatingArrowPaint,
+    surface: &SurfacePaint,
+    arrow: EguiFloatingArrowPaint,
 ) {
-    paint_shadows_with_arrow(
-        painter,
-        rect,
-        frame.style.radius,
-        &frame.style.shadows,
-        arrow,
-    );
-    if let Some(color) = frame.style.background {
-        painter.rect_filled(
-            rect,
-            to_egui_radius(frame.style.radius),
-            to_egui_color(color),
-        );
+    paint_shadows_with_arrow(painter, rect, surface.radius, &surface.shadows, arrow);
+    if let Some(color) = surface.background {
+        painter.rect_filled(rect, to_egui_radius(surface.radius), to_egui_color(color));
         painter.add(egui::Shape::convex_polygon(
             arrow.points.to_vec(),
             to_egui_color(color),
             egui::Stroke::NONE,
         ));
     }
-    if let Some(color) = frame.style.border {
+    if let Some(border) = surface.border {
         paint_border(
             painter,
             rect,
-            frame.style.radius,
-            frame.style.border_width,
-            frame.style.border_style,
-            color,
+            surface.radius,
+            border.widths,
+            border.style,
+            border.color,
         );
-        paint_arrow_border(painter, arrow, frame.style.border_width, color);
+        paint_arrow_border(painter, arrow, border);
     }
 }
 
@@ -664,7 +584,7 @@ fn paint_shadows_with_arrow(
     rect: egui::Rect,
     radius: CornerRadii,
     shadows: &[Shadow],
-    arrow: FloatingArrowPaint,
+    arrow: EguiFloatingArrowPaint,
 ) {
     for shadow in shadows.iter().rev().copied() {
         paint_shadow(painter, rect, radius, shadow);
@@ -672,7 +592,7 @@ fn paint_shadows_with_arrow(
     }
 }
 
-fn paint_arrow_shadow(painter: &egui::Painter, arrow: FloatingArrowPaint, shadow: Shadow) {
+fn paint_arrow_shadow(painter: &egui::Painter, arrow: EguiFloatingArrowPaint, shadow: Shadow) {
     if shadow.color.a == 0 {
         return;
     }
@@ -715,18 +635,18 @@ fn paint_arrow_shadow(painter: &egui::Painter, arrow: FloatingArrowPaint, shadow
     }
 }
 
-fn translate_arrow(arrow: FloatingArrowPaint, x: f32, y: f32) -> FloatingArrowPaint {
-    FloatingArrowPaint {
+fn translate_arrow(arrow: EguiFloatingArrowPaint, x: f32, y: f32) -> EguiFloatingArrowPaint {
+    EguiFloatingArrowPaint {
         points: arrow.points.map(|point| point + egui::vec2(x, y)),
     }
 }
 
-fn expanded_arrow(arrow: FloatingArrowPaint, amount: f32) -> FloatingArrowPaint {
+fn expanded_arrow(arrow: EguiFloatingArrowPaint, amount: f32) -> EguiFloatingArrowPaint {
     let center = egui::pos2(
         (arrow.points[0].x + arrow.points[1].x + arrow.points[2].x) / 3.0,
         (arrow.points[0].y + arrow.points[1].y + arrow.points[2].y) / 3.0,
     );
-    FloatingArrowPaint {
+    EguiFloatingArrowPaint {
         points: arrow.points.map(|point| {
             let vector = point - center;
             let length = vector.length();
@@ -739,23 +659,19 @@ fn expanded_arrow(arrow: FloatingArrowPaint, amount: f32) -> FloatingArrowPaint 
     }
 }
 
-fn paint_arrow_border(
-    painter: &egui::Painter,
-    arrow: FloatingArrowPaint,
-    widths: Insets,
-    color: Color,
-) {
-    let width = widths
+fn paint_arrow_border(painter: &egui::Painter, arrow: EguiFloatingArrowPaint, border: BorderPaint) {
+    let width = border
+        .widths
         .top
-        .max(widths.right)
-        .max(widths.bottom)
-        .max(widths.left);
+        .max(border.widths.right)
+        .max(border.widths.bottom)
+        .max(border.widths.left);
     if width <= 0.0 {
         return;
     }
     painter.add(egui::Shape::closed_line(
         arrow.points.to_vec(),
-        egui::Stroke::new(width, to_egui_color(color)),
+        egui::Stroke::new(width, to_egui_color(border.color)),
     ));
 }
 
@@ -832,54 +748,42 @@ fn gaussian_alpha(distance: f32, sigma: f32) -> f32 {
     (-0.5 * (distance / sigma).powi(2)).exp()
 }
 
-pub fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[ScrollChrome]) {
-    let painter = ui.painter();
-    for chrome in chromes {
-        if !chrome.visible {
-            continue;
-        }
-
-        let track = document_rect_to_egui(origin, chrome.track_rect);
-        let handle = document_rect_to_egui(origin, chrome.handle_rect);
-        if let Some(track_color) = chrome.track_color {
-            painter.rect_filled(track, chrome.radius, to_egui_color(track_color));
-        }
-        painter.rect_filled(handle, chrome.radius, to_egui_color(chrome.handle_color));
-        if let Some(border_color) = chrome.handle_border_color
-            && chrome.handle_border_width > 0.0
-        {
-            painter.rect_stroke(
-                handle,
-                chrome.radius,
-                egui::Stroke::new(chrome.handle_border_width, to_egui_color(border_color)),
-                egui::StrokeKind::Inside,
-            );
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use des_ui_document::FloatingPlacement;
+    use des_ui_render::floating_arrow_points;
 
     #[test]
     fn floating_arrow_points_attach_to_opposite_side_of_placement() {
-        let rect = egui::Rect::from_min_size(egui::pos2(20.0, 30.0), egui::vec2(80.0, 40.0));
+        let bottom = floating_arrow_points(
+            Rect::new(20.0, 30.0, 80.0, 40.0),
+            FloatingPlacement::Bottom,
+            30.0,
+            0.0,
+            12.0,
+            6.0,
+        );
+        assert_eq!(bottom[0], Point::new(50.0, 30.0));
+        assert_eq!(bottom[1], Point::new(62.0, 30.0));
+        assert_eq!(bottom[2], Point::new(56.0, 24.0));
 
-        let bottom = floating_arrow_points(rect, FloatingPlacement::Bottom, 30.0, 0.0, 12.0, 6.0);
-        assert_eq!(bottom[0], egui::pos2(50.0, 30.0));
-        assert_eq!(bottom[1], egui::pos2(62.0, 30.0));
-        assert_eq!(bottom[2], egui::pos2(56.0, 24.0));
-
-        let right = floating_arrow_points(rect, FloatingPlacement::Right, 0.0, 10.0, 6.0, 12.0);
-        assert_eq!(right[0], egui::pos2(20.0, 52.0));
-        assert_eq!(right[1], egui::pos2(20.0, 40.0));
-        assert_eq!(right[2], egui::pos2(14.0, 46.0));
+        let right = floating_arrow_points(
+            Rect::new(20.0, 30.0, 80.0, 40.0),
+            FloatingPlacement::Right,
+            0.0,
+            10.0,
+            6.0,
+            12.0,
+        );
+        assert_eq!(right[0], Point::new(20.0, 52.0));
+        assert_eq!(right[1], Point::new(20.0, 40.0));
+        assert_eq!(right[2], Point::new(14.0, 46.0));
     }
 
     #[test]
     fn expanded_arrow_keeps_center_and_moves_points_outward() {
-        let arrow = FloatingArrowPaint {
+        let arrow = EguiFloatingArrowPaint {
             points: [
                 egui::pos2(0.0, 0.0),
                 egui::pos2(10.0, 0.0),
@@ -928,6 +832,10 @@ fn document_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
         egui::pos2(origin.x + rect.origin.x, origin.y + rect.origin.y),
         egui::vec2(rect.size.width, rect.size.height),
     )
+}
+
+fn point_to_egui(point: Point) -> egui::Pos2 {
+    egui::pos2(point.x, point.y)
 }
 
 fn to_egui_color(color: Color) -> egui::Color32 {
