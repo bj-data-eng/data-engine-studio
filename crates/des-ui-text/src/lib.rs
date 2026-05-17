@@ -20,6 +20,19 @@ const INTER_VARIABLE: &[u8] = include_bytes!("../assets/fonts/inter/InterVariabl
 const INTER_VARIABLE_ITALIC: &[u8] =
     include_bytes!("../assets/fonts/inter/InterVariable-Italic.ttf");
 
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct TextRevision(u64);
+
+impl TextRevision {
+    pub fn value(self) -> u64 {
+        self.0
+    }
+
+    fn advance(&mut self) {
+        self.0 = self.0.wrapping_add(1);
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FontOrigin {
     BuiltIn,
@@ -123,6 +136,7 @@ impl std::error::Error for FontRegistryError {}
 #[derive(Clone, Debug, PartialEq)]
 pub struct FontRegistry {
     default_family: String,
+    revision: TextRevision,
     faces: Vec<FontFace>,
 }
 
@@ -130,6 +144,7 @@ impl FontRegistry {
     pub fn empty(default_family: impl Into<String>) -> Self {
         Self {
             default_family: default_family.into(),
+            revision: TextRevision::default(),
             faces: Vec::new(),
         }
     }
@@ -159,8 +174,13 @@ impl FontRegistry {
         &self.default_family
     }
 
+    pub fn revision(&self) -> TextRevision {
+        self.revision
+    }
+
     pub fn set_default_family(&mut self, family: impl Into<String>) {
         self.default_family = family.into();
+        self.revision.advance();
     }
 
     pub fn faces(&self) -> &[FontFace] {
@@ -224,6 +244,7 @@ impl FontRegistry {
             attributes,
             bytes,
         });
+        self.revision.advance();
         Ok(id)
     }
 
@@ -314,6 +335,198 @@ pub enum TextAlignment {
     Justify,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TextDocumentError {
+    InvalidRange {
+        start: usize,
+        end: usize,
+        len: usize,
+    },
+    NotCharBoundary {
+        index: usize,
+    },
+}
+
+impl fmt::Display for TextDocumentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidRange { start, end, len } => {
+                write!(f, "invalid text range {start}..{end} for length {len}")
+            }
+            Self::NotCharBoundary { index } => {
+                write!(f, "text index {index} is not a UTF-8 character boundary")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TextDocumentError {}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextDocument {
+    text: String,
+    revision: TextRevision,
+    style_revision: TextRevision,
+    spans: Vec<TextSpan>,
+}
+
+impl TextDocument {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            revision: TextRevision::default(),
+            style_revision: TextRevision::default(),
+            spans: Vec::new(),
+        }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn revision(&self) -> TextRevision {
+        self.revision
+    }
+
+    pub fn style_revision(&self) -> TextRevision {
+        self.style_revision
+    }
+
+    pub fn spans(&self) -> &[TextSpan] {
+        &self.spans
+    }
+
+    pub fn insert(&mut self, index: usize, text: &str) -> Result<(), TextDocumentError> {
+        self.validate_boundary(index)?;
+        self.text.insert_str(index, text);
+        self.revision.advance();
+        self.spans.clear();
+        self.style_revision.advance();
+        Ok(())
+    }
+
+    pub fn delete(&mut self, range: Range<usize>) -> Result<(), TextDocumentError> {
+        self.validate_range(range.clone())?;
+        self.text.replace_range(range, "");
+        self.revision.advance();
+        self.spans.clear();
+        self.style_revision.advance();
+        Ok(())
+    }
+
+    pub fn replace(&mut self, range: Range<usize>, text: &str) -> Result<(), TextDocumentError> {
+        self.validate_range(range.clone())?;
+        self.text.replace_range(range, text);
+        self.revision.advance();
+        self.spans.clear();
+        self.style_revision.advance();
+        Ok(())
+    }
+
+    pub fn set_spans(&mut self, spans: impl Into<Vec<TextSpan>>) {
+        self.spans = spans.into();
+        self.style_revision.advance();
+    }
+
+    fn validate_range(&self, range: Range<usize>) -> Result<(), TextDocumentError> {
+        if range.start > range.end || range.end > self.text.len() {
+            return Err(TextDocumentError::InvalidRange {
+                start: range.start,
+                end: range.end,
+                len: self.text.len(),
+            });
+        }
+        self.validate_boundary(range.start)?;
+        self.validate_boundary(range.end)
+    }
+
+    fn validate_boundary(&self, index: usize) -> Result<(), TextDocumentError> {
+        if index > self.text.len() {
+            return Err(TextDocumentError::InvalidRange {
+                start: index,
+                end: index,
+                len: self.text.len(),
+            });
+        }
+        if !self.text.is_char_boundary(index) {
+            return Err(TextDocumentError::NotCharBoundary { index });
+        }
+        Ok(())
+    }
+}
+
+impl Default for TextDocument {
+    fn default() -> Self {
+        Self::new("")
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextSpan {
+    pub range: Range<usize>,
+    pub style: TextStyle,
+}
+
+impl TextSpan {
+    pub fn new(range: Range<usize>, style: TextStyle) -> Self {
+        Self { range, style }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextStyle {
+    pub font_family: String,
+    pub font_size: f32,
+    pub line_height: Option<f32>,
+    pub color: TextColor,
+    pub alignment: TextAlignment,
+    pub wrap: TextWrap,
+}
+
+impl TextStyle {
+    pub fn new(font_size: f32) -> Self {
+        Self {
+            font_family: DEFAULT_FONT_FAMILY.to_owned(),
+            font_size,
+            line_height: None,
+            color: TextColor::rgb(0, 0, 0),
+            alignment: TextAlignment::Start,
+            wrap: TextWrap::Wrap,
+        }
+    }
+
+    pub fn font_family(mut self, family: impl Into<String>) -> Self {
+        self.font_family = family.into();
+        self
+    }
+
+    pub fn line_height(mut self, line_height: impl Into<Option<f32>>) -> Self {
+        self.line_height = line_height.into();
+        self
+    }
+
+    pub fn color(mut self, color: TextColor) -> Self {
+        self.color = color;
+        self
+    }
+
+    pub fn alignment(mut self, alignment: TextAlignment) -> Self {
+        self.alignment = alignment;
+        self
+    }
+
+    pub fn wrap(mut self, wrap: TextWrap) -> Self {
+        self.wrap = wrap;
+        self
+    }
+}
+
+impl Default for TextStyle {
+    fn default() -> Self {
+        Self::new(14.0)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextLayoutRequest {
     pub text: String,
@@ -342,6 +555,24 @@ impl TextLayoutRequest {
         }
     }
 
+    pub fn from_document(
+        document: &TextDocument,
+        style: &TextStyle,
+        constraints: TextLayoutConstraints,
+    ) -> Self {
+        Self {
+            text: document.text().to_owned(),
+            font_family: style.font_family.clone(),
+            font_size: style.font_size,
+            wrap_width: constraints.wrap_width,
+            wrap: style.wrap,
+            line_height: style.line_height,
+            color: style.color,
+            alignment: style.alignment,
+            display_scale: constraints.display_scale,
+        }
+    }
+
     pub fn wrap(mut self, wrap: TextWrap) -> Self {
         self.wrap = wrap;
         self
@@ -364,6 +595,26 @@ impl TextLayoutRequest {
 
     pub fn alignment(mut self, alignment: TextAlignment) -> Self {
         self.alignment = alignment;
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextLayoutConstraints {
+    pub wrap_width: f32,
+    pub display_scale: f32,
+}
+
+impl TextLayoutConstraints {
+    pub fn new(wrap_width: f32) -> Self {
+        Self {
+            wrap_width,
+            display_scale: 1.0,
+        }
+    }
+
+    pub fn display_scale(mut self, display_scale: f32) -> Self {
+        self.display_scale = display_scale;
         self
     }
 }
@@ -523,6 +774,86 @@ impl TextLayout {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextLayoutCacheStatus {
+    Reused,
+    Computed,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct TextLayoutCacheKey {
+    document_revision: TextRevision,
+    style_revision: TextRevision,
+    font_registry_revision: TextRevision,
+    constraints: TextLayoutConstraints,
+    style: TextStyle,
+}
+
+struct TextLayoutCacheEntry {
+    key: TextLayoutCacheKey,
+    layout: TextLayout,
+}
+
+pub struct CachedTextLayout<'a> {
+    pub status: TextLayoutCacheStatus,
+    pub layout: &'a TextLayout,
+}
+
+#[derive(Default)]
+pub struct TextLayoutCache {
+    entries: Vec<TextLayoutCacheEntry>,
+}
+
+impl TextLayoutCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn layout_document<'a>(
+        &'a mut self,
+        engine: &mut TextEngine,
+        document: &TextDocument,
+        style: &TextStyle,
+        constraints: TextLayoutConstraints,
+    ) -> CachedTextLayout<'a> {
+        let key = TextLayoutCacheKey {
+            document_revision: document.revision(),
+            style_revision: document.style_revision(),
+            font_registry_revision: engine.font_registry().revision(),
+            constraints,
+            style: style.clone(),
+        };
+
+        if let Some(index) = self.entries.iter().position(|entry| entry.key == key) {
+            return CachedTextLayout {
+                status: TextLayoutCacheStatus::Reused,
+                layout: &self.entries[index].layout,
+            };
+        }
+
+        let request = TextLayoutRequest::from_document(document, style, constraints);
+        let layout = engine.layout(&request);
+        self.entries.push(TextLayoutCacheEntry { key, layout });
+        let index = self.entries.len() - 1;
+        CachedTextLayout {
+            status: TextLayoutCacheStatus::Computed,
+            layout: &self.entries[index].layout,
+        }
+    }
+}
+
 pub struct TextEngine {
     font_registry: FontRegistry,
     font_context: FontContext,
@@ -649,6 +980,7 @@ mod tests {
         let registry = FontRegistry::default();
 
         assert_eq!(registry.default_family(), DEFAULT_FONT_FAMILY);
+        assert_eq!(registry.revision().value(), 2);
         assert!(registry.contains_family(DEFAULT_FONT_FAMILY));
         assert_eq!(registry.faces().len(), 2);
         assert!(
@@ -686,5 +1018,96 @@ mod tests {
             }
         );
         assert!(registry.faces().is_empty());
+    }
+
+    #[test]
+    fn text_document_edits_advance_revision() {
+        let mut document = TextDocument::new("hello");
+        assert_eq!(document.revision().value(), 0);
+
+        document.insert(5, " world").unwrap();
+        assert_eq!(document.text(), "hello world");
+        assert_eq!(document.revision().value(), 1);
+
+        document.replace(6..11, "studio").unwrap();
+        assert_eq!(document.text(), "hello studio");
+        assert_eq!(document.revision().value(), 2);
+
+        document.delete(5..12).unwrap();
+        assert_eq!(document.text(), "hello");
+        assert_eq!(document.revision().value(), 3);
+    }
+
+    #[test]
+    fn text_document_rejects_non_boundary_edits() {
+        let mut document = TextDocument::new("éclair");
+
+        let error = document
+            .insert(1, "x")
+            .expect_err("index 1 is inside the first UTF-8 codepoint");
+
+        assert_eq!(error, TextDocumentError::NotCharBoundary { index: 1 });
+        assert_eq!(document.text(), "éclair");
+        assert_eq!(document.revision().value(), 0);
+    }
+
+    #[test]
+    fn text_layout_cache_reuses_matching_revision_and_constraints() {
+        let mut engine = TextEngine::new();
+        let document = TextDocument::new("cached report text");
+        let style = TextStyle::new(14.0);
+        let constraints = TextLayoutConstraints::new(160.0);
+        let mut cache = TextLayoutCache::new();
+
+        let first = cache
+            .layout_document(&mut engine, &document, &style, constraints)
+            .status;
+        let second = cache
+            .layout_document(&mut engine, &document, &style, constraints)
+            .status;
+
+        assert_eq!(first, TextLayoutCacheStatus::Computed);
+        assert_eq!(second, TextLayoutCacheStatus::Reused);
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn text_layout_cache_invalidates_after_document_edit() {
+        let mut engine = TextEngine::new();
+        let mut document = TextDocument::new("cached report text");
+        let style = TextStyle::new(14.0);
+        let constraints = TextLayoutConstraints::new(160.0);
+        let mut cache = TextLayoutCache::new();
+
+        cache.layout_document(&mut engine, &document, &style, constraints);
+        document.insert(0, "live ").unwrap();
+        let status = cache
+            .layout_document(&mut engine, &document, &style, constraints)
+            .status;
+
+        assert_eq!(status, TextLayoutCacheStatus::Computed);
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn text_layout_cache_invalidates_after_font_registry_change() {
+        let mut registry = FontRegistry::default();
+        let mut engine = TextEngine::with_font_registry(registry.clone());
+        let document = TextDocument::new("cached report text");
+        let style = TextStyle::new(14.0);
+        let constraints = TextLayoutConstraints::new(160.0);
+        let mut cache = TextLayoutCache::new();
+
+        cache.layout_document(&mut engine, &document, &style, constraints);
+        registry
+            .add_user_font("Report Sans", INTER_VARIABLE, FontFaceAttributes::regular())
+            .unwrap();
+        engine = TextEngine::with_font_registry(registry);
+        let status = cache
+            .layout_document(&mut engine, &document, &style, constraints)
+            .status;
+
+        assert_eq!(status, TextLayoutCacheStatus::Computed);
+        assert_eq!(cache.len(), 2);
     }
 }
