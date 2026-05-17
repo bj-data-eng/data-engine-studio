@@ -7,8 +7,8 @@
 
 use des_ui_document::{Color, Rect};
 use des_ui_render::{
-    DisplayList, PrimitiveCommand, PrimitiveList, RenderPrimitive, TriangleMeshPrimitive,
-    plan_primitives,
+    DisplayList, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
+    TriangleMeshPrimitive, plan_primitives,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -78,19 +78,33 @@ impl Default for RenderOptions {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RenderPlan {
     pub clear_color: ClearColor,
+    pub items: Vec<RenderItem>,
     pub batches: Vec<MeshBatch>,
+    pub text_batches: Vec<TextBatch>,
 }
 
 impl RenderPlan {
     pub fn is_empty(&self) -> bool {
-        self.batches.iter().all(|batch| batch.mesh.is_empty())
+        self.batches.iter().all(|batch| batch.mesh.is_empty()) && self.text_batches.is_empty()
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum RenderItem {
+    Mesh(MeshBatch),
+    Text(TextBatch),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MeshBatch {
     pub clip: Option<Rect>,
     pub mesh: Mesh,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextBatch {
+    pub clip: Option<Rect>,
+    pub text: TextPaint,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -101,6 +115,10 @@ pub struct DisplayListRenderer {
 impl DisplayListRenderer {
     pub fn new(options: RenderOptions) -> Self {
         Self { options }
+    }
+
+    pub fn build_plan_for_output(&self, output: &des_ui_document::DocumentOutput) -> RenderPlan {
+        self.build_plan(&des_ui_render::plan_paint(output))
     }
 
     pub fn build_plan(&self, display_list: &DisplayList) -> RenderPlan {
@@ -219,7 +237,9 @@ impl RenderPlanBuilder {
         Self {
             plan: RenderPlan {
                 clear_color: options.clear_color,
+                items: Vec::new(),
                 batches: Vec::new(),
+                text_batches: Vec::new(),
             },
             current_clip: None,
             current_mesh: MeshBuilder::new(),
@@ -238,6 +258,15 @@ impl RenderPlanBuilder {
                     clip_stack.pop();
                     self.set_clip(clip_stack.last().copied());
                 }
+                PrimitiveCommand::Draw(RenderPrimitive::Text(text)) => {
+                    self.flush();
+                    let batch = TextBatch {
+                        clip: self.current_clip,
+                        text: text.clone(),
+                    };
+                    self.plan.items.push(RenderItem::Text(batch.clone()));
+                    self.plan.text_batches.push(batch);
+                }
                 _ => self.current_mesh.push_command(command),
             }
         }
@@ -254,10 +283,12 @@ impl RenderPlanBuilder {
     fn flush(&mut self) {
         let mesh = std::mem::take(&mut self.current_mesh).finish();
         if !mesh.is_empty() {
-            self.plan.batches.push(MeshBatch {
+            let batch = MeshBatch {
                 clip: self.current_clip,
                 mesh,
-            });
+            };
+            self.plan.items.push(RenderItem::Mesh(batch.clone()));
+            self.plan.batches.push(batch);
         }
     }
 
@@ -269,11 +300,14 @@ impl RenderPlanBuilder {
 
 #[cfg(test)]
 mod tests {
-    use des_ui_document::{Color, CornerRadii, ElementId, Rect};
-    use des_ui_render::{DisplayList, FillRectPaint, PaintCommand};
+    use des_ui_document::{
+        Color, CornerRadii, Document, DocumentEngine, Element, ElementId, Rect, Size, Style,
+        StyleSelector, StyleSheet, TextWrapMode,
+    };
+    use des_ui_render::{DisplayList, FillRectPaint, PaintCommand, TextPaint};
 
     use crate::{
-        ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, RenderOptions,
+        ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, RenderItem, RenderOptions,
         mesh_for_display_list,
     };
 
@@ -341,6 +375,102 @@ mod tests {
         assert_eq!(plan.batches[1].clip, Some(Rect::new(4.0, 5.0, 6.0, 7.0)));
         assert_eq!(plan.batches[0].mesh.indices.len(), 6);
         assert_eq!(plan.batches[1].mesh.indices.len(), 6);
+    }
+
+    #[test]
+    fn render_plan_preserves_text_batches_with_active_clip() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::PushClip(Rect::new(1.0, 2.0, 30.0, 40.0)));
+        display_list.push(PaintCommand::Text(TextPaint {
+            element_id: ElementId::new("label"),
+            rect: Rect::new(4.0, 5.0, 20.0, 10.0),
+            text: "Ready".into(),
+            color: Color::rgb(1, 2, 3),
+            font_size: 12.0,
+            wrap_width: 20.0,
+            wrap_mode: TextWrapMode::Extend,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        }));
+        display_list.push(PaintCommand::PopClip);
+
+        let plan = DisplayListRenderer::new(RenderOptions::default()).build_plan(&display_list);
+
+        assert_eq!(plan.text_batches.len(), 1);
+        assert_eq!(
+            plan.text_batches[0].clip,
+            Some(Rect::new(1.0, 2.0, 30.0, 40.0))
+        );
+        assert_eq!(plan.text_batches[0].text.text, "Ready");
+        assert!(plan.batches.is_empty());
+        assert!(!plan.is_empty());
+    }
+
+    #[test]
+    fn renderer_builds_plan_directly_from_document_output() {
+        let mut document = Document::build(Size::new(200.0, 100.0), |ui| {
+            ui.div("panel").children(|ui| {
+                ui.text("label", "Document text");
+            });
+        });
+        let stylesheet = StyleSheet::new()
+            .rule(
+                StyleSelector::Id("panel".into()),
+                Style::default()
+                    .size(100.0, 60.0)
+                    .background(Color::rgb(20, 30, 40)),
+            )
+            .rule(
+                StyleSelector::Element(Element::Text),
+                Style::default()
+                    .size(80.0, 20.0)
+                    .text_color(Color::rgb(240, 241, 242)),
+            );
+        let output = DocumentEngine::default().update(&mut document, &stylesheet);
+
+        let plan = DisplayListRenderer::default().build_plan_for_output(&output);
+
+        assert!(!plan.batches.is_empty());
+        assert_eq!(plan.text_batches.len(), 1);
+        assert_eq!(plan.text_batches[0].text.text, "Document text");
+    }
+
+    #[test]
+    fn render_plan_preserves_mixed_mesh_and_text_order() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("background"),
+            rect: Rect::new(0.0, 0.0, 100.0, 40.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(20, 30, 40),
+        }));
+        display_list.push(PaintCommand::Text(TextPaint {
+            element_id: ElementId::new("label"),
+            rect: Rect::new(4.0, 5.0, 20.0, 10.0),
+            text: "Layered".into(),
+            color: Color::rgb(1, 2, 3),
+            font_size: 12.0,
+            wrap_width: 20.0,
+            wrap_mode: TextWrapMode::Extend,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        }));
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("overlay"),
+            rect: Rect::new(8.0, 8.0, 20.0, 8.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgba(200, 0, 0, 128),
+        }));
+
+        let plan = DisplayListRenderer::default().build_plan(&display_list);
+
+        assert!(matches!(plan.items[0], RenderItem::Mesh(_)));
+        assert!(matches!(plan.items[1], RenderItem::Text(_)));
+        assert!(matches!(plan.items[2], RenderItem::Mesh(_)));
+        assert_eq!(plan.batches.len(), 2);
+        assert_eq!(plan.text_batches.len(), 1);
     }
 
     #[test]

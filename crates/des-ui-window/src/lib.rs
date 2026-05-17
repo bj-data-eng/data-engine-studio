@@ -3,8 +3,8 @@
 //! `des-ui-window` is the product-facing app/window layer that replaces the
 //! useful shell responsibilities of `eframe` without taking on egui semantics.
 
-use des_ui_document::DocumentInput;
-use des_ui_render::DisplayList;
+use des_ui_document::{DocumentInput, DocumentOutput};
+use des_ui_render::{DisplayList, plan_paint};
 use des_ui_wgpu::{DisplayListRenderer, RenderOptions, RenderPlan};
 use des_ui_winit::HostViewport;
 
@@ -83,6 +83,14 @@ impl AppFrame {
         &mut self.display_list
     }
 
+    pub fn set_document_output(&mut self, output: &DocumentOutput) {
+        self.display_list = plan_paint(output);
+    }
+
+    pub fn set_display_list(&mut self, display_list: DisplayList) {
+        self.display_list = display_list;
+    }
+
     pub fn request_repaint(&mut self) {
         self.repaint_requested = true;
     }
@@ -120,7 +128,10 @@ pub struct FrameOutput {
 
 #[cfg(test)]
 mod tests {
-    use des_ui_document::{Color, CornerRadii, DocumentInput, ElementId, Point, Rect};
+    use des_ui_document::{
+        Color, CornerRadii, Document, DocumentEngine, DocumentInput, Element, ElementId, Point,
+        Rect, Size, Style, StyleSelector, StyleSheet,
+    };
     use des_ui_render::{FillRectPaint, PaintCommand};
     use des_ui_wgpu::ClearColor;
     use des_ui_winit::HostViewport;
@@ -208,5 +219,37 @@ mod tests {
 
         assert_eq!(app.updates, 1);
         assert!(frame.repaint_requested());
+    }
+
+    #[test]
+    fn app_frame_accepts_document_output_as_render_source() {
+        let mut document = Document::build(Size::new(200.0, 120.0), |ui| {
+            ui.div("panel").children(|ui| {
+                ui.text("label", "Native document");
+            });
+        });
+        let stylesheet = StyleSheet::new()
+            .rule(
+                StyleSelector::Id("panel".into()),
+                Style::default()
+                    .size(100.0, 50.0)
+                    .background(Color::rgb(20, 30, 40)),
+            )
+            .rule(
+                StyleSelector::Element(Element::Text),
+                Style::default().size(80.0, 20.0),
+            );
+        let output = DocumentEngine::default().update(&mut document, &stylesheet);
+        let mut frame = AppFrame::new(HostViewport::new(800, 600, 1.0), DocumentInput::default());
+
+        frame.set_document_output(&output);
+        let output = frame.into_output(des_ui_wgpu::RenderOptions::default());
+
+        assert!(!output.render_plan.batches.is_empty());
+        assert_eq!(output.render_plan.text_batches.len(), 1);
+        assert_eq!(
+            output.render_plan.text_batches[0].text.text,
+            "Native document"
+        );
     }
 }
