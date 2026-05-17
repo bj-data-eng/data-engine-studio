@@ -16,6 +16,12 @@ Refinement bar:
 
 Good refinement lets developers declare structure, classes, and behavior intent while the system handles layout, hit testing, state, animation, and painting predictably. Avoid both bespoke per-widget plumbing and hidden magic.
 
+Craft standard:
+
+- Code should be fluent, well-shaped, and humane to use at every layer, including internal APIs, adapters, tests, and other dark corners users may never see.
+- Treat hidden implementation surfaces as part of the product. Names, boundaries, error paths, defaults, and extension points should feel holistically designed rather than merely functional.
+- Prefer the Apple/Steve Jobs craft philosophy: the unseen back of the cabinet still matters. If a part exists, it deserves care, consistency, and maximum attention to detail.
+
 ## Project Shape
 
 - Rust owns app behavior. Python owns PyPI packaging/process entry. No `.exe` distribution requirement.
