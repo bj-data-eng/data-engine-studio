@@ -826,6 +826,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-ui-window"
+version = "0.1.0"
+dependencies = [
+ "des-ui-document",
+ "des-ui-render",
+ "des-ui-wgpu",
+ "des-ui-winit",
+ "winit",
+]
+
+[[package]]
 name = "des-ui-winit"
 version = "0.1.0"
 dependencies = [

@@ -11,6 +11,7 @@ members = [
     "crates/des-ui-lab",
     "crates/des-ui-render",
     "crates/des-ui-text",
+    "crates/des-ui-window",
     "crates/des-ui-wgpu",
     "crates/des-ui-widgets",
     "crates/des-ui-winit",
@@ -35,6 +36,7 @@ des-ui-egui = { path = "crates/des-ui-egui" }
 des-ui-lab = { path = "crates/des-ui-lab" }
 des-ui-render = { path = "crates/des-ui-render" }
 des-ui-text = { path = "crates/des-ui-text" }
+des-ui-window = { path = "crates/des-ui-window" }
 des-ui-wgpu = { path = "crates/des-ui-wgpu" }
 des-ui-widgets = { path = "crates/des-ui-widgets" }
 des-ui-winit = { path = "crates/des-ui-winit" }
