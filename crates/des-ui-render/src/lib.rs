@@ -125,6 +125,72 @@ pub struct TextSelectionPaint {
     pub color: Color,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PrimitiveList {
+    pub commands: Vec<PrimitiveCommand>,
+}
+
+impl PrimitiveList {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, command: PrimitiveCommand) {
+        self.commands.push(command);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PrimitiveCommand {
+    PushClip(Rect),
+    PopClip,
+    Draw(RenderPrimitive),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum RenderPrimitive {
+    Triangles(TriangleMeshPrimitive),
+    Text(TextPaint),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TriangleMeshPrimitive {
+    pub element_id: ElementId,
+    pub vertices: Vec<PrimitiveVertex>,
+    pub indices: Vec<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PrimitiveVertex {
+    pub position: Point,
+    pub color: Color,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PrimitivePlanner;
+
+impl PrimitivePlanner {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn plan_display_list(&self, display_list: &DisplayList) -> PrimitiveList {
+        let mut primitives = PrimitiveList::new();
+        for command in &display_list.commands {
+            append_primitive_command(&mut primitives, command);
+        }
+        primitives
+    }
+}
+
+pub fn plan_primitives(display_list: &DisplayList) -> PrimitiveList {
+    PrimitivePlanner::new().plan_display_list(display_list)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollChromePaint {
     pub element_id: ElementId,
@@ -217,6 +283,287 @@ pub fn content_rect(frame: &ResolvedElement) -> Rect {
         bottom: frame.style.border_width.bottom + frame.style.padding.bottom,
         left: frame.style.border_width.left + frame.style.padding.left,
     })
+}
+
+fn append_primitive_command(primitives: &mut PrimitiveList, command: &PaintCommand) {
+    match command {
+        PaintCommand::PushClip(rect) => primitives.push(PrimitiveCommand::PushClip(*rect)),
+        PaintCommand::PopClip => primitives.push(PrimitiveCommand::PopClip),
+        PaintCommand::FillRect(command) => {
+            if let Some(mesh) = fill_rect_mesh(command) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
+            }
+        }
+        PaintCommand::StrokeRect(command) => {
+            for mesh in stroke_rect_meshes(command) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
+            }
+        }
+        PaintCommand::StrokeLine(command) => {
+            if let Some(mesh) = stroke_line_mesh(
+                command.element_id.clone(),
+                command.from,
+                command.to,
+                command.width,
+                command.color,
+            ) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
+            }
+        }
+        PaintCommand::StrokePath(command) => {
+            for mesh in stroke_path_meshes(command) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
+            }
+        }
+        PaintCommand::FillCircle(command) => {
+            if let Some(mesh) = fill_circle_mesh(command) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
+            }
+        }
+        PaintCommand::FillPolygon(command) => {
+            if let Some(mesh) = fill_polygon_mesh(
+                command.element_id.clone(),
+                command.points.clone(),
+                command.color,
+            ) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
+            }
+        }
+        PaintCommand::Text(command) => {
+            primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Text(
+                command.clone(),
+            )));
+        }
+    }
+}
+
+fn fill_rect_mesh(command: &FillRectPaint) -> Option<TriangleMeshPrimitive> {
+    if command.rect.size.width <= 0.0 || command.rect.size.height <= 0.0 || command.color.a == 0 {
+        return None;
+    }
+    if command.radius == CornerRadii::ZERO {
+        return fill_polygon_mesh(
+            command.element_id.clone(),
+            rect_points(command.rect),
+            command.color,
+        );
+    }
+    fill_polygon_mesh(
+        command.element_id.clone(),
+        rounded_rect_points(command.rect, command.radius),
+        command.color,
+    )
+}
+
+fn stroke_rect_meshes(command: &StrokeRectPaint) -> Vec<TriangleMeshPrimitive> {
+    if command.width <= 0.0 || command.rect.size.width <= 0.0 || command.rect.size.height <= 0.0 {
+        return Vec::new();
+    }
+    let points = if command.radius == CornerRadii::ZERO {
+        rect_points(command.rect)
+    } else {
+        rounded_rect_points(command.rect, command.radius)
+    };
+    stroke_closed_polyline_meshes(
+        command.element_id.clone(),
+        &points,
+        command.width,
+        command.color,
+    )
+}
+
+fn stroke_path_meshes(command: &StrokePathPaint) -> Vec<TriangleMeshPrimitive> {
+    if command.width <= 0.0 || command.points.len() < 2 {
+        return Vec::new();
+    }
+    if command.closed {
+        return stroke_closed_polyline_meshes(
+            command.element_id.clone(),
+            &command.points,
+            command.width,
+            command.color,
+        );
+    }
+    command
+        .points
+        .windows(2)
+        .filter_map(|points| {
+            stroke_line_mesh(
+                command.element_id.clone(),
+                points[0],
+                points[1],
+                command.width,
+                command.color,
+            )
+        })
+        .collect()
+}
+
+fn stroke_closed_polyline_meshes(
+    element_id: ElementId,
+    points: &[Point],
+    width: f32,
+    color: Color,
+) -> Vec<TriangleMeshPrimitive> {
+    if points.len() < 2 {
+        return Vec::new();
+    }
+    let mut meshes: Vec<_> = points
+        .windows(2)
+        .filter_map(|points| {
+            stroke_line_mesh(element_id.clone(), points[0], points[1], width, color)
+        })
+        .collect();
+    if let Some(mesh) = stroke_line_mesh(
+        element_id,
+        *points.last().expect("checked length"),
+        points[0],
+        width,
+        color,
+    ) {
+        meshes.push(mesh);
+    }
+    meshes
+}
+
+fn stroke_line_mesh(
+    element_id: ElementId,
+    from: Point,
+    to: Point,
+    width: f32,
+    color: Color,
+) -> Option<TriangleMeshPrimitive> {
+    if width <= 0.0 || color.a == 0 {
+        return None;
+    }
+    let vector = sub_points(to, from);
+    let length = point_length(vector);
+    if length <= f32::EPSILON {
+        return None;
+    }
+    let normal = scale_point(Point::new(-vector.y, vector.x), width * 0.5 / length);
+    fill_polygon_mesh(
+        element_id,
+        vec![
+            add_points(from, normal),
+            add_points(to, normal),
+            sub_points(to, normal),
+            sub_points(from, normal),
+        ],
+        color,
+    )
+}
+
+fn fill_circle_mesh(command: &FillCirclePaint) -> Option<TriangleMeshPrimitive> {
+    if command.radius <= 0.0 || command.color.a == 0 {
+        return None;
+    }
+    let segments = circle_segments(command.radius);
+    let mut points = Vec::with_capacity(segments);
+    for index in 0..segments {
+        let angle = std::f32::consts::TAU * index as f32 / segments as f32;
+        points.push(Point::new(
+            command.center.x + angle.cos() * command.radius,
+            command.center.y + angle.sin() * command.radius,
+        ));
+    }
+    fill_polygon_mesh(command.element_id.clone(), points, command.color)
+}
+
+fn fill_polygon_mesh(
+    element_id: ElementId,
+    points: Vec<Point>,
+    color: Color,
+) -> Option<TriangleMeshPrimitive> {
+    if points.len() < 3 || color.a == 0 {
+        return None;
+    }
+    let vertices = points
+        .iter()
+        .copied()
+        .map(|position| PrimitiveVertex { position, color })
+        .collect();
+    let mut indices = Vec::with_capacity((points.len() - 2) * 3);
+    for index in 1..points.len() - 1 {
+        indices.extend([0, index as u32, index as u32 + 1]);
+    }
+    Some(TriangleMeshPrimitive {
+        element_id,
+        vertices,
+        indices,
+    })
+}
+
+fn rect_points(rect: Rect) -> Vec<Point> {
+    vec![
+        rect.origin,
+        Point::new(rect.right(), rect.origin.y),
+        Point::new(rect.right(), rect.bottom()),
+        Point::new(rect.origin.x, rect.bottom()),
+    ]
+}
+
+fn rounded_rect_points(rect: Rect, radius: CornerRadii) -> Vec<Point> {
+    let max_x = rect.size.width * 0.5;
+    let max_y = rect.size.height * 0.5;
+    let top_left = radius.top_left.min(max_x).min(max_y).max(0.0);
+    let top_right = radius.top_right.min(max_x).min(max_y).max(0.0);
+    let bottom_right = radius.bottom_right.min(max_x).min(max_y).max(0.0);
+    let bottom_left = radius.bottom_left.min(max_x).min(max_y).max(0.0);
+    let mut points = Vec::new();
+    append_corner_arc(
+        &mut points,
+        Point::new(rect.origin.x + top_left, rect.origin.y + top_left),
+        top_left,
+        std::f32::consts::PI,
+        std::f32::consts::PI * 1.5,
+    );
+    append_corner_arc(
+        &mut points,
+        Point::new(rect.right() - top_right, rect.origin.y + top_right),
+        top_right,
+        std::f32::consts::PI * 1.5,
+        std::f32::consts::TAU,
+    );
+    append_corner_arc(
+        &mut points,
+        Point::new(rect.right() - bottom_right, rect.bottom() - bottom_right),
+        bottom_right,
+        0.0,
+        std::f32::consts::FRAC_PI_2,
+    );
+    append_corner_arc(
+        &mut points,
+        Point::new(rect.origin.x + bottom_left, rect.bottom() - bottom_left),
+        bottom_left,
+        std::f32::consts::FRAC_PI_2,
+        std::f32::consts::PI,
+    );
+    points
+}
+
+fn append_corner_arc(points: &mut Vec<Point>, center: Point, radius: f32, start: f32, end: f32) {
+    if radius <= f32::EPSILON {
+        points.push(center);
+        return;
+    }
+    let segments = corner_segments(radius);
+    for index in 0..=segments {
+        let t = index as f32 / segments as f32;
+        let angle = start + (end - start) * t;
+        points.push(Point::new(
+            center.x + angle.cos() * radius,
+            center.y + angle.sin() * radius,
+        ));
+    }
+}
+
+fn corner_segments(radius: f32) -> usize {
+    ((radius / 3.0).ceil() as usize).clamp(3, 10)
+}
+
+fn circle_segments(radius: f32) -> usize {
+    ((radius * 1.5).ceil() as usize).clamp(12, 48)
 }
 
 fn append_surface_commands(list: &mut DisplayList, frame: &ResolvedElement) {
@@ -1252,5 +1599,67 @@ mod tests {
         assert!(matches!(list.commands[0], PaintCommand::StrokeLine(_)));
         assert!(matches!(list.commands[1], PaintCommand::StrokeLine(_)));
         assert_eq!(list.commands.len(), 2);
+    }
+
+    #[test]
+    fn primitive_planner_expands_shapes_and_preserves_text_and_clips() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::PushClip(Rect::new(0.0, 0.0, 40.0, 30.0)));
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("surface"),
+            rect: Rect::new(4.0, 5.0, 20.0, 10.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(10, 20, 30),
+        }));
+        list.push(PaintCommand::Text(TextPaint {
+            element_id: ElementId::new("label"),
+            rect: Rect::new(8.0, 9.0, 20.0, 10.0),
+            text: "Hello".into(),
+            color: Color::rgb(1, 2, 3),
+            font_size: 12.0,
+            wrap_width: 20.0,
+            wrap_mode: TextWrapMode::Extend,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        }));
+        list.push(PaintCommand::PopClip);
+
+        let primitives = plan_primitives(&list);
+
+        assert!(matches!(
+            primitives.commands[0],
+            PrimitiveCommand::PushClip(_)
+        ));
+        assert!(matches!(
+            primitives.commands[1],
+            PrimitiveCommand::Draw(RenderPrimitive::Triangles(_))
+        ));
+        assert!(matches!(
+            primitives.commands[2],
+            PrimitiveCommand::Draw(RenderPrimitive::Text(_))
+        ));
+        assert!(matches!(primitives.commands[3], PrimitiveCommand::PopClip));
+    }
+
+    #[test]
+    fn rounded_rect_primitives_are_tessellated_beyond_a_plain_quad() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("rounded"),
+            rect: Rect::new(0.0, 0.0, 40.0, 24.0),
+            radius: CornerRadii::all(6.0),
+            color: Color::rgb(10, 20, 30),
+        }));
+
+        let primitives = plan_primitives(&list);
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected rounded rect mesh");
+        };
+
+        assert!(mesh.vertices.len() > 4);
+        assert!(mesh.indices.len() > 6);
+        assert_eq!(mesh.element_id.as_str(), "rounded");
     }
 }

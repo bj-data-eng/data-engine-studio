@@ -6,7 +6,10 @@
 //! turns the supported commands into meshes and, later, `wgpu` draw calls.
 
 use des_ui_document::{Color, Rect};
-use des_ui_render::{DisplayList, FillRectPaint, PaintCommand};
+use des_ui_render::{
+    DisplayList, PrimitiveCommand, PrimitiveList, RenderPrimitive, TriangleMeshPrimitive,
+    plan_primitives,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ClearColor {
@@ -102,7 +105,7 @@ impl DisplayListRenderer {
 
     pub fn build_plan(&self, display_list: &DisplayList) -> RenderPlan {
         let mut builder = RenderPlanBuilder::new(self.options);
-        builder.push_display_list(display_list);
+        builder.push_primitives(&plan_primitives(display_list));
         builder.finish()
     }
 }
@@ -165,22 +168,18 @@ impl MeshBuilder {
     }
 
     pub fn push_display_list(&mut self, display_list: &DisplayList) {
-        for command in &display_list.commands {
+        let primitives = plan_primitives(display_list);
+        for command in &primitives.commands {
             self.push_command(command);
         }
     }
 
-    pub fn push_command(&mut self, command: &PaintCommand) {
+    pub fn push_command(&mut self, command: &PrimitiveCommand) {
         match command {
-            PaintCommand::FillRect(command) => self.push_fill_rect(command),
-            PaintCommand::PushClip(_)
-            | PaintCommand::PopClip
-            | PaintCommand::StrokeRect(_)
-            | PaintCommand::StrokeLine(_)
-            | PaintCommand::StrokePath(_)
-            | PaintCommand::FillCircle(_)
-            | PaintCommand::FillPolygon(_)
-            | PaintCommand::Text(_) => {}
+            PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) => self.push_triangles(mesh),
+            PrimitiveCommand::Draw(RenderPrimitive::Text(_))
+            | PrimitiveCommand::PushClip(_)
+            | PrimitiveCommand::PopClip => {}
         }
     }
 
@@ -188,41 +187,17 @@ impl MeshBuilder {
         self.mesh
     }
 
-    fn push_fill_rect(&mut self, command: &FillRectPaint) {
-        if command.rect.size.width <= 0.0 || command.rect.size.height <= 0.0 {
-            return;
-        }
-        self.push_solid_rect(command.rect, command.color);
-    }
-
-    fn push_solid_rect(&mut self, rect: Rect, color: Color) {
+    fn push_triangles(&mut self, primitive: &TriangleMeshPrimitive) {
         let base = self.mesh.vertices.len() as u32;
-        let color = PackedColor::from(color).to_array();
-        let left = rect.origin.x;
-        let top = rect.origin.y;
-        let right = rect.right();
-        let bottom = rect.bottom();
-        self.mesh.vertices.extend([
-            Vertex {
-                position: [left, top],
-                color,
-            },
-            Vertex {
-                position: [right, top],
-                color,
-            },
-            Vertex {
-                position: [right, bottom],
-                color,
-            },
-            Vertex {
-                position: [left, bottom],
-                color,
-            },
-        ]);
+        self.mesh
+            .vertices
+            .extend(primitive.vertices.iter().map(|vertex| Vertex {
+                position: [vertex.position.x, vertex.position.y],
+                color: PackedColor::from(vertex.color).to_array(),
+            }));
         self.mesh
             .indices
-            .extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+            .extend(primitive.indices.iter().map(|index| base + *index));
     }
 }
 
@@ -251,15 +226,15 @@ impl RenderPlanBuilder {
         }
     }
 
-    fn push_display_list(&mut self, display_list: &DisplayList) {
+    fn push_primitives(&mut self, primitives: &PrimitiveList) {
         let mut clip_stack: Vec<Rect> = Vec::new();
-        for command in &display_list.commands {
+        for command in &primitives.commands {
             match command {
-                PaintCommand::PushClip(rect) => {
+                PrimitiveCommand::PushClip(rect) => {
                     clip_stack.push(*rect);
                     self.set_clip(clip_stack.last().copied());
                 }
-                PaintCommand::PopClip => {
+                PrimitiveCommand::PopClip => {
                     clip_stack.pop();
                     self.set_clip(clip_stack.last().copied());
                 }
@@ -297,7 +272,10 @@ mod tests {
     use des_ui_document::{Color, CornerRadii, ElementId, Rect};
     use des_ui_render::{DisplayList, FillRectPaint, PaintCommand};
 
-    use crate::{ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, RenderOptions};
+    use crate::{
+        ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, RenderOptions,
+        mesh_for_display_list,
+    };
 
     #[test]
     fn packed_color_preserves_rgba_channel_order() {
@@ -309,13 +287,15 @@ mod tests {
 
     #[test]
     fn fill_rect_generates_two_triangles_in_document_coordinates() {
-        let mut builder = MeshBuilder::new();
-        builder.push_command(&PaintCommand::FillRect(FillRectPaint {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
             element_id: ElementId::new("box"),
             rect: Rect::new(10.0, 20.0, 30.0, 40.0),
             radius: CornerRadii::ZERO,
             color: Color::rgba(1, 2, 3, 4),
         }));
+        let mut builder = MeshBuilder::new();
+        builder.push_display_list(&display_list);
 
         let mesh = builder.finish();
         assert_eq!(mesh.vertices.len(), 4);
@@ -361,5 +341,26 @@ mod tests {
         assert_eq!(plan.batches[1].clip, Some(Rect::new(4.0, 5.0, 6.0, 7.0)));
         assert_eq!(plan.batches[0].mesh.indices.len(), 6);
         assert_eq!(plan.batches[1].mesh.indices.len(), 6);
+    }
+
+    #[test]
+    fn mesh_builder_consumes_backend_neutral_primitives() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::FillCircle(des_ui_render::FillCirclePaint {
+            element_id: ElementId::new("dot"),
+            center: des_ui_document::Point::new(10.0, 10.0),
+            radius: 4.0,
+            color: Color::rgba(7, 8, 9, 10),
+        }));
+
+        let mesh = mesh_for_display_list(&display_list);
+
+        assert!(mesh.vertices.len() > 4);
+        assert!(mesh.indices.len() > 6);
+        assert!(
+            mesh.vertices
+                .iter()
+                .all(|vertex| vertex.color == [7, 8, 9, 10])
+        );
     }
 }
