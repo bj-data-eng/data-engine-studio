@@ -833,6 +833,7 @@ dependencies = [
  "des-ui-render",
  "des-ui-wgpu",
  "des-ui-winit",
+ "pollster",
  "winit",
 ]
 

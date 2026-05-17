@@ -11,4 +11,5 @@ des-ui-document.workspace = true
 des-ui-render.workspace = true
 des-ui-wgpu.workspace = true
 des-ui-winit.workspace = true
+pollster.workspace = true
 winit.workspace = true

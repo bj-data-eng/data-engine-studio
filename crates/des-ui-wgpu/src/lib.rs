@@ -10,6 +10,43 @@ use des_ui_render::{
     DisplayList, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
     TriangleMeshPrimitive, plan_primitives,
 };
+use std::{error, fmt, mem};
+
+const SHADER: &str = r#"
+struct Viewport {
+    size: vec2<f32>,
+};
+
+@group(0) @binding(0)
+var<uniform> viewport: Viewport;
+
+struct VertexInput {
+    @location(0) position: vec2<f32>,
+    @location(1) color: vec4<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+};
+
+@vertex
+fn vs_main(input: VertexInput) -> VertexOutput {
+    let ndc = vec2<f32>(
+        (input.position.x / viewport.size.x) * 2.0 - 1.0,
+        1.0 - (input.position.y / viewport.size.y) * 2.0,
+    );
+    var output: VertexOutput;
+    output.position = vec4<f32>(ndc, 0.0, 1.0);
+    output.color = input.color;
+    return output;
+}
+
+@fragment
+fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    return input.color;
+}
+"#;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ClearColor {
@@ -74,6 +111,66 @@ impl Default for RenderOptions {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PhysicalRenderSize {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
+impl PhysicalRenderSize {
+    pub fn new(width: u32, height: u32, scale_factor: f64) -> Self {
+        Self {
+            width,
+            height,
+            scale_factor,
+        }
+    }
+
+    pub fn logical_width(self) -> f32 {
+        self.width as f32 / self.scale_factor as f32
+    }
+
+    pub fn logical_height(self) -> f32 {
+        self.height as f32 / self.scale_factor as f32
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.width == 0 || self.height == 0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ScissorRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug)]
+pub enum RendererError {
+    CreateSurface(wgpu::CreateSurfaceError),
+    RequestAdapter(wgpu::RequestAdapterError),
+    RequestDevice(wgpu::RequestDeviceError),
+    UnsupportedSurface,
+    SurfaceFrame(&'static str),
+}
+
+impl fmt::Display for RendererError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CreateSurface(error) => write!(f, "failed to create wgpu surface: {error}"),
+            Self::RequestAdapter(error) => write!(f, "failed to request wgpu adapter: {error}"),
+            Self::RequestDevice(error) => write!(f, "failed to request wgpu device: {error}"),
+            Self::UnsupportedSurface => f.write_str("surface is not supported by the selected GPU"),
+            Self::SurfaceFrame(error) => write!(f, "failed to render surface frame: {error}"),
+        }
+    }
+}
+
+impl error::Error for RendererError {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RenderPlan {
@@ -163,6 +260,13 @@ impl Vertex {
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+struct ViewportUniform {
+    size: [f32; 2],
+    _pad: [f32; 2],
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
@@ -223,6 +327,279 @@ pub fn mesh_for_display_list(display_list: &DisplayList) -> Mesh {
     let mut builder = MeshBuilder::new();
     builder.push_display_list(display_list);
     builder.finish()
+}
+
+pub struct GpuRenderer<'window> {
+    surface: wgpu::Surface<'window>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    pipeline: wgpu::RenderPipeline,
+    viewport_buffer: wgpu::Buffer,
+    viewport_bind_group: wgpu::BindGroup,
+    size: PhysicalRenderSize,
+}
+
+impl<'window> GpuRenderer<'window> {
+    pub async fn new(
+        target: impl Into<wgpu::SurfaceTarget<'window>>,
+        size: PhysicalRenderSize,
+        options: RenderOptions,
+    ) -> Result<Self, RendererError> {
+        let instance = wgpu::Instance::default();
+        let surface = instance
+            .create_surface(target)
+            .map_err(RendererError::CreateSurface)?;
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .map_err(RendererError::RequestAdapter)?;
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("des-ui-wgpu device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                trace: wgpu::Trace::Off,
+            })
+            .await
+            .map_err(RendererError::RequestDevice)?;
+        let mut config = surface
+            .get_default_config(&adapter, size.width.max(1), size.height.max(1))
+            .ok_or(RendererError::UnsupportedSurface)?;
+        config.present_mode = options.present_mode.to_wgpu();
+        surface.configure(&device, &config);
+        let viewport_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("des-ui viewport uniform"),
+            size: mem::size_of::<ViewportUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let viewport_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("des-ui viewport bind group layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+        let viewport_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("des-ui viewport bind group"),
+            layout: &viewport_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: viewport_buffer.as_entire_binding(),
+            }],
+        });
+        let pipeline = create_pipeline(&device, config.format, &viewport_bind_group_layout);
+        let renderer = Self {
+            surface,
+            device,
+            queue,
+            config,
+            pipeline,
+            viewport_buffer,
+            viewport_bind_group,
+            size,
+        };
+        renderer.write_viewport_uniform();
+        Ok(renderer)
+    }
+
+    pub fn resize(&mut self, size: PhysicalRenderSize) {
+        self.size = size;
+        if size.is_empty() {
+            return;
+        }
+        self.config.width = size.width;
+        self.config.height = size.height;
+        self.surface.configure(&self.device, &self.config);
+        self.write_viewport_uniform();
+    }
+
+    pub fn render_plan(&mut self, plan: &RenderPlan) -> Result<(), RendererError> {
+        if self.size.is_empty() {
+            return Ok(());
+        }
+        self.write_viewport_uniform();
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
+            wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
+                self.surface.configure(&self.device, &self.config);
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                return Err(RendererError::SurfaceFrame("surface validation error"));
+            }
+        };
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("des-ui render encoder"),
+            });
+        {
+            let color_attachment = Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(plan.clear_color.to_wgpu()),
+                    store: wgpu::StoreOp::Store,
+                },
+            });
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("des-ui render pass"),
+                color_attachments: &[color_attachment],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.viewport_bind_group, &[]);
+            for item in &plan.items {
+                if let RenderItem::Mesh(batch) = item {
+                    self.draw_mesh_batch(&mut pass, batch);
+                }
+            }
+        }
+        self.queue.submit([encoder.finish()]);
+        frame.present();
+        Ok(())
+    }
+
+    fn draw_mesh_batch<'pass>(
+        &'pass self,
+        pass: &mut wgpu::RenderPass<'pass>,
+        batch: &'pass MeshBatch,
+    ) {
+        if batch.mesh.is_empty() {
+            return;
+        }
+        let Some(scissor) = clip_rect_to_scissor(batch.clip, self.size) else {
+            return;
+        };
+        pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
+        let vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("des-ui mesh vertex buffer"),
+            size: (batch.mesh.vertices.len() * mem::size_of::<Vertex>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let index_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("des-ui mesh index buffer"),
+            size: (batch.mesh.indices.len() * mem::size_of::<u32>()) as u64,
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        self.queue.write_buffer(
+            &vertex_buffer,
+            0,
+            bytemuck::cast_slice(&batch.mesh.vertices),
+        );
+        self.queue
+            .write_buffer(&index_buffer, 0, bytemuck::cast_slice(&batch.mesh.indices));
+        pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        pass.draw_indexed(0..batch.mesh.indices.len() as u32, 0, 0..1);
+    }
+
+    fn write_viewport_uniform(&self) {
+        let uniform = ViewportUniform {
+            size: [
+                self.size.logical_width().max(1.0),
+                self.size.logical_height().max(1.0),
+            ],
+            _pad: [0.0, 0.0],
+        };
+        self.queue
+            .write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&uniform));
+    }
+}
+
+fn create_pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    viewport_bind_group_layout: &wgpu::BindGroupLayout,
+) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("des-ui mesh shader"),
+        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("des-ui mesh pipeline layout"),
+        bind_group_layouts: &[Some(viewport_bind_group_layout)],
+        immediate_size: 0,
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("des-ui mesh pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: &[Vertex::layout()],
+        },
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
+pub fn clip_rect_to_scissor(clip: Option<Rect>, size: PhysicalRenderSize) -> Option<ScissorRect> {
+    if size.is_empty() {
+        return None;
+    }
+    let scale = size.scale_factor as f32;
+    let (left, top, right, bottom) = if let Some(clip) = clip {
+        (
+            (clip.origin.x * scale).floor().max(0.0),
+            (clip.origin.y * scale).floor().max(0.0),
+            (clip.right() * scale).ceil().min(size.width as f32),
+            (clip.bottom() * scale).ceil().min(size.height as f32),
+        )
+    } else {
+        (0.0, 0.0, size.width as f32, size.height as f32)
+    };
+    if right <= left || bottom <= top {
+        return None;
+    }
+    Some(ScissorRect {
+        x: left as u32,
+        y: top as u32,
+        width: (right - left) as u32,
+        height: (bottom - top) as u32,
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -307,8 +684,8 @@ mod tests {
     use des_ui_render::{DisplayList, FillRectPaint, PaintCommand, TextPaint};
 
     use crate::{
-        ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, RenderItem, RenderOptions,
-        mesh_for_display_list,
+        ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
+        RenderOptions, ScissorRect, clip_rect_to_scissor, mesh_for_display_list,
     };
 
     #[test]
@@ -471,6 +848,28 @@ mod tests {
         assert!(matches!(plan.items[2], RenderItem::Mesh(_)));
         assert_eq!(plan.batches.len(), 2);
         assert_eq!(plan.text_batches.len(), 1);
+    }
+
+    #[test]
+    fn clip_rect_converts_to_physical_scissor_inside_surface() {
+        let scissor = clip_rect_to_scissor(
+            Some(Rect::new(10.0, 20.5, 30.0, 40.0)),
+            PhysicalRenderSize {
+                width: 200,
+                height: 200,
+                scale_factor: 2.0,
+            },
+        );
+
+        assert_eq!(
+            scissor,
+            Some(ScissorRect {
+                x: 20,
+                y: 41,
+                width: 60,
+                height: 80,
+            })
+        );
     }
 
     #[test]
