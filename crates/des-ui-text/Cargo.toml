@@ -7,4 +7,5 @@ repository.workspace = true
 description = "Renderer-neutral text layout contracts for Data Engine Studio document UI."
 
 [dependencies]
+fontique.workspace = true
 parley.workspace = true
