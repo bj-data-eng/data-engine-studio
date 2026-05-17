@@ -3,6 +3,8 @@
 //! `des-ui-window` is the product-facing app/window layer that replaces the
 //! useful shell responsibilities of `eframe` without taking on egui semantics.
 
+pub mod demo;
+
 use des_ui_document::{DocumentInput, DocumentOutput};
 use des_ui_render::{DisplayList, plan_paint};
 use des_ui_wgpu::{
@@ -445,5 +447,55 @@ mod tests {
         assert_eq!(size.height, 900);
         assert_eq!(size.logical_width(), 800.0);
         assert_eq!(size.logical_height(), 450.0);
+    }
+
+    #[test]
+    fn native_document_demo_renders_document_layout_into_frame() {
+        let mut app = crate::demo::NativeDocumentDemo::new();
+        let mut frame = AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
+
+        app.update(&mut frame);
+        let frame_output = frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let index_count = frame_output
+            .render_plan
+            .batches
+            .iter()
+            .map(|batch| batch.mesh.indices.len())
+            .sum::<usize>();
+
+        assert!(app.last_output().is_some());
+        assert!(index_count > 48);
+        assert!(!frame_output.render_plan.text_batches.is_empty());
+        assert_eq!(
+            app.last_output().unwrap().layout.rect.size,
+            Size::new(980.0, 680.0)
+        );
+    }
+
+    #[test]
+    fn native_document_demo_clicks_flow_through_document_engine() {
+        let mut app = crate::demo::NativeDocumentDemo::new();
+        let mut frame = AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
+        app.update(&mut frame);
+        let action_rect = app
+            .last_output()
+            .unwrap()
+            .layout
+            .find("native-action")
+            .unwrap()
+            .rect;
+        let click_position = Point::new(
+            action_rect.origin.x + action_rect.size.width * 0.5,
+            action_rect.origin.y + action_rect.size.height * 0.5,
+        );
+        let mut click_frame = AppFrame::new(
+            HostViewport::new(980, 680, 1.0),
+            crate::demo::click_input_at(click_position, 0.10),
+        );
+
+        app.update(&mut click_frame);
+
+        assert_eq!(app.clicks(), 1);
+        assert!(click_frame.repaint_requested());
     }
 }
