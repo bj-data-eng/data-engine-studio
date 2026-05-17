@@ -30,6 +30,14 @@ impl HostViewport {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum WindowSignal {
+    None,
+    CloseRequested,
+    RedrawRequested,
+    Resized(HostViewport),
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PointerButton {
     Primary,
@@ -110,15 +118,17 @@ impl WinitInputTranslator {
         self.viewport = viewport;
     }
 
-    pub fn handle_window_event(&mut self, event: &WindowEvent, time_seconds: f64) {
+    pub fn handle_window_event(&mut self, event: &WindowEvent, time_seconds: f64) -> WindowSignal {
         self.time_seconds = time_seconds;
         match event {
             WindowEvent::Resized(size) => {
                 self.viewport.physical_width = size.width;
                 self.viewport.physical_height = size.height;
+                WindowSignal::Resized(self.viewport)
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 self.viewport.scale_factor = (*scale_factor).max(0.000_001);
+                WindowSignal::Resized(self.viewport)
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_moved(
@@ -128,18 +138,24 @@ impl WinitInputTranslator {
                     ),
                     time_seconds,
                 );
+                WindowSignal::None
             }
             WindowEvent::CursorLeft { .. } => {
                 self.previous_pointer_position = self.pointer_position;
                 self.pointer_position = None;
+                WindowSignal::None
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 self.pointer_button((*button).into(), (*state).into(), time_seconds);
+                WindowSignal::None
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 self.scroll(scroll_delta(*delta, self.viewport.scale_factor));
+                WindowSignal::None
             }
-            _ => {}
+            WindowEvent::CloseRequested => WindowSignal::CloseRequested,
+            WindowEvent::RedrawRequested => WindowSignal::RedrawRequested,
+            _ => WindowSignal::None,
         }
     }
 
@@ -219,8 +235,10 @@ fn scroll_delta(delta: MouseScrollDelta, scale_factor: f64) -> Point {
 #[cfg(test)]
 mod tests {
     use des_ui_document::Point;
+    use winit::dpi::PhysicalSize;
+    use winit::event::WindowEvent;
 
-    use crate::{HostViewport, PointerButton, PointerPhase, WinitInputTranslator};
+    use crate::{HostViewport, PointerButton, PointerPhase, WindowSignal, WinitInputTranslator};
 
     #[test]
     fn viewport_reports_logical_size_from_physical_pixels() {
@@ -257,5 +275,28 @@ mod tests {
         assert!(!pointer.primary_clicked);
         assert_eq!(pointer.primary_click_count, 0);
         assert_eq!(next.scroll_delta, Point::ZERO);
+    }
+
+    #[test]
+    fn window_events_report_lifecycle_signals_and_update_viewport() {
+        let mut input = WinitInputTranslator::new();
+        input.set_viewport(HostViewport::new(800, 600, 1.0));
+
+        let signal =
+            input.handle_window_event(&WindowEvent::Resized(PhysicalSize::new(1024, 768)), 1.0);
+
+        assert_eq!(
+            signal,
+            WindowSignal::Resized(HostViewport::new(1024, 768, 1.0))
+        );
+        assert_eq!(input.viewport(), HostViewport::new(1024, 768, 1.0));
+        assert_eq!(
+            input.handle_window_event(&WindowEvent::CloseRequested, 1.1),
+            WindowSignal::CloseRequested
+        );
+        assert_eq!(
+            input.handle_window_event(&WindowEvent::RedrawRequested, 1.2),
+            WindowSignal::RedrawRequested
+        );
     }
 }

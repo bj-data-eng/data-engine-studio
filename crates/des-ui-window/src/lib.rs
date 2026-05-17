@@ -5,6 +5,7 @@
 
 use des_ui_document::DocumentInput;
 use des_ui_render::DisplayList;
+use des_ui_wgpu::{DisplayListRenderer, RenderOptions, RenderPlan};
 use des_ui_winit::HostViewport;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +14,7 @@ pub struct NativeOptions {
     pub initial_width: u32,
     pub initial_height: u32,
     pub vsync: bool,
+    pub render_options: RenderOptions,
 }
 
 impl Default for NativeOptions {
@@ -22,7 +24,14 @@ impl Default for NativeOptions {
             initial_width: 1280,
             initial_height: 800,
             vsync: true,
+            render_options: RenderOptions::default(),
         }
+    }
+}
+
+impl NativeOptions {
+    pub fn initial_viewport(&self, scale_factor: f64) -> HostViewport {
+        HostViewport::new(self.initial_width, self.initial_height, scale_factor)
     }
 }
 
@@ -36,6 +45,7 @@ pub struct AppFrame {
     input: DocumentInput,
     display_list: DisplayList,
     repaint_requested: bool,
+    close_requested: bool,
 }
 
 impl AppFrame {
@@ -53,6 +63,7 @@ impl AppFrame {
             input,
             display_list,
             repaint_requested: false,
+            close_requested: false,
         }
     }
 
@@ -79,11 +90,39 @@ impl AppFrame {
     pub fn repaint_requested(&self) -> bool {
         self.repaint_requested
     }
+
+    pub fn request_close(&mut self) {
+        self.close_requested = true;
+    }
+
+    pub fn close_requested(&self) -> bool {
+        self.close_requested
+    }
+
+    pub fn into_output(self, render_options: RenderOptions) -> FrameOutput {
+        let render_plan = DisplayListRenderer::new(render_options).build_plan(&self.display_list);
+        FrameOutput {
+            display_list: self.display_list,
+            render_plan,
+            repaint_requested: self.repaint_requested,
+            close_requested: self.close_requested,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FrameOutput {
+    pub display_list: DisplayList,
+    pub render_plan: RenderPlan,
+    pub repaint_requested: bool,
+    pub close_requested: bool,
 }
 
 #[cfg(test)]
 mod tests {
-    use des_ui_document::{DocumentInput, Point};
+    use des_ui_document::{Color, CornerRadii, DocumentInput, ElementId, Point, Rect};
+    use des_ui_render::{FillRectPaint, PaintCommand};
+    use des_ui_wgpu::ClearColor;
     use des_ui_winit::HostViewport;
 
     use crate::{AppFrame, NativeOptions, WindowApp};
@@ -96,6 +135,10 @@ mod tests {
         assert_eq!(options.initial_width, 1280);
         assert_eq!(options.initial_height, 800);
         assert!(options.vsync);
+        assert_eq!(
+            options.initial_viewport(2.0),
+            HostViewport::new(1280, 800, 2.0)
+        );
     }
 
     #[test]
@@ -112,6 +155,36 @@ mod tests {
 
         frame.request_repaint();
         assert!(frame.repaint_requested());
+    }
+
+    #[test]
+    fn app_frame_output_builds_render_plan_from_display_list() {
+        let input = DocumentInput::default();
+        let mut frame = AppFrame::new(HostViewport::new(800, 600, 1.0), input);
+        frame
+            .display_list_mut()
+            .push(PaintCommand::FillRect(FillRectPaint {
+                element_id: ElementId::new("panel"),
+                rect: Rect::new(0.0, 0.0, 80.0, 40.0),
+                radius: CornerRadii::ZERO,
+                color: Color::rgb(20, 30, 40),
+            }));
+        frame.request_repaint();
+
+        let output = frame.into_output(des_ui_wgpu::RenderOptions {
+            clear_color: ClearColor::rgb(250, 249, 247),
+            ..des_ui_wgpu::RenderOptions::default()
+        });
+
+        assert!(output.repaint_requested);
+        assert!(!output.close_requested);
+        assert_eq!(output.display_list.commands.len(), 1);
+        assert_eq!(
+            output.render_plan.clear_color,
+            ClearColor::rgb(250, 249, 247)
+        );
+        assert_eq!(output.render_plan.batches.len(), 1);
+        assert_eq!(output.render_plan.batches[0].mesh.indices.len(), 6);
     }
 
     #[test]
