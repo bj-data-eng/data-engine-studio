@@ -5,8 +5,18 @@
 
 use des_ui_document::{DocumentInput, DocumentOutput};
 use des_ui_render::{DisplayList, plan_paint};
-use des_ui_wgpu::{DisplayListRenderer, RenderOptions, RenderPlan};
-use des_ui_winit::HostViewport;
+use des_ui_wgpu::{
+    DisplayListRenderer, GpuRenderer, PhysicalRenderSize, RenderOptions, RenderPlan,
+};
+use des_ui_winit::{HostViewport, WindowSignal, WinitInputTranslator};
+use std::{error, fmt, sync::Arc, time::Instant};
+use winit::{
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, EventLoop},
+    window::{Window, WindowId},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct NativeOptions {
@@ -37,6 +47,53 @@ impl NativeOptions {
 
 pub trait WindowApp {
     fn update(&mut self, frame: &mut AppFrame);
+}
+
+#[derive(Debug)]
+pub enum NativeRunError {
+    EventLoop(winit::error::EventLoopError),
+    Window(winit::error::OsError),
+    Renderer(des_ui_wgpu::RendererError),
+}
+
+impl fmt::Display for NativeRunError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EventLoop(error) => write!(f, "native event loop failed: {error}"),
+            Self::Window(error) => write!(f, "native window failed: {error}"),
+            Self::Renderer(error) => write!(f, "native renderer failed: {error}"),
+        }
+    }
+}
+
+impl error::Error for NativeRunError {}
+
+impl From<winit::error::EventLoopError> for NativeRunError {
+    fn from(error: winit::error::EventLoopError) -> Self {
+        Self::EventLoop(error)
+    }
+}
+
+impl From<winit::error::OsError> for NativeRunError {
+    fn from(error: winit::error::OsError) -> Self {
+        Self::Window(error)
+    }
+}
+
+impl From<des_ui_wgpu::RendererError> for NativeRunError {
+    fn from(error: des_ui_wgpu::RendererError) -> Self {
+        Self::Renderer(error)
+    }
+}
+
+pub fn run_native<A>(options: NativeOptions, app: A) -> Result<(), NativeRunError>
+where
+    A: WindowApp + 'static,
+{
+    let event_loop = EventLoop::new()?;
+    let mut shell = NativeShell::new(options, app);
+    event_loop.run_app(&mut shell)?;
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -124,6 +181,133 @@ pub struct FrameOutput {
     pub render_plan: RenderPlan,
     pub repaint_requested: bool,
     pub close_requested: bool,
+}
+
+struct NativeShell<A> {
+    options: NativeOptions,
+    app: A,
+    start: Instant,
+    window: Option<Arc<Window>>,
+    renderer: Option<GpuRenderer<'static>>,
+    input: WinitInputTranslator,
+}
+
+impl<A> NativeShell<A> {
+    fn new(options: NativeOptions, app: A) -> Self {
+        Self {
+            options,
+            app,
+            start: Instant::now(),
+            window: None,
+            renderer: None,
+            input: WinitInputTranslator::new(),
+        }
+    }
+
+    fn create_window(&mut self, event_loop: &ActiveEventLoop) -> Result<(), NativeRunError> {
+        if self.window.is_some() {
+            return Ok(());
+        }
+        let window = Arc::new(
+            event_loop.create_window(
+                Window::default_attributes()
+                    .with_title(self.options.title.clone())
+                    .with_resizable(true)
+                    .with_inner_size(PhysicalSize::new(
+                        self.options.initial_width,
+                        self.options.initial_height,
+                    )),
+            )?,
+        );
+        let size = window.inner_size();
+        let viewport = HostViewport::new(size.width, size.height, window.scale_factor());
+        self.input.set_viewport(viewport);
+        let renderer = pollster::block_on(GpuRenderer::new(
+            window.clone(),
+            render_size_from_viewport(viewport),
+            self.options.render_options,
+        ))?;
+        self.renderer = Some(renderer);
+        self.window = Some(window);
+        Ok(())
+    }
+
+    fn redraw(&mut self, event_loop: &ActiveEventLoop) -> Result<(), NativeRunError>
+    where
+        A: WindowApp,
+    {
+        let Some(window) = self.window.as_ref() else {
+            return Ok(());
+        };
+        let Some(renderer) = self.renderer.as_mut() else {
+            return Ok(());
+        };
+        let input = self.input.frame_input();
+        let mut frame = AppFrame::new(self.input.viewport(), input);
+        self.app.update(&mut frame);
+        let output = frame.into_output(self.options.render_options);
+        renderer.render_plan(&output.render_plan)?;
+        if output.close_requested {
+            event_loop.exit();
+        } else if output.repaint_requested {
+            window.request_redraw();
+        }
+        Ok(())
+    }
+
+    fn request_redraw(&self) {
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
+    fn time_seconds(&self) -> f64 {
+        self.start.elapsed().as_secs_f64()
+    }
+}
+
+impl<A> ApplicationHandler for NativeShell<A>
+where
+    A: WindowApp,
+{
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if let Err(error) = self.create_window(event_loop) {
+            eprintln!("{error}");
+            event_loop.exit();
+            return;
+        }
+        self.request_redraw();
+    }
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        let signal = self.input.handle_window_event(&event, self.time_seconds());
+        match signal {
+            WindowSignal::CloseRequested => event_loop.exit(),
+            WindowSignal::RedrawRequested => {
+                if let Err(error) = self.redraw(event_loop) {
+                    eprintln!("{error}");
+                    event_loop.exit();
+                }
+            }
+            WindowSignal::Resized(viewport) => {
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.resize(render_size_from_viewport(viewport));
+                }
+                self.request_redraw();
+            }
+            WindowSignal::None => {
+                self.request_redraw();
+            }
+        }
+    }
+}
+
+fn render_size_from_viewport(viewport: HostViewport) -> PhysicalRenderSize {
+    PhysicalRenderSize::new(
+        viewport.physical_width,
+        viewport.physical_height,
+        viewport.scale_factor,
+    )
 }
 
 #[cfg(test)]
@@ -251,5 +435,15 @@ mod tests {
             output.render_plan.text_batches[0].text.text,
             "Native document"
         );
+    }
+
+    #[test]
+    fn render_size_uses_host_viewport_physical_extent_and_scale() {
+        let size = super::render_size_from_viewport(HostViewport::new(1600, 900, 2.0));
+
+        assert_eq!(size.width, 1600);
+        assert_eq!(size.height, 900);
+        assert_eq!(size.logical_width(), 800.0);
+        assert_eq!(size.logical_height(), 450.0);
     }
 }
