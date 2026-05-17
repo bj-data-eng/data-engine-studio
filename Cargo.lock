@@ -809,10 +809,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-ui-wgpu"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "des-ui-document",
+ "des-ui-render",
+ "wgpu",
+]
+
+[[package]]
 name = "des-ui-widgets"
 version = "0.1.0"
 dependencies = [
  "des-ui-document",
+]
+
+[[package]]
+name = "des-ui-winit"
+version = "0.1.0"
+dependencies = [
+ "des-ui-document",
+ "winit",
 ]
 
 [[package]]

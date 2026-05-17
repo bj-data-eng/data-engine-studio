@@ -11,7 +11,9 @@ members = [
     "crates/des-ui-lab",
     "crates/des-ui-render",
     "crates/des-ui-text",
+    "crates/des-ui-wgpu",
     "crates/des-ui-widgets",
+    "crates/des-ui-winit",
 ]
 exclude = ["crates/des-apple-dispatch"]
 resolver = "3"
@@ -33,7 +35,10 @@ des-ui-egui = { path = "crates/des-ui-egui" }
 des-ui-lab = { path = "crates/des-ui-lab" }
 des-ui-render = { path = "crates/des-ui-render" }
 des-ui-text = { path = "crates/des-ui-text" }
+des-ui-wgpu = { path = "crates/des-ui-wgpu" }
 des-ui-widgets = { path = "crates/des-ui-widgets" }
+des-ui-winit = { path = "crates/des-ui-winit" }
+bytemuck = { version = "=1.25.0", features = ["derive"] }
 eframe = { version = "=0.34.1", default-features = true }
 egui = "=0.34.1"
 iconflow = { version = "=1.0.0", default-features = false }
@@ -43,6 +48,8 @@ parley = { version = "=0.9.0", default-features = false, features = ["libm"] }
 filetime = "=0.2.29"
 pyo3 = { version = "=0.27.2", features = ["extension-module", "abi3-py311"] }
 serde = { version = "=1.0.228", features = ["derive"] }
+wgpu = "=29.0.1"
+winit = "=0.30.13"
 
 [patch.crates-io]
 bitflags = { path = "vendor/text-stack/bitflags-2.11.1" }
