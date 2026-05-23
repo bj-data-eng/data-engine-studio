@@ -242,6 +242,18 @@ pub struct DocumentInput {
     pub scroll_delta: Point,
 }
 
+impl DocumentInput {
+    pub fn without_primary_activation(mut self) -> Self {
+        if let Some(pointer) = &mut self.pointer {
+            pointer.primary_down = false;
+            pointer.primary_pressed = false;
+            pointer.primary_clicked = false;
+            pointer.primary_click_count = 0;
+        }
+        self
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PointerInput {
     pub position: Point,

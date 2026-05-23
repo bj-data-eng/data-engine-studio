@@ -57,7 +57,8 @@ impl Default for NativeDocumentDemo {
 impl WindowApp for NativeDocumentDemo {
     fn update(&mut self, frame: &mut AppFrame) {
         let viewport = frame.viewport().logical_size();
-        let output = self.update_document(viewport, *frame.input());
+        let input = *frame.input();
+        let mut output = self.update_document(viewport, input);
         let clicked = output.events.iter().any(|event| {
             event.target.as_str() == ACTION_ID && event.kind == DocumentEventKind::Clicked
         });
@@ -65,6 +66,7 @@ impl WindowApp for NativeDocumentDemo {
         if clicked {
             self.clicks = self.clicks.wrapping_add(1);
             frame.request_repaint();
+            output = self.update_document(viewport, input.without_primary_activation());
         }
         if output.animating {
             frame.request_repaint();
@@ -273,6 +275,7 @@ fn demo_stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id("responsive-grid"),
             Style::default()
+                .width_fill()
                 .flex_direction(FlexDirection::Row)
                 .flex_wrap(FlexWrap::Wrap)
                 .gap(14.0)

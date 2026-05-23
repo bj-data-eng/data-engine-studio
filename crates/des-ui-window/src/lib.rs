@@ -538,6 +538,54 @@ mod tests {
 
         assert_eq!(app.clicks(), 1);
         assert!(click_frame.repaint_requested());
+        assert!(
+            click_frame
+                .display_list()
+                .commands
+                .iter()
+                .any(|command| matches!(
+                    command,
+                    PaintCommand::Text(text)
+                        if text.element_id.as_str() == "native-action-label"
+                            && text.text == "Clicks: 1"
+                )),
+            "the click frame should render the document state produced by the click"
+        );
+    }
+
+    #[test]
+    fn native_document_demo_reflows_with_viewport_size() {
+        let mut app = crate::demo::NativeDocumentDemo::new();
+
+        let mut wide_frame =
+            AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
+        app.update(&mut wide_frame);
+        let wide_output = app.last_output().unwrap().clone();
+
+        let mut narrow_frame =
+            AppFrame::new(HostViewport::new(520, 680, 1.0), DocumentInput::default());
+        app.update(&mut narrow_frame);
+        let narrow_output = app.last_output().unwrap();
+
+        let wide_card = wide_output.layout.find("native-card").unwrap().rect;
+        let narrow_card = narrow_output.layout.find("native-card").unwrap().rect;
+        let wide_tile = wide_output.layout.find("tile-one").unwrap().rect;
+        let narrow_tile = narrow_output.layout.find("tile-one").unwrap().rect;
+
+        assert_eq!(wide_output.layout.rect.size, Size::new(980.0, 680.0));
+        assert_eq!(narrow_output.layout.rect.size, Size::new(520.0, 680.0));
+        assert!(
+            narrow_card.size.width < wide_card.size.width,
+            "the document shell should resize from the host viewport instead of freezing layout"
+        );
+        assert!(
+            wide_tile.size.width < wide_card.size.width * 0.6,
+            "wide viewport should keep the demo tiles in the two-column flex row"
+        );
+        assert!(
+            narrow_tile.size.width > narrow_card.size.width * 0.8,
+            "narrow viewport should apply the viewport breakpoint and stack tiles full width"
+        );
     }
 
     #[test]
