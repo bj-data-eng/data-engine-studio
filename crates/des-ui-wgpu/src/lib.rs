@@ -402,12 +402,14 @@ impl Default for TextRasterizer {
 }
 
 fn epaint_layout_job(text: &TextPaint) -> epaint::text::LayoutJob {
-    let mut format = epaint::text::TextFormat::simple(
-        epaint::FontId::new(text.font_size, epaint::FontFamily::Proportional),
-        to_epaint_color(text.color),
-    );
-    format.line_height = text.line_height;
-    let mut job = epaint::text::LayoutJob::single_section(text.text.clone(), format);
+    let mut job = if let Some(selection) = text.selection {
+        epaint_selection_layout_job(text, selection)
+    } else {
+        epaint::text::LayoutJob::single_section(
+            text.text.clone(),
+            epaint_text_format(text, text.color, None),
+        )
+    };
     job.wrap.max_width = match text.wrap_mode {
         TextWrapMode::Extend => f32::INFINITY,
         TextWrapMode::Wrap => text.wrap_width.max(1.0),
@@ -419,6 +421,74 @@ fn epaint_layout_job(text: &TextPaint) -> epaint::text::LayoutJob {
     };
     job.wrap.break_anywhere = text.wrap_mode == TextWrapMode::Truncate;
     job
+}
+
+fn epaint_selection_layout_job(
+    text: &TextPaint,
+    selection: des_ui_render::TextSelectionPaint,
+) -> epaint::text::LayoutJob {
+    let mut range_start = selection.anchor_index.min(selection.focus_index);
+    let mut range_end = selection.anchor_index.max(selection.focus_index);
+    let char_len = text.text.chars().count();
+    range_start = range_start.min(char_len);
+    range_end = range_end.min(char_len);
+    if range_start == range_end {
+        return epaint::text::LayoutJob::single_section(
+            text.text.clone(),
+            epaint_text_format(text, text.color, None),
+        );
+    }
+
+    let byte_start = char_index_to_byte_index(&text.text, range_start);
+    let byte_end = char_index_to_byte_index(&text.text, range_end);
+    let mut sections = Vec::new();
+    if byte_start > 0 {
+        sections.push(epaint::text::LayoutSection {
+            leading_space: 0.0,
+            byte_range: 0..byte_start,
+            format: epaint_text_format(text, text.color, None),
+        });
+    }
+    sections.push(epaint::text::LayoutSection {
+        leading_space: 0.0,
+        byte_range: byte_start..byte_end,
+        format: epaint_text_format(text, selection.color, Some(selection.background)),
+    });
+    if byte_end < text.text.len() {
+        sections.push(epaint::text::LayoutSection {
+            leading_space: 0.0,
+            byte_range: byte_end..text.text.len(),
+            format: epaint_text_format(text, text.color, None),
+        });
+    }
+
+    epaint::text::LayoutJob {
+        text: text.text.clone(),
+        sections,
+        break_on_newline: true,
+        ..Default::default()
+    }
+}
+
+fn epaint_text_format(
+    text: &TextPaint,
+    color: Color,
+    background: Option<Color>,
+) -> epaint::text::TextFormat {
+    let mut format = epaint::text::TextFormat::simple(
+        epaint::FontId::new(text.font_size, epaint::FontFamily::Proportional),
+        to_epaint_color(color),
+    );
+    format.line_height = text.line_height;
+    format.background = background.map_or(epaint::Color32::TRANSPARENT, to_epaint_color);
+    format
+}
+
+fn char_index_to_byte_index(text: &str, char_index: usize) -> usize {
+    text.char_indices()
+        .map(|(byte_index, _)| byte_index)
+        .nth(char_index)
+        .unwrap_or(text.len())
 }
 
 fn to_epaint_color(color: Color) -> epaint::Color32 {
@@ -1144,7 +1214,7 @@ mod tests {
         Color, CornerRadii, Document, DocumentEngine, Element, ElementId, Rect, Size, Style,
         StyleSelector, StyleSheet, TextWrapMode,
     };
-    use des_ui_render::{DisplayList, FillRectPaint, PaintCommand, TextPaint};
+    use des_ui_render::{DisplayList, FillRectPaint, PaintCommand, TextPaint, TextSelectionPaint};
 
     use crate::{
         ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
@@ -1407,6 +1477,48 @@ mod tests {
         wrap.wrap_mode = TextWrapMode::Extend;
         let extend_job = epaint_layout_job(&wrap);
         assert_eq!(extend_job.wrap.max_width, f32::INFINITY);
+    }
+
+    #[test]
+    fn text_layout_job_maps_document_selection_to_epaint_sections() {
+        let text = TextPaint {
+            element_id: ElementId::new("selected"),
+            rect: Rect::new(0.0, 0.0, 160.0, 40.0),
+            text: "alpha π beta".into(),
+            color: Color::rgb(20, 21, 22),
+            font_size: 14.0,
+            wrap_width: 160.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: Some(TextSelectionPaint {
+                anchor_index: 6,
+                focus_index: 7,
+                background: Color::rgb(234, 221, 255),
+                color: Color::rgb(29, 27, 32),
+            }),
+        };
+
+        let job = epaint_layout_job(&text);
+
+        assert_eq!(job.sections.len(), 3);
+        assert_eq!(&job.text[job.sections[1].byte_range.clone()], "π");
+        assert_eq!(
+            job.sections[1].format.background,
+            epaint::Color32::from_rgb(234, 221, 255)
+        );
+        assert_eq!(
+            job.sections[1].format.color,
+            epaint::Color32::from_rgb(29, 27, 32)
+        );
+        assert_eq!(
+            job.sections[0].format.background,
+            epaint::Color32::TRANSPARENT
+        );
+        assert_eq!(
+            job.sections[2].format.background,
+            epaint::Color32::TRANSPARENT
+        );
     }
 
     #[test]
