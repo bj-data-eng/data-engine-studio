@@ -228,7 +228,16 @@ fn text_rendering_stylesheet() -> StyleSheet {
                 .background(Color::rgb(255, 252, 255))
                 .border(Color::rgb(194, 184, 203))
                 .border_width(1.5)
-                .radius(18.0),
+                .radius(18.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_visible(true)
+                .scrollbar_width(4.0)
+                .scrollbar_expanded_width(10.0)
+                .scrollbar_radius(4.0)
+                .scrollbar_handle_color(Color::rgba(103, 80, 164, 142))
+                .scrollbar_track_color(Color::rgba(103, 80, 164, 26))
+                .scrollbar_hover_handle_color(Color::rgba(103, 80, 164, 190))
+                .scrollbar_pressed_handle_color(Color::rgba(103, 80, 164, 230)),
         )
         .rule(
             StyleSelector::id("text-aa-header"),
@@ -255,7 +264,6 @@ fn text_rendering_stylesheet() -> StyleSheet {
             StyleSelector::id("text-aa-grid"),
             Style::default()
                 .width_fill()
-                .height_fill()
                 .flex_direction(des_ui_document::FlexDirection::Row)
                 .flex_wrap(des_ui_document::FlexWrap::Wrap)
                 .gap(14.0)
@@ -597,6 +605,24 @@ mod tests {
             text_items
                 .iter()
                 .any(|text| text.element_id.as_str() == "clip-sample")
+        );
+    }
+
+    #[test]
+    fn text_rendering_demo_scrolls_when_cards_wrap_beyond_the_viewport() {
+        let mut app = NativeTextRenderingDemo::new();
+        let mut frame = AppFrame::new(HostViewport::new(560, 640, 1.0), DocumentInput::default());
+
+        app.update(&mut frame);
+
+        let output = app
+            .last_output()
+            .expect("text rendering demo should retain its latest document output");
+        assert!(
+            output.scroll_chrome.iter().any(|chrome| {
+                chrome.element_id.as_str() == "text-aa-board" && chrome.max_scroll > 0.0
+            }),
+            "the specimen board should expose a vertical scrollbar when cards wrap into a tall column"
         );
     }
 }
