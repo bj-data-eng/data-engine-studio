@@ -214,6 +214,7 @@ pub enum RenderPrimitive {
 #[derive(Clone, Debug, PartialEq)]
 pub struct EpaintMeshPrimitive {
     pub element_id: ElementId,
+    pub clip: Option<Rect>,
     pub mesh: epaint::Mesh,
 }
 
@@ -479,6 +480,7 @@ fn tessellate_command(
             }
             Some(EpaintMeshPrimitive {
                 element_id: element_id.clone(),
+                clip: from_epaint_clip_rect(primitive.clip_rect),
                 mesh,
             })
         })
@@ -725,6 +727,18 @@ fn to_epaint_rect(rect: Rect) -> epaint::Rect {
         to_epaint_pos(rect.origin),
         epaint::vec2(rect.size.width, rect.size.height),
     )
+}
+
+fn from_epaint_clip_rect(rect: epaint::Rect) -> Option<Rect> {
+    if rect == epaint::Rect::EVERYTHING {
+        return None;
+    }
+    Some(Rect::new(
+        rect.min.x,
+        rect.min.y,
+        (rect.max.x - rect.min.x).max(0.0),
+        (rect.max.y - rect.min.y).max(0.0),
+    ))
 }
 
 fn to_epaint_radius(radius: CornerRadii) -> epaint::CornerRadius {
@@ -2100,6 +2114,10 @@ mod tests {
             primitives.commands[1],
             PrimitiveCommand::Draw(RenderPrimitive::Mesh(_))
         ));
+        let PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) = &primitives.commands[1] else {
+            panic!("expected clipped epaint mesh");
+        };
+        assert_eq!(mesh.clip, Some(Rect::new(0.0, 0.0, 40.0, 30.0)));
         assert!(matches!(
             primitives.commands[2],
             PrimitiveCommand::Draw(RenderPrimitive::Text(_))

@@ -2113,6 +2113,7 @@ impl RenderPlanBuilder {
                     self.set_clip(active_clip(&clip_stack));
                 }
                 PrimitiveCommand::Draw(RenderPrimitive::Text(text)) => {
+                    self.set_clip(active_clip(&clip_stack));
                     self.flush();
                     if self.current_clip_empty {
                         continue;
@@ -2126,6 +2127,10 @@ impl RenderPlanBuilder {
                 }
                 PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) => {
                     if !self.current_clip_empty {
+                        self.set_clip(match mesh.clip {
+                            Some(rect) => ClipState::Clipped(rect),
+                            None => ClipState::Unclipped,
+                        });
                         if self
                             .current_mesh
                             .texture_id()
@@ -2437,6 +2442,7 @@ mod tests {
         builder.push_command(&des_ui_render::PrimitiveCommand::Draw(
             des_ui_render::RenderPrimitive::Mesh(des_ui_render::EpaintMeshPrimitive {
                 element_id: ElementId::new("payload"),
+                clip: None,
                 mesh: epaint_mesh,
             }),
         ));
@@ -2464,6 +2470,7 @@ mod tests {
             des_ui_render::PrimitiveCommand::Draw(des_ui_render::RenderPrimitive::Mesh(
                 des_ui_render::EpaintMeshPrimitive {
                     element_id: ElementId::new("textured"),
+                    clip: None,
                     mesh,
                 },
             ))
@@ -2488,6 +2495,81 @@ mod tests {
     }
 
     #[test]
+    fn render_plan_uses_epaint_mesh_clip_metadata() {
+        let mut mesh = epaint::Mesh::default();
+        mesh.vertices.push(epaint::Vertex {
+            pos: epaint::pos2(0.0, 0.0),
+            uv: epaint::pos2(0.0, 0.0),
+            color: epaint::Color32::WHITE,
+        });
+        mesh.indices.push(0);
+
+        let mut primitives = des_ui_render::PrimitiveList::new();
+        primitives.push(des_ui_render::PrimitiveCommand::Draw(
+            des_ui_render::RenderPrimitive::Mesh(des_ui_render::EpaintMeshPrimitive {
+                element_id: ElementId::new("clipped"),
+                clip: Some(Rect::new(3.0, 4.0, 50.0, 60.0)),
+                mesh,
+            }),
+        ));
+        let mut builder = crate::RenderPlanBuilder::new(RenderOptions::default());
+        builder.push_primitives(&primitives);
+
+        let plan = builder.finish();
+        assert_eq!(plan.batches.len(), 1);
+        assert_eq!(plan.batches[0].clip, Some(Rect::new(3.0, 4.0, 50.0, 60.0)));
+    }
+
+    #[test]
+    fn render_plan_text_uses_document_clip_after_mesh_clip_metadata() {
+        let mut mesh = epaint::Mesh::default();
+        mesh.vertices.push(epaint::Vertex {
+            pos: epaint::pos2(0.0, 0.0),
+            uv: epaint::pos2(0.0, 0.0),
+            color: epaint::Color32::WHITE,
+        });
+        mesh.indices.push(0);
+
+        let document_clip = Rect::new(1.0, 2.0, 100.0, 80.0);
+        let mesh_clip = Rect::new(10.0, 20.0, 30.0, 40.0);
+        let mut primitives = des_ui_render::PrimitiveList::new();
+        primitives.push(des_ui_render::PrimitiveCommand::PushClip(document_clip));
+        primitives.push(des_ui_render::PrimitiveCommand::Draw(
+            des_ui_render::RenderPrimitive::Mesh(des_ui_render::EpaintMeshPrimitive {
+                element_id: ElementId::new("mesh"),
+                clip: Some(mesh_clip),
+                mesh,
+            }),
+        ));
+        primitives.push(des_ui_render::PrimitiveCommand::Draw(
+            des_ui_render::RenderPrimitive::Text(TextPaint {
+                element_id: ElementId::new("label"),
+                rect: Rect::new(4.0, 5.0, 20.0, 10.0),
+                text: "Still clipped by document".into(),
+                color: Color::rgb(1, 2, 3),
+                override_text_color: None,
+                font_size: 12.0,
+                wrap_width: 20.0,
+                wrap_mode: TextWrapMode::Extend,
+                max_lines: None,
+                line_height: None,
+                selection: None,
+                underline: None,
+                opacity_factor: 1.0,
+                angle: 0.0,
+            }),
+        ));
+        primitives.push(des_ui_render::PrimitiveCommand::PopClip);
+
+        let mut builder = crate::RenderPlanBuilder::new(RenderOptions::default());
+        builder.push_primitives(&primitives);
+
+        let plan = builder.finish();
+        assert_eq!(plan.batches[0].clip, Some(mesh_clip));
+        assert_eq!(plan.text_batches[0].clip, Some(document_clip));
+    }
+
+    #[test]
     fn mesh_builder_rejects_mixed_epaint_texture_ids() {
         fn primitive(texture_id: epaint::TextureId) -> des_ui_render::PrimitiveCommand {
             let mut mesh = epaint::Mesh {
@@ -2503,6 +2585,7 @@ mod tests {
             des_ui_render::PrimitiveCommand::Draw(des_ui_render::RenderPrimitive::Mesh(
                 des_ui_render::EpaintMeshPrimitive {
                     element_id: ElementId::new("textured"),
+                    clip: None,
                     mesh,
                 },
             ))
