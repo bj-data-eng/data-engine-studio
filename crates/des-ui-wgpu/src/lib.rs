@@ -388,7 +388,6 @@ pub enum RendererError {
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
     UnsupportedTexture(epaint::TextureId),
-    UnsupportedPaintAtlasMesh,
     TextMeshCountMismatch { expected: usize, actual: usize },
     SurfaceFrame(&'static str),
 }
@@ -403,9 +402,6 @@ impl fmt::Display for RendererError {
             Self::UnsupportedTexture(texture_id) => {
                 write!(f, "unsupported native epaint texture id: {texture_id:?}")
             }
-            Self::UnsupportedPaintAtlasMesh => f.write_str(
-                "unsupported native paint-atlas mesh: only WHITE_UV managed texture meshes can use the solid texture",
-            ),
             Self::TextMeshCountMismatch { expected, actual } => write!(
                 f,
                 "native text mesh count mismatch: expected {expected}, got {actual}"
@@ -952,7 +948,7 @@ struct TextAtlasDescriptor {
 
 impl TextAtlasDescriptor {
     fn from_frame(frame: &RasterizedTextFrame, current: Option<Self>) -> Option<Self> {
-        if frame.is_empty() {
+        if frame.is_empty() && frame.atlas_delta.is_none() {
             return None;
         }
         let options = frame
@@ -1013,7 +1009,7 @@ fn draw_texture_for_mesh(mesh: &Mesh) -> Result<DrawTexture, RendererError> {
         None | Some(epaint::TextureId::Managed(0)) if mesh_uses_only_white_uv(mesh) => {
             Ok(DrawTexture::Solid)
         }
-        None | Some(epaint::TextureId::Managed(0)) => Err(RendererError::UnsupportedPaintAtlasMesh),
+        None | Some(epaint::TextureId::Managed(0)) => Ok(DrawTexture::TextAtlas),
         Some(texture_id) => Err(RendererError::UnsupportedTexture(texture_id)),
     }
 }
@@ -1023,6 +1019,18 @@ fn mesh_uses_only_white_uv(mesh: &Mesh) -> bool {
     mesh.vertices
         .iter()
         .all(|vertex| vertex.uv == [white.x, white.y])
+}
+
+fn mesh_uses_paint_atlas(mesh: &Mesh) -> bool {
+    matches!(mesh.texture_id, None | Some(epaint::TextureId::Managed(0)))
+        && !mesh_uses_only_white_uv(mesh)
+}
+
+fn render_plan_needs_text_atlas(plan: &RenderPlan) -> bool {
+    plan.items.iter().any(|item| match item {
+        RenderItem::Text(_) => true,
+        RenderItem::Mesh(batch) => mesh_uses_paint_atlas(&batch.mesh),
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1252,9 +1260,7 @@ impl<'window> GpuRenderer<'window> {
             .iter()
             .map(|batch| batch.text.clone())
             .collect::<Vec<_>>();
-        let text_frame = if text_paints.is_empty() {
-            RasterizedTextFrame::default()
-        } else {
+        let text_frame = if render_plan_needs_text_atlas(plan) {
             self.text_rasterizer
                 .borrow_mut()
                 .rasterize_frame_with_options(
@@ -1263,6 +1269,8 @@ impl<'window> GpuRenderer<'window> {
                     self.options.text,
                     self.options.tessellation,
                 )
+        } else {
+            RasterizedTextFrame::default()
         };
         let uploaded_frame = self.upload_render_frame(plan, &text_frame)?;
         let frame = match self.surface.get_current_texture() {
@@ -2161,7 +2169,7 @@ mod tests {
     }
 
     #[test]
-    fn managed_zero_mesh_requires_white_uv_for_solid_texture() {
+    fn managed_zero_mesh_with_atlas_uv_uses_text_atlas_texture() {
         let mesh = crate::Mesh {
             texture_id: Some(epaint::TextureId::Managed(0)),
             vertices: vec![crate::Vertex {
@@ -2174,7 +2182,7 @@ mod tests {
 
         assert!(matches!(
             crate::draw_texture_for_mesh(&mesh),
-            Err(RendererError::UnsupportedPaintAtlasMesh)
+            Ok(crate::DrawTexture::TextAtlas)
         ));
     }
 
@@ -2202,7 +2210,7 @@ mod tests {
     }
 
     #[test]
-    fn uploaded_frame_reports_managed_zero_paint_atlas_meshes() {
+    fn uploaded_frame_routes_managed_zero_paint_atlas_meshes() {
         let atlas_mesh = Mesh {
             texture_id: Some(epaint::TextureId::Managed(0)),
             vertices: vec![crate::Vertex {
@@ -2220,10 +2228,10 @@ mod tests {
             ..crate::RenderPlan::default()
         };
 
-        let error = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
-            .expect_err("paint atlas UVs should not silently sample the solid texture");
+        let (uploaded, _, _) = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
+            .expect("paint atlas UV meshes should route to the shared epaint atlas texture");
 
-        assert!(matches!(error, RendererError::UnsupportedPaintAtlasMesh));
+        assert_eq!(uploaded.draws[0].texture, crate::DrawTexture::TextAtlas);
     }
 
     #[test]
@@ -2742,6 +2750,17 @@ mod tests {
     }
 
     #[test]
+    fn text_rasterizer_can_upload_initial_atlas_without_text() {
+        let frame = TextRasterizer::new().rasterize_frame(&[], 1.0);
+
+        assert_eq!(frame.batches.len(), 0);
+        assert!(
+            frame.atlas_delta.is_some(),
+            "epaint's initial atlas contains the white pixel and prepared discs used by shape meshes"
+        );
+    }
+
+    #[test]
     fn text_atlas_upload_reuses_existing_gpu_texture_until_size_changes() {
         let empty = crate::RasterizedTextFrame::default();
         assert_eq!(
@@ -2802,6 +2821,59 @@ mod tests {
             ),
             crate::TextAtlasUpload::Recreate(descriptor)
         );
+    }
+
+    #[test]
+    fn text_atlas_upload_keeps_initial_atlas_delta_without_text_meshes() {
+        let frame = crate::RasterizedTextFrame {
+            width: 64,
+            height: 32,
+            atlas_delta: Some(crate::TextAtlasDelta {
+                pos: None,
+                width: 64,
+                height: 32,
+                options: TextureOptions::default(),
+                pixels: vec![255; 64 * 32 * 4],
+            }),
+            batches: Vec::new(),
+        };
+        let descriptor = crate::TextAtlasDescriptor {
+            width: 64,
+            height: 32,
+            options: TextureOptions::default(),
+        };
+
+        assert_eq!(
+            text_atlas_upload(None, &frame),
+            crate::TextAtlasUpload::Recreate(descriptor)
+        );
+    }
+
+    #[test]
+    fn render_plan_needs_text_atlas_for_text_or_atlas_uv_meshes() {
+        assert!(!crate::render_plan_needs_text_atlas(&crate::RenderPlan {
+            items: vec![RenderItem::Mesh(crate::MeshBatch {
+                clip: None,
+                mesh: crate::Mesh::default(),
+            })],
+            ..crate::RenderPlan::default()
+        }));
+
+        assert!(crate::render_plan_needs_text_atlas(&crate::RenderPlan {
+            items: vec![RenderItem::Mesh(crate::MeshBatch {
+                clip: None,
+                mesh: crate::Mesh {
+                    texture_id: Some(epaint::TextureId::Managed(0)),
+                    vertices: vec![crate::Vertex {
+                        position: [0.0, 0.0],
+                        uv: [0.5, 0.5],
+                        color: PackedColor::from(Color::rgb(255, 255, 255)).to_epaint_u32(),
+                    }],
+                    indices: vec![0],
+                },
+            })],
+            ..crate::RenderPlan::default()
+        }));
     }
 
     #[test]
