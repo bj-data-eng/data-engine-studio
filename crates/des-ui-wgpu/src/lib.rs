@@ -256,6 +256,20 @@ pub struct RasterizedText {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+pub struct RasterizedTextFrame {
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+    pub batches: Vec<TextMesh>,
+}
+
+impl RasterizedTextFrame {
+    pub fn is_empty(&self) -> bool {
+        self.batches.iter().all(TextMesh::is_empty) || self.pixels.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextMesh {
     pub vertices: Vec<TextVertex>,
     pub indices: Vec<u32>,
@@ -318,11 +332,28 @@ impl TextRasterizer {
     }
 
     pub fn rasterize(&mut self, text: &TextPaint, scale_factor: f32) -> RasterizedText {
+        let frame = self.rasterize_frame(std::slice::from_ref(text), scale_factor);
+        RasterizedText {
+            width: frame.width,
+            height: frame.height,
+            pixels: frame.pixels,
+            mesh: frame.batches.into_iter().next().unwrap_or_default(),
+        }
+    }
+
+    pub fn rasterize_frame(
+        &mut self,
+        text_batches: &[TextPaint],
+        scale_factor: f32,
+    ) -> RasterizedTextFrame {
         let scale_factor = scale_factor.max(0.000_001);
         self.fonts.begin_pass(epaint::TextOptions::default());
-        let galley = {
+        let galleys = {
             let mut view = self.fonts.with_pixels_per_point(scale_factor);
-            view.layout_job(epaint_layout_job(text))
+            text_batches
+                .iter()
+                .map(|text| view.layout_job(epaint_layout_job(text)))
+                .collect::<Vec<_>>()
         };
         let font_image_size = self.fonts.font_image_size();
         let prepared_discs = self.fonts.texture_atlas().prepared_discs();
@@ -332,13 +363,20 @@ impl TextRasterizer {
             font_image_size,
             prepared_discs,
         );
-        let text_shape = epaint::TextShape::new(
-            epaint::pos2(text.rect.origin.x, text.rect.origin.y),
-            galley,
-            to_epaint_color(text.color),
-        );
-        let mut mesh = epaint::Mesh::default();
-        tessellator.tessellate_text(&text_shape, &mut mesh);
+        let batches = text_batches
+            .iter()
+            .zip(galleys)
+            .map(|(text, galley)| {
+                let text_shape = epaint::TextShape::new(
+                    epaint::pos2(text.rect.origin.x, text.rect.origin.y),
+                    galley,
+                    to_epaint_color(text.color),
+                );
+                let mut mesh = epaint::Mesh::default();
+                tessellator.tessellate_text(&text_shape, &mut mesh);
+                TextMesh::from_epaint_mesh(&mesh)
+            })
+            .collect();
         let image = self.fonts.image();
         let width = image.size[0] as u32;
         let height = image.size[1] as u32;
@@ -348,11 +386,11 @@ impl TextRasterizer {
             .flat_map(|color| color.to_array())
             .collect::<Vec<_>>();
 
-        RasterizedText {
+        RasterizedTextFrame {
             width,
             height,
             pixels,
-            mesh: TextMesh::from_epaint_mesh(&mesh),
+            batches,
         }
     }
 }
@@ -667,6 +705,18 @@ impl<'window> GpuRenderer<'window> {
             return Ok(());
         }
         self.write_viewport_uniform();
+        let text_paints = plan
+            .text_batches
+            .iter()
+            .map(|batch| batch.text.clone())
+            .collect::<Vec<_>>();
+        let text_frame = if text_paints.is_empty() {
+            RasterizedTextFrame::default()
+        } else {
+            self.text_rasterizer
+                .borrow_mut()
+                .rasterize_frame(&text_paints, self.size.scale_factor as f32)
+        };
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -689,6 +739,7 @@ impl<'window> GpuRenderer<'window> {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("des-ui render encoder"),
             });
+        let text_bind_group = self.upload_text_frame(&text_frame);
         {
             let color_attachment = Some(wgpu::RenderPassColorAttachment {
                 view: &view,
@@ -709,6 +760,7 @@ impl<'window> GpuRenderer<'window> {
             });
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.viewport_bind_group, &[]);
+            let mut text_index = 0;
             for item in &plan.items {
                 match item {
                     RenderItem::Mesh(batch) => {
@@ -718,7 +770,11 @@ impl<'window> GpuRenderer<'window> {
                     }
                     RenderItem::Text(batch) => {
                         pass.set_pipeline(&self.text_pipeline);
-                        self.draw_text_batch(&mut pass, batch);
+                        let mesh = text_frame.batches.get(text_index);
+                        text_index += 1;
+                        if let (Some(mesh), Some(bind_group)) = (mesh, text_bind_group.as_ref()) {
+                            self.draw_text_batch(&mut pass, batch, mesh, bind_group);
+                        }
                     }
                 }
             }
@@ -764,30 +820,17 @@ impl<'window> GpuRenderer<'window> {
         pass.draw_indexed(0..batch.mesh.indices.len() as u32, 0, 0..1);
     }
 
-    fn draw_text_batch<'pass>(
-        &'pass self,
-        pass: &mut wgpu::RenderPass<'pass>,
-        batch: &'pass TextBatch,
-    ) {
-        let rasterized = self
-            .text_rasterizer
-            .borrow_mut()
-            .rasterize(&batch.text, self.size.scale_factor as f32);
-        if rasterized.mesh.is_empty() || rasterized.pixels.is_empty() {
-            return;
+    fn upload_text_frame(&self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
+        if frame.is_empty() {
+            return None;
         }
-        let Some(scissor) = clip_rect_to_scissor(batch.clip, self.size) else {
-            return;
-        };
-        pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
-
         let texture_size = wgpu::Extent3d {
-            width: rasterized.width,
-            height: rasterized.height,
+            width: frame.width,
+            height: frame.height,
             depth_or_array_layers: 1,
         };
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("des-ui text texture"),
+            label: Some("des-ui text atlas texture"),
             size: texture_size,
             mip_level_count: 1,
             sample_count: 1,
@@ -803,17 +846,17 @@ impl<'window> GpuRenderer<'window> {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &rasterized.pixels,
+            &frame.pixels,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(rasterized.width * 4),
-                rows_per_image: Some(rasterized.height),
+                bytes_per_row: Some(frame.width * 4),
+                rows_per_image: Some(frame.height),
             },
             texture_size,
         );
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("des-ui text bind group"),
+        Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("des-ui text atlas bind group"),
             layout: &self.text_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -829,33 +872,43 @@ impl<'window> GpuRenderer<'window> {
                     resource: wgpu::BindingResource::Sampler(&self.text_sampler),
                 },
             ],
-        });
+        }))
+    }
+
+    fn draw_text_batch<'pass>(
+        &'pass self,
+        pass: &mut wgpu::RenderPass<'pass>,
+        batch: &'pass TextBatch,
+        mesh: &'pass TextMesh,
+        bind_group: &'pass wgpu::BindGroup,
+    ) {
+        if mesh.is_empty() {
+            return;
+        }
+        let Some(scissor) = clip_rect_to_scissor(batch.clip, self.size) else {
+            return;
+        };
+        pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
         let vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("des-ui text vertex buffer"),
-            size: (rasterized.mesh.vertices.len() * mem::size_of::<TextVertex>()) as u64,
+            size: (mesh.vertices.len() * mem::size_of::<TextVertex>()) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let index_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("des-ui text index buffer"),
-            size: (rasterized.mesh.indices.len() * mem::size_of::<u32>()) as u64,
+            size: (mesh.indices.len() * mem::size_of::<u32>()) as u64,
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        self.queue.write_buffer(
-            &vertex_buffer,
-            0,
-            bytemuck::cast_slice(&rasterized.mesh.vertices),
-        );
-        self.queue.write_buffer(
-            &index_buffer,
-            0,
-            bytemuck::cast_slice(&rasterized.mesh.indices),
-        );
-        pass.set_bind_group(0, &bind_group, &[]);
+        self.queue
+            .write_buffer(&vertex_buffer, 0, bytemuck::cast_slice(&mesh.vertices));
+        self.queue
+            .write_buffer(&index_buffer, 0, bytemuck::cast_slice(&mesh.indices));
+        pass.set_bind_group(0, bind_group, &[]);
         pass.set_vertex_buffer(0, vertex_buffer.slice(..));
         pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        pass.draw_indexed(0..rasterized.mesh.indices.len() as u32, 0, 0..1);
+        pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
     }
 
     fn write_viewport_uniform(&self) {
@@ -920,8 +973,8 @@ fn premultiplied_alpha_blend() -> wgpu::BlendState {
             operation: wgpu::BlendOperation::Add,
         },
         alpha: wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            src_factor: wgpu::BlendFactor::OneMinusDstAlpha,
+            dst_factor: wgpu::BlendFactor::One,
             operation: wgpu::BlendOperation::Add,
         },
     }
@@ -1090,6 +1143,16 @@ mod tests {
     }
 
     #[test]
+    fn blend_state_matches_epaint_premultiplied_alpha_contract() {
+        let blend = crate::premultiplied_alpha_blend();
+
+        assert_eq!(blend.color.src_factor, wgpu::BlendFactor::One);
+        assert_eq!(blend.color.dst_factor, wgpu::BlendFactor::OneMinusSrcAlpha);
+        assert_eq!(blend.alpha.src_factor, wgpu::BlendFactor::OneMinusDstAlpha);
+        assert_eq!(blend.alpha.dst_factor, wgpu::BlendFactor::One);
+    }
+
+    #[test]
     fn fill_rect_uses_epaint_tessellation_in_document_coordinates() {
         let mut display_list = DisplayList::new();
         display_list.push(PaintCommand::FillRect(FillRectPaint {
@@ -1218,6 +1281,52 @@ mod tests {
                 .vertices
                 .iter()
                 .any(|vertex| vertex.position[0] >= 12.0 && vertex.position[1] >= 18.0)
+        );
+    }
+
+    #[test]
+    fn text_rasterizer_lays_out_frame_text_against_one_atlas() {
+        let first = TextPaint {
+            element_id: ElementId::new("first"),
+            rect: Rect::new(12.0, 18.0, 220.0, 72.0),
+            text: "First label".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+        let second = TextPaint {
+            element_id: ElementId::new("second"),
+            rect: Rect::new(12.0, 54.0, 220.0, 72.0),
+            text: "Second label".into(),
+            color: Color::rgb(96, 72, 154),
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+
+        let frame = TextRasterizer::new().rasterize_frame(&[first, second], 2.0);
+
+        assert_eq!(frame.batches.len(), 2);
+        assert!(frame.width > 0);
+        assert!(frame.height > 0);
+        assert_eq!(
+            frame.pixels.len(),
+            frame.width as usize * frame.height as usize * 4
+        );
+        assert!(!frame.batches[0].is_empty());
+        assert!(!frame.batches[1].is_empty());
+        assert!(
+            frame.batches[1]
+                .vertices
+                .iter()
+                .any(|vertex| vertex.position[1] >= 54.0)
         );
     }
 
