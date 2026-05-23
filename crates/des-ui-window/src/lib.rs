@@ -167,7 +167,9 @@ impl AppFrame {
     }
 
     pub fn into_output(self, render_options: RenderOptions) -> FrameOutput {
-        let render_plan = DisplayListRenderer::new(render_options).build_plan(&self.display_list);
+        let render_plan = DisplayListRenderer::new(render_options)
+            .with_pixels_per_point(self.viewport.scale_factor as f32)
+            .build_plan(&self.display_list);
         FrameOutput {
             display_list: self.display_list,
             render_plan,
@@ -322,7 +324,7 @@ mod tests {
     use des_ui_wgpu::ClearColor;
     use des_ui_winit::HostViewport;
 
-    use crate::{AppFrame, NativeOptions, WindowApp};
+    use crate::{AppFrame, FrameOutput, NativeOptions, WindowApp};
 
     #[test]
     fn native_options_have_desktop_friendly_defaults() {
@@ -382,6 +384,38 @@ mod tests {
         );
         assert_eq!(output.render_plan.batches.len(), 1);
         assert!(!output.render_plan.batches[0].mesh.indices.is_empty());
+    }
+
+    #[test]
+    fn app_frame_output_uses_viewport_scale_for_shape_tessellation() {
+        fn output_for_scale(scale_factor: f64) -> FrameOutput {
+            let mut frame = AppFrame::new(
+                HostViewport::new(800, 600, scale_factor),
+                DocumentInput::default(),
+            );
+            frame
+                .display_list_mut()
+                .push(PaintCommand::FillRect(FillRectPaint {
+                    element_id: ElementId::new("panel"),
+                    rect: Rect::new(10.0, 20.0, 80.0, 40.0),
+                    radius: CornerRadii::ZERO,
+                    color: Color::rgb(20, 30, 40),
+                }));
+            frame.into_output(des_ui_wgpu::RenderOptions::default())
+        }
+
+        let low_density = output_for_scale(1.0);
+        let high_density = output_for_scale(2.0);
+        let min_x = |output: &FrameOutput| {
+            output.render_plan.batches[0]
+                .mesh
+                .vertices
+                .iter()
+                .map(|vertex| vertex.position[0])
+                .fold(f32::INFINITY, f32::min)
+        };
+
+        assert!(min_x(&high_density) > min_x(&low_density));
     }
 
     #[test]

@@ -7,8 +7,8 @@
 
 use des_ui_document::{Color, Rect, TextWrapMode};
 use des_ui_render::{
-    DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
-    plan_primitives,
+    DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
+    RenderPrimitive, TextPaint, plan_primitives,
 };
 use std::{cell::RefCell, error, fmt, mem};
 
@@ -425,14 +425,23 @@ fn to_epaint_color(color: Color) -> epaint::Color32 {
     epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DisplayListRenderer {
     options: RenderOptions,
+    pixels_per_point: f32,
 }
 
 impl DisplayListRenderer {
     pub fn new(options: RenderOptions) -> Self {
-        Self { options }
+        Self {
+            options,
+            pixels_per_point: 1.0,
+        }
+    }
+
+    pub fn with_pixels_per_point(mut self, pixels_per_point: f32) -> Self {
+        self.pixels_per_point = pixels_per_point.max(0.000_001);
+        self
     }
 
     pub fn build_plan_for_output(&self, output: &des_ui_document::DocumentOutput) -> RenderPlan {
@@ -441,8 +450,17 @@ impl DisplayListRenderer {
 
     pub fn build_plan(&self, display_list: &DisplayList) -> RenderPlan {
         let mut builder = RenderPlanBuilder::new(self.options);
-        builder.push_primitives(&plan_primitives(display_list));
+        let primitives = PrimitivePlanner::new()
+            .with_pixels_per_point(self.pixels_per_point)
+            .plan_display_list(display_list);
+        builder.push_primitives(&primitives);
         builder.finish()
+    }
+}
+
+impl Default for DisplayListRenderer {
+    fn default() -> Self {
+        Self::new(RenderOptions::default())
     }
 }
 
@@ -1184,6 +1202,35 @@ mod tests {
                 .iter()
                 .any(|vertex| vertex.position[0] < 10.0 && vertex.position[1] < 20.0),
             "outer fringe vertices should expand outside the filled edge"
+        );
+    }
+
+    #[test]
+    fn display_list_renderer_tessellates_shapes_for_pixels_per_point() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("box"),
+            rect: Rect::new(10.0, 20.0, 30.0, 40.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(1, 2, 3),
+        }));
+
+        let low_density = DisplayListRenderer::default().build_plan(&display_list);
+        let high_density = DisplayListRenderer::default()
+            .with_pixels_per_point(2.0)
+            .build_plan(&display_list);
+        let min_x = |plan: &crate::RenderPlan| {
+            plan.batches[0]
+                .mesh
+                .vertices
+                .iter()
+                .map(|vertex| vertex.position[0])
+                .fold(f32::INFINITY, f32::min)
+        };
+
+        assert!(
+            min_x(&high_density) > min_x(&low_density),
+            "higher pixel density should shrink the antialiasing fringe in logical coordinates"
         );
     }
 
