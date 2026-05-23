@@ -76,7 +76,6 @@ pub struct StrokePathPaint {
     pub color: Color,
     pub closed: bool,
     pub cap: StrokeCap,
-    pub join: StrokeJoin,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -84,14 +83,6 @@ pub enum StrokeCap {
     #[default]
     Butt,
     Square,
-    Round,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum StrokeJoin {
-    #[default]
-    Miter,
-    Bevel,
     Round,
 }
 
@@ -888,7 +879,6 @@ fn append_corner_preserved_dashed_border(
             color,
             closed: false,
             cap: StrokeCap::Butt,
-            join: StrokeJoin::Miter,
         }));
     }
     append_distributed_dashes(
@@ -1209,7 +1199,6 @@ fn append_arrow_border_command(
         color: border.color,
         closed: true,
         cap: StrokeCap::Butt,
-        join: StrokeJoin::Miter,
     }));
 }
 
@@ -1730,7 +1719,6 @@ mod tests {
             color: Color::rgba(40, 50, 60, 230),
             closed: false,
             cap: StrokeCap::Butt,
-            join: StrokeJoin::Miter,
         }));
 
         let primitives = plan_primitives(&list);
