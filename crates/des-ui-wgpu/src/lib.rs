@@ -984,6 +984,7 @@ pub struct GpuRenderer<'window> {
     texture_bind_group_layout: wgpu::BindGroupLayout,
     viewport_buffer: wgpu::Buffer,
     viewport_bind_group: wgpu::BindGroup,
+    previous_viewport_uniform: Option<ViewportUniform>,
     solid_texture: GpuTexture,
     text_rasterizer: RefCell<TextRasterizer>,
     text_atlas: Option<GpuTextAtlas>,
@@ -1316,7 +1317,7 @@ impl<'window> GpuRenderer<'window> {
                 pixels: &[255, 255, 255, 255],
             },
         );
-        let renderer = Self {
+        let mut renderer = Self {
             surface,
             device,
             queue,
@@ -1326,6 +1327,7 @@ impl<'window> GpuRenderer<'window> {
             texture_bind_group_layout,
             viewport_buffer,
             viewport_bind_group,
+            previous_viewport_uniform: None,
             solid_texture,
             text_rasterizer: RefCell::new(TextRasterizer::with_text_options(options.text)),
             text_atlas: None,
@@ -1668,10 +1670,14 @@ impl<'window> GpuRenderer<'window> {
         GpuTextAtlas { descriptor, gpu }
     }
 
-    fn write_viewport_uniform(&self) {
+    fn write_viewport_uniform(&mut self) {
         let uniform = viewport_uniform(self.size, self.options);
+        if !should_write_viewport_uniform(self.previous_viewport_uniform, uniform) {
+            return;
+        }
         self.queue
             .write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&uniform));
+        self.previous_viewport_uniform = Some(uniform);
     }
 }
 
@@ -1733,6 +1739,10 @@ fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> Viewpor
         dithering: u32::from(options.dithering),
         predictable_texture_filtering: u32::from(options.predictable_texture_filtering),
     }
+}
+
+fn should_write_viewport_uniform(previous: Option<ViewportUniform>, next: ViewportUniform) -> bool {
+    previous != Some(next)
 }
 
 fn write_text_atlas_delta(queue: &wgpu::Queue, texture: &wgpu::Texture, delta: &TextAtlasDelta) {
@@ -2252,6 +2262,37 @@ mod tests {
         );
 
         assert_eq!(uniform.predictable_texture_filtering, 1);
+    }
+
+    #[test]
+    fn viewport_uniform_upload_skips_when_epaint_viewport_contract_is_unchanged() {
+        let first = crate::viewport_uniform(
+            PhysicalRenderSize::new(320, 180, 2.0),
+            RenderOptions::default(),
+        );
+        let same = crate::viewport_uniform(
+            PhysicalRenderSize::new(320, 180, 2.0),
+            RenderOptions::default(),
+        );
+        let resized = crate::viewport_uniform(
+            PhysicalRenderSize::new(640, 180, 2.0),
+            RenderOptions::default(),
+        );
+        let changed_filtering = crate::viewport_uniform(
+            PhysicalRenderSize::new(320, 180, 2.0),
+            RenderOptions {
+                predictable_texture_filtering: true,
+                ..RenderOptions::default()
+            },
+        );
+
+        assert!(crate::should_write_viewport_uniform(None, first));
+        assert!(!crate::should_write_viewport_uniform(Some(first), same));
+        assert!(crate::should_write_viewport_uniform(Some(first), resized));
+        assert!(crate::should_write_viewport_uniform(
+            Some(first),
+            changed_filtering
+        ));
     }
 
     #[test]
