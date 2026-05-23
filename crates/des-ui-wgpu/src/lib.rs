@@ -412,6 +412,7 @@ pub enum RendererError {
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
     MissingTexture(epaint::TextureId),
+    PartialTextureUpdateMissingTexture(epaint::TextureId),
     TextMeshCountMismatch { expected: usize, actual: usize },
     SurfaceFrame(&'static str),
 }
@@ -429,6 +430,10 @@ impl fmt::Display for RendererError {
                     "native epaint texture id has not been registered: {texture_id:?}"
                 )
             }
+            Self::PartialTextureUpdateMissingTexture(texture_id) => write!(
+                f,
+                "cannot apply partial native texture update before full allocation: {texture_id:?}"
+            ),
             Self::TextMeshCountMismatch { expected, actual } => write!(
                 f,
                 "native text mesh count mismatch: expected {expected}, got {actual}"
@@ -496,6 +501,15 @@ impl RasterizedTextFrame {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextAtlasDelta {
+    pub pos: Option<[u32; 2]>,
+    pub width: u32,
+    pub height: u32,
+    pub options: TextureOptions,
+    pub pixels: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextureDelta {
     pub pos: Option<[u32; 2]>,
     pub width: u32,
     pub height: u32,
@@ -734,7 +748,7 @@ fn to_epaint_color(color: Color) -> epaint::Color32 {
     epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
 }
 
-fn text_atlas_delta_from_epaint(delta: epaint::ImageDelta) -> TextAtlasDelta {
+fn texture_delta_from_epaint(delta: epaint::ImageDelta) -> TextureDelta {
     let width = delta.image.width() as u32;
     let height = delta.image.height() as u32;
     let pixels = match delta.image {
@@ -744,12 +758,23 @@ fn text_atlas_delta_from_epaint(delta: epaint::ImageDelta) -> TextAtlasDelta {
             .flat_map(|color| color.to_array())
             .collect(),
     };
-    TextAtlasDelta {
+    TextureDelta {
         pos: delta.pos.map(|[x, y]| [x as u32, y as u32]),
         width,
         height,
         options: delta.options.into(),
         pixels,
+    }
+}
+
+fn text_atlas_delta_from_epaint(delta: epaint::ImageDelta) -> TextAtlasDelta {
+    let delta = texture_delta_from_epaint(delta);
+    TextAtlasDelta {
+        pos: delta.pos,
+        width: delta.width,
+        height: delta.height,
+        options: delta.options,
+        pixels: delta.pixels,
     }
 }
 
@@ -962,12 +987,17 @@ pub struct GpuRenderer<'window> {
     text_rasterizer: RefCell<TextRasterizer>,
     text_atlas: Option<GpuTextAtlas>,
     frame_buffers: GpuFrameBuffers,
-    textures: HashMap<epaint::TextureId, GpuTexture>,
+    textures: HashMap<epaint::TextureId, GpuRegisteredTexture>,
     size: PhysicalRenderSize,
 }
 
 struct GpuTextAtlas {
-    descriptor: TextAtlasDescriptor,
+    descriptor: TextureDescriptor,
+    gpu: GpuTexture,
+}
+
+struct GpuRegisteredTexture {
+    descriptor: TextureDescriptor,
     gpu: GpuTexture,
 }
 
@@ -984,13 +1014,13 @@ struct TextureUpload<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct TextAtlasDescriptor {
+struct TextureDescriptor {
     width: u32,
     height: u32,
     options: TextureOptions,
 }
 
-impl TextAtlasDescriptor {
+impl TextureDescriptor {
     fn from_frame(frame: &RasterizedTextFrame, current: Option<Self>) -> Option<Self> {
         if frame.is_empty() && frame.atlas_delta.is_none() {
             return None;
@@ -1012,9 +1042,9 @@ impl TextAtlasDescriptor {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TextAtlasUpload {
     Skip,
-    Unchanged(TextAtlasDescriptor),
-    Reuse(TextAtlasDescriptor),
-    Recreate(TextAtlasDescriptor),
+    Unchanged(TextureDescriptor),
+    Reuse(TextureDescriptor),
+    Recreate(TextureDescriptor),
 }
 
 #[derive(Default)]
@@ -1092,10 +1122,10 @@ enum FrameBufferSlot {
 }
 
 fn text_atlas_upload(
-    current: Option<TextAtlasDescriptor>,
+    current: Option<TextureDescriptor>,
     frame: &RasterizedTextFrame,
 ) -> TextAtlasUpload {
-    let Some(next) = TextAtlasDescriptor::from_frame(frame, current) else {
+    let Some(next) = TextureDescriptor::from_frame(frame, current) else {
         return TextAtlasUpload::Skip;
     };
     if current == Some(next) {
@@ -1297,11 +1327,80 @@ impl<'window> GpuRenderer<'window> {
     }
 
     pub fn set_texture(&mut self, texture_id: epaint::TextureId, texture: RegisteredTexture) {
+        let delta = TextureDelta {
+            pos: None,
+            width: texture.width,
+            height: texture.height,
+            options: texture.options,
+            pixels: texture.pixels,
+        };
+        self.apply_texture_delta(texture_id, &delta)
+            .expect("full texture uploads should always allocate");
+    }
+
+    pub fn apply_textures_delta(
+        &mut self,
+        delta: epaint::textures::TexturesDelta,
+    ) -> Result<(), RendererError> {
+        for (texture_id, image_delta) in delta.set {
+            self.apply_epaint_texture_delta(texture_id, image_delta)?;
+        }
+        for texture_id in delta.free {
+            self.remove_texture(texture_id);
+        }
+        Ok(())
+    }
+
+    pub fn apply_epaint_texture_delta(
+        &mut self,
+        texture_id: epaint::TextureId,
+        delta: epaint::ImageDelta,
+    ) -> Result<(), RendererError> {
+        let delta = texture_delta_from_epaint(delta);
+        self.apply_texture_delta(texture_id, &delta)
+    }
+
+    pub fn remove_texture(&mut self, texture_id: epaint::TextureId) {
+        self.textures.remove(&texture_id);
+    }
+
+    fn apply_texture_delta(
+        &mut self,
+        texture_id: epaint::TextureId,
+        delta: &TextureDelta,
+    ) -> Result<(), RendererError> {
+        if delta.pos.is_some() {
+            let texture = self.textures.get_mut(&texture_id).ok_or(
+                RendererError::PartialTextureUpdateMissingTexture(texture_id),
+            )?;
+            if texture.descriptor.options != delta.options {
+                texture.gpu.bind_group = create_texture_bind_group(
+                    &self.device,
+                    &self.texture_bind_group_layout,
+                    &self.viewport_buffer,
+                    &texture.gpu.texture,
+                    &self.device.create_sampler(&texture_sampler_descriptor(
+                        "des-ui registered texture sampler",
+                        delta.options,
+                    )),
+                    "des-ui registered texture",
+                );
+                texture.descriptor.options = delta.options;
+            }
+            write_rgba_texture_delta(&self.queue, &texture.gpu.texture, delta);
+            return Ok(());
+        }
+
+        let descriptor = TextureDescriptor {
+            width: delta.width,
+            height: delta.height,
+            options: delta.options,
+        };
         let sampler = self.device.create_sampler(&texture_sampler_descriptor(
             "des-ui registered texture sampler",
-            texture.options,
+            delta.options,
         ));
-        let gpu_texture = create_rgba_texture(
+        let gpu = create_rgba_texture(
             &self.device,
             &self.queue,
             &self.texture_bind_group_layout,
@@ -1309,16 +1408,14 @@ impl<'window> GpuRenderer<'window> {
             &self.viewport_buffer,
             "des-ui registered texture",
             TextureUpload {
-                width: texture.width,
-                height: texture.height,
-                pixels: &texture.pixels,
+                width: delta.width,
+                height: delta.height,
+                pixels: &delta.pixels,
             },
         );
-        self.textures.insert(texture_id, gpu_texture);
-    }
-
-    pub fn remove_texture(&mut self, texture_id: epaint::TextureId) {
-        self.textures.remove(&texture_id);
+        self.textures
+            .insert(texture_id, GpuRegisteredTexture { descriptor, gpu });
+        Ok(())
     }
 
     pub fn render_plan(&mut self, plan: &RenderPlan) -> Result<(), RendererError> {
@@ -1401,7 +1498,7 @@ impl<'window> GpuRenderer<'window> {
                             .textures
                             .get(&texture_id)
                             .ok_or(RendererError::MissingTexture(texture_id))?;
-                        self.draw_batch(&mut pass, draw, &texture.bind_group);
+                        self.draw_batch(&mut pass, draw, &texture.gpu.bind_group);
                     }
                 }
             }
@@ -1511,7 +1608,7 @@ impl<'window> GpuRenderer<'window> {
         Some(self.text_atlas.as_ref()?.gpu.bind_group.clone())
     }
 
-    fn create_text_atlas(&self, descriptor: TextAtlasDescriptor) -> GpuTextAtlas {
+    fn create_text_atlas(&self, descriptor: TextureDescriptor) -> GpuTextAtlas {
         let sampler = self.device.create_sampler(&texture_sampler_descriptor(
             "des-ui text atlas sampler",
             descriptor.options,
@@ -1600,29 +1697,87 @@ fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> Viewpor
 }
 
 fn write_text_atlas_delta(queue: &wgpu::Queue, texture: &wgpu::Texture, delta: &TextAtlasDelta) {
+    write_rgba_texture_patch(
+        queue,
+        texture,
+        delta.pos,
+        delta.width,
+        delta.height,
+        &delta.pixels,
+    );
+}
+
+fn write_rgba_texture_delta(queue: &wgpu::Queue, texture: &wgpu::Texture, delta: &TextureDelta) {
+    write_rgba_texture_patch(
+        queue,
+        texture,
+        delta.pos,
+        delta.width,
+        delta.height,
+        &delta.pixels,
+    );
+}
+
+fn write_rgba_texture_patch(
+    queue: &wgpu::Queue,
+    texture: &wgpu::Texture,
+    pos: Option<[u32; 2]>,
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+) {
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,
             origin: wgpu::Origin3d {
-                x: delta.pos.map_or(0, |pos| pos[0]),
-                y: delta.pos.map_or(0, |pos| pos[1]),
+                x: pos.map_or(0, |pos| pos[0]),
+                y: pos.map_or(0, |pos| pos[1]),
                 z: 0,
             },
             aspect: wgpu::TextureAspect::All,
         },
-        &delta.pixels,
+        pixels,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
-            bytes_per_row: Some(delta.width * 4),
-            rows_per_image: Some(delta.height),
+            bytes_per_row: Some(width * 4),
+            rows_per_image: Some(height),
         },
         wgpu::Extent3d {
-            width: delta.width,
-            height: delta.height,
+            width,
+            height,
             depth_or_array_layers: 1,
         },
     );
+}
+
+fn create_texture_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    viewport_buffer: &wgpu::Buffer,
+    texture: &wgpu::Texture,
+    sampler: &wgpu::Sampler,
+    label: &'static str,
+) -> wgpu::BindGroup {
+    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: viewport_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
 }
 
 fn texture_sampler_descriptor(
@@ -1687,25 +1842,8 @@ fn create_rgba_texture(
             },
         );
     }
-    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some(label),
-        layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: viewport_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::TextureView(&texture_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::Sampler(sampler),
-            },
-        ],
-    });
+    let bind_group =
+        create_texture_bind_group(device, layout, viewport_buffer, &texture, sampler, label);
     GpuTexture {
         texture,
         bind_group,
@@ -2888,7 +3026,7 @@ mod tests {
             atlas_delta: None,
             ..frame_with_delta.clone()
         };
-        let descriptor = crate::TextAtlasDescriptor {
+        let descriptor = crate::TextureDescriptor {
             width: 64,
             height: 128,
             options: TextureOptions::default(),
@@ -2908,7 +3046,7 @@ mod tests {
         );
         assert_eq!(
             text_atlas_upload(
-                Some(crate::TextAtlasDescriptor {
+                Some(crate::TextureDescriptor {
                     width: 32,
                     height: 128,
                     options: TextureOptions::default(),
@@ -2933,7 +3071,7 @@ mod tests {
             }),
             batches: Vec::new(),
         };
-        let descriptor = crate::TextAtlasDescriptor {
+        let descriptor = crate::TextureDescriptor {
             width: 64,
             height: 32,
             options: TextureOptions::default(),
@@ -2980,7 +3118,7 @@ mod tests {
             wrap_mode: TextureWrapMode::ClampToEdge,
             mipmap_mode: None,
         };
-        let current = crate::TextAtlasDescriptor {
+        let current = crate::TextureDescriptor {
             width: 64,
             height: 64,
             options: TextureOptions::default(),
@@ -3005,7 +3143,7 @@ mod tests {
                 indices: vec![0],
             }],
         };
-        let next = crate::TextAtlasDescriptor {
+        let next = crate::TextureDescriptor {
             options: nearest,
             ..current
         };
@@ -3046,6 +3184,50 @@ mod tests {
             }
         );
         assert_eq!(atlas_delta.pixels, vec![10, 20, 30, 40, 50, 60, 70, 80]);
+    }
+
+    #[test]
+    fn texture_delta_preserves_epaint_full_and_partial_contracts() {
+        let full = crate::texture_delta_from_epaint(epaint::ImageDelta::full(
+            epaint::ColorImage::new(
+                [1, 2],
+                vec![
+                    epaint::Color32::from_rgba_premultiplied(1, 2, 3, 4),
+                    epaint::Color32::from_rgba_premultiplied(5, 6, 7, 8),
+                ],
+            ),
+            epaint::textures::TextureOptions::LINEAR,
+        ));
+        assert_eq!(full.pos, None);
+        assert_eq!(full.width, 1);
+        assert_eq!(full.height, 2);
+        assert_eq!(full.options, TextureOptions::default());
+        assert_eq!(full.pixels, vec![1, 2, 3, 4, 5, 6, 7, 8]);
+
+        let partial = crate::texture_delta_from_epaint(epaint::ImageDelta::partial(
+            [3, 5],
+            epaint::ColorImage::new(
+                [2, 1],
+                vec![
+                    epaint::Color32::from_rgba_premultiplied(9, 10, 11, 12),
+                    epaint::Color32::from_rgba_premultiplied(13, 14, 15, 16),
+                ],
+            ),
+            epaint::textures::TextureOptions::NEAREST_REPEAT,
+        ));
+        assert_eq!(partial.pos, Some([3, 5]));
+        assert_eq!(partial.width, 2);
+        assert_eq!(partial.height, 1);
+        assert_eq!(
+            partial.options,
+            TextureOptions {
+                magnification: TextureFilter::Nearest,
+                minification: TextureFilter::Nearest,
+                wrap_mode: TextureWrapMode::Repeat,
+                mipmap_mode: None,
+            }
+        );
+        assert_eq!(partial.pixels, vec![9, 10, 11, 12, 13, 14, 15, 16]);
     }
 
     #[test]
