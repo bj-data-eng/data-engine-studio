@@ -36,6 +36,8 @@ pub enum PaintCommand {
     FillRect(FillRectPaint),
     StrokeRect(StrokeRectPaint),
     StrokeLine(StrokeLinePaint),
+    DashedLine(DashedLinePaint),
+    DottedLine(DottedLinePaint),
     StrokePath(StrokePathPaint),
     FillCircle(FillCirclePaint),
     FillPolygon(FillPolygonPaint),
@@ -76,6 +78,28 @@ pub struct StrokeLinePaint {
     pub width: f32,
     pub color: Color,
     pub cap: StrokeCap,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DashedLinePaint {
+    pub element_id: ElementId,
+    pub from: Point,
+    pub to: Point,
+    pub width: f32,
+    pub color: Color,
+    pub dash: f32,
+    pub gap: f32,
+    pub offset: f32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DottedLinePaint {
+    pub element_id: ElementId,
+    pub from: Point,
+    pub to: Point,
+    pub radius: f32,
+    pub color: Color,
+    pub spacing: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -500,6 +524,35 @@ fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
                     command.cap,
                 ),
             ))
+        }
+        PaintCommand::DashedLine(command) => {
+            if command.width <= 0.0
+                || command.color.a == 0
+                || command.dash <= 0.0
+                || command.gap < 0.0
+            {
+                return None;
+            }
+            let shapes = epaint::Shape::dashed_line_with_offset(
+                &[to_epaint_pos(command.from), to_epaint_pos(command.to)],
+                epaint::Stroke::new(command.width, to_epaint_color(command.color)),
+                &[command.dash],
+                &[command.gap],
+                command.offset.max(0.0),
+            );
+            Some((command.element_id.clone(), epaint::Shape::Vec(shapes)))
+        }
+        PaintCommand::DottedLine(command) => {
+            if command.radius <= 0.0 || command.color.a == 0 || command.spacing <= 0.0 {
+                return None;
+            }
+            let shapes = epaint::Shape::dotted_line(
+                &[to_epaint_pos(command.from), to_epaint_pos(command.to)],
+                to_epaint_color(command.color),
+                command.spacing,
+                command.radius,
+            );
+            Some((command.element_id.clone(), epaint::Shape::Vec(shapes)))
         }
         PaintCommand::StrokePath(command) => {
             if command.width <= 0.0 || command.color.a == 0 || command.points.len() < 2 {
@@ -1140,19 +1193,16 @@ fn append_distributed_dashes(
         return;
     }
     let pattern = distributed_dash_pattern(length, preferred_dash, preferred_gap);
-    let direction = scale_point(vector, 1.0 / length);
-    let mut cursor = pattern.leading_gap;
-    for _ in 0..pattern.count {
-        list.push(PaintCommand::StrokeLine(StrokeLinePaint {
-            element_id: element_id.clone(),
-            from: add_points(start, scale_point(direction, cursor)),
-            to: add_points(start, scale_point(direction, cursor + pattern.dash)),
-            width,
-            color,
-            cap: StrokeCap::Butt,
-        }));
-        cursor += pattern.dash + pattern.gap;
-    }
+    list.push(PaintCommand::DashedLine(DashedLinePaint {
+        element_id,
+        from: start,
+        to: end,
+        width,
+        color,
+        dash: pattern.dash,
+        gap: pattern.gap,
+        offset: pattern.leading_gap,
+    }));
 }
 
 fn append_dotted_segment(
@@ -1169,17 +1219,14 @@ fn append_dotted_segment(
     if length <= f32::EPSILON {
         return;
     }
-    let direction = scale_point(vector, 1.0 / length);
-    let mut cursor = 0.0;
-    while cursor <= length {
-        list.push(PaintCommand::FillCircle(FillCirclePaint {
-            element_id: element_id.clone(),
-            center: add_points(start, scale_point(direction, cursor)),
-            radius,
-            color,
-        }));
-        cursor += gap;
-    }
+    list.push(PaintCommand::DottedLine(DottedLinePaint {
+        element_id,
+        from: start,
+        to: end,
+        radius,
+        color,
+        spacing: gap,
+    }));
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1724,6 +1771,60 @@ mod tests {
         assert_eq!(
             pattern.dash * pattern.count as f32 + pattern.gap * (pattern.count - 1) as f32,
             52.0
+        );
+    }
+
+    #[test]
+    fn dashed_line_delegates_segment_geometry_to_epaint() {
+        let command = PaintCommand::DashedLine(DashedLinePaint {
+            element_id: ElementId::new("dash"),
+            from: Point::new(0.0, 0.0),
+            to: Point::new(20.0, 0.0),
+            width: 2.0,
+            color: Color::rgb(1, 2, 3),
+            dash: 4.0,
+            gap: 3.0,
+            offset: 0.0,
+        });
+
+        let Some((_, epaint::Shape::Vec(shapes))) = epaint_shape(&command) else {
+            panic!("dashed lines should compose epaint dash shapes");
+        };
+
+        assert_eq!(
+            shapes,
+            epaint::Shape::dashed_line(
+                &[epaint::pos2(0.0, 0.0), epaint::pos2(20.0, 0.0)],
+                epaint::Stroke::new(2.0, epaint::Color32::from_rgb(1, 2, 3)),
+                4.0,
+                3.0,
+            )
+        );
+    }
+
+    #[test]
+    fn dotted_line_delegates_point_geometry_to_epaint() {
+        let command = PaintCommand::DottedLine(DottedLinePaint {
+            element_id: ElementId::new("dots"),
+            from: Point::new(0.0, 0.0),
+            to: Point::new(20.0, 0.0),
+            radius: 1.5,
+            color: Color::rgb(4, 5, 6),
+            spacing: 5.0,
+        });
+
+        let Some((_, epaint::Shape::Vec(shapes))) = epaint_shape(&command) else {
+            panic!("dotted lines should compose epaint dot shapes");
+        };
+
+        assert_eq!(
+            shapes,
+            epaint::Shape::dotted_line(
+                &[epaint::pos2(0.0, 0.0), epaint::pos2(20.0, 0.0)],
+                epaint::Color32::from_rgb(4, 5, 6),
+                5.0,
+                1.5,
+            )
         );
     }
 
