@@ -813,7 +813,6 @@ dependencies = [
 name = "des-ui-wgpu"
 version = "0.1.0"
 dependencies = [
- "ab_glyph",
  "bytemuck",
  "des-ui-document",
  "des-ui-render",

@@ -5,16 +5,12 @@
 //! semantics: document/style/layout produce paint commands, and this crate
 //! turns the supported commands into meshes and, later, `wgpu` draw calls.
 
-use ab_glyph::{Font, FontArc, GlyphId, PxScale, ScaleFont, point};
 use des_ui_document::{Color, Rect, TextWrapMode};
 use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
     plan_primitives,
 };
-use std::{error, fmt, mem};
-
-const INTER_VARIABLE: &[u8] =
-    include_bytes!("../../des-ui-text/assets/fonts/inter/InterVariable.ttf");
+use std::{cell::RefCell, error, fmt, mem};
 
 const SHADER: &str = r#"
 struct Viewport {
@@ -67,11 +63,13 @@ var text_sampler: sampler;
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
+    @location(2) color: vec4<f32>,
 };
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
+    @location(1) color: vec4<f32>,
 };
 
 @vertex
@@ -83,12 +81,13 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
     output.position = vec4<f32>(ndc, 0.0, 1.0);
     output.uv = input.uv;
+    output.color = input.color;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(text_texture, text_sampler, input.uv);
+    return textureSample(text_texture, text_sampler, input.uv) * input.color;
 }
 "#;
 
@@ -266,6 +265,21 @@ impl TextMesh {
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
     }
+
+    pub fn from_epaint_mesh(mesh: &epaint::Mesh) -> Self {
+        Self {
+            vertices: mesh
+                .vertices
+                .iter()
+                .map(|vertex| TextVertex {
+                    position: [vertex.pos.x, vertex.pos.y],
+                    uv: [vertex.uv.x, vertex.uv.y],
+                    color: vertex.color.to_array(),
+                })
+                .collect(),
+            indices: mesh.indices.clone(),
+        }
+    }
 }
 
 #[repr(C)]
@@ -273,11 +287,12 @@ impl TextMesh {
 pub struct TextVertex {
     pub position: [f32; 2],
     pub uv: [f32; 2],
+    pub color: [u8; 4],
 }
 
 impl TextVertex {
-    pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2];
+    pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Unorm8x4];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -288,108 +303,57 @@ impl TextVertex {
     }
 }
 
-#[derive(Clone, Debug)]
 pub struct TextRasterizer {
-    font: FontArc,
+    fonts: epaint::Fonts,
 }
 
 impl TextRasterizer {
     pub fn new() -> Self {
         Self {
-            font: FontArc::try_from_slice(INTER_VARIABLE)
-                .expect("bundled Inter font must load for native text rendering"),
+            fonts: epaint::Fonts::new(
+                epaint::TextOptions::default(),
+                epaint::text::FontDefinitions::default(),
+            ),
         }
     }
 
-    pub fn rasterize(&self, text: &TextPaint, scale_factor: f32) -> RasterizedText {
+    pub fn rasterize(&mut self, text: &TextPaint, scale_factor: f32) -> RasterizedText {
         let scale_factor = scale_factor.max(0.000_001);
-        let width = (text.rect.size.width * scale_factor).ceil().max(1.0) as u32;
-        let height = (text.rect.size.height * scale_factor).ceil().max(1.0) as u32;
-        let mut pixels = vec![0; width as usize * height as usize * 4];
-        let layout = self.layout_text(text, scale_factor, width as f32);
-
-        for glyph in layout.glyphs {
-            let Some(outlined) = self.font.outline_glyph(glyph) else {
-                continue;
-            };
-            let bounds = outlined.px_bounds();
-            outlined.draw(|x, y, coverage| {
-                let pixel_x = bounds.min.x.floor() as i32 + x as i32;
-                let pixel_y = bounds.min.y.floor() as i32 + y as i32;
-                if pixel_x < 0 || pixel_y < 0 || pixel_x >= width as i32 || pixel_y >= height as i32
-                {
-                    return;
-                }
-                let index = (pixel_y as u32 * width + pixel_x as u32) as usize * 4;
-                let alpha = (text.color.a as f32 * coverage).round().clamp(0.0, 255.0) as u8;
-                blend_pixel(
-                    &mut pixels[index..index + 4],
-                    [text.color.r, text.color.g, text.color.b, alpha],
-                );
-            });
-        }
+        self.fonts.begin_pass(epaint::TextOptions::default());
+        let galley = {
+            let mut view = self.fonts.with_pixels_per_point(scale_factor);
+            view.layout_job(epaint_layout_job(text))
+        };
+        let font_image_size = self.fonts.font_image_size();
+        let prepared_discs = self.fonts.texture_atlas().prepared_discs();
+        let mut tessellator = epaint::Tessellator::new(
+            scale_factor,
+            epaint::TessellationOptions::default(),
+            font_image_size,
+            prepared_discs,
+        );
+        let text_shape = epaint::TextShape::new(
+            epaint::pos2(text.rect.origin.x, text.rect.origin.y),
+            galley,
+            to_epaint_color(text.color),
+        );
+        let mut mesh = epaint::Mesh::default();
+        tessellator.tessellate_text(&text_shape, &mut mesh);
+        let image = self.fonts.image();
+        let width = image.size[0] as u32;
+        let height = image.size[1] as u32;
+        let pixels = image
+            .pixels
+            .iter()
+            .flat_map(|color| color.to_array())
+            .collect::<Vec<_>>();
 
         RasterizedText {
             width,
             height,
             pixels,
-            mesh: text_quad(text.rect),
+            mesh: TextMesh::from_epaint_mesh(&mesh),
         }
-    }
-
-    fn layout_text(
-        &self,
-        text: &TextPaint,
-        scale_factor: f32,
-        physical_wrap_width: f32,
-    ) -> RasterTextLayout {
-        let scale = PxScale::from(text.font_size * scale_factor);
-        let scaled = self.font.as_scaled(scale);
-        let line_height = text
-            .line_height
-            .unwrap_or_else(|| text.font_size * 1.2)
-            .max(1.0)
-            * scale_factor;
-        let max_lines = text.max_lines.unwrap_or(usize::MAX);
-        let wrap_width = match text.wrap_mode {
-            TextWrapMode::Extend => f32::INFINITY,
-            TextWrapMode::Wrap => (text.wrap_width * scale_factor)
-                .min(physical_wrap_width)
-                .max(1.0),
-            TextWrapMode::Truncate => physical_wrap_width.max(1.0),
-        };
-        let mut glyphs = Vec::new();
-        let mut line = 0usize;
-        let mut x = 0.0;
-        let mut baseline = scaled.ascent().ceil();
-        let mut previous: Option<GlyphId> = None;
-
-        for ch in text.text.chars() {
-            if ch == '\n' {
-                if !advance_line(&mut line, max_lines, &mut x, &mut baseline, line_height) {
-                    break;
-                }
-                previous = None;
-                continue;
-            }
-            let glyph_id = self.font.glyph_id(ch);
-            let advance = scaled.h_advance(glyph_id);
-            if x > 0.0 && x + advance > wrap_width {
-                if !advance_line(&mut line, max_lines, &mut x, &mut baseline, line_height) {
-                    break;
-                }
-                previous = None;
-            }
-            if let Some(previous) = previous {
-                x += scaled.kern(previous, glyph_id);
-            }
-            let glyph = glyph_id.with_scale_and_position(scale, point(x, baseline));
-            glyphs.push(glyph);
-            x += advance;
-            previous = Some(glyph_id);
-        }
-
-        RasterTextLayout { glyphs }
     }
 }
 
@@ -399,72 +363,28 @@ impl Default for TextRasterizer {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-struct RasterTextLayout {
-    glyphs: Vec<ab_glyph::Glyph>,
+fn epaint_layout_job(text: &TextPaint) -> epaint::text::LayoutJob {
+    let mut format = epaint::text::TextFormat::simple(
+        epaint::FontId::new(text.font_size, epaint::FontFamily::Proportional),
+        to_epaint_color(text.color),
+    );
+    format.line_height = text.line_height;
+    let mut job = epaint::text::LayoutJob::single_section(text.text.clone(), format);
+    job.wrap.max_width = match text.wrap_mode {
+        TextWrapMode::Extend => f32::INFINITY,
+        TextWrapMode::Wrap => text.wrap_width.max(1.0),
+        TextWrapMode::Truncate => text.wrap_width.max(1.0),
+    };
+    job.wrap.max_rows = match text.wrap_mode {
+        TextWrapMode::Truncate => text.max_lines.unwrap_or(1).max(1),
+        _ => text.max_lines.unwrap_or(usize::MAX),
+    };
+    job.wrap.break_anywhere = text.wrap_mode == TextWrapMode::Truncate;
+    job
 }
 
-fn advance_line(
-    line: &mut usize,
-    max_lines: usize,
-    x: &mut f32,
-    baseline: &mut f32,
-    line_height: f32,
-) -> bool {
-    *line += 1;
-    if *line >= max_lines {
-        return false;
-    }
-    *x = 0.0;
-    *baseline += line_height;
-    true
-}
-
-fn text_quad(rect: Rect) -> TextMesh {
-    let left = rect.origin.x;
-    let top = rect.origin.y;
-    let right = rect.right();
-    let bottom = rect.bottom();
-    TextMesh {
-        vertices: vec![
-            TextVertex {
-                position: [left, top],
-                uv: [0.0, 0.0],
-            },
-            TextVertex {
-                position: [right, top],
-                uv: [1.0, 0.0],
-            },
-            TextVertex {
-                position: [right, bottom],
-                uv: [1.0, 1.0],
-            },
-            TextVertex {
-                position: [left, bottom],
-                uv: [0.0, 1.0],
-            },
-        ],
-        indices: vec![0, 1, 2, 0, 2, 3],
-    }
-}
-
-fn blend_pixel(destination: &mut [u8], source: [u8; 4]) {
-    let source_alpha = source[3] as f32 / 255.0;
-    let destination_alpha = destination[3] as f32 / 255.0;
-    let out_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
-    if out_alpha <= f32::EPSILON {
-        destination.copy_from_slice(&[0, 0, 0, 0]);
-        return;
-    }
-    for channel in 0..3 {
-        let source_value = source[channel] as f32 / 255.0;
-        let destination_value = destination[channel] as f32 / 255.0;
-        let out = (source_value * source_alpha
-            + destination_value * destination_alpha * (1.0 - source_alpha))
-            / out_alpha;
-        destination[channel] = (out * 255.0).round().clamp(0.0, 255.0) as u8;
-    }
-    destination[3] = (out_alpha * 255.0).round().clamp(0.0, 255.0) as u8;
+fn to_epaint_color(color: Color) -> epaint::Color32 {
+    epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -603,7 +523,7 @@ pub struct GpuRenderer<'window> {
     text_sampler: wgpu::Sampler,
     viewport_buffer: wgpu::Buffer,
     viewport_bind_group: wgpu::BindGroup,
-    text_rasterizer: TextRasterizer,
+    text_rasterizer: RefCell<TextRasterizer>,
     size: PhysicalRenderSize,
 }
 
@@ -724,7 +644,7 @@ impl<'window> GpuRenderer<'window> {
             text_sampler,
             viewport_buffer,
             viewport_bind_group,
-            text_rasterizer: TextRasterizer::new(),
+            text_rasterizer: RefCell::new(TextRasterizer::new()),
             size,
         };
         renderer.write_viewport_uniform();
@@ -851,6 +771,7 @@ impl<'window> GpuRenderer<'window> {
     ) {
         let rasterized = self
             .text_rasterizer
+            .borrow_mut()
             .rasterize(&batch.text, self.size.scale_factor as f32);
         if rasterized.mesh.is_empty() || rasterized.pixels.is_empty() {
             return;
@@ -1038,7 +959,7 @@ fn create_text_pipeline(
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                blend: Some(premultiplied_alpha_blend()),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
@@ -1288,8 +1209,15 @@ mod tests {
             rasterized.width as usize * rasterized.height as usize * 4
         );
         assert!(rasterized.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
-        assert_eq!(rasterized.mesh.vertices[0].position, [12.0, 18.0]);
-        assert_eq!(rasterized.mesh.indices, [0, 1, 2, 0, 2, 3]);
+        assert!(!rasterized.mesh.vertices.is_empty());
+        assert!(!rasterized.mesh.indices.is_empty());
+        assert!(
+            rasterized
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.position[0] >= 12.0 && vertex.position[1] >= 18.0)
+        );
     }
 
     #[test]
