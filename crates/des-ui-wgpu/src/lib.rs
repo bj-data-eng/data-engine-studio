@@ -1957,6 +1957,77 @@ mod tests {
     }
 
     #[test]
+    fn text_rasterizer_tessellates_selection_background_with_epaint_text() {
+        let text = TextPaint {
+            element_id: ElementId::new("selected"),
+            rect: Rect::new(12.0, 18.0, 220.0, 72.0),
+            text: "alpha beta gamma".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: Some(TextSelectionPaint {
+                anchor_index: 6,
+                focus_index: 10,
+                background: Color::rgb(234, 221, 255),
+                color: Color::rgb(29, 27, 32),
+            }),
+        };
+
+        let rasterized = TextRasterizer::new().rasterize(&text, 2.0);
+        let selection_color = epaint::Color32::from_rgb(234, 221, 255).to_array();
+        let selected_text_color = epaint::Color32::from_rgb(29, 27, 32).to_array();
+
+        assert!(
+            rasterized
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color_array() == selection_color),
+            "epaint should tessellate text selection background into the text mesh"
+        );
+        assert!(
+            rasterized
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color_array() == selected_text_color),
+            "selected glyphs should use the selected text color"
+        );
+    }
+
+    #[test]
+    fn text_rasterizer_honors_epaint_truncation_layout_bounds() {
+        let text = TextPaint {
+            element_id: ElementId::new("truncated"),
+            rect: Rect::new(24.0, 30.0, 72.0, 24.0),
+            text: "this label should not extend forever".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 72.0,
+            wrap_mode: TextWrapMode::Truncate,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+
+        let rasterized = TextRasterizer::new().rasterize(&text, 1.0);
+        let max_x = rasterized
+            .mesh
+            .vertices
+            .iter()
+            .map(|vertex| vertex.position[0])
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        assert!(
+            max_x <= text.rect.right() + 1.0,
+            "epaint truncation should keep tessellated glyphs inside the wrap width"
+        );
+    }
+
+    #[test]
     fn text_rasterizer_lays_out_frame_text_against_one_atlas() {
         let first = TextPaint {
             element_id: ElementId::new("first"),
