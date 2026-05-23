@@ -410,9 +410,12 @@ fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
             }
             Some((
                 command.element_id.clone(),
-                epaint::Shape::line_segment(
-                    [to_epaint_pos(command.from), to_epaint_pos(command.to)],
-                    epaint::Stroke::new(command.width, to_epaint_color(command.color)),
+                capped_line_shape(
+                    command.from,
+                    command.to,
+                    command.width,
+                    command.color,
+                    command.cap,
                 ),
             ))
         }
@@ -422,15 +425,26 @@ fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
             }
             let stroke =
                 epaint::PathStroke::new(command.width, to_epaint_color(command.color)).middle();
-            let points = command
+            let mut points = command
                 .points
                 .iter()
                 .copied()
                 .map(to_epaint_pos)
                 .collect::<Vec<_>>();
+            if !command.closed && command.cap == StrokeCap::Square {
+                extend_open_path_for_square_cap(&mut points, command.width);
+            }
             let path = if command.closed {
                 epaint::PathShape::closed_line(points, stroke)
             } else {
+                let mut shapes = vec![epaint::Shape::Path(epaint::PathShape::line(
+                    points.clone(),
+                    stroke.clone(),
+                ))];
+                if command.cap == StrokeCap::Round {
+                    push_round_path_caps(&mut shapes, &points, command.width, command.color);
+                    return Some((command.element_id.clone(), epaint::Shape::Vec(shapes)));
+                }
                 epaint::PathShape::line(points, stroke)
             };
             Some((command.element_id.clone(), epaint::Shape::Path(path)))
@@ -468,6 +482,62 @@ fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
         }
         PaintCommand::PushClip(_) | PaintCommand::PopClip | PaintCommand::Text(_) => None,
     }
+}
+
+fn capped_line_shape(
+    from: Point,
+    to: Point,
+    width: f32,
+    color: Color,
+    cap: StrokeCap,
+) -> epaint::Shape {
+    let mut from = from;
+    let mut to = to;
+    if cap == StrokeCap::Square {
+        let direction = normalized_point(sub_points(to, from));
+        let extension = scale_point(direction, width * 0.5);
+        from = sub_points(from, extension);
+        to = add_points(to, extension);
+    }
+    let stroke = epaint::Stroke::new(width, to_epaint_color(color));
+    let line = epaint::Shape::line_segment([to_epaint_pos(from), to_epaint_pos(to)], stroke);
+    if cap != StrokeCap::Round {
+        return line;
+    }
+    epaint::Shape::Vec(vec![
+        line,
+        epaint::Shape::circle_filled(to_epaint_pos(from), width * 0.5, to_epaint_color(color)),
+        epaint::Shape::circle_filled(to_epaint_pos(to), width * 0.5, to_epaint_color(color)),
+    ])
+}
+
+fn extend_open_path_for_square_cap(points: &mut [epaint::Pos2], width: f32) {
+    if points.len() < 2 {
+        return;
+    }
+    let first_direction = (points[1] - points[0]).normalized();
+    let last_index = points.len() - 1;
+    let last_direction = (points[last_index] - points[last_index - 1]).normalized();
+    points[0] -= first_direction * width * 0.5;
+    points[last_index] += last_direction * width * 0.5;
+}
+
+fn push_round_path_caps(
+    shapes: &mut Vec<epaint::Shape>,
+    points: &[epaint::Pos2],
+    width: f32,
+    color: Color,
+) {
+    let Some(first) = points.first() else {
+        return;
+    };
+    let Some(last) = points.last() else {
+        return;
+    };
+    let radius = width * 0.5;
+    let color = to_epaint_color(color);
+    shapes.push(epaint::Shape::circle_filled(*first, radius, color));
+    shapes.push(epaint::Shape::circle_filled(*last, radius, color));
 }
 
 fn to_epaint_pos(point: Point) -> epaint::Pos2 {
@@ -1387,6 +1457,15 @@ fn point_length(point: Point) -> f32 {
     (point.x * point.x + point.y * point.y).sqrt()
 }
 
+fn normalized_point(point: Point) -> Point {
+    let length = point_length(point);
+    if length <= f32::EPSILON {
+        Point::new(0.0, 0.0)
+    } else {
+        scale_point(point, 1.0 / length)
+    }
+}
+
 impl From<&ScrollChrome> for ScrollChromePaint {
     fn from(chrome: &ScrollChrome) -> Self {
         Self {
@@ -1675,6 +1754,48 @@ mod tests {
                 .iter()
                 .any(|vertex| vertex.color.a() == 230)
         );
+    }
+
+    #[test]
+    fn stroke_line_round_cap_is_composed_from_epaint_shapes() {
+        let Some((_, shape)) = epaint_shape(&PaintCommand::StrokeLine(StrokeLinePaint {
+            element_id: ElementId::new("round-line"),
+            from: Point::new(0.0, 0.0),
+            to: Point::new(10.0, 0.0),
+            width: 4.0,
+            color: Color::rgb(1, 2, 3),
+            cap: StrokeCap::Round,
+        })) else {
+            panic!("expected shape");
+        };
+
+        let epaint::Shape::Vec(shapes) = shape else {
+            panic!("round caps should compose line and cap circles");
+        };
+        assert_eq!(shapes.len(), 3);
+        assert!(matches!(shapes[0], epaint::Shape::LineSegment { .. }));
+        assert!(matches!(shapes[1], epaint::Shape::Circle(_)));
+        assert!(matches!(shapes[2], epaint::Shape::Circle(_)));
+    }
+
+    #[test]
+    fn stroke_line_square_cap_extends_along_line_axis() {
+        let Some((_, shape)) = epaint_shape(&PaintCommand::StrokeLine(StrokeLinePaint {
+            element_id: ElementId::new("square-line"),
+            from: Point::new(0.0, 0.0),
+            to: Point::new(10.0, 0.0),
+            width: 4.0,
+            color: Color::rgb(1, 2, 3),
+            cap: StrokeCap::Square,
+        })) else {
+            panic!("expected shape");
+        };
+
+        let epaint::Shape::LineSegment { points, .. } = shape else {
+            panic!("square caps should remain a single epaint line segment");
+        };
+        assert_eq!(points[0], epaint::pos2(-2.0, 0.0));
+        assert_eq!(points[1], epaint::pos2(12.0, 0.0));
     }
 
     #[test]
