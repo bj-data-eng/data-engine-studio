@@ -167,9 +167,78 @@ impl PresentMode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RenderAlphaFromCoverage {
+    Linear,
+    Gamma(f32),
+    TwoCoverageMinusCoverageSq,
+}
+
+impl Default for RenderAlphaFromCoverage {
+    fn default() -> Self {
+        epaint::AlphaFromCoverage::default().into()
+    }
+}
+
+impl From<epaint::AlphaFromCoverage> for RenderAlphaFromCoverage {
+    fn from(value: epaint::AlphaFromCoverage) -> Self {
+        match value {
+            epaint::AlphaFromCoverage::Linear => Self::Linear,
+            epaint::AlphaFromCoverage::Gamma(gamma) => Self::Gamma(gamma),
+            epaint::AlphaFromCoverage::TwoCoverageMinusCoverageSq => {
+                Self::TwoCoverageMinusCoverageSq
+            }
+        }
+    }
+}
+
+impl From<RenderAlphaFromCoverage> for epaint::AlphaFromCoverage {
+    fn from(value: RenderAlphaFromCoverage) -> Self {
+        match value {
+            RenderAlphaFromCoverage::Linear => Self::Linear,
+            RenderAlphaFromCoverage::Gamma(gamma) => Self::Gamma(gamma),
+            RenderAlphaFromCoverage::TwoCoverageMinusCoverageSq => Self::TwoCoverageMinusCoverageSq,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderTextOptions {
+    pub max_texture_side: usize,
+    pub alpha_from_coverage: RenderAlphaFromCoverage,
+    pub font_hinting: bool,
+}
+
+impl Default for RenderTextOptions {
+    fn default() -> Self {
+        epaint::TextOptions::default().into()
+    }
+}
+
+impl From<epaint::TextOptions> for RenderTextOptions {
+    fn from(value: epaint::TextOptions) -> Self {
+        Self {
+            max_texture_side: value.max_texture_side,
+            alpha_from_coverage: value.alpha_from_coverage.into(),
+            font_hinting: value.font_hinting,
+        }
+    }
+}
+
+impl From<RenderTextOptions> for epaint::TextOptions {
+    fn from(value: RenderTextOptions) -> Self {
+        Self {
+            max_texture_side: value.max_texture_side,
+            alpha_from_coverage: value.alpha_from_coverage.into(),
+            font_hinting: value.font_hinting,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderOptions {
     pub clear_color: ClearColor,
     pub present_mode: PresentMode,
+    pub text: RenderTextOptions,
     pub tessellation: RenderTessellationOptions,
     pub dithering: bool,
     pub predictable_texture_filtering: bool,
@@ -180,6 +249,7 @@ impl Default for RenderOptions {
         Self {
             clear_color: ClearColor::default(),
             present_mode: PresentMode::default(),
+            text: RenderTextOptions::default(),
             tessellation: RenderTessellationOptions::default(),
             dithering: true,
             predictable_texture_filtering: false,
@@ -315,27 +385,38 @@ pub struct TextRasterizer {
 
 impl TextRasterizer {
     pub fn new() -> Self {
+        Self::with_text_options(RenderTextOptions::default())
+    }
+
+    pub fn with_text_options(text_options: RenderTextOptions) -> Self {
         Self {
             fonts: epaint::Fonts::new(
-                epaint::TextOptions::default(),
+                epaint::TextOptions::from(text_options),
                 epaint::text::FontDefinitions::default(),
             ),
         }
     }
 
     pub fn rasterize(&mut self, text: &TextPaint, scale_factor: f32) -> RasterizedText {
-        self.rasterize_with_options(text, scale_factor, RenderTessellationOptions::default())
+        self.rasterize_with_options(
+            text,
+            scale_factor,
+            RenderTextOptions::default(),
+            RenderTessellationOptions::default(),
+        )
     }
 
     pub fn rasterize_with_options(
         &mut self,
         text: &TextPaint,
         scale_factor: f32,
+        text_options: RenderTextOptions,
         tessellation: RenderTessellationOptions,
     ) -> RasterizedText {
         let frame = self.rasterize_frame_with_options(
             std::slice::from_ref(text),
             scale_factor,
+            text_options,
             tessellation,
         );
         RasterizedText {
@@ -357,6 +438,7 @@ impl TextRasterizer {
         self.rasterize_frame_with_options(
             text_batches,
             scale_factor,
+            RenderTextOptions::default(),
             RenderTessellationOptions::default(),
         )
     }
@@ -365,10 +447,12 @@ impl TextRasterizer {
         &mut self,
         text_batches: &[TextPaint],
         scale_factor: f32,
+        text_options: RenderTextOptions,
         tessellation: RenderTessellationOptions,
     ) -> RasterizedTextFrame {
         let scale_factor = scale_factor.max(0.000_001);
-        self.fonts.begin_pass(epaint::TextOptions::default());
+        self.fonts
+            .begin_pass(epaint::TextOptions::from(text_options));
         let galleys = {
             let mut view = self.fonts.with_pixels_per_point(scale_factor);
             text_batches
@@ -1026,7 +1110,7 @@ impl<'window> GpuRenderer<'window> {
             texture_sampler,
             viewport_buffer,
             solid_texture,
-            text_rasterizer: RefCell::new(TextRasterizer::new()),
+            text_rasterizer: RefCell::new(TextRasterizer::with_text_options(options.text)),
             text_atlas: None,
             frame_buffers: GpuFrameBuffers::default(),
             size,
@@ -1064,6 +1148,7 @@ impl<'window> GpuRenderer<'window> {
                 .rasterize_frame_with_options(
                     &text_paints,
                     self.size.scale_factor as f32,
+                    self.options.text,
                     self.options.tessellation,
                 )
         };
@@ -1612,8 +1697,9 @@ mod tests {
 
     use crate::{
         ClearColor, DisplayListRenderer, Mesh, MeshBuilder, PackedColor, PhysicalRenderSize,
-        RenderItem, RenderOptions, ScissorRect, TextRasterizer, Vertex, clip_rect_to_scissor,
-        epaint_layout_job, mesh_for_display_list, text_atlas_upload,
+        RenderAlphaFromCoverage, RenderItem, RenderOptions, RenderTextOptions, ScissorRect,
+        TextRasterizer, Vertex, clip_rect_to_scissor, epaint_layout_job, mesh_for_display_list,
+        text_atlas_upload,
     };
 
     #[test]
@@ -1676,6 +1762,40 @@ mod tests {
             RenderOptions::default().tessellation,
             RenderTessellationOptions::default()
         );
+        assert_eq!(RenderOptions::default().text, RenderTextOptions::default());
+    }
+
+    #[test]
+    fn text_options_default_to_epaint_contract() {
+        let epaint_defaults = epaint::TextOptions::default();
+
+        assert_eq!(
+            RenderTextOptions::default(),
+            RenderTextOptions {
+                max_texture_side: epaint_defaults.max_texture_side,
+                alpha_from_coverage: RenderAlphaFromCoverage::from(
+                    epaint_defaults.alpha_from_coverage
+                ),
+                font_hinting: epaint_defaults.font_hinting,
+            }
+        );
+    }
+
+    #[test]
+    fn text_options_convert_to_epaint_text_contract() {
+        let options = RenderTextOptions {
+            max_texture_side: 4096,
+            alpha_from_coverage: RenderAlphaFromCoverage::Gamma(0.75),
+            font_hinting: false,
+        };
+        let epaint_options = epaint::TextOptions::from(options);
+
+        assert_eq!(epaint_options.max_texture_side, 4096);
+        assert_eq!(
+            epaint_options.alpha_from_coverage,
+            epaint::AlphaFromCoverage::Gamma(0.75)
+        );
+        assert!(!epaint_options.font_hinting);
     }
 
     #[test]
@@ -2237,6 +2357,7 @@ mod tests {
         let rounded = rasterizer.rasterize_with_options(
             &text,
             1.0,
+            RenderTextOptions::default(),
             RenderTessellationOptions {
                 round_text_to_pixels: true,
                 ..RenderTessellationOptions::default()
@@ -2245,6 +2366,7 @@ mod tests {
         let unrounded = rasterizer.rasterize_with_options(
             &text,
             1.0,
+            RenderTextOptions::default(),
             RenderTessellationOptions {
                 round_text_to_pixels: false,
                 ..RenderTessellationOptions::default()
@@ -2256,6 +2378,54 @@ mod tests {
         assert!(
             (rounded_bounds.min_x - unrounded_bounds.min_x).abs() > 0.1,
             "native text rasterization should pass round_text_to_pixels through to epaint"
+        );
+    }
+
+    #[test]
+    fn text_rasterizer_passes_alpha_coverage_option_to_epaint() {
+        let text = TextPaint {
+            element_id: ElementId::new("coverage"),
+            rect: Rect::new(8.0, 12.0, 240.0, 64.0),
+            text: "coverage".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 28.0,
+            wrap_width: 240.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+        let mut linear_rasterizer = TextRasterizer::with_text_options(RenderTextOptions {
+            alpha_from_coverage: RenderAlphaFromCoverage::Linear,
+            ..RenderTextOptions::default()
+        });
+        let mut dark_rasterizer = TextRasterizer::with_text_options(RenderTextOptions {
+            alpha_from_coverage: RenderAlphaFromCoverage::TwoCoverageMinusCoverageSq,
+            ..RenderTextOptions::default()
+        });
+
+        let linear = linear_rasterizer.rasterize_with_options(
+            &text,
+            2.0,
+            RenderTextOptions {
+                alpha_from_coverage: RenderAlphaFromCoverage::Linear,
+                ..RenderTextOptions::default()
+            },
+            RenderTessellationOptions::default(),
+        );
+        let dark = dark_rasterizer.rasterize_with_options(
+            &text,
+            2.0,
+            RenderTextOptions {
+                alpha_from_coverage: RenderAlphaFromCoverage::TwoCoverageMinusCoverageSq,
+                ..RenderTextOptions::default()
+            },
+            RenderTessellationOptions::default(),
+        );
+
+        assert_ne!(
+            linear.pixels, dark.pixels,
+            "native text rasterization should pass coverage-to-alpha policy through to epaint"
         );
     }
 
