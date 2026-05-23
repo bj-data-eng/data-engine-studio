@@ -36,6 +36,7 @@ impl GlyphStyle {
         self.0 & Self::DIGIT != 0
     }
 
+    #[cfg_attr(not(feature = "std"), allow(dead_code))]
     pub fn style_class(self) -> Option<&'static StyleClass> {
         StyleClass::from_index(self.style_index()?)
     }
@@ -357,6 +358,7 @@ pub(crate) struct StyleClass {
 }
 
 impl StyleClass {
+    #[cfg_attr(not(feature = "std"), allow(dead_code))]
     pub(crate) fn from_index(index: u16) -> Option<&'static StyleClass> {
         STYLE_CLASSES.get(index as usize)
     }

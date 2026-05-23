@@ -65,6 +65,7 @@ impl Instance {
         coords: &[F2Dot14],
         target: Target,
         styles: Option<GlyphStyles>,
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
         lazy_metrics: bool,
     ) -> Self {
         let styles = styles.unwrap_or_else(|| GlyphStyles::new(outlines));

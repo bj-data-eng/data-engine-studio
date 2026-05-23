@@ -125,9 +125,13 @@ impl UnscaledStyleMetricsSet {
     /// Returns the unscaled style metrics for the given style map and glyph
     /// identifier.
     pub fn get(
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
         &self,
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
         font: &FontRef,
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
         coords: &[F2Dot14],
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
         shaper_mode: ShaperMode,
         style_map: &GlyphStyleMap,
         glyph_id: GlyphId,
