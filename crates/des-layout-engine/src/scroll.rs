@@ -229,30 +229,34 @@ pub fn child_clip_rect(
     overflow_y: Overflow,
     parent_clip: Option<ScrollRect>,
 ) -> Option<ScrollRect> {
-    if overflow_x != Overflow::Scroll && overflow_y != Overflow::Scroll {
+    if !overflow_x.is_scroll_container()
+        && overflow_x != Overflow::Clip
+        && !overflow_y.is_scroll_container()
+        && overflow_y != Overflow::Clip
+    {
         return parent_clip;
     }
 
     let viewport = viewport_rect(border_box, border, padding);
-    let left = if overflow_x == Overflow::Scroll {
+    let left = if overflow_x.is_scroll_container() || overflow_x == Overflow::Clip {
         viewport.left()
     } else {
-        parent_clip.map_or(f32::NEG_INFINITY, ScrollRect::left)
+        parent_clip.map_or(border_box.left(), ScrollRect::left)
     };
-    let right = if overflow_x == Overflow::Scroll {
+    let right = if overflow_x.is_scroll_container() || overflow_x == Overflow::Clip {
         viewport.right()
     } else {
-        parent_clip.map_or(f32::INFINITY, ScrollRect::right)
+        parent_clip.map_or(border_box.right(), ScrollRect::right)
     };
-    let top = if overflow_y == Overflow::Scroll {
+    let top = if overflow_y.is_scroll_container() || overflow_y == Overflow::Clip {
         viewport.top()
     } else {
-        parent_clip.map_or(f32::NEG_INFINITY, ScrollRect::top)
+        parent_clip.map_or(border_box.top(), ScrollRect::top)
     };
-    let bottom = if overflow_y == Overflow::Scroll {
+    let bottom = if overflow_y.is_scroll_container() || overflow_y == Overflow::Clip {
         viewport.bottom()
     } else {
-        parent_clip.map_or(f32::INFINITY, ScrollRect::bottom)
+        parent_clip.map_or(border_box.bottom(), ScrollRect::bottom)
     };
 
     let scroll_clip = ScrollRect::from_xy_size(left, top, right - left, bottom - top);
@@ -433,5 +437,45 @@ mod tests {
         );
 
         assert_eq!(offset, 200.0);
+    }
+
+    #[test]
+    fn child_clip_rect_uses_finite_border_box_on_unclipped_axis_without_parent_clip() {
+        let clip = child_clip_rect(
+            rect(10.0, 20.0, 120.0, 80.0),
+            Rect {
+                left: 2.0,
+                right: 4.0,
+                top: 3.0,
+                bottom: 5.0,
+            },
+            Rect {
+                left: 7.0,
+                right: 11.0,
+                top: 13.0,
+                bottom: 17.0,
+            },
+            Overflow::Visible,
+            Overflow::Scroll,
+            None,
+        )
+        .expect("scrolling one axis should still produce a finite clip rectangle");
+
+        assert_eq!(clip, rect(10.0, 36.0, 120.0, 42.0));
+    }
+
+    #[test]
+    fn child_clip_rect_clips_hidden_and_clip_overflow_without_scroll_chrome_semantics() {
+        let hidden = child_clip_rect(
+            rect(10.0, 20.0, 120.0, 80.0),
+            Rect::length(2.0),
+            Rect::length(8.0),
+            Overflow::Hidden,
+            Overflow::Clip,
+            None,
+        )
+        .expect("hidden and clip overflow should constrain descendants");
+
+        assert_eq!(hidden, rect(20.0, 30.0, 100.0, 60.0));
     }
 }

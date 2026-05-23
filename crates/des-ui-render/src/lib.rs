@@ -4,6 +4,7 @@
 //! list. Backends such as `des-ui-egui` should translate these commands into
 //! host-specific drawing calls.
 
+use des_layout_engine::{scroll as layout_scroll, style::Overflow as LayoutOverflow};
 use des_ui_document::{
     BorderStyle, Color, CornerRadii, DocumentOutput, ElementId, FloatingPlacement, Glyph, Insets,
     Overflow, Point, Rect, ResolvedElement, ScrollAxis, ScrollChrome, Shadow, TextWrapMode,
@@ -886,35 +887,51 @@ fn text_paint(frame: &ResolvedElement, text: &str, output: &DocumentOutput) -> T
 }
 
 fn child_clip_rect(frame: &ResolvedElement, current_clip: Option<Rect>) -> Option<Rect> {
-    if frame.style.overflow_x != Overflow::Scroll && frame.style.overflow_y != Overflow::Scroll {
-        return current_clip;
-    }
+    layout_scroll::child_clip_rect(
+        to_scroll_rect(frame.rect),
+        to_layout_insets(frame.style.border_width),
+        to_layout_insets(frame.style.padding),
+        to_layout_overflow(frame.style.overflow_x),
+        to_layout_overflow(frame.style.overflow_y),
+        current_clip.map(to_scroll_rect),
+    )
+    .map(from_scroll_rect)
+}
 
-    let content = content_rect(frame);
-    let base = current_clip.unwrap_or(frame.rect);
-    let clip = Rect::new(
-        if frame.style.overflow_x == Overflow::Scroll {
-            content.origin.x
-        } else {
-            base.origin.x
-        },
-        if frame.style.overflow_y == Overflow::Scroll {
-            content.origin.y
-        } else {
-            base.origin.y
-        },
-        if frame.style.overflow_x == Overflow::Scroll {
-            content.size.width
-        } else {
-            base.size.width
-        },
-        if frame.style.overflow_y == Overflow::Scroll {
-            content.size.height
-        } else {
-            base.size.height
-        },
-    );
-    base.intersect(clip)
+fn to_layout_insets(insets: Insets) -> des_layout_engine::geometry::Rect<f32> {
+    des_layout_engine::geometry::Rect {
+        left: insets.left,
+        right: insets.right,
+        top: insets.top,
+        bottom: insets.bottom,
+    }
+}
+
+fn to_layout_overflow(overflow: Overflow) -> LayoutOverflow {
+    match overflow {
+        Overflow::Visible => LayoutOverflow::Visible,
+        Overflow::Clip => LayoutOverflow::Clip,
+        Overflow::Hidden => LayoutOverflow::Hidden,
+        Overflow::Scroll => LayoutOverflow::Scroll,
+    }
+}
+
+fn to_scroll_rect(rect: Rect) -> layout_scroll::ScrollRect {
+    layout_scroll::ScrollRect::from_xy_size(
+        rect.origin.x,
+        rect.origin.y,
+        rect.size.width,
+        rect.size.height,
+    )
+}
+
+fn from_scroll_rect(rect: layout_scroll::ScrollRect) -> Rect {
+    Rect::new(
+        rect.origin.x,
+        rect.origin.y,
+        rect.size.width,
+        rect.size.height,
+    )
 }
 
 fn floating_arrow(frame: &ResolvedElement) -> Option<FloatingArrowPaint> {
@@ -1744,7 +1761,7 @@ impl From<&ScrollChrome> for ScrollChromePaint {
 mod tests {
     use super::*;
     use des_ui_document::{
-        Color, Document, DocumentEngine, Insets, Size, Style, StyleSelector, StyleSheet,
+        Color, Document, DocumentEngine, Insets, Overflow, Size, Style, StyleSelector, StyleSheet,
     };
 
     #[test]
@@ -1797,6 +1814,40 @@ mod tests {
         let box_frame = output.layout.find("box").expect("box frame");
 
         assert_eq!(content_rect(box_frame), Rect::new(12.0, 8.0, 76.0, 64.0));
+    }
+
+    #[test]
+    fn paint_planner_clips_hidden_overflow_children_to_content_viewport() {
+        let mut document = Document::build(Size::new(200.0, 140.0), |ui| {
+            ui.div("panel").children(|ui| {
+                ui.div("child").empty();
+            });
+        });
+        let stylesheet = StyleSheet::new()
+            .rule(
+                StyleSelector::Id("panel".into()),
+                Style::default()
+                    .size(100.0, 80.0)
+                    .border_width(2.0)
+                    .padding(Insets::all(8.0))
+                    .overflow(Overflow::Hidden),
+            )
+            .rule(
+                StyleSelector::Id("child".into()),
+                Style::default()
+                    .size(140.0, 120.0)
+                    .background(Color::rgb(10, 20, 30)),
+            );
+        let output = DocumentEngine::default().update(&mut document, &stylesheet);
+
+        let list = plan_paint(&output);
+
+        assert!(
+            list.commands
+                .iter()
+                .any(|command| matches!(command, PaintCommand::PushClip(rect) if *rect == Rect::new(10.0, 10.0, 80.0, 60.0))),
+            "hidden overflow should push the same content viewport clip as scroll overflow"
+        );
     }
 
     #[test]

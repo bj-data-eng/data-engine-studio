@@ -8,4 +8,5 @@ description = "Renderer-neutral paint planning for Data Engine Studio document U
 
 [dependencies]
 des-ui-document.workspace = true
+des-layout-engine.workspace = true
 epaint.workspace = true

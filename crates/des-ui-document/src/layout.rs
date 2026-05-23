@@ -9,7 +9,7 @@ pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&Res
     children.sort_by_key(|child| child.style.z_index);
 
     let clips_overflow =
-        frame.style.overflow_x == Overflow::Scroll || frame.style.overflow_y == Overflow::Scroll;
+        frame.style.overflow_x.clips_contents() || frame.style.overflow_y.clips_contents();
     let may_hit_children = !clips_overflow || frame.rect.contains(point);
     if may_hit_children
         && let Some(mut child_path) = children
@@ -55,6 +55,8 @@ pub(crate) fn to_layout_insets(insets: Insets) -> LayoutInsets<f32> {
 pub(crate) fn to_layout_overflow(overflow: Overflow) -> LayoutOverflow {
     match overflow {
         Overflow::Visible => LayoutOverflow::Visible,
+        Overflow::Clip => LayoutOverflow::Clip,
+        Overflow::Hidden => LayoutOverflow::Hidden,
         Overflow::Scroll => LayoutOverflow::Scroll,
     }
 }

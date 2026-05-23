@@ -1,7 +1,7 @@
 use crate::animation::{AnimationUpdate, update_element_style_animation};
 use crate::document::{Document, StyleResolutionReport};
 use crate::element::ElementId;
-use crate::geometry::{Overflow, Point, Rect, ScrollAxis, Size};
+use crate::geometry::{Point, Rect, ScrollAxis, Size};
 use crate::layout::{hit_path, to_layout_point, to_scroll_axis, to_scroll_rect};
 use crate::scroll::scroll_chrome;
 use crate::state::{
@@ -507,8 +507,7 @@ impl DocumentEngine {
         };
         if (input.scroll_delta.x.abs() > f32::EPSILON || input.scroll_delta.y.abs() > f32::EPSILON)
             && let Some(scroll_frame) = path.iter().rev().find(|frame| {
-                frame.style.overflow_x == Overflow::Scroll
-                    || frame.style.overflow_y == Overflow::Scroll
+                frame.style.overflow_x.is_scrollable() || frame.style.overflow_y.is_scrollable()
             })
             && let Some(state) = self.states.get_mut(&scroll_frame.id)
         {
@@ -517,14 +516,14 @@ impl DocumentEngine {
                 .get(&scroll_frame.id)
                 .copied()
                 .unwrap_or_default();
-            if scroll_frame.style.overflow_x == Overflow::Scroll {
+            if scroll_frame.style.overflow_x.is_scrollable() {
                 let scroll_x = layout_engine::scroll::clamp_scroll_value(
                     state.scroll_x - input.scroll_delta.x,
                     max_scroll.width,
                 );
                 update.changed |= set_f32(&mut state.scroll_x, scroll_x);
             }
-            if scroll_frame.style.overflow_y == Overflow::Scroll {
+            if scroll_frame.style.overflow_y.is_scrollable() {
                 let scroll_y = layout_engine::scroll::clamp_scroll_value(
                     state.scroll_y - input.scroll_delta.y,
                     max_scroll.height,

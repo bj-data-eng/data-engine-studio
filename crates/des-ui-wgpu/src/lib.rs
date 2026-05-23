@@ -2148,20 +2148,20 @@ impl RenderPlanBuilder {
                     self.plan.text_batches.push(batch);
                 }
                 PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) => {
-                    if !self.current_clip_empty {
-                        self.set_clip(match mesh.clip {
-                            Some(rect) => ClipState::Clipped(rect),
-                            None => ClipState::Unclipped,
-                        });
-                        if self
-                            .current_mesh
-                            .texture_id()
-                            .is_some_and(|texture_id| texture_id != mesh.mesh.texture_id)
-                        {
-                            self.flush();
-                        }
-                        self.current_mesh.push_command(command);
+                    let document_clip = active_clip(&clip_stack);
+                    let effective_clip = intersect_clip_states(document_clip, mesh.clip);
+                    self.set_clip(effective_clip);
+                    if self.current_clip_empty {
+                        continue;
                     }
+                    if self
+                        .current_mesh
+                        .texture_id()
+                        .is_some_and(|texture_id| texture_id != mesh.mesh.texture_id)
+                    {
+                        self.flush();
+                    }
+                    self.current_mesh.push_command(command);
                 }
             }
         }
@@ -2214,6 +2214,19 @@ fn active_clip(clip_stack: &[Rect]) -> ClipState {
     match clips.try_fold(first, Rect::intersect) {
         Some(rect) => ClipState::Clipped(rect),
         None => ClipState::Empty,
+    }
+}
+
+fn intersect_clip_states(document_clip: ClipState, primitive_clip: Option<Rect>) -> ClipState {
+    match (document_clip, primitive_clip) {
+        (ClipState::Empty, _) => ClipState::Empty,
+        (ClipState::Unclipped, None) => ClipState::Unclipped,
+        (ClipState::Unclipped, Some(rect)) | (ClipState::Clipped(rect), None) => {
+            ClipState::Clipped(rect)
+        }
+        (ClipState::Clipped(document), Some(primitive)) => document
+            .intersect(primitive)
+            .map_or(ClipState::Empty, ClipState::Clipped),
     }
 }
 
@@ -2564,7 +2577,7 @@ mod tests {
     }
 
     #[test]
-    fn render_plan_text_uses_document_clip_after_mesh_clip_metadata() {
+    fn render_plan_intersects_mesh_clip_with_active_document_clip() {
         let mut mesh = epaint::Mesh::default();
         mesh.vertices.push(epaint::Vertex {
             pos: epaint::pos2(0.0, 0.0),
@@ -2575,6 +2588,9 @@ mod tests {
 
         let document_clip = Rect::new(1.0, 2.0, 100.0, 80.0);
         let mesh_clip = Rect::new(10.0, 20.0, 30.0, 40.0);
+        let expected_mesh_clip = document_clip
+            .intersect(mesh_clip)
+            .expect("fixture clips should overlap");
         let mut primitives = des_ui_render::PrimitiveList::new();
         primitives.push(des_ui_render::PrimitiveCommand::PushClip(document_clip));
         primitives.push(des_ui_render::PrimitiveCommand::Draw(
@@ -2608,8 +2624,38 @@ mod tests {
         builder.push_primitives(&primitives);
 
         let plan = builder.finish();
-        assert_eq!(plan.batches[0].clip, Some(mesh_clip));
+        assert_eq!(plan.batches[0].clip, Some(expected_mesh_clip));
         assert_eq!(plan.text_batches[0].clip, Some(document_clip));
+    }
+
+    #[test]
+    fn render_plan_keeps_mesh_inside_document_clip_when_epaint_reports_unclipped() {
+        let mut mesh = epaint::Mesh::default();
+        mesh.vertices.push(epaint::Vertex {
+            pos: epaint::pos2(0.0, 0.0),
+            uv: epaint::pos2(0.0, 0.0),
+            color: epaint::Color32::WHITE,
+        });
+        mesh.indices.push(0);
+
+        let document_clip = Rect::new(5.0, 6.0, 70.0, 80.0);
+        let mut primitives = des_ui_render::PrimitiveList::new();
+        primitives.push(des_ui_render::PrimitiveCommand::PushClip(document_clip));
+        primitives.push(des_ui_render::PrimitiveCommand::Draw(
+            des_ui_render::RenderPrimitive::Mesh(des_ui_render::EpaintMeshPrimitive {
+                element_id: ElementId::new("mesh"),
+                clip: None,
+                mesh,
+            }),
+        ));
+        primitives.push(des_ui_render::PrimitiveCommand::PopClip);
+
+        let mut builder = crate::RenderPlanBuilder::new(RenderOptions::default());
+        builder.push_primitives(&primitives);
+
+        let plan = builder.finish();
+        assert_eq!(plan.batches.len(), 1);
+        assert_eq!(plan.batches[0].clip, Some(document_clip));
     }
 
     #[test]

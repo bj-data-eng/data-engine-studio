@@ -612,7 +612,7 @@ impl Document {
         for id in self.element_ids() {
             let element = self.element(&id)?;
             let style = &element.computed_style;
-            if style.overflow_x != Overflow::Scroll && style.overflow_y != Overflow::Scroll {
+            if !style.overflow_x.is_scrollable() && !style.overflow_y.is_scrollable() {
                 continue;
             }
 
@@ -1687,10 +1687,14 @@ fn layout_overflow(x: Overflow, y: Overflow) -> layout_engine::geometry::Point<L
     layout_engine::geometry::Point {
         x: match x {
             Overflow::Visible => LayoutOverflow::Visible,
+            Overflow::Clip => LayoutOverflow::Clip,
+            Overflow::Hidden => LayoutOverflow::Hidden,
             Overflow::Scroll => LayoutOverflow::Scroll,
         },
         y: match y {
             Overflow::Visible => LayoutOverflow::Visible,
+            Overflow::Clip => LayoutOverflow::Clip,
+            Overflow::Hidden => LayoutOverflow::Hidden,
             Overflow::Scroll => LayoutOverflow::Scroll,
         },
     }
