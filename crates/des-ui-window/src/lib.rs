@@ -8,7 +8,7 @@ pub mod demo;
 use des_ui_document::{DocumentInput, DocumentOutput};
 use des_ui_render::{DisplayList, plan_paint};
 use des_ui_wgpu::{
-    DisplayListRenderer, GpuRenderer, PhysicalRenderSize, RenderOptions, RenderPlan,
+    DisplayListRenderer, GpuRenderer, PhysicalRenderSize, PresentMode, RenderOptions, RenderPlan,
 };
 use des_ui_winit::{HostViewport, WindowSignal, WinitInputTranslator};
 use std::{error, fmt, sync::Arc, time::Instant};
@@ -44,6 +44,17 @@ impl Default for NativeOptions {
 impl NativeOptions {
     pub fn initial_viewport(&self, scale_factor: f64) -> HostViewport {
         HostViewport::new(self.initial_width, self.initial_height, scale_factor)
+    }
+
+    pub fn render_options(&self) -> RenderOptions {
+        RenderOptions {
+            present_mode: if self.vsync {
+                PresentMode::Vsync
+            } else {
+                PresentMode::Immediate
+            },
+            ..self.render_options
+        }
     }
 }
 
@@ -229,7 +240,7 @@ impl<A> NativeShell<A> {
         let renderer = pollster::block_on(GpuRenderer::new(
             window.clone(),
             render_size_from_viewport(viewport),
-            self.options.render_options,
+            self.options.render_options(),
         ))?;
         self.renderer = Some(renderer);
         self.window = Some(window);
@@ -249,7 +260,7 @@ impl<A> NativeShell<A> {
         let input = self.input.frame_input();
         let mut frame = AppFrame::new(self.input.viewport(), input);
         self.app.update(&mut frame);
-        let output = frame.into_output(self.options.render_options);
+        let output = frame.into_output(self.options.render_options());
         renderer.render_plan(&output.render_plan)?;
         if output.close_requested {
             event_loop.exit();
@@ -321,7 +332,7 @@ mod tests {
         ElementId, Point, Rect, Size, Style, StyleSelector, StyleSheet,
     };
     use des_ui_render::{FillRectPaint, PaintCommand, content_rect};
-    use des_ui_wgpu::ClearColor;
+    use des_ui_wgpu::{ClearColor, PresentMode};
     use des_ui_winit::HostViewport;
 
     use crate::{AppFrame, FrameOutput, NativeOptions, WindowApp};
@@ -337,6 +348,31 @@ mod tests {
         assert_eq!(
             options.initial_viewport(2.0),
             HostViewport::new(1280, 800, 2.0)
+        );
+    }
+
+    #[test]
+    fn native_options_map_vsync_to_renderer_present_mode() {
+        let mut options = NativeOptions {
+            render_options: des_ui_wgpu::RenderOptions {
+                present_mode: PresentMode::Immediate,
+                clear_color: ClearColor::rgb(1, 2, 3),
+                ..des_ui_wgpu::RenderOptions::default()
+            },
+            ..NativeOptions::default()
+        };
+
+        assert_eq!(options.render_options().present_mode, PresentMode::Vsync);
+        assert_eq!(
+            options.render_options().clear_color,
+            ClearColor::rgb(1, 2, 3)
+        );
+
+        options.vsync = false;
+
+        assert_eq!(
+            options.render_options().present_mode,
+            PresentMode::Immediate
         );
     }
 
