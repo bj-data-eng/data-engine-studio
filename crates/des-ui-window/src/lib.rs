@@ -320,7 +320,7 @@ mod tests {
         Color, CornerRadii, Document, DocumentEngine, DocumentEventKind, DocumentInput, Element,
         ElementId, Point, Rect, Size, Style, StyleSelector, StyleSheet,
     };
-    use des_ui_render::{FillRectPaint, PaintCommand};
+    use des_ui_render::{FillRectPaint, PaintCommand, content_rect};
     use des_ui_wgpu::ClearColor;
     use des_ui_winit::HostViewport;
 
@@ -489,6 +489,7 @@ mod tests {
         let mut frame = AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
 
         app.update(&mut frame);
+        let document_output = app.last_output().unwrap().clone();
         let frame_output = frame.into_output(des_ui_wgpu::RenderOptions::default());
         let index_count = frame_output
             .render_plan
@@ -507,9 +508,37 @@ mod tests {
                 .iter()
                 .any(|batch| batch.text.text.contains("π"))
         );
-        assert_eq!(
-            app.last_output().unwrap().layout.rect.size,
-            Size::new(980.0, 680.0)
+        assert_eq!(document_output.layout.rect.size, Size::new(980.0, 680.0));
+    }
+
+    #[test]
+    fn native_document_demo_clips_overflow_text_in_render_plan() {
+        let mut app = crate::demo::NativeDocumentDemo::new();
+        let mut frame = AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
+
+        app.update(&mut frame);
+
+        let output = app.last_output().unwrap();
+        let clip_frame = output.layout.find("native-clip-window").unwrap();
+        let content = content_rect(clip_frame);
+        let expected_clip = Rect::new(
+            clip_frame.rect.origin.x,
+            content.origin.y,
+            clip_frame.rect.size.width,
+            content.size.height,
+        );
+        let frame_output = frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let clipped_text = frame_output
+            .render_plan
+            .text_batches
+            .iter()
+            .find(|batch| batch.text.element_id.as_str() == "native-clip-copy")
+            .expect("native clipped text should be rendered from the real document");
+
+        assert_eq!(clipped_text.clip, Some(expected_clip));
+        assert!(
+            clipped_text.text.rect.size.height > expected_clip.size.height,
+            "the text item should overflow the container and rely on native scissor clipping"
         );
     }
 

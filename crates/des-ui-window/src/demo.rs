@@ -2,7 +2,7 @@ use crate::{AppFrame, WindowApp};
 use des_ui_document::{
     AlignItems, Color, Document, DocumentEngine, DocumentEventKind, DocumentInput, DocumentOutput,
     Element, ElementStateSelector, FlexDirection, FlexWrap, Glyph, Insets, JustifyContent, Length,
-    Size, Style, StyleSelector, StyleSheet, Transition,
+    Overflow, Size, Style, StyleSelector, StyleSheet, Transition,
 };
 
 const ACTION_ID: &str = "native-action";
@@ -119,6 +119,13 @@ fn demo_document(viewport: Size, clicks: u32) -> Document {
                             .empty();
                         ui.text("native-action-label", format!("Clicks: {clicks}"));
                     });
+                });
+
+                ui.div("native-clip-window").children(|ui| {
+                    ui.text(
+                        "native-clip-copy",
+                        "This long document text is intentionally clipped by an overflow container so native text, layout, and scissor planning move through the same renderer path.",
+                    );
                 });
 
                 ui.div("responsive-grid").children(|ui| {
@@ -271,6 +278,29 @@ fn demo_stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::id("native-action-label"),
             Style::default().size(86.0, 22.0),
+        )
+        .rule(
+            StyleSelector::id("native-clip-window"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(38.0))
+                .padding(Insets::symmetric(12.0, 7.0))
+                .background(Color::rgb(248, 244, 252))
+                .border(Color::rgb(204, 194, 215))
+                .border_width(1.0)
+                .radius(10.0)
+                .overflow_y(Overflow::Scroll)
+                .scrollbar_width(2.0)
+                .scrollbar_handle_color(Color::rgba(103, 80, 164, 128)),
+        )
+        .rule(
+            StyleSelector::id("native-clip-copy"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(96.0))
+                .font_size(14.0)
+                .line_height(19.0)
+                .text_color(Color::rgb(91, 82, 101)),
         )
         .rule(
             StyleSelector::id("responsive-grid"),

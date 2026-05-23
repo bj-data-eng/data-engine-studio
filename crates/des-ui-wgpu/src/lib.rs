@@ -8,7 +8,7 @@
 use des_ui_document::{Color, Rect, TextWrapMode};
 use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
-    RenderPrimitive, TextPaint, plan_primitives,
+    RenderPrimitive, TextPaint,
 };
 use std::{cell::RefCell, error, fmt, mem, ops::Range};
 
@@ -646,7 +646,7 @@ impl MeshBuilder {
 
     #[cfg(test)]
     fn push_display_list(&mut self, display_list: &DisplayList) {
-        let primitives = plan_primitives(display_list);
+        let primitives = des_ui_render::plan_primitives(display_list);
         for command in &primitives.commands {
             self.push_command(command);
         }
