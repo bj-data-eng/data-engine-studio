@@ -1490,6 +1490,7 @@ pub fn clip_rect_to_scissor(clip: Option<Rect>, size: PhysicalRenderSize) -> Opt
 struct RenderPlanBuilder {
     plan: RenderPlan,
     current_clip: Option<Rect>,
+    current_clip_empty: bool,
     current_mesh: MeshBuilder,
 }
 
@@ -1503,6 +1504,7 @@ impl RenderPlanBuilder {
                 text_batches: Vec::new(),
             },
             current_clip: None,
+            current_clip_empty: false,
             current_mesh: MeshBuilder::new(),
         }
     }
@@ -1513,14 +1515,17 @@ impl RenderPlanBuilder {
             match command {
                 PrimitiveCommand::PushClip(rect) => {
                     clip_stack.push(*rect);
-                    self.set_clip(clip_stack.last().copied());
+                    self.set_clip(active_clip(&clip_stack));
                 }
                 PrimitiveCommand::PopClip => {
                     clip_stack.pop();
-                    self.set_clip(clip_stack.last().copied());
+                    self.set_clip(active_clip(&clip_stack));
                 }
                 PrimitiveCommand::Draw(RenderPrimitive::Text(text)) => {
                     self.flush();
+                    if self.current_clip_empty {
+                        continue;
+                    }
                     let batch = TextBatch {
                         clip: self.current_clip,
                         text: text.clone(),
@@ -1528,17 +1533,27 @@ impl RenderPlanBuilder {
                     self.plan.items.push(RenderItem::Text(batch.clone()));
                     self.plan.text_batches.push(batch);
                 }
-                _ => self.current_mesh.push_command(command),
+                _ => {
+                    if !self.current_clip_empty {
+                        self.current_mesh.push_command(command);
+                    }
+                }
             }
         }
     }
 
-    fn set_clip(&mut self, clip: Option<Rect>) {
-        if self.current_clip == clip {
+    fn set_clip(&mut self, clip: ClipState) {
+        let (next_clip, next_empty) = match clip {
+            ClipState::Unclipped => (None, false),
+            ClipState::Clipped(rect) => (Some(rect), false),
+            ClipState::Empty => (None, true),
+        };
+        if self.current_clip == next_clip && self.current_clip_empty == next_empty {
             return;
         }
         self.flush();
-        self.current_clip = clip;
+        self.current_clip = next_clip;
+        self.current_clip_empty = next_empty;
     }
 
     fn flush(&mut self) {
@@ -1556,6 +1571,24 @@ impl RenderPlanBuilder {
     fn finish(mut self) -> RenderPlan {
         self.flush();
         self.plan
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ClipState {
+    Unclipped,
+    Clipped(Rect),
+    Empty,
+}
+
+fn active_clip(clip_stack: &[Rect]) -> ClipState {
+    let mut clips = clip_stack.iter().copied();
+    let Some(first) = clips.next() else {
+        return ClipState::Unclipped;
+    };
+    match clips.try_fold(first, Rect::intersect) {
+        Some(rect) => ClipState::Clipped(rect),
+        None => ClipState::Empty,
     }
 }
 
@@ -1729,6 +1762,55 @@ mod tests {
         assert_eq!(plan.text_batches[0].text.text, "Ready");
         assert!(plan.batches.is_empty());
         assert!(!plan.is_empty());
+    }
+
+    #[test]
+    fn render_plan_intersects_nested_clips_without_expanding_parent_clip() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::PushClip(Rect::new(10.0, 10.0, 40.0, 40.0)));
+        display_list.push(PaintCommand::PushClip(Rect::new(0.0, 0.0, 80.0, 80.0)));
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("inside"),
+            rect: Rect::new(0.0, 0.0, 20.0, 20.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(1, 2, 3),
+        }));
+        display_list.push(PaintCommand::PopClip);
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("after-inner"),
+            rect: Rect::new(20.0, 20.0, 20.0, 20.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(4, 5, 6),
+        }));
+        display_list.push(PaintCommand::PopClip);
+
+        let plan = DisplayListRenderer::default().build_plan(&display_list);
+
+        assert_eq!(plan.batches.len(), 1);
+        assert_eq!(
+            plan.batches[0].clip,
+            Some(Rect::new(10.0, 10.0, 40.0, 40.0))
+        );
+        assert_eq!(plan.items.len(), 1);
+    }
+
+    #[test]
+    fn render_plan_drops_draws_inside_empty_nested_clip() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::PushClip(Rect::new(0.0, 0.0, 10.0, 10.0)));
+        display_list.push(PaintCommand::PushClip(Rect::new(20.0, 20.0, 10.0, 10.0)));
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("hidden"),
+            rect: Rect::new(0.0, 0.0, 20.0, 20.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(1, 2, 3),
+        }));
+
+        let plan = DisplayListRenderer::default().build_plan(&display_list);
+
+        assert!(plan.batches.is_empty());
+        assert!(plan.items.is_empty());
+        assert!(plan.is_empty());
     }
 
     #[test]
