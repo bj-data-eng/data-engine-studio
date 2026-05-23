@@ -2468,6 +2468,62 @@ fn pointer_input_can_target_absolute_child_outside_parent_box() {
 }
 
 #[test]
+fn absolute_viewport_child_escapes_ancestor_overflow_clip() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("clipper"),
+            Style::default().size(60.0, 40.0).overflow(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("absolute-child"),
+            Style::default()
+                .absolute_viewport()
+                .left(Length::Px(140.0))
+                .top(Length::Px(80.0))
+                .size(40.0, 20.0),
+        );
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.element("clipper", ElementSpec::new(Element::Div), |ui| {
+            ui.element(
+                "absolute-child",
+                ElementSpec::new(Element::Div).interactive(),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(150.0, 90.0),
+                primary_delta: Point::ZERO,
+                primary_down: true,
+                primary_pressed: false,
+                primary_clicked: true,
+                primary_click_count: 1,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::ZERO,
+        },
+    );
+
+    assert_eq!(
+        output
+            .snapshot()
+            .find("absolute-child")
+            .unwrap()
+            .clip_rect(),
+        des_ui_document::ClipRect::from_rect(des_ui_document::Rect::new(0.0, 0.0, 320.0, 200.0))
+    );
+    assert_eq!(output.hit_id, Some(ElementId::new("absolute-child")));
+    assert!(engine.element_state("absolute-child").unwrap().pressed);
+}
+
+#[test]
 fn pointer_input_targets_interactive_owner_instead_of_inner_text() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new().rule(
@@ -2703,7 +2759,7 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
                 .overflow_y(Overflow::Scroll),
         )
         .rule(
-            StyleSelector::Element(Element::Div),
+            StyleSelector::class("scroll-row"),
             Style::default().size(120.0, 36.0),
         );
     let mut document = overflowing_scroll_document();
@@ -2805,6 +2861,324 @@ fn horizontal_overflow_scrolls_child_content_on_x_axis() {
                 && chrome.max_scroll > 0.0
         }),
         "horizontal overflow should emit horizontal scroll chrome"
+    );
+}
+
+#[test]
+fn overflow_clip_chain_is_axis_aware_for_hit_testing() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("clipper"),
+            Style::default()
+                .size(80.0, 60.0)
+                .overflow_x(Overflow::Clip)
+                .overflow_y(Overflow::Visible),
+        )
+        .rule(
+            StyleSelector::id("below"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(20.0))
+                .top(Length::Px(90.0))
+                .size(24.0, 18.0),
+        )
+        .rule(
+            StyleSelector::id("side"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(90.0))
+                .top(Length::Px(90.0))
+                .size(24.0, 18.0),
+        );
+    let mut document = Document::build(Size::new(180.0, 180.0), |ui| {
+        ui.element("clipper", ElementSpec::new(Element::Div), |ui| {
+            ui.element(
+                "below",
+                ElementSpec::new(Element::Div).interactive(),
+                |_| {},
+            );
+            ui.element("side", ElementSpec::new(Element::Div).interactive(), |_| {});
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let below = output.snapshot().find("below").unwrap();
+
+    assert_eq!(below.clip_rect().left, Some(0.0));
+    assert_eq!(below.clip_rect().right, Some(80.0));
+    assert_eq!(below.clip_rect().top, Some(0.0));
+    assert_eq!(below.clip_rect().bottom, Some(180.0));
+    assert_eq!(
+        output
+            .snapshot()
+            .hit_test(Point::new(30.0, 100.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("below")
+    );
+    assert_ne!(
+        output
+            .snapshot()
+            .hit_test(Point::new(100.0, 100.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("side")
+    );
+}
+
+#[test]
+fn declared_visible_cross_axis_normalizes_to_auto_clip() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("clipper"),
+            Style::default()
+                .size(80.0, 60.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible),
+        )
+        .rule(
+            StyleSelector::id("below"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(20.0))
+                .top(Length::Px(90.0))
+                .size(24.0, 18.0),
+        )
+        .rule(
+            StyleSelector::id("side"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(90.0))
+                .top(Length::Px(20.0))
+                .size(24.0, 18.0),
+        );
+    let mut document = Document::build(Size::new(180.0, 180.0), |ui| {
+        ui.element("clipper", ElementSpec::new(Element::Div), |ui| {
+            ui.element(
+                "below",
+                ElementSpec::new(Element::Div).interactive(),
+                |_| {},
+            );
+            ui.element("side", ElementSpec::new(Element::Div).interactive(), |_| {});
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let clipper = output.snapshot().find("clipper").unwrap();
+    let below = output.snapshot().find("below").unwrap();
+
+    assert_eq!(clipper.style().overflow_x, Overflow::Scroll);
+    assert_eq!(clipper.style().overflow_y, Overflow::Auto);
+    assert_eq!(below.clip_rect().left, Some(0.0));
+    assert_eq!(below.clip_rect().right, Some(80.0));
+    assert_eq!(below.clip_rect().top, Some(0.0));
+    assert_eq!(below.clip_rect().bottom, Some(60.0));
+    assert_ne!(
+        output
+            .snapshot()
+            .hit_test(Point::new(30.0, 100.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("below")
+    );
+    assert_ne!(
+        output
+            .snapshot()
+            .hit_test(Point::new(100.0, 30.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("side")
+    );
+}
+
+#[test]
+fn normalized_auto_axis_scrolls_overflowing_content() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroller"),
+            Style::default()
+                .size(100.0, 60.0)
+                .overflow_x(Overflow::Scroll)
+                .overflow_y(Overflow::Visible),
+        )
+        .rule(
+            StyleSelector::class("scroll-row"),
+            Style::default().size(80.0, 30.0),
+        );
+    let mut document = Document::build(Size::new(140.0, 100.0), |ui| {
+        ui.element("scroller", ElementSpec::new(Element::Div), |ui| {
+            for index in 0..4 {
+                ui.element(
+                    format!("row-{index}"),
+                    ElementSpec::new(Element::Div).class("scroll-row"),
+                    |_| {},
+                );
+            }
+        });
+    });
+
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput {
+            pointer: Some(PointerInput {
+                position: Point::new(10.0, 10.0),
+                primary_delta: Point::ZERO,
+                primary_down: false,
+                primary_pressed: false,
+                primary_clicked: false,
+                primary_click_count: 0,
+                secondary_clicked: false,
+                time_seconds: 0.0,
+            }),
+            scroll_delta: Point::new(0.0, -20.0),
+        },
+    );
+
+    let scroller = output.snapshot().find("scroller").unwrap();
+    assert_eq!(scroller.style().overflow_y, Overflow::Auto);
+    assert!(
+        output
+            .events
+            .contains(&DocumentEvent::scrolled("scroller", ScrollAxis::Vertical))
+    );
+    assert_eq!(engine.element_state("scroller").unwrap().scroll_y, 20.0);
+    assert!(output.scroll_chrome.iter().any(|chrome| {
+        chrome.element_id == ElementId::new("scroller")
+            && chrome.axis == ScrollAxis::Vertical
+            && chrome.max_scroll > 0.0
+    }));
+
+    let output = engine.update(&mut document, &stylesheet);
+    let first_row = output.layout.find("row-0").unwrap();
+    assert_eq!(first_row.rect.origin.y, -20.0);
+}
+
+#[test]
+fn declared_clip_cross_axis_normalizes_to_hidden_when_paired_with_scroll() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("clipper"),
+            Style::default()
+                .size(80.0, 60.0)
+                .overflow_x(Overflow::Clip)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::id("side"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(90.0))
+                .top(Length::Px(20.0))
+                .size(24.0, 18.0),
+        );
+    let mut document = Document::build(Size::new(180.0, 180.0), |ui| {
+        ui.element("clipper", ElementSpec::new(Element::Div), |ui| {
+            ui.element("side", ElementSpec::new(Element::Div).interactive(), |_| {});
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let clipper = output.snapshot().find("clipper").unwrap();
+
+    assert_eq!(clipper.style().overflow_x, Overflow::Hidden);
+    assert_eq!(clipper.style().overflow_y, Overflow::Scroll);
+    assert_ne!(
+        output
+            .snapshot()
+            .hit_test(Point::new(100.0, 30.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("side")
+    );
+}
+
+#[test]
+fn overflow_hidden_clips_without_emitting_scroll_chrome() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("clipper"),
+            Style::default().size(80.0, 60.0).overflow(Overflow::Hidden),
+        )
+        .rule(
+            StyleSelector::id("child"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(90.0))
+                .top(Length::Px(10.0))
+                .size(24.0, 18.0),
+        );
+    let mut document = Document::build(Size::new(180.0, 180.0), |ui| {
+        ui.element("clipper", ElementSpec::new(Element::Div), |ui| {
+            ui.element(
+                "child",
+                ElementSpec::new(Element::Div).interactive(),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert!(output.scroll_chrome.is_empty());
+    assert_ne!(
+        output
+            .snapshot()
+            .hit_test(Point::new(100.0, 20.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("child")
+    );
+}
+
+#[test]
+fn overflow_clip_clips_without_emitting_scroll_chrome() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("clipper"),
+            Style::default().size(80.0, 60.0).overflow(Overflow::Clip),
+        )
+        .rule(
+            StyleSelector::id("child"),
+            Style::default()
+                .absolute_parent()
+                .left(Length::Px(90.0))
+                .top(Length::Px(10.0))
+                .size(24.0, 18.0),
+        );
+    let mut document = Document::build(Size::new(180.0, 180.0), |ui| {
+        ui.element("clipper", ElementSpec::new(Element::Div), |ui| {
+            ui.element(
+                "child",
+                ElementSpec::new(Element::Div).interactive(),
+                |_| {},
+            );
+        });
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+
+    assert!(output.scroll_chrome.is_empty());
+    assert_ne!(
+        output
+            .snapshot()
+            .hit_test(Point::new(100.0, 20.0))
+            .unwrap()
+            .target
+            .id(),
+        &ElementId::new("child")
     );
 }
 

@@ -1,8 +1,6 @@
 use crate::element::ElementId;
-use crate::geometry::{Overflow, Rect, ScrollAxis, Size};
-use crate::layout::{
-    from_scroll_rect, to_layout_insets, to_layout_overflow, to_scroll_axis, to_scroll_rect,
-};
+use crate::geometry::{ClipRect, Rect, ScrollAxis, Size};
+use crate::layout::{from_scroll_rect, to_layout_insets, to_scroll_axis, to_scroll_rect};
 use crate::state::{ElementState, ResolvedElement, ScrollChrome};
 use layout_engine::scroll::{self as layout_scroll, ScrollbarGeometryInput};
 use std::collections::HashMap;
@@ -13,7 +11,7 @@ pub(crate) fn scroll_chrome(
     scroll_limits: &HashMap<ElementId, Size>,
 ) -> Vec<ScrollChrome> {
     let mut chrome = Vec::new();
-    collect_scroll_chrome(frame, states, scroll_limits, None, &mut chrome);
+    collect_scroll_chrome(frame, states, scroll_limits, &mut chrome);
     chrome
 }
 
@@ -21,11 +19,11 @@ fn collect_scroll_chrome(
     frame: &ResolvedElement,
     states: &HashMap<ElementId, ElementState>,
     scroll_limits: &HashMap<ElementId, Size>,
-    clip_rect: Option<Rect>,
     chrome: &mut Vec<ScrollChrome>,
 ) {
     if let Some(max_scroll) = scroll_limits.get(&frame.id).copied() {
-        if frame.style.overflow_y == Overflow::Scroll && max_scroll.height > 0.0 {
+        let clip_rect = scroll_geometry_clip(frame.clip_rect);
+        if frame.style.overflow_y.is_scrollable() && max_scroll.height > 0.0 {
             if let Some(scroll_chrome) = scroll_chrome_for_frame(
                 frame,
                 states,
@@ -36,7 +34,7 @@ fn collect_scroll_chrome(
                 chrome.push(scroll_chrome);
             }
         }
-        if frame.style.overflow_x == Overflow::Scroll && max_scroll.width > 0.0 {
+        if frame.style.overflow_x.is_scrollable() && max_scroll.width > 0.0 {
             if let Some(scroll_chrome) = scroll_chrome_for_frame(
                 frame,
                 states,
@@ -49,9 +47,8 @@ fn collect_scroll_chrome(
         }
     }
 
-    let child_clip = child_clip_rect(frame, clip_rect);
     for child in &frame.children {
-        collect_scroll_chrome(child, states, scroll_limits, child_clip, chrome);
+        collect_scroll_chrome(child, states, scroll_limits, chrome);
     }
 }
 
@@ -181,14 +178,14 @@ fn scroll_chrome_for_frame(
     })
 }
 
-fn child_clip_rect(frame: &ResolvedElement, parent_clip: Option<Rect>) -> Option<Rect> {
-    layout_scroll::child_clip_rect(
-        to_scroll_rect(frame.rect),
-        to_layout_insets(frame.style.border_width),
-        to_layout_insets(frame.style.padding),
-        to_layout_overflow(frame.style.overflow_x),
-        to_layout_overflow(frame.style.overflow_y),
-        parent_clip.map(to_scroll_rect),
-    )
-    .map(from_scroll_rect)
+fn scroll_geometry_clip(clip: ClipRect) -> Option<Rect> {
+    if clip == ClipRect::UNBOUNDED {
+        return None;
+    }
+
+    let left = clip.left.unwrap_or(f32::NEG_INFINITY);
+    let top = clip.top.unwrap_or(f32::NEG_INFINITY);
+    let right = clip.right.unwrap_or(f32::INFINITY);
+    let bottom = clip.bottom.unwrap_or(f32::INFINITY);
+    Some(Rect::new(left, top, right - left, bottom - top))
 }

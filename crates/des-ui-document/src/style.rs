@@ -1821,6 +1821,28 @@ impl ComputedStyle {
             self.transition = Some(value);
         }
     }
+
+    pub(crate) fn normalize_overflow_axes(&mut self) {
+        let (overflow_x, overflow_y) = normalize_overflow_pair(self.overflow_x, self.overflow_y);
+        self.overflow_x = overflow_x;
+        self.overflow_y = overflow_y;
+    }
+}
+
+fn normalize_overflow_pair(x: Overflow, y: Overflow) -> (Overflow, Overflow) {
+    if x.forces_cross_axis_normalization() || y.forces_cross_axis_normalization() {
+        (normalize_overflow_axis(x), normalize_overflow_axis(y))
+    } else {
+        (x, y)
+    }
+}
+
+fn normalize_overflow_axis(overflow: Overflow) -> Overflow {
+    match overflow {
+        Overflow::Visible => Overflow::Auto,
+        Overflow::Clip => Overflow::Hidden,
+        overflow => overflow,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1982,6 +2004,8 @@ pub(crate) fn resolve_style_with_position(
             style.apply(&rule.style);
         }
     }
+
+    style.normalize_overflow_axes();
 
     style
 }

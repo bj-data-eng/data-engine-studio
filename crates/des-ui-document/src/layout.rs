@@ -1,21 +1,20 @@
-use crate::geometry::{Insets, Overflow, Point, Rect, ScrollAxis, Size};
+use crate::geometry::{ClipRect, Insets, Overflow, Point, Rect, ScrollAxis, Size};
 use crate::state::ResolvedElement;
 use layout_engine::geometry::{Point as LayoutPoint, Rect as LayoutInsets, Size as LayoutSize};
 use layout_engine::scroll::{ScrollAxis as LayoutScrollAxis, ScrollRect};
-use layout_engine::style::Overflow as LayoutOverflow;
 
 pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {
+    if !frame.clip_rect.contains(point) || frame.clip_rect.is_empty() {
+        return None;
+    }
+
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
 
-    let clips_overflow =
-        frame.style.overflow_x == Overflow::Scroll || frame.style.overflow_y == Overflow::Scroll;
-    let may_hit_children = !clips_overflow || frame.rect.contains(point);
-    if may_hit_children
-        && let Some(mut child_path) = children
-            .into_iter()
-            .rev()
-            .find_map(|child| hit_path(child, point))
+    if let Some(mut child_path) = children
+        .into_iter()
+        .rev()
+        .find_map(|child| hit_path(child, point))
     {
         let mut path = vec![frame];
         path.append(&mut child_path);
@@ -52,13 +51,6 @@ pub(crate) fn to_layout_insets(insets: Insets) -> LayoutInsets<f32> {
     }
 }
 
-pub(crate) fn to_layout_overflow(overflow: Overflow) -> LayoutOverflow {
-    match overflow {
-        Overflow::Visible => LayoutOverflow::Visible,
-        Overflow::Scroll => LayoutOverflow::Scroll,
-    }
-}
-
 pub(crate) fn to_scroll_axis(axis: ScrollAxis) -> LayoutScrollAxis {
     match axis {
         ScrollAxis::Horizontal => LayoutScrollAxis::Horizontal,
@@ -77,4 +69,24 @@ pub(crate) fn from_scroll_rect(rect: ScrollRect) -> Rect {
         rect.size.width,
         rect.size.height,
     )
+}
+
+pub(crate) fn child_clip_rect(
+    frame_rect: Rect,
+    style: &crate::ComputedStyle,
+    parent_clip: ClipRect,
+) -> ClipRect {
+    let viewport = frame_rect.inset(style.border_width).inset(style.padding);
+    let mut clip = parent_clip;
+    if clips_overflow(style.overflow_x) {
+        clip = clip.constrain_x(viewport.origin.x, viewport.right());
+    }
+    if clips_overflow(style.overflow_y) {
+        clip = clip.constrain_y(viewport.origin.y, viewport.bottom());
+    }
+    clip
+}
+
+pub(crate) fn clips_overflow(overflow: Overflow) -> bool {
+    overflow.clips_contents()
 }

@@ -1,5 +1,5 @@
 use crate::element::{ClassName, Element, ElementId, VisualElementClone};
-use crate::geometry::{Point, Rect};
+use crate::geometry::{ClipRect, Point, Rect};
 use crate::layout::hit_path;
 use crate::state::ResolvedElement;
 
@@ -86,6 +86,10 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn rect(&self) -> Rect {
         self.element.rect
+    }
+
+    pub fn clip_rect(&self) -> ClipRect {
+        self.element.clip_rect
     }
 
     pub fn text(&self) -> Option<&str> {

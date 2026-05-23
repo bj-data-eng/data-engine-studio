@@ -1,5 +1,5 @@
 use crate::element::{ClassName, Color, Element, ElementId, Glyph};
-use crate::geometry::{Point, Rect, ScrollAxis, Size};
+use crate::geometry::{ClipRect, Point, Rect, ScrollAxis, Size};
 use crate::query::DocumentSnapshot;
 use crate::style::{
     ComputedStyle, FloatingHideData, FloatingPlacement, FloatingVisibility, Transition,
@@ -35,6 +35,7 @@ pub struct ResolvedElement {
     pub element: Element,
     pub classes: Vec<ClassName>,
     pub rect: Rect,
+    pub clip_rect: ClipRect,
     pub style: ComputedStyle,
     pub text: Option<String>,
     pub text_layout: Option<TextLayoutResult>,

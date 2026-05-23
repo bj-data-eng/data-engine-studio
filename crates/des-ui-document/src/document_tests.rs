@@ -291,7 +291,7 @@ fn document_applies_document_style_to_existing_layout_node() {
         }
     );
     assert_eq!(layout_style.overflow.x, LayoutOverflow::Scroll);
-    assert_eq!(layout_style.overflow.y, LayoutOverflow::Visible);
+    assert_eq!(layout_style.overflow.y, LayoutOverflow::Hidden);
 }
 
 #[test]

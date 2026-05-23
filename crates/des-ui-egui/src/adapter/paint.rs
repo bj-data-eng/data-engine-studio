@@ -1,7 +1,7 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_ui_document::{
-    BorderStyle, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph, Insets,
-    Overflow, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
+    BorderStyle, ClipRect, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph,
+    Insets, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
 };
 use eframe::egui;
 pub fn paint_frame(
@@ -17,9 +17,10 @@ fn paint_frame_clipped(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
     frame: &ResolvedElement,
-    clip_rect: egui::Rect,
+    host_clip_rect: egui::Rect,
     text_selection: Option<&DocumentTextSelection>,
 ) {
+    let clip_rect = apply_document_clip(origin, host_clip_rect, frame.clip_rect);
     let painter = ui.painter().with_clip_rect(clip_rect);
     if frame.id.as_str() != "root" {
         let rect = frame_rect(origin, frame);
@@ -95,41 +96,80 @@ fn paint_frame_clipped(
 
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
-    let next_clip = if frame.style.overflow_x == Overflow::Scroll
-        || frame.style.overflow_y == Overflow::Scroll
-    {
-        let rect = frame_rect(origin, frame);
-        let content_rect = frame_content_rect(rect, frame);
-        let min = egui::pos2(
-            if frame.style.overflow_x == Overflow::Scroll {
-                content_rect.left()
-            } else {
-                clip_rect.left()
-            },
-            if frame.style.overflow_y == Overflow::Scroll {
-                content_rect.top()
-            } else {
-                clip_rect.top()
-            },
-        );
-        let max = egui::pos2(
-            if frame.style.overflow_x == Overflow::Scroll {
-                content_rect.right()
-            } else {
-                clip_rect.right()
-            },
-            if frame.style.overflow_y == Overflow::Scroll {
-                content_rect.bottom()
-            } else {
-                clip_rect.bottom()
-            },
-        );
-        clip_rect.intersect(egui::Rect::from_min_max(min, max))
-    } else {
-        clip_rect
-    };
     for child in children {
-        paint_frame_clipped(ui, origin, child, next_clip, text_selection);
+        paint_frame_clipped(ui, origin, child, host_clip_rect, text_selection);
+    }
+}
+
+fn apply_document_clip(
+    origin: egui::Pos2,
+    base_clip: egui::Rect,
+    document_clip: ClipRect,
+) -> egui::Rect {
+    let min_x = document_clip.left.map_or(base_clip.left(), |left| {
+        base_clip.left().max(origin.x + left)
+    });
+    let min_y = document_clip
+        .top
+        .map_or(base_clip.top(), |top| base_clip.top().max(origin.y + top));
+    let max_x = document_clip
+        .right
+        .map_or(base_clip.right(), |right| {
+            base_clip.right().min(origin.x + right)
+        })
+        .max(min_x);
+    let max_y = document_clip
+        .bottom
+        .map_or(base_clip.bottom(), |bottom| {
+            base_clip.bottom().min(origin.y + bottom)
+        })
+        .max(min_y);
+
+    egui::Rect::from_min_max(egui::pos2(min_x, min_y), egui::pos2(max_x, max_y))
+}
+
+#[cfg(test)]
+mod clip_tests {
+    use super::*;
+
+    #[test]
+    fn document_clip_can_constrain_one_axis_without_clipping_the_other() {
+        let base = egui::Rect::from_min_max(egui::pos2(10.0, 20.0), egui::pos2(210.0, 220.0));
+
+        let clipped = apply_document_clip(
+            egui::pos2(10.0, 20.0),
+            base,
+            ClipRect {
+                left: Some(0.0),
+                right: Some(80.0),
+                top: None,
+                bottom: None,
+            },
+        );
+
+        assert_eq!(
+            clipped,
+            egui::Rect::from_min_max(egui::pos2(10.0, 20.0), egui::pos2(90.0, 220.0))
+        );
+    }
+
+    #[test]
+    fn document_clip_collapses_empty_intersections() {
+        let base = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(100.0, 100.0));
+
+        let clipped = apply_document_clip(
+            egui::pos2(0.0, 0.0),
+            base,
+            ClipRect {
+                left: Some(120.0),
+                right: Some(140.0),
+                top: None,
+                bottom: None,
+            },
+        );
+
+        assert_eq!(clipped.width(), 0.0);
+        assert_eq!(clipped.height(), 100.0);
     }
 }
 

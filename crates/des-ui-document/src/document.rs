@@ -3,10 +3,10 @@ use crate::element::{
     VisualElementClone,
 };
 use crate::geometry::{
-    AlignContent, AlignItems, FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow,
-    Point, Position, Rect as DocumentRect, Size,
+    AlignContent, AlignItems, ClipRect, FlexDirection, FlexWrap, Insets, JustifyContent, Length,
+    Overflow, Point, Position, Rect as DocumentRect, Size,
 };
-use crate::layout::{to_layout_insets, to_layout_size};
+use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
 use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
     ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
@@ -430,10 +430,12 @@ impl Document {
         style: &ComputedStyle,
     ) -> DocumentResult<bool> {
         let id = id.into();
+        let mut style = style.clone();
+        style.normalize_overflow_axes();
         let node = self.element(&id)?.layout_node;
-        let layout_style = self.layout_style_from_computed(style);
+        let layout_style = self.layout_style_from_computed(&style);
         let layout_changed = self.set_layout_style_if_changed(node, layout_style)?;
-        self.element_mut(&id)?.computed_style = style.clone();
+        self.element_mut(&id)?.computed_style = style;
         Ok(layout_changed)
     }
 
@@ -601,6 +603,12 @@ impl Document {
             &self.root,
             Point::ZERO,
             Point::ZERO,
+            ClipRect::from_rect(DocumentRect::new(
+                0.0,
+                0.0,
+                self.viewport.width,
+                self.viewport.height,
+            )),
             text_measurer,
             &mut anchors,
             &mut boundaries,
@@ -612,7 +620,7 @@ impl Document {
         for id in self.element_ids() {
             let element = self.element(&id)?;
             let style = &element.computed_style;
-            if style.overflow_x != Overflow::Scroll && style.overflow_y != Overflow::Scroll {
+            if !style.overflow_x.is_scrollable() && !style.overflow_y.is_scrollable() {
                 continue;
             }
 
@@ -791,6 +799,7 @@ impl Document {
         id: &ElementId,
         parent_origin: Point,
         parent_scroll_offset: Point,
+        parent_clip: ClipRect,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
         boundaries: &mut HashMap<ElementId, DocumentRect>,
@@ -806,6 +815,16 @@ impl Document {
             anchors,
             boundaries,
         );
+        let clip_rect = if element.computed_style.position == Position::AbsoluteViewport {
+            ClipRect::from_rect(DocumentRect::new(
+                0.0,
+                0.0,
+                self.viewport.width,
+                self.viewport.height,
+            ))
+        } else {
+            parent_clip
+        };
         let text_layout = element
             .text
             .as_deref()
@@ -819,6 +838,7 @@ impl Document {
             id,
             rect,
             element.scroll_offset,
+            child_clip_rect(rect, &element.computed_style, clip_rect),
             text_measurer,
             anchors,
             boundaries,
@@ -829,6 +849,7 @@ impl Document {
             element: element.spec.element,
             classes: element.spec.classes.clone(),
             rect,
+            clip_rect,
             style: element.computed_style.clone(),
             text: element.text.clone(),
             text_layout,
@@ -849,6 +870,7 @@ impl Document {
         id: &ElementId,
         parent_rect: DocumentRect,
         parent_scroll_offset: Point,
+        child_clip: ClipRect,
         text_measurer: &mut dyn TextMeasurer,
         anchors: &mut HashMap<ElementId, DocumentRect>,
         boundaries: &mut HashMap<ElementId, DocumentRect>,
@@ -868,6 +890,7 @@ impl Document {
                     &self.element(child)?.computed_style,
                 ),
                 parent_scroll_offset,
+                child_clip,
                 text_measurer,
                 anchors,
                 boundaries,
@@ -886,6 +909,7 @@ impl Document {
                     &self.element(child)?.computed_style,
                 ),
                 parent_scroll_offset,
+                child_clip,
                 text_measurer,
                 anchors,
                 boundaries,
@@ -1687,10 +1711,16 @@ fn layout_overflow(x: Overflow, y: Overflow) -> layout_engine::geometry::Point<L
     layout_engine::geometry::Point {
         x: match x {
             Overflow::Visible => LayoutOverflow::Visible,
+            Overflow::Clip => LayoutOverflow::Clip,
+            Overflow::Hidden => LayoutOverflow::Hidden,
+            Overflow::Auto => LayoutOverflow::Hidden,
             Overflow::Scroll => LayoutOverflow::Scroll,
         },
         y: match y {
             Overflow::Visible => LayoutOverflow::Visible,
+            Overflow::Clip => LayoutOverflow::Clip,
+            Overflow::Hidden => LayoutOverflow::Hidden,
+            Overflow::Auto => LayoutOverflow::Hidden,
             Overflow::Scroll => LayoutOverflow::Scroll,
         },
     }

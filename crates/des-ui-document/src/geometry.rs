@@ -75,6 +75,71 @@ impl Rect {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClipRect {
+    pub left: Option<f32>,
+    pub top: Option<f32>,
+    pub right: Option<f32>,
+    pub bottom: Option<f32>,
+}
+
+impl ClipRect {
+    pub const UNBOUNDED: Self = Self {
+        left: None,
+        top: None,
+        right: None,
+        bottom: None,
+    };
+
+    pub fn from_rect(rect: Rect) -> Self {
+        Self {
+            left: Some(rect.origin.x),
+            top: Some(rect.origin.y),
+            right: Some(rect.right()),
+            bottom: Some(rect.bottom()),
+        }
+    }
+
+    pub fn contains(self, point: Point) -> bool {
+        self.left.is_none_or(|left| point.x >= left)
+            && self.right.is_none_or(|right| point.x <= right)
+            && self.top.is_none_or(|top| point.y >= top)
+            && self.bottom.is_none_or(|bottom| point.y <= bottom)
+    }
+
+    pub fn constrain_x(self, left: f32, right: f32) -> Self {
+        Self {
+            left: Some(self.left.map_or(left, |existing| existing.max(left))),
+            right: Some(self.right.map_or(right, |existing| existing.min(right))),
+            ..self
+        }
+    }
+
+    pub fn constrain_y(self, top: f32, bottom: f32) -> Self {
+        Self {
+            top: Some(self.top.map_or(top, |existing| existing.max(top))),
+            bottom: Some(self.bottom.map_or(bottom, |existing| existing.min(bottom))),
+            ..self
+        }
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.left
+            .zip(self.right)
+            .is_some_and(|(left, right)| right <= left)
+            || self
+                .top
+                .zip(self.bottom)
+                .is_some_and(|(top, bottom)| bottom <= top)
+    }
+}
+
+impl Default for ClipRect {
+    fn default() -> Self {
+        Self::UNBOUNDED
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Insets {
     pub top: f32,
@@ -214,7 +279,24 @@ pub enum JustifyContent {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Overflow {
     Visible,
+    Clip,
+    Hidden,
+    Auto,
     Scroll,
+}
+
+impl Overflow {
+    pub fn clips_contents(self) -> bool {
+        matches!(self, Self::Clip | Self::Hidden | Self::Auto | Self::Scroll)
+    }
+
+    pub fn is_scrollable(self) -> bool {
+        matches!(self, Self::Auto | Self::Scroll)
+    }
+
+    pub fn forces_cross_axis_normalization(self) -> bool {
+        matches!(self, Self::Hidden | Self::Auto | Self::Scroll)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
