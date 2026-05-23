@@ -411,7 +411,6 @@ pub enum RendererError {
     RequestAdapter(wgpu::RequestAdapterError),
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
-    MissingTexture(epaint::TextureId),
     PartialTextureUpdateMissingTexture(epaint::TextureId),
     TextMeshCountMismatch { expected: usize, actual: usize },
     SurfaceFrame(&'static str),
@@ -424,12 +423,6 @@ impl fmt::Display for RendererError {
             Self::RequestAdapter(error) => write!(f, "failed to request wgpu adapter: {error}"),
             Self::RequestDevice(error) => write!(f, "failed to request wgpu device: {error}"),
             Self::UnsupportedSurface => f.write_str("surface is not supported by the selected GPU"),
-            Self::MissingTexture(texture_id) => {
-                write!(
-                    f,
-                    "native epaint texture id has not been registered: {texture_id:?}"
-                )
-            }
             Self::PartialTextureUpdateMissingTexture(texture_id) => write!(
                 f,
                 "cannot apply partial native texture update before full allocation: {texture_id:?}"
@@ -1575,11 +1568,10 @@ impl<'window> GpuRenderer<'window> {
                         }
                     }
                     DrawTexture::Registered(texture_id) => {
-                        let texture = self
-                            .textures
-                            .get(&texture_id)
-                            .ok_or(RendererError::MissingTexture(texture_id))?;
-                        self.draw_batch(&mut pass, draw, &texture.gpu.bind_group);
+                        if should_draw_registered_texture(self.textures.contains_key(&texture_id)) {
+                            let texture = &self.textures[&texture_id];
+                            self.draw_batch(&mut pass, draw, &texture.gpu.bind_group);
+                        }
                     }
                 }
             }
@@ -1786,6 +1778,10 @@ fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> Viewpor
 
 fn should_write_viewport_uniform(previous: Option<ViewportUniform>, next: ViewportUniform) -> bool {
     previous != Some(next)
+}
+
+fn should_draw_registered_texture(is_registered: bool) -> bool {
+    is_registered
 }
 
 fn write_text_atlas_delta(queue: &wgpu::Queue, texture: &wgpu::Texture, delta: &TextAtlasDelta) {
@@ -2558,6 +2554,12 @@ mod tests {
             uploaded.draws[0].texture,
             crate::DrawTexture::Registered(epaint::TextureId::User(42))
         );
+    }
+
+    #[test]
+    fn missing_registered_textures_are_skipped_like_egui_wgpu() {
+        assert!(crate::should_draw_registered_texture(true));
+        assert!(!crate::should_draw_registered_texture(false));
     }
 
     #[test]
