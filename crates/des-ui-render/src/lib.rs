@@ -10,6 +10,7 @@ use des_ui_document::{
 };
 
 const DEFAULT_ANTIALIASING_FRINGE: f32 = 1.0;
+const POLYGON_POINT_EPSILON: f32 = 0.01;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DisplayList {
@@ -666,7 +667,37 @@ fn fill_polygon_mesh(
     if points.len() < 3 || color.a == 0 {
         return None;
     }
+    let points = clean_polygon_points(&points);
+    if points.len() < 3 {
+        return None;
+    }
     fill_antialiased_convex_polygon_mesh(element_id, &points, color, DEFAULT_ANTIALIASING_FRINGE)
+}
+
+fn clean_polygon_points(points: &[Point]) -> Vec<Point> {
+    let mut cleaned = Vec::with_capacity(points.len());
+    for point in points {
+        if cleaned
+            .last()
+            .is_none_or(|previous| !points_are_near(*previous, *point))
+        {
+            cleaned.push(*point);
+        }
+    }
+    if cleaned.len() > 1
+        && points_are_near(
+            *cleaned.first().expect("checked polygon point count"),
+            *cleaned.last().expect("checked polygon point count"),
+        )
+    {
+        cleaned.pop();
+    }
+    cleaned
+}
+
+fn points_are_near(a: Point, b: Point) -> bool {
+    let delta = sub_points(a, b);
+    delta.x * delta.x + delta.y * delta.y <= POLYGON_POINT_EPSILON * POLYGON_POINT_EPSILON
 }
 
 fn fill_antialiased_convex_polygon_mesh(
@@ -2193,5 +2224,24 @@ mod tests {
         );
         assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
         assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 255));
+    }
+
+    #[test]
+    fn pill_fill_antialiasing_ignores_duplicate_arc_seams() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("pill"),
+            rect: Rect::new(0.0, 0.0, 120.0, 32.0),
+            radius: CornerRadii::all(999.0),
+            color: Color::rgb(170, 140, 220),
+        }));
+
+        let primitives = plan_primitives(&list);
+
+        assert_eq!(
+            primitives.commands.len(),
+            1,
+            "pill-shaped rounded rectangles should still tessellate when arc endpoints meet"
+        );
     }
 }
