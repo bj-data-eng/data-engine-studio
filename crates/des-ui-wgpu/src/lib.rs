@@ -201,7 +201,7 @@ impl From<RenderAlphaFromCoverage> for epaint::AlphaFromCoverage {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum TextureFilter {
     Nearest,
     #[default]
@@ -235,7 +235,7 @@ impl From<TextureFilter> for wgpu::MipmapFilterMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum TextureWrapMode {
     #[default]
     ClampToEdge,
@@ -263,7 +263,7 @@ impl From<TextureWrapMode> for wgpu::AddressMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TextureOptions {
     pub magnification: TextureFilter,
     pub minification: TextureFilter,
@@ -989,6 +989,7 @@ pub struct GpuRenderer<'window> {
     text_atlas: Option<GpuTextAtlas>,
     frame_buffers: GpuFrameBuffers,
     textures: HashMap<epaint::TextureId, GpuRegisteredTexture>,
+    samplers: HashMap<TextureOptions, wgpu::Sampler>,
     size: PhysicalRenderSize,
 }
 
@@ -1290,10 +1291,13 @@ impl<'window> GpuRenderer<'window> {
                     },
                 ],
             });
-        let texture_sampler = device.create_sampler(&texture_sampler_descriptor(
+        let mut samplers = HashMap::new();
+        let texture_sampler = cached_sampler(
+            &device,
+            &mut samplers,
             "des-ui texture sampler",
             TextureOptions::default(),
-        ));
+        );
         let pipeline = create_pipeline(
             &device,
             config.format,
@@ -1327,6 +1331,7 @@ impl<'window> GpuRenderer<'window> {
             text_atlas: None,
             frame_buffers: GpuFrameBuffers::default(),
             textures: HashMap::new(),
+            samplers,
             size,
         };
         renderer.write_viewport_uniform();
@@ -1388,18 +1393,32 @@ impl<'window> GpuRenderer<'window> {
         delta: &TextureDelta,
     ) -> Result<(), RendererError> {
         if delta.pos.is_some() {
+            let needs_sampler = self
+                .textures
+                .get(&texture_id)
+                .ok_or(RendererError::PartialTextureUpdateMissingTexture(
+                    texture_id,
+                ))?
+                .descriptor
+                .options
+                != delta.options;
+            let sampler = needs_sampler.then(|| {
+                cached_sampler(
+                    &self.device,
+                    &mut self.samplers,
+                    "des-ui registered texture sampler",
+                    delta.options,
+                )
+            });
             let texture = self.textures.get_mut(&texture_id).ok_or(
                 RendererError::PartialTextureUpdateMissingTexture(texture_id),
             )?;
-            if texture.descriptor.options != delta.options {
+            if let Some(sampler) = sampler {
                 texture.gpu.bind_group = create_texture_bind_group(
                     &self.device,
                     &self.texture_bind_group_layout,
                     &texture.gpu.texture,
-                    &self.device.create_sampler(&texture_sampler_descriptor(
-                        "des-ui registered texture sampler",
-                        delta.options,
-                    )),
+                    &sampler,
                     "des-ui registered texture",
                 );
                 texture.descriptor.options = delta.options;
@@ -1413,10 +1432,12 @@ impl<'window> GpuRenderer<'window> {
             height: delta.height,
             options: delta.options,
         };
-        let sampler = self.device.create_sampler(&texture_sampler_descriptor(
+        let sampler = cached_sampler(
+            &self.device,
+            &mut self.samplers,
             "des-ui registered texture sampler",
             delta.options,
-        ));
+        );
         let gpu = create_rgba_texture(
             &self.device,
             &self.queue,
@@ -1625,11 +1646,13 @@ impl<'window> GpuRenderer<'window> {
         Some(self.text_atlas.as_ref()?.gpu.bind_group.clone())
     }
 
-    fn create_text_atlas(&self, descriptor: TextureDescriptor) -> GpuTextAtlas {
-        let sampler = self.device.create_sampler(&texture_sampler_descriptor(
+    fn create_text_atlas(&mut self, descriptor: TextureDescriptor) -> GpuTextAtlas {
+        let sampler = cached_sampler(
+            &self.device,
+            &mut self.samplers,
             "des-ui text atlas sampler",
             descriptor.options,
-        ));
+        );
         let gpu = create_rgba_texture(
             &self.device,
             &self.queue,
@@ -1789,6 +1812,18 @@ fn create_texture_bind_group(
             },
         ],
     })
+}
+
+fn cached_sampler(
+    device: &wgpu::Device,
+    samplers: &mut HashMap<TextureOptions, wgpu::Sampler>,
+    label: &'static str,
+    options: TextureOptions,
+) -> wgpu::Sampler {
+    samplers
+        .entry(options)
+        .or_insert_with(|| device.create_sampler(&texture_sampler_descriptor(label, options)))
+        .clone()
 }
 
 fn texture_sampler_descriptor(
@@ -3266,6 +3301,24 @@ mod tests {
         assert_eq!(descriptor.mag_filter, wgpu::FilterMode::Linear);
         assert_eq!(descriptor.min_filter, wgpu::FilterMode::Linear);
         assert_eq!(descriptor.mipmap_filter, wgpu::MipmapFilterMode::Linear);
+    }
+
+    #[test]
+    fn texture_options_are_stable_sampler_cache_keys() {
+        let linear = TextureOptions::default();
+        let repeated_linear = epaint::textures::TextureOptions::LINEAR.into();
+        let nearest_repeat = epaint::textures::TextureOptions::NEAREST_REPEAT.into();
+
+        let mut keys = std::collections::HashSet::new();
+        keys.insert(linear);
+        keys.insert(repeated_linear);
+        keys.insert(nearest_repeat);
+
+        assert_eq!(
+            keys.len(),
+            2,
+            "sampler caching should share equivalent epaint texture options"
+        );
     }
 
     #[test]
