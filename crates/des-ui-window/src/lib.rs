@@ -637,6 +637,9 @@ mod tests {
             .find("native-action")
             .unwrap()
             .rect;
+        let base_output = frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let base_color = fill_rect_color(&base_output, "native-action")
+            .expect("native action should paint a base fill");
         let hover_position = Point::new(
             base_rect.origin.x + base_rect.size.width * 0.5,
             base_rect.origin.y + base_rect.size.height * 0.5,
@@ -652,10 +655,17 @@ mod tests {
         let hover_rect = hover_output.layout.find("native-action").unwrap().rect;
         assert!(hover_output.animating);
         assert!(hover_output.metrics.animation_changed_layout);
+        assert!(hover_output.metrics.animation_changed_paint);
         assert!(hover_frame.repaint_requested());
         assert!(hover_rect.size.width > base_rect.size.width);
 
         let frame_output = hover_frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let hover_color = fill_rect_color(&frame_output, "native-action")
+            .expect("native action should paint a hover fill");
+        assert_ne!(
+            hover_color, base_color,
+            "hover paint animation should reach the native renderer display list"
+        );
         assert!(!frame_output.render_plan.is_empty());
         assert!(!frame_output.render_plan.batches.is_empty());
         assert!(!frame_output.render_plan.text_batches.is_empty());
@@ -673,6 +683,9 @@ mod tests {
             .find("native-action")
             .unwrap()
             .rect;
+        let base_output = frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let base_color = fill_rect_color(&base_output, "native-action")
+            .expect("native action should paint a base fill");
         let press_position = Point::new(
             base_rect.origin.x + base_rect.size.width * 0.5,
             base_rect.origin.y + base_rect.size.height * 0.5,
@@ -688,10 +701,32 @@ mod tests {
         let press_rect = press_output.layout.find("native-action").unwrap().rect;
         assert!(press_output.animating);
         assert!(press_output.metrics.animation_changed_layout);
+        assert!(press_output.metrics.animation_changed_paint);
         assert!(press_frame.repaint_requested());
         assert!(press_rect.size.width < base_rect.size.width);
         assert!(press_output.events.iter().any(|event| {
             event.target.as_str() == "native-action" && event.kind == DocumentEventKind::Pressed
         }));
+
+        let frame_output = press_frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let press_color = fill_rect_color(&frame_output, "native-action")
+            .expect("native action should paint a pressed fill");
+        assert_ne!(
+            press_color, base_color,
+            "press paint animation should reach the native renderer display list"
+        );
+    }
+
+    fn fill_rect_color(output: &FrameOutput, element_id: &str) -> Option<Color> {
+        output
+            .display_list
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                PaintCommand::FillRect(fill) if fill.element_id.as_str() == element_id => {
+                    Some(fill.color)
+                }
+                _ => None,
+            })
     }
 }
