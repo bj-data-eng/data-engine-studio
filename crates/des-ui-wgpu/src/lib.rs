@@ -10,7 +10,7 @@ use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
     RenderPrimitive, RenderTessellationOptions, TextPaint,
 };
-use std::{cell::RefCell, error, fmt, mem, ops::Range};
+use std::{cell::RefCell, collections::HashMap, error, fmt, mem, ops::Range};
 
 const TEXTURED_SHADER: &str = r#"
 struct Viewport {
@@ -344,6 +344,30 @@ impl Default for RenderOptions {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RegisteredTexture {
+    pub width: u32,
+    pub height: u32,
+    pub options: TextureOptions,
+    pub pixels: Vec<u8>,
+}
+
+impl RegisteredTexture {
+    pub fn rgba(
+        width: u32,
+        height: u32,
+        pixels: impl Into<Vec<u8>>,
+        options: TextureOptions,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            options,
+            pixels: pixels.into(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PhysicalRenderSize {
     pub width: u32,
@@ -387,7 +411,7 @@ pub enum RendererError {
     RequestAdapter(wgpu::RequestAdapterError),
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
-    UnsupportedTexture(epaint::TextureId),
+    MissingTexture(epaint::TextureId),
     TextMeshCountMismatch { expected: usize, actual: usize },
     SurfaceFrame(&'static str),
 }
@@ -399,8 +423,11 @@ impl fmt::Display for RendererError {
             Self::RequestAdapter(error) => write!(f, "failed to request wgpu adapter: {error}"),
             Self::RequestDevice(error) => write!(f, "failed to request wgpu device: {error}"),
             Self::UnsupportedSurface => f.write_str("surface is not supported by the selected GPU"),
-            Self::UnsupportedTexture(texture_id) => {
-                write!(f, "unsupported native epaint texture id: {texture_id:?}")
+            Self::MissingTexture(texture_id) => {
+                write!(
+                    f,
+                    "native epaint texture id has not been registered: {texture_id:?}"
+                )
             }
             Self::TextMeshCountMismatch { expected, actual } => write!(
                 f,
@@ -935,6 +962,7 @@ pub struct GpuRenderer<'window> {
     text_rasterizer: RefCell<TextRasterizer>,
     text_atlas: Option<GpuTextAtlas>,
     frame_buffers: GpuFrameBuffers,
+    textures: HashMap<epaint::TextureId, GpuTexture>,
     size: PhysicalRenderSize,
 }
 
@@ -1018,15 +1046,16 @@ struct UploadedDraw {
 enum DrawTexture {
     Solid,
     TextAtlas,
+    Registered(epaint::TextureId),
 }
 
-fn draw_texture_for_mesh(mesh: &Mesh) -> Result<DrawTexture, RendererError> {
+fn draw_texture_for_mesh(mesh: &Mesh) -> DrawTexture {
     match mesh.texture_id {
         None | Some(epaint::TextureId::Managed(0)) if mesh_uses_only_white_uv(mesh) => {
-            Ok(DrawTexture::Solid)
+            DrawTexture::Solid
         }
-        None | Some(epaint::TextureId::Managed(0)) => Ok(DrawTexture::TextAtlas),
-        Some(texture_id) => Err(RendererError::UnsupportedTexture(texture_id)),
+        None | Some(epaint::TextureId::Managed(0)) => DrawTexture::TextAtlas,
+        Some(texture_id) => DrawTexture::Registered(texture_id),
     }
 }
 
@@ -1249,6 +1278,7 @@ impl<'window> GpuRenderer<'window> {
             text_rasterizer: RefCell::new(TextRasterizer::with_text_options(options.text)),
             text_atlas: None,
             frame_buffers: GpuFrameBuffers::default(),
+            textures: HashMap::new(),
             size,
         };
         renderer.write_viewport_uniform();
@@ -1264,6 +1294,31 @@ impl<'window> GpuRenderer<'window> {
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
         self.write_viewport_uniform();
+    }
+
+    pub fn set_texture(&mut self, texture_id: epaint::TextureId, texture: RegisteredTexture) {
+        let sampler = self.device.create_sampler(&texture_sampler_descriptor(
+            "des-ui registered texture sampler",
+            texture.options,
+        ));
+        let gpu_texture = create_rgba_texture(
+            &self.device,
+            &self.queue,
+            &self.texture_bind_group_layout,
+            &sampler,
+            &self.viewport_buffer,
+            "des-ui registered texture",
+            TextureUpload {
+                width: texture.width,
+                height: texture.height,
+                pixels: &texture.pixels,
+            },
+        );
+        self.textures.insert(texture_id, gpu_texture);
+    }
+
+    pub fn remove_texture(&mut self, texture_id: epaint::TextureId) {
+        self.textures.remove(&texture_id);
     }
 
     pub fn render_plan(&mut self, plan: &RenderPlan) -> Result<(), RendererError> {
@@ -1340,6 +1395,13 @@ impl<'window> GpuRenderer<'window> {
                         if let Some(bind_group) = text_bind_group.as_ref() {
                             self.draw_batch(&mut pass, draw, bind_group);
                         }
+                    }
+                    DrawTexture::Registered(texture_id) => {
+                        let texture = self
+                            .textures
+                            .get(&texture_id)
+                            .ok_or(RendererError::MissingTexture(texture_id))?;
+                        self.draw_batch(&mut pass, draw, &texture.bind_group);
                     }
                 }
             }
@@ -1499,7 +1561,7 @@ fn build_uploaded_frame(
     for item in &plan.items {
         match item {
             RenderItem::Mesh(batch) => {
-                let texture = draw_texture_for_mesh(&batch.mesh)?;
+                let texture = draw_texture_for_mesh(&batch.mesh);
                 draws.push(append_mesh_draw(
                     &mut vertices,
                     &mut indices,
@@ -2151,37 +2213,33 @@ mod tests {
     }
 
     #[test]
-    fn draw_texture_for_mesh_supports_only_known_native_textures() {
+    fn draw_texture_for_mesh_routes_epaint_texture_ids() {
         let mut solid = crate::Mesh::default();
-        assert!(matches!(
+        assert_eq!(
             crate::draw_texture_for_mesh(&solid),
-            Ok(crate::DrawTexture::Solid)
-        ));
+            crate::DrawTexture::Solid
+        );
 
         solid.texture_id = Some(epaint::TextureId::Managed(0));
-        assert!(matches!(
+        assert_eq!(
             crate::draw_texture_for_mesh(&solid),
-            Ok(crate::DrawTexture::Solid)
-        ));
+            crate::DrawTexture::Solid
+        );
 
-        let mut unsupported = crate::Mesh {
+        let mut registered = crate::Mesh {
             texture_id: Some(epaint::TextureId::Managed(1)),
             ..crate::Mesh::default()
         };
-        assert!(matches!(
-            crate::draw_texture_for_mesh(&unsupported),
-            Err(RendererError::UnsupportedTexture(
-                epaint::TextureId::Managed(1)
-            ))
-        ));
+        assert_eq!(
+            crate::draw_texture_for_mesh(&registered),
+            crate::DrawTexture::Registered(epaint::TextureId::Managed(1))
+        );
 
-        unsupported.texture_id = Some(epaint::TextureId::User(7));
-        assert!(matches!(
-            crate::draw_texture_for_mesh(&unsupported),
-            Err(RendererError::UnsupportedTexture(epaint::TextureId::User(
-                7
-            )))
-        ));
+        registered.texture_id = Some(epaint::TextureId::User(7));
+        assert_eq!(
+            crate::draw_texture_for_mesh(&registered),
+            crate::DrawTexture::Registered(epaint::TextureId::User(7))
+        );
     }
 
     #[test]
@@ -2198,31 +2256,31 @@ mod tests {
 
         assert!(matches!(
             crate::draw_texture_for_mesh(&mesh),
-            Ok(crate::DrawTexture::TextAtlas)
+            crate::DrawTexture::TextAtlas
         ));
     }
 
     #[test]
-    fn uploaded_frame_reports_unsupported_epaint_textures() {
-        let unsupported_mesh = Mesh {
+    fn uploaded_frame_routes_registered_epaint_textures() {
+        let registered_mesh = Mesh {
             texture_id: Some(epaint::TextureId::User(42)),
             ..Mesh::default()
         };
         let plan = crate::RenderPlan {
             items: vec![RenderItem::Mesh(crate::MeshBatch {
                 clip: None,
-                mesh: unsupported_mesh,
+                mesh: registered_mesh,
             })],
             ..crate::RenderPlan::default()
         };
 
-        let error = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
-            .expect_err("unsupported epaint textures should be explicit renderer errors");
+        let (uploaded, _, _) = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
+            .expect("registered epaint texture ids should survive upload planning");
 
-        assert!(matches!(
-            error,
-            RendererError::UnsupportedTexture(epaint::TextureId::User(42))
-        ));
+        assert_eq!(
+            uploaded.draws[0].texture,
+            crate::DrawTexture::Registered(epaint::TextureId::User(42))
+        );
     }
 
     #[test]
