@@ -1062,6 +1062,9 @@ impl TextureDescriptor {
         if frame.is_empty() && frame.atlas_delta.is_none() {
             return None;
         }
+        if current.is_none() && frame.atlas_delta.is_none() {
+            return None;
+        }
         let options = frame
             .atlas_delta
             .as_ref()
@@ -1531,6 +1534,20 @@ impl<'window> GpuRenderer<'window> {
             return Ok(());
         }
         self.write_viewport_uniform();
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
+            wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
+                self.surface.configure(&self.device, &self.config);
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                return Err(RendererError::SurfaceFrame("surface validation error"));
+            }
+        };
         let text_paints = plan
             .text_batches
             .iter()
@@ -1549,20 +1566,6 @@ impl<'window> GpuRenderer<'window> {
             RasterizedTextFrame::default()
         };
         let uploaded_frame = self.upload_render_frame(plan, &text_frame)?;
-        let frame = match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(frame)
-            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
-            wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
-                self.surface.configure(&self.device, &self.config);
-                return Ok(());
-            }
-            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
-                return Ok(());
-            }
-            wgpu::CurrentSurfaceTexture::Validation => {
-                return Err(RendererError::SurfaceFrame("surface validation error"));
-            }
-        };
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -3516,6 +3519,30 @@ mod tests {
         assert_eq!(
             text_atlas_upload(None, &frame),
             crate::TextAtlasUpload::Recreate(descriptor)
+        );
+    }
+
+    #[test]
+    fn text_atlas_upload_refuses_initial_empty_atlas_for_text_meshes() {
+        let frame = crate::RasterizedTextFrame {
+            width: 64,
+            height: 32,
+            atlas_delta: None,
+            batches: vec![crate::Mesh {
+                texture_id: Some(epaint::TextureId::Managed(0)),
+                vertices: vec![crate::Vertex {
+                    position: [0.0, 0.0],
+                    uv: [0.25, 0.25],
+                    color: PackedColor::from(Color::rgb(255, 255, 255)).to_epaint_u32(),
+                }],
+                indices: vec![0],
+            }],
+        };
+
+        assert_eq!(
+            text_atlas_upload(None, &frame),
+            crate::TextAtlasUpload::Skip,
+            "the first text-atlas allocation must include pixels; otherwise text meshes sample an empty atlas"
         );
     }
 

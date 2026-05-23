@@ -114,6 +114,10 @@ impl WinitInputTranslator {
         self.viewport
     }
 
+    pub fn set_time_seconds(&mut self, time_seconds: f64) {
+        self.time_seconds = time_seconds;
+    }
+
     pub fn set_viewport(&mut self, viewport: HostViewport) {
         self.viewport = viewport;
     }
@@ -275,6 +279,19 @@ mod tests {
         assert!(!pointer.primary_clicked);
         assert_eq!(pointer.primary_click_count, 0);
         assert_eq!(next.scroll_delta, Point::ZERO);
+    }
+
+    #[test]
+    fn redraw_frames_can_advance_input_time_without_pointer_motion() {
+        let mut input = WinitInputTranslator::new();
+        input.cursor_moved(Point::new(10.0, 12.0), 0.10);
+        let first = input.frame_input();
+        assert_eq!(first.pointer.unwrap().time_seconds, 0.10);
+
+        input.set_time_seconds(0.35);
+        let next = input.frame_input();
+
+        assert_eq!(next.pointer.unwrap().time_seconds, 0.35);
     }
 
     #[test]

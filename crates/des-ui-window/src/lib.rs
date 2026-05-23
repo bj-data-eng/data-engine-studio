@@ -254,9 +254,11 @@ impl<A> NativeShell<A> {
         let Some(window) = self.window.as_ref() else {
             return Ok(());
         };
+        let time_seconds = self.time_seconds();
         let Some(renderer) = self.renderer.as_mut() else {
             return Ok(());
         };
+        self.input.set_time_seconds(time_seconds);
         let input = self.input.frame_input();
         let mut frame = AppFrame::new(self.input.viewport(), input);
         self.app.update(&mut frame);
