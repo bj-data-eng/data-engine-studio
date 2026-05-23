@@ -284,6 +284,10 @@ fn text_rendering_stylesheet() -> StyleSheet {
                 .border_width(1.0)
                 .radius(12.0),
         )
+        .rule(
+            StyleSelector::id("text-aa-size-card"),
+            Style::default().height(Length::Px(348.0)),
+        )
         .viewport_max_width(
             900.0,
             StyleSelector::class("text-aa-card"),
@@ -313,7 +317,7 @@ fn text_rendering_stylesheet() -> StyleSheet {
             StyleSelector::class("text-aa-row"),
             Style::default()
                 .width_fill()
-                .height(Length::Px(14.0))
+                .height(Length::Px(18.0))
                 .flex_direction(des_ui_document::FlexDirection::Row)
                 .align_items(AlignItems::Center)
                 .gap(8.0),
@@ -321,7 +325,7 @@ fn text_rendering_stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-aa-row-label"),
             Style::default()
-                .size(44.0, 14.0)
+                .size(44.0, 16.0)
                 .font_size(9.0)
                 .text_color(Color::rgb(112, 103, 121)),
         )
@@ -329,9 +333,25 @@ fn text_rendering_stylesheet() -> StyleSheet {
             StyleSelector::class("text-aa-sample"),
             Style::default()
                 .width_fill()
-                .height(Length::Px(14.0))
+                .height(Length::Px(18.0))
                 .font_size(12.0)
                 .text_color(Color::rgb(31, 27, 36)),
+        )
+        .rule(
+            StyleSelector::id("text-size-16-row"),
+            Style::default().height(Length::Px(22.0)),
+        )
+        .rule(
+            StyleSelector::id("text-size-20-row"),
+            Style::default().height(Length::Px(29.0)),
+        )
+        .rule(
+            StyleSelector::id("text-size-24-row"),
+            Style::default().height(Length::Px(35.0)),
+        )
+        .rule(
+            StyleSelector::id("text-size-32-row"),
+            Style::default().height(Length::Px(46.0)),
         )
         .rule(
             StyleSelector::id("text-size-9"),
@@ -359,19 +379,19 @@ fn text_rendering_stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::id("text-size-16"),
-            Style::default().font_size(16.0),
+            Style::default().height(Length::Px(22.0)).font_size(16.0),
         )
         .rule(
             StyleSelector::id("text-size-20"),
-            Style::default().font_size(20.0),
+            Style::default().height(Length::Px(29.0)).font_size(20.0),
         )
         .rule(
             StyleSelector::id("text-size-24"),
-            Style::default().font_size(24.0),
+            Style::default().height(Length::Px(35.0)).font_size(24.0),
         )
         .rule(
             StyleSelector::id("text-size-32"),
-            Style::default().font_size(32.0),
+            Style::default().height(Length::Px(46.0)).font_size(32.0),
         )
         .rule(
             StyleSelector::class("contrast-row"),
@@ -606,6 +626,22 @@ mod tests {
                 .iter()
                 .any(|text| text.element_id.as_str() == "clip-sample")
         );
+
+        let document = app
+            .last_output()
+            .expect("text rendering demo should retain its latest document output");
+        let size_card = document
+            .layout
+            .find("text-aa-size-card")
+            .expect("size ladder card should be present");
+        let largest_size_row = document
+            .layout
+            .find("text-size-32-row")
+            .expect("largest size row should be present");
+        assert!(
+            largest_size_row.rect.bottom() <= size_card.rect.bottom(),
+            "the largest size specimen row should stay inside the size ladder card"
+        );
     }
 
     #[test]
@@ -623,6 +659,20 @@ mod tests {
                 chrome.element_id.as_str() == "text-aa-board" && chrome.max_scroll > 0.0
             }),
             "the specimen board should expose a vertical scrollbar when cards wrap into a tall column"
+        );
+
+        let size_card = output
+            .layout
+            .find("text-aa-size-card")
+            .expect("size ladder card should be present");
+        let next_card = output
+            .layout
+            .find("text-aa-contrast-card")
+            .expect("following contrast card should be present");
+
+        assert!(
+            size_card.rect.bottom() <= next_card.rect.origin.y,
+            "wrapped specimen cards should stack after the full size ladder height"
         );
     }
 }
