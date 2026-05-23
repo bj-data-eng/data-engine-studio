@@ -301,6 +301,7 @@ pub enum RendererError {
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
     UnsupportedTexture(epaint::TextureId),
+    TextMeshCountMismatch { expected: usize, actual: usize },
     SurfaceFrame(&'static str),
 }
 
@@ -314,6 +315,10 @@ impl fmt::Display for RendererError {
             Self::UnsupportedTexture(texture_id) => {
                 write!(f, "unsupported native epaint texture id: {texture_id:?}")
             }
+            Self::TextMeshCountMismatch { expected, actual } => write!(
+                f,
+                "native text mesh count mismatch: expected {expected}, got {actual}"
+            ),
             Self::SurfaceFrame(error) => write!(f, "failed to render surface frame: {error}"),
         }
     }
@@ -1352,6 +1357,17 @@ fn build_uploaded_frame(
     plan: &RenderPlan,
     frame: &RasterizedTextFrame,
 ) -> Result<(UploadedFrame, Vec<Vertex>, Vec<u32>), RendererError> {
+    let expected_text_meshes = plan
+        .items
+        .iter()
+        .filter(|item| matches!(item, RenderItem::Text(_)))
+        .count();
+    if frame.batches.len() != expected_text_meshes {
+        return Err(RendererError::TextMeshCountMismatch {
+            expected: expected_text_meshes,
+            actual: frame.batches.len(),
+        });
+    }
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
     let mut draws = Vec::new();
@@ -2039,6 +2055,39 @@ mod tests {
         assert!(matches!(
             error,
             RendererError::UnsupportedTexture(epaint::TextureId::User(42))
+        ));
+    }
+
+    #[test]
+    fn uploaded_frame_requires_one_text_mesh_per_text_item() {
+        let plan = crate::RenderPlan {
+            items: vec![RenderItem::Text(crate::TextBatch {
+                clip: None,
+                text: TextPaint {
+                    element_id: ElementId::new("label"),
+                    rect: Rect::new(0.0, 0.0, 100.0, 24.0),
+                    text: "Missing mesh".into(),
+                    color: Color::rgb(1, 2, 3),
+                    font_size: 12.0,
+                    wrap_width: 100.0,
+                    wrap_mode: TextWrapMode::Extend,
+                    max_lines: None,
+                    line_height: None,
+                    selection: None,
+                },
+            })],
+            ..crate::RenderPlan::default()
+        };
+
+        let error = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
+            .expect_err("text draw items must have matching epaint text meshes");
+
+        assert!(matches!(
+            error,
+            RendererError::TextMeshCountMismatch {
+                expected: 1,
+                actual: 0
+            }
         ));
     }
 
