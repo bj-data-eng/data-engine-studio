@@ -297,8 +297,9 @@ impl PrimitivePlanner {
         let options = epaint::TessellationOptions::from(self.options);
         let mut tessellator =
             epaint::Tessellator::new(self.pixels_per_point, options, [1, 1], Vec::new());
+        let mut clip_stack = Vec::new();
         for command in &display_list.commands {
-            append_primitive_command(&mut primitives, command, &mut tessellator);
+            append_primitive_command(&mut primitives, command, &mut tessellator, &mut clip_stack);
         }
         primitives
     }
@@ -412,17 +413,24 @@ fn append_primitive_command(
     primitives: &mut PrimitiveList,
     command: &PaintCommand,
     tessellator: &mut epaint::Tessellator,
+    clip_stack: &mut Vec<Rect>,
 ) {
     match command {
-        PaintCommand::PushClip(rect) => primitives.push(PrimitiveCommand::PushClip(*rect)),
-        PaintCommand::PopClip => primitives.push(PrimitiveCommand::PopClip),
+        PaintCommand::PushClip(rect) => {
+            primitives.push(PrimitiveCommand::PushClip(*rect));
+            clip_stack.push(*rect);
+        }
+        PaintCommand::PopClip => {
+            primitives.push(PrimitiveCommand::PopClip);
+            clip_stack.pop();
+        }
         PaintCommand::Text(command) => {
             primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Text(
                 command.clone(),
             )));
         }
         command => {
-            if let Some(primitive) = tessellate_command(command, tessellator) {
+            if let Some(primitive) = tessellate_command(command, tessellator, clip_stack) {
                 primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Mesh(primitive)));
             }
         }
@@ -432,16 +440,29 @@ fn append_primitive_command(
 fn tessellate_command(
     command: &PaintCommand,
     tessellator: &mut epaint::Tessellator,
+    clip_stack: &[Rect],
 ) -> Option<EpaintMeshPrimitive> {
     let Some((element_id, shape)) = epaint_shape(command) else {
         return None;
     };
     let mut mesh = epaint::Mesh::default();
+    tessellator.set_clip_rect(active_epaint_clip(clip_stack));
     tessellator.tessellate_shape(shape, &mut mesh);
     if mesh.is_empty() {
         return None;
     }
     Some(EpaintMeshPrimitive { element_id, mesh })
+}
+
+fn active_epaint_clip(clip_stack: &[Rect]) -> epaint::Rect {
+    let mut clips = clip_stack.iter().copied();
+    let Some(first) = clips.next() else {
+        return epaint::Rect::EVERYTHING;
+    };
+    match clips.try_fold(first, Rect::intersect) {
+        Some(rect) => to_epaint_rect(rect),
+        None => epaint::Rect::NOTHING,
+    }
 }
 
 fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
@@ -1998,6 +2019,62 @@ mod tests {
             PrimitiveCommand::Draw(RenderPrimitive::Text(_))
         ));
         assert!(matches!(primitives.commands[3], PrimitiveCommand::PopClip));
+    }
+
+    #[test]
+    fn primitive_planner_culls_shapes_outside_active_epaint_clip() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::PushClip(Rect::new(0.0, 0.0, 20.0, 20.0)));
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("outside"),
+            rect: Rect::new(100.0, 100.0, 20.0, 20.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(10, 20, 30),
+        }));
+        list.push(PaintCommand::PopClip);
+
+        let primitives = PrimitivePlanner::new()
+            .with_tessellation_options(RenderTessellationOptions {
+                coarse_tessellation_culling: true,
+                ..RenderTessellationOptions::default()
+            })
+            .plan_display_list(&list);
+
+        assert!(
+            primitives.commands.iter().all(|command| !matches!(
+                command,
+                PrimitiveCommand::Draw(RenderPrimitive::Mesh(_))
+            )),
+            "DES primitive planning should feed the active document clip into epaint so off-clip shapes are culled before GPU upload"
+        );
+    }
+
+    #[test]
+    fn primitive_planner_keeps_shapes_intersecting_active_epaint_clip() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::PushClip(Rect::new(0.0, 0.0, 20.0, 20.0)));
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("intersecting"),
+            rect: Rect::new(10.0, 10.0, 20.0, 20.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(10, 20, 30),
+        }));
+        list.push(PaintCommand::PopClip);
+
+        let primitives = PrimitivePlanner::new()
+            .with_tessellation_options(RenderTessellationOptions {
+                coarse_tessellation_culling: true,
+                ..RenderTessellationOptions::default()
+            })
+            .plan_display_list(&list);
+
+        assert!(
+            primitives
+                .commands
+                .iter()
+                .any(|command| matches!(command, PrimitiveCommand::Draw(RenderPrimitive::Mesh(_)))),
+            "intersecting shapes should still be tessellated and clipped later by the GPU scissor"
+        );
     }
 
     #[test]
