@@ -562,6 +562,9 @@ mod tests {
             .find("native-action")
             .unwrap()
             .rect;
+        let base_output = frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let inactive_swatch_color = fill_rect_color(&base_output, "swatch-b")
+            .expect("inactive swatch should paint before the click");
         let click_position = Point::new(
             action_rect.origin.x + action_rect.size.width * 0.5,
             action_rect.origin.y + action_rect.size.height * 0.5,
@@ -574,6 +577,10 @@ mod tests {
         app.update(&mut click_frame);
 
         assert_eq!(app.clicks(), 1);
+        let click_output = app.last_output().unwrap();
+        assert!(click_output.animating);
+        assert!(click_output.metrics.animation_changed_layout);
+        assert!(click_output.metrics.animation_changed_paint);
         assert!(click_frame.repaint_requested());
         assert!(
             click_frame
@@ -587,6 +594,13 @@ mod tests {
                             && text.text == "Clicks: 1"
                 )),
             "the click frame should render the document state produced by the click"
+        );
+        let frame_output = click_frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let active_swatch_color = fill_rect_color(&frame_output, "swatch-b")
+            .expect("clicked swatch state should paint through the native path");
+        assert_ne!(
+            active_swatch_color, inactive_swatch_color,
+            "click state should animate swatch paint through the native renderer display list"
         );
     }
 
