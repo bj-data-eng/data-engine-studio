@@ -914,7 +914,6 @@ pub struct GpuRenderer<'window> {
     options: RenderOptions,
     pipeline: wgpu::RenderPipeline,
     texture_bind_group_layout: wgpu::BindGroupLayout,
-    texture_sampler: wgpu::Sampler,
     viewport_buffer: wgpu::Buffer,
     solid_texture: GpuTexture,
     text_rasterizer: RefCell<TextRasterizer>,
@@ -924,7 +923,7 @@ pub struct GpuRenderer<'window> {
 }
 
 struct GpuTextAtlas {
-    size: TextAtlasSize,
+    descriptor: TextAtlasDescriptor,
     gpu: GpuTexture,
 }
 
@@ -941,19 +940,27 @@ struct TextureUpload<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct TextAtlasSize {
+struct TextAtlasDescriptor {
     width: u32,
     height: u32,
+    options: TextureOptions,
 }
 
-impl TextAtlasSize {
-    fn from_frame(frame: &RasterizedTextFrame) -> Option<Self> {
+impl TextAtlasDescriptor {
+    fn from_frame(frame: &RasterizedTextFrame, current: Option<Self>) -> Option<Self> {
         if frame.is_empty() {
             return None;
         }
+        let options = frame
+            .atlas_delta
+            .as_ref()
+            .map(|delta| delta.options)
+            .or_else(|| current.map(|descriptor| descriptor.options))
+            .unwrap_or_default();
         Some(Self {
             width: frame.width,
             height: frame.height,
+            options,
         })
     }
 }
@@ -961,9 +968,9 @@ impl TextAtlasSize {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TextAtlasUpload {
     Skip,
-    Unchanged(TextAtlasSize),
-    Reuse(TextAtlasSize),
-    Recreate(TextAtlasSize),
+    Unchanged(TextAtlasDescriptor),
+    Reuse(TextAtlasDescriptor),
+    Recreate(TextAtlasDescriptor),
 }
 
 #[derive(Default)]
@@ -1025,10 +1032,10 @@ enum FrameBufferSlot {
 }
 
 fn text_atlas_upload(
-    current: Option<TextAtlasSize>,
+    current: Option<TextAtlasDescriptor>,
     frame: &RasterizedTextFrame,
 ) -> TextAtlasUpload {
-    let Some(next) = TextAtlasSize::from_frame(frame) else {
+    let Some(next) = TextAtlasDescriptor::from_frame(frame, current) else {
         return TextAtlasUpload::Skip;
     };
     if current == Some(next) {
@@ -1206,7 +1213,6 @@ impl<'window> GpuRenderer<'window> {
             options,
             pipeline,
             texture_bind_group_layout,
-            texture_sampler,
             viewport_buffer,
             solid_texture,
             text_rasterizer: RefCell::new(TextRasterizer::with_text_options(options.text)),
@@ -1396,13 +1402,13 @@ impl<'window> GpuRenderer<'window> {
     }
 
     fn upload_text_frame(&mut self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
-        let current = self.text_atlas.as_ref().map(|atlas| atlas.size);
+        let current = self.text_atlas.as_ref().map(|atlas| atlas.descriptor);
         match text_atlas_upload(current, frame) {
             TextAtlasUpload::Skip => return None,
             TextAtlasUpload::Unchanged(_) => {}
             TextAtlasUpload::Reuse(_) => {}
-            TextAtlasUpload::Recreate(size) => {
-                self.text_atlas = Some(self.create_text_atlas(size));
+            TextAtlasUpload::Recreate(descriptor) => {
+                self.text_atlas = Some(self.create_text_atlas(descriptor));
             }
         }
         if let Some(delta) = frame.atlas_delta.as_ref() {
@@ -1412,21 +1418,25 @@ impl<'window> GpuRenderer<'window> {
         Some(self.text_atlas.as_ref()?.gpu.bind_group.clone())
     }
 
-    fn create_text_atlas(&self, size: TextAtlasSize) -> GpuTextAtlas {
+    fn create_text_atlas(&self, descriptor: TextAtlasDescriptor) -> GpuTextAtlas {
+        let sampler = self.device.create_sampler(&texture_sampler_descriptor(
+            "des-ui text atlas sampler",
+            descriptor.options,
+        ));
         let gpu = create_rgba_texture(
             &self.device,
             &self.queue,
             &self.texture_bind_group_layout,
-            &self.texture_sampler,
+            &sampler,
             &self.viewport_buffer,
             "des-ui text atlas texture",
             TextureUpload {
-                width: size.width,
-                height: size.height,
+                width: descriptor.width,
+                height: descriptor.height,
                 pixels: &[],
             },
         );
-        GpuTextAtlas { size, gpu }
+        GpuTextAtlas { descriptor, gpu }
     }
 
     fn write_viewport_uniform(&self) {
@@ -2707,32 +2717,78 @@ mod tests {
             atlas_delta: None,
             ..frame_with_delta.clone()
         };
-        let size = crate::TextAtlasSize {
+        let descriptor = crate::TextAtlasDescriptor {
             width: 64,
             height: 128,
+            options: TextureOptions::default(),
         };
 
         assert_eq!(
             text_atlas_upload(None, &frame_with_delta),
-            crate::TextAtlasUpload::Recreate(size)
+            crate::TextAtlasUpload::Recreate(descriptor)
         );
         assert_eq!(
-            text_atlas_upload(Some(size), &frame_without_delta),
-            crate::TextAtlasUpload::Unchanged(size)
+            text_atlas_upload(Some(descriptor), &frame_without_delta),
+            crate::TextAtlasUpload::Unchanged(descriptor)
         );
         assert_eq!(
-            text_atlas_upload(Some(size), &frame_with_delta),
-            crate::TextAtlasUpload::Reuse(size)
+            text_atlas_upload(Some(descriptor), &frame_with_delta),
+            crate::TextAtlasUpload::Reuse(descriptor)
         );
         assert_eq!(
             text_atlas_upload(
-                Some(crate::TextAtlasSize {
+                Some(crate::TextAtlasDescriptor {
                     width: 32,
                     height: 128,
+                    options: TextureOptions::default(),
                 }),
                 &frame_with_delta
             ),
-            crate::TextAtlasUpload::Recreate(size)
+            crate::TextAtlasUpload::Recreate(descriptor)
+        );
+    }
+
+    #[test]
+    fn text_atlas_upload_recreates_when_sampling_contract_changes() {
+        let nearest = TextureOptions {
+            magnification: TextureFilter::Nearest,
+            minification: TextureFilter::Nearest,
+            wrap_mode: TextureWrapMode::ClampToEdge,
+            mipmap_mode: None,
+        };
+        let current = crate::TextAtlasDescriptor {
+            width: 64,
+            height: 64,
+            options: TextureOptions::default(),
+        };
+        let frame = crate::RasterizedTextFrame {
+            width: 64,
+            height: 64,
+            atlas_delta: Some(crate::TextAtlasDelta {
+                pos: None,
+                width: 64,
+                height: 64,
+                options: nearest,
+                pixels: vec![255; 64 * 64 * 4],
+            }),
+            batches: vec![crate::Mesh {
+                texture_id: Some(epaint::TextureId::Managed(0)),
+                vertices: vec![crate::Vertex {
+                    position: [0.0, 0.0],
+                    uv: [0.0, 0.0],
+                    color: PackedColor::from(Color::rgb(255, 255, 255)).to_epaint_u32(),
+                }],
+                indices: vec![0],
+            }],
+        };
+        let next = crate::TextAtlasDescriptor {
+            options: nearest,
+            ..current
+        };
+
+        assert_eq!(
+            text_atlas_upload(Some(current), &frame),
+            crate::TextAtlasUpload::Recreate(next)
         );
     }
 
