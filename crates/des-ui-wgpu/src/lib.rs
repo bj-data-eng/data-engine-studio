@@ -388,6 +388,7 @@ pub enum RendererError {
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
     UnsupportedTexture(epaint::TextureId),
+    UnsupportedPaintAtlasMesh,
     TextMeshCountMismatch { expected: usize, actual: usize },
     SurfaceFrame(&'static str),
 }
@@ -402,6 +403,9 @@ impl fmt::Display for RendererError {
             Self::UnsupportedTexture(texture_id) => {
                 write!(f, "unsupported native epaint texture id: {texture_id:?}")
             }
+            Self::UnsupportedPaintAtlasMesh => f.write_str(
+                "unsupported native paint-atlas mesh: only WHITE_UV managed texture meshes can use the solid texture",
+            ),
             Self::TextMeshCountMismatch { expected, actual } => write!(
                 f,
                 "native text mesh count mismatch: expected {expected}, got {actual}"
@@ -1004,18 +1008,21 @@ enum DrawTexture {
     TextAtlas,
 }
 
-fn draw_texture_for_mesh(mesh: &Mesh) -> Option<DrawTexture> {
+fn draw_texture_for_mesh(mesh: &Mesh) -> Result<DrawTexture, RendererError> {
     match mesh.texture_id {
-        None | Some(epaint::TextureId::Managed(0)) => Some(DrawTexture::Solid),
-        Some(epaint::TextureId::Managed(_)) | Some(epaint::TextureId::User(_)) => None,
+        None | Some(epaint::TextureId::Managed(0)) if mesh_uses_only_white_uv(mesh) => {
+            Ok(DrawTexture::Solid)
+        }
+        None | Some(epaint::TextureId::Managed(0)) => Err(RendererError::UnsupportedPaintAtlasMesh),
+        Some(texture_id) => Err(RendererError::UnsupportedTexture(texture_id)),
     }
 }
 
-fn unsupported_texture_for_mesh(mesh: &Mesh) -> Option<epaint::TextureId> {
-    match mesh.texture_id {
-        Some(epaint::TextureId::Managed(0)) | None => None,
-        Some(texture_id) => Some(texture_id),
-    }
+fn mesh_uses_only_white_uv(mesh: &Mesh) -> bool {
+    let white = epaint::WHITE_UV;
+    mesh.vertices
+        .iter()
+        .all(|vertex| vertex.uv == [white.x, white.y])
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1468,11 +1475,7 @@ fn build_uploaded_frame(
     for item in &plan.items {
         match item {
             RenderItem::Mesh(batch) => {
-                let Some(texture) = draw_texture_for_mesh(&batch.mesh) else {
-                    let texture_id = unsupported_texture_for_mesh(&batch.mesh)
-                        .expect("unsupported native mesh texture");
-                    return Err(RendererError::UnsupportedTexture(texture_id));
-                };
+                let texture = draw_texture_for_mesh(&batch.mesh)?;
                 draws.push(append_mesh_draw(
                     &mut vertices,
                     &mut indices,
@@ -2126,25 +2129,53 @@ mod tests {
     #[test]
     fn draw_texture_for_mesh_supports_only_known_native_textures() {
         let mut solid = crate::Mesh::default();
-        assert_eq!(
+        assert!(matches!(
             crate::draw_texture_for_mesh(&solid),
-            Some(crate::DrawTexture::Solid)
-        );
+            Ok(crate::DrawTexture::Solid)
+        ));
 
         solid.texture_id = Some(epaint::TextureId::Managed(0));
-        assert_eq!(
+        assert!(matches!(
             crate::draw_texture_for_mesh(&solid),
-            Some(crate::DrawTexture::Solid)
-        );
+            Ok(crate::DrawTexture::Solid)
+        ));
 
         let mut unsupported = crate::Mesh {
             texture_id: Some(epaint::TextureId::Managed(1)),
             ..crate::Mesh::default()
         };
-        assert_eq!(crate::draw_texture_for_mesh(&unsupported), None);
+        assert!(matches!(
+            crate::draw_texture_for_mesh(&unsupported),
+            Err(RendererError::UnsupportedTexture(
+                epaint::TextureId::Managed(1)
+            ))
+        ));
 
         unsupported.texture_id = Some(epaint::TextureId::User(7));
-        assert_eq!(crate::draw_texture_for_mesh(&unsupported), None);
+        assert!(matches!(
+            crate::draw_texture_for_mesh(&unsupported),
+            Err(RendererError::UnsupportedTexture(epaint::TextureId::User(
+                7
+            )))
+        ));
+    }
+
+    #[test]
+    fn managed_zero_mesh_requires_white_uv_for_solid_texture() {
+        let mesh = crate::Mesh {
+            texture_id: Some(epaint::TextureId::Managed(0)),
+            vertices: vec![crate::Vertex {
+                position: [0.0, 0.0],
+                uv: [0.25, 0.5],
+                color: PackedColor::from(Color::rgb(255, 255, 255)).to_epaint_u32(),
+            }],
+            indices: vec![0],
+        };
+
+        assert!(matches!(
+            crate::draw_texture_for_mesh(&mesh),
+            Err(RendererError::UnsupportedPaintAtlasMesh)
+        ));
     }
 
     #[test]
@@ -2168,6 +2199,31 @@ mod tests {
             error,
             RendererError::UnsupportedTexture(epaint::TextureId::User(42))
         ));
+    }
+
+    #[test]
+    fn uploaded_frame_reports_managed_zero_paint_atlas_meshes() {
+        let atlas_mesh = Mesh {
+            texture_id: Some(epaint::TextureId::Managed(0)),
+            vertices: vec![crate::Vertex {
+                position: [0.0, 0.0],
+                uv: [0.125, 0.25],
+                color: PackedColor::from(Color::rgb(255, 255, 255)).to_epaint_u32(),
+            }],
+            indices: vec![0],
+        };
+        let plan = crate::RenderPlan {
+            items: vec![RenderItem::Mesh(crate::MeshBatch {
+                clip: None,
+                mesh: atlas_mesh,
+            })],
+            ..crate::RenderPlan::default()
+        };
+
+        let error = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
+            .expect_err("paint atlas UVs should not silently sample the solid texture");
+
+        assert!(matches!(error, RendererError::UnsupportedPaintAtlasMesh));
     }
 
     #[test]
