@@ -4,6 +4,7 @@
 //! useful shell responsibilities of `eframe` without taking on egui semantics.
 
 pub mod demo;
+pub mod text_rendering_demo;
 
 use des_ui_document::{DocumentInput, DocumentOutput};
 use des_ui_render::{DisplayList, plan_paint};
