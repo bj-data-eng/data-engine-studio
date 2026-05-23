@@ -1575,8 +1575,8 @@ mod tests {
     use des_ui_render::{DisplayList, FillRectPaint, PaintCommand, TextPaint, TextSelectionPaint};
 
     use crate::{
-        ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
-        RenderOptions, ScissorRect, TextRasterizer, Vertex, clip_rect_to_scissor,
+        ClearColor, DisplayListRenderer, Mesh, MeshBuilder, PackedColor, PhysicalRenderSize,
+        RenderItem, RenderOptions, ScissorRect, TextRasterizer, Vertex, clip_rect_to_scissor,
         epaint_layout_job, mesh_for_display_list, text_atlas_upload,
     };
 
@@ -2095,6 +2095,62 @@ mod tests {
     }
 
     #[test]
+    fn text_rasterizer_truncates_newline_text_to_one_row_like_epaint() {
+        let text = TextPaint {
+            element_id: ElementId::new("newline-truncated"),
+            rect: Rect::new(24.0, 30.0, 96.0, 24.0),
+            text: "first line\nsecond line should not render".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 96.0,
+            wrap_mode: TextWrapMode::Truncate,
+            max_lines: None,
+            line_height: Some(22.0),
+            selection: None,
+        };
+
+        let rasterized = TextRasterizer::new().rasterize(&text, 1.0);
+        let bounds = mesh_bounds(&rasterized.mesh).expect("truncated text should produce glyphs");
+
+        assert!(
+            bounds.max_y <= text.rect.origin.y + 24.0,
+            "epaint newline truncation should keep native text on one visible row"
+        );
+        assert!(
+            bounds.max_x <= text.rect.right() + 1.0,
+            "epaint newline truncation should also honor the configured wrap width"
+        );
+    }
+
+    #[test]
+    fn text_rasterizer_handles_zero_wrap_width_through_epaint_layout() {
+        let text = TextPaint {
+            element_id: ElementId::new("zero-width"),
+            rect: Rect::new(8.0, 12.0, 0.0, 24.0),
+            text: "a".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 0.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+
+        let job = epaint_layout_job(&text);
+        assert_eq!(
+            job.wrap.max_width, 1.0,
+            "DES clamps zero document text width before handing layout to epaint"
+        );
+
+        let rasterized = TextRasterizer::new().rasterize(&text, 1.0);
+        assert!(
+            !rasterized.mesh.vertices.is_empty(),
+            "epaint should still produce a stable glyph mesh for zero-width document text"
+        );
+    }
+
+    #[test]
     fn text_rasterizer_lays_out_frame_text_against_one_atlas() {
         let first = TextPaint {
             element_id: ElementId::new("first"),
@@ -2375,6 +2431,24 @@ mod tests {
             job.sections[2].format.background,
             epaint::Color32::TRANSPARENT
         );
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    struct MeshBounds {
+        max_x: f32,
+        max_y: f32,
+    }
+
+    fn mesh_bounds(mesh: &Mesh) -> Option<MeshBounds> {
+        let mut vertices = mesh.vertices.iter();
+        let first = vertices.next()?;
+        let mut max_x = first.position[0];
+        let mut max_y = first.position[1];
+        for vertex in vertices {
+            max_x = max_x.max(vertex.position[0]);
+            max_y = max_y.max(vertex.position[1]);
+        }
+        Some(MeshBounds { max_x, max_y })
     }
 
     #[test]
