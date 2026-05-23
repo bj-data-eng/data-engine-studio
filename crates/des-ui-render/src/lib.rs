@@ -366,66 +366,89 @@ fn stroke_rect_meshes(command: &StrokeRectPaint) -> Vec<TriangleMeshPrimitive> {
     } else {
         rounded_rect_points(command.rect, command.radius)
     };
-    stroke_closed_polyline_meshes(
+    joined_stroke_polyline_mesh(
         command.element_id.clone(),
         &points,
         command.width,
         command.color,
+        true,
     )
+    .into_iter()
+    .collect()
 }
 
 fn stroke_path_meshes(command: &StrokePathPaint) -> Vec<TriangleMeshPrimitive> {
     if command.width <= 0.0 || command.points.len() < 2 {
         return Vec::new();
     }
-    if command.closed {
-        return stroke_closed_polyline_meshes(
-            command.element_id.clone(),
-            &command.points,
-            command.width,
-            command.color,
-        );
-    }
-    command
-        .points
-        .windows(2)
-        .filter_map(|points| {
-            stroke_line_mesh(
-                command.element_id.clone(),
-                points[0],
-                points[1],
-                command.width,
-                command.color,
-            )
-        })
-        .collect()
+    joined_stroke_polyline_mesh(
+        command.element_id.clone(),
+        &command.points,
+        command.width,
+        command.color,
+        command.closed,
+    )
+    .into_iter()
+    .collect()
 }
 
-fn stroke_closed_polyline_meshes(
+fn joined_stroke_polyline_mesh(
     element_id: ElementId,
     points: &[Point],
     width: f32,
     color: Color,
-) -> Vec<TriangleMeshPrimitive> {
-    if points.len() < 2 {
-        return Vec::new();
+    closed: bool,
+) -> Option<TriangleMeshPrimitive> {
+    if width <= 0.0 || color.a == 0 || points.len() < 2 {
+        return None;
     }
-    let mut meshes: Vec<_> = points
-        .windows(2)
-        .filter_map(|points| {
-            stroke_line_mesh(element_id.clone(), points[0], points[1], width, color)
-        })
-        .collect();
-    if let Some(mesh) = stroke_line_mesh(
-        element_id,
-        *points.last().expect("checked length"),
-        points[0],
-        width,
-        color,
-    ) {
-        meshes.push(mesh);
+    let half_width = width * 0.5;
+    let mut left = Vec::with_capacity(points.len());
+    let mut right = Vec::with_capacity(points.len());
+
+    for index in 0..points.len() {
+        let previous_index = if index == 0 {
+            if closed { points.len() - 1 } else { 0 }
+        } else {
+            index - 1
+        };
+        let next_index = if index + 1 == points.len() {
+            if closed { 0 } else { points.len() - 1 }
+        } else {
+            index + 1
+        };
+        let incoming = normalized_or(
+            Point::ZERO,
+            sub_points(points[index], points[previous_index]),
+        );
+        let outgoing = normalized_or(Point::ZERO, sub_points(points[next_index], points[index]));
+        let tangent = if point_length(incoming) <= f32::EPSILON {
+            outgoing
+        } else if point_length(outgoing) <= f32::EPSILON {
+            incoming
+        } else {
+            normalized_or(incoming, add_points(incoming, outgoing))
+        };
+        if point_length(tangent) <= f32::EPSILON {
+            return None;
+        }
+        let normal = Point::new(-tangent.y, tangent.x);
+        let reference_direction = if point_length(outgoing) > f32::EPSILON {
+            outgoing
+        } else {
+            incoming
+        };
+        let reference_normal = Point::new(-reference_direction.y, reference_direction.x);
+        let dot = dot_points(normal, reference_normal).abs().max(0.25);
+        let miter = (half_width / dot).min(width * 2.0);
+        left.push(add_points(points[index], scale_point(normal, miter)));
+        right.push(sub_points(points[index], scale_point(normal, miter)));
     }
-    meshes
+
+    let mut outline = Vec::with_capacity(points.len() * 2);
+    outline.extend(left);
+    outline.extend(right.into_iter().rev());
+    fill_polygon_mesh(element_id, outline, color)
 }
 
 fn stroke_line_mesh(
@@ -435,25 +458,7 @@ fn stroke_line_mesh(
     width: f32,
     color: Color,
 ) -> Option<TriangleMeshPrimitive> {
-    if width <= 0.0 || color.a == 0 {
-        return None;
-    }
-    let vector = sub_points(to, from);
-    let length = point_length(vector);
-    if length <= f32::EPSILON {
-        return None;
-    }
-    let normal = scale_point(Point::new(-vector.y, vector.x), width * 0.5 / length);
-    fill_polygon_mesh(
-        element_id,
-        vec![
-            add_points(from, normal),
-            add_points(to, normal),
-            sub_points(to, normal),
-            sub_points(from, normal),
-        ],
-        color,
-    )
+    joined_stroke_polyline_mesh(element_id, &[from, to], width, color, false)
 }
 
 fn fill_circle_mesh(command: &FillCirclePaint) -> Option<TriangleMeshPrimitive> {
@@ -1813,6 +1818,64 @@ mod tests {
     }
 
     #[test]
+    fn open_stroke_path_uses_one_joined_antialiased_mesh() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::StrokePath(StrokePathPaint {
+            element_id: ElementId::new("joined"),
+            points: vec![
+                Point::new(0.0, 0.0),
+                Point::new(20.0, 0.0),
+                Point::new(20.0, 20.0),
+            ],
+            width: 4.0,
+            color: Color::rgba(40, 50, 60, 230),
+            closed: false,
+        }));
+
+        let primitives = plan_primitives(&list);
+
+        assert_eq!(
+            primitives.commands.len(),
+            1,
+            "a joined stroke path should not emit one mesh per segment"
+        );
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected joined stroke mesh");
+        };
+        assert_eq!(mesh.element_id.as_str(), "joined");
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 230));
+    }
+
+    #[test]
+    fn stroked_rect_uses_joined_border_meshes() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::StrokeRect(StrokeRectPaint {
+            element_id: ElementId::new("border"),
+            rect: Rect::new(0.0, 0.0, 40.0, 24.0),
+            radius: CornerRadii::ZERO,
+            width: 2.0,
+            color: Color::rgb(1, 2, 3),
+        }));
+
+        let primitives = plan_primitives(&list);
+
+        assert_eq!(
+            primitives.commands.len(),
+            1,
+            "a rectangular border should be one joined closed stroke mesh"
+        );
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected joined border mesh");
+        };
+        assert_eq!(mesh.element_id.as_str(), "border");
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 255));
+    }
+
+    #[test]
     fn rounded_rect_antialiasing_preserves_curved_edge_coverage() {
         let mut list = DisplayList::new();
         list.push(PaintCommand::FillRect(FillRectPaint {
@@ -1829,7 +1892,9 @@ mod tests {
         };
 
         assert!(
-            mesh.vertices.len() >= 2 * rounded_rect_points(Rect::new(0.0, 0.0, 40.0, 24.0), CornerRadii::all(6.0)).len(),
+            mesh.vertices.len()
+                >= 2 * rounded_rect_points(Rect::new(0.0, 0.0, 40.0, 24.0), CornerRadii::all(6.0))
+                    .len(),
             "rounded rect should keep its curve samples and add an antialiasing fringe"
         );
         assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
