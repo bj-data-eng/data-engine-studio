@@ -547,7 +547,7 @@ impl PackedColor {
 
 impl From<Color> for PackedColor {
     fn from(color: Color) -> Self {
-        Self([color.r, color.g, color.b, color.a])
+        Self(epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a).to_array())
     }
 }
 
@@ -1572,8 +1572,31 @@ mod tests {
     #[test]
     fn packed_color_preserves_rgba_channel_order() {
         let color = PackedColor::from(Color::rgba(10, 20, 30, 40));
-        assert_eq!(color.to_array(), [10, 20, 30, 40]);
-        assert_eq!(color.to_epaint_u32(), 0x281e_140a);
+        let expected = epaint::Color32::from_rgba_unmultiplied(10, 20, 30, 40).to_array();
+
+        assert_eq!(color.to_array(), expected);
+        assert_eq!(
+            color.to_epaint_u32(),
+            u32::from(expected[0])
+                | (u32::from(expected[1]) << 8)
+                | (u32::from(expected[2]) << 16)
+                | (u32::from(expected[3]) << 24)
+        );
+    }
+
+    #[test]
+    fn packed_color_from_document_color_uses_epaint_premultiplied_alpha() {
+        let color = PackedColor::from(Color::rgba(120, 80, 40, 128));
+
+        assert_eq!(
+            color.to_array(),
+            epaint::Color32::from_rgba_unmultiplied(120, 80, 40, 128).to_array()
+        );
+        assert_ne!(
+            color.to_array(),
+            [120, 80, 40, 128],
+            "epaint vertices store premultiplied color, not straight RGBA"
+        );
     }
 
     #[test]
