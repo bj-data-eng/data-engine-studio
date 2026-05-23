@@ -10,14 +10,7 @@ use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
     RenderPrimitive, TextPaint, plan_primitives,
 };
-use std::{
-    cell::RefCell,
-    collections::hash_map::DefaultHasher,
-    error, fmt,
-    hash::{Hash, Hasher},
-    mem,
-    ops::Range,
-};
+use std::{cell::RefCell, error, fmt, mem, ops::Range};
 
 const TEXTURED_SHADER: &str = r#"
 struct Viewport {
@@ -296,22 +289,22 @@ pub struct RasterizedText {
 pub struct RasterizedTextFrame {
     pub width: u32,
     pub height: u32,
-    pub pixels: Vec<u8>,
+    pub atlas_delta: Option<TextAtlasDelta>,
     pub batches: Vec<Mesh>,
 }
 
 impl RasterizedTextFrame {
     pub fn is_empty(&self) -> bool {
-        self.batches.iter().all(Mesh::is_empty) || self.pixels.is_empty()
+        self.batches.iter().all(Mesh::is_empty)
     }
+}
 
-    fn pixel_fingerprint(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.width.hash(&mut hasher);
-        self.height.hash(&mut hasher);
-        self.pixels.hash(&mut hasher);
-        hasher.finish()
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextAtlasDelta {
+    pub pos: Option<[u32; 2]>,
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
 }
 
 pub struct TextRasterizer {
@@ -333,7 +326,10 @@ impl TextRasterizer {
         RasterizedText {
             width: frame.width,
             height: frame.height,
-            pixels: frame.pixels,
+            pixels: frame
+                .atlas_delta
+                .as_ref()
+                .map_or_else(Vec::new, |delta| delta.pixels.clone()),
             mesh: frame.batches.into_iter().next().unwrap_or_default(),
         }
     }
@@ -374,19 +370,16 @@ impl TextRasterizer {
                 Mesh::from_epaint_mesh(&mesh)
             })
             .collect();
-        let image = self.fonts.image();
-        let width = image.size[0] as u32;
-        let height = image.size[1] as u32;
-        let pixels = image
-            .pixels
-            .iter()
-            .flat_map(|color| color.to_array())
-            .collect::<Vec<_>>();
+        let [width, height] = self.fonts.font_image_size();
+        let atlas_delta = self
+            .fonts
+            .font_image_delta()
+            .map(text_atlas_delta_from_epaint);
 
         RasterizedTextFrame {
-            width,
-            height,
-            pixels,
+            width: width as u32,
+            height: height as u32,
+            atlas_delta,
             batches,
         }
     }
@@ -490,6 +483,24 @@ fn char_index_to_byte_index(text: &str, char_index: usize) -> usize {
 
 fn to_epaint_color(color: Color) -> epaint::Color32 {
     epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
+}
+
+fn text_atlas_delta_from_epaint(delta: epaint::ImageDelta) -> TextAtlasDelta {
+    let width = delta.image.width() as u32;
+    let height = delta.image.height() as u32;
+    let pixels = match delta.image {
+        epaint::ImageData::Color(image) => image
+            .pixels
+            .iter()
+            .flat_map(|color| color.to_array())
+            .collect(),
+    };
+    TextAtlasDelta {
+        pos: delta.pos.map(|[x, y]| [x as u32, y as u32]),
+        width,
+        height,
+        pixels,
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -695,7 +706,6 @@ pub struct GpuRenderer<'window> {
 
 struct GpuTextAtlas {
     size: TextAtlasSize,
-    fingerprint: u64,
     gpu: GpuTexture,
 }
 
@@ -733,8 +743,8 @@ impl TextAtlasSize {
 enum TextAtlasUpload {
     Skip,
     Unchanged(TextAtlasSize),
-    Reuse(TextAtlasSize, u64),
-    Recreate(TextAtlasSize, u64),
+    Reuse(TextAtlasSize),
+    Recreate(TextAtlasSize),
 }
 
 #[derive(Default)]
@@ -790,21 +800,19 @@ enum FrameBufferSlot {
 
 fn text_atlas_upload(
     current: Option<TextAtlasSize>,
-    current_fingerprint: Option<u64>,
     frame: &RasterizedTextFrame,
 ) -> TextAtlasUpload {
     let Some(next) = TextAtlasSize::from_frame(frame) else {
         return TextAtlasUpload::Skip;
     };
-    let next_fingerprint = frame.pixel_fingerprint();
     if current == Some(next) {
-        if current_fingerprint == Some(next_fingerprint) {
-            TextAtlasUpload::Unchanged(next)
+        if frame.atlas_delta.is_some() {
+            TextAtlasUpload::Reuse(next)
         } else {
-            TextAtlasUpload::Reuse(next, next_fingerprint)
+            TextAtlasUpload::Unchanged(next)
         }
     } else {
-        TextAtlasUpload::Recreate(next, next_fingerprint)
+        TextAtlasUpload::Recreate(next)
     }
 }
 
@@ -1195,49 +1203,22 @@ impl<'window> GpuRenderer<'window> {
 
     fn upload_text_frame(&mut self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
         let current = self.text_atlas.as_ref().map(|atlas| atlas.size);
-        let current_fingerprint = self.text_atlas.as_ref().map(|atlas| atlas.fingerprint);
-        let (size, fingerprint, write_pixels) =
-            match text_atlas_upload(current, current_fingerprint, frame) {
-                TextAtlasUpload::Skip => return None,
-                TextAtlasUpload::Unchanged(size) => {
-                    let fingerprint = self.text_atlas.as_ref()?.fingerprint;
-                    (size, fingerprint, false)
-                }
-                TextAtlasUpload::Reuse(size, fingerprint) => (size, fingerprint, true),
-                TextAtlasUpload::Recreate(size, fingerprint) => {
-                    self.text_atlas = Some(self.create_text_atlas(size, fingerprint));
-                    (size, fingerprint, true)
-                }
-            };
-        if write_pixels {
-            let atlas = self.text_atlas.as_ref()?;
-            self.queue.write_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture: &atlas.gpu.texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                &frame.pixels,
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(size.width * 4),
-                    rows_per_image: Some(size.height),
-                },
-                wgpu::Extent3d {
-                    width: size.width,
-                    height: size.height,
-                    depth_or_array_layers: 1,
-                },
-            );
-            if let Some(atlas) = self.text_atlas.as_mut() {
-                atlas.fingerprint = fingerprint;
+        match text_atlas_upload(current, frame) {
+            TextAtlasUpload::Skip => return None,
+            TextAtlasUpload::Unchanged(_) => {}
+            TextAtlasUpload::Reuse(_) => {}
+            TextAtlasUpload::Recreate(size) => {
+                self.text_atlas = Some(self.create_text_atlas(size));
             }
+        }
+        if let Some(delta) = frame.atlas_delta.as_ref() {
+            let atlas = self.text_atlas.as_ref()?;
+            write_text_atlas_delta(&self.queue, &atlas.gpu.texture, delta);
         }
         Some(self.text_atlas.as_ref()?.gpu.bind_group.clone())
     }
 
-    fn create_text_atlas(&self, size: TextAtlasSize, fingerprint: u64) -> GpuTextAtlas {
+    fn create_text_atlas(&self, size: TextAtlasSize) -> GpuTextAtlas {
         let gpu = create_rgba_texture(
             &self.device,
             &self.queue,
@@ -1251,11 +1232,7 @@ impl<'window> GpuRenderer<'window> {
                 pixels: &[],
             },
         );
-        GpuTextAtlas {
-            size,
-            fingerprint,
-            gpu,
-        }
+        GpuTextAtlas { size, gpu }
     }
 
     fn write_viewport_uniform(&self) {
@@ -1274,6 +1251,32 @@ fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> Viewpor
         dithering: u32::from(options.dithering),
         predictable_texture_filtering: u32::from(options.predictable_texture_filtering),
     }
+}
+
+fn write_text_atlas_delta(queue: &wgpu::Queue, texture: &wgpu::Texture, delta: &TextAtlasDelta) {
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d {
+                x: delta.pos.map_or(0, |pos| pos[0]),
+                y: delta.pos.map_or(0, |pos| pos[1]),
+                z: 0,
+            },
+            aspect: wgpu::TextureAspect::All,
+        },
+        &delta.pixels,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(delta.width * 4),
+            rows_per_image: Some(delta.height),
+        },
+        wgpu::Extent3d {
+            width: delta.width,
+            height: delta.height,
+            depth_or_array_layers: 1,
+        },
+    );
 }
 
 fn create_rgba_texture(
@@ -2082,9 +2085,13 @@ mod tests {
         assert_eq!(frame.batches.len(), 2);
         assert!(frame.width > 0);
         assert!(frame.height > 0);
+        let delta = frame
+            .atlas_delta
+            .as_ref()
+            .expect("new glyphs should produce an epaint font atlas delta");
         assert_eq!(
-            frame.pixels.len(),
-            frame.width as usize * frame.height as usize * 4
+            delta.pixels.len(),
+            delta.width as usize * delta.height as usize * 4
         );
         assert!(!frame.batches[0].is_empty());
         assert!(!frame.batches[1].is_empty());
@@ -2100,14 +2107,19 @@ mod tests {
     fn text_atlas_upload_reuses_existing_gpu_texture_until_size_changes() {
         let empty = crate::RasterizedTextFrame::default();
         assert_eq!(
-            text_atlas_upload(None, None, &empty),
+            text_atlas_upload(None, &empty),
             crate::TextAtlasUpload::Skip
         );
 
-        let frame = crate::RasterizedTextFrame {
+        let frame_with_delta = crate::RasterizedTextFrame {
             width: 64,
             height: 128,
-            pixels: vec![255; 64 * 128 * 4],
+            atlas_delta: Some(crate::TextAtlasDelta {
+                pos: None,
+                width: 64,
+                height: 128,
+                pixels: vec![255; 64 * 128 * 4],
+            }),
             batches: vec![crate::Mesh {
                 texture_id: Some(epaint::TextureId::Managed(0)),
                 vertices: vec![crate::Vertex {
@@ -2118,23 +2130,26 @@ mod tests {
                 indices: vec![0],
             }],
         };
+        let frame_without_delta = crate::RasterizedTextFrame {
+            atlas_delta: None,
+            ..frame_with_delta.clone()
+        };
         let size = crate::TextAtlasSize {
             width: 64,
             height: 128,
         };
-        let fingerprint = frame.pixel_fingerprint();
 
         assert_eq!(
-            text_atlas_upload(None, None, &frame),
-            crate::TextAtlasUpload::Recreate(size, fingerprint)
+            text_atlas_upload(None, &frame_with_delta),
+            crate::TextAtlasUpload::Recreate(size)
         );
         assert_eq!(
-            text_atlas_upload(Some(size), Some(fingerprint), &frame),
+            text_atlas_upload(Some(size), &frame_without_delta),
             crate::TextAtlasUpload::Unchanged(size)
         );
         assert_eq!(
-            text_atlas_upload(Some(size), Some(fingerprint.wrapping_add(1)), &frame),
-            crate::TextAtlasUpload::Reuse(size, fingerprint)
+            text_atlas_upload(Some(size), &frame_with_delta),
+            crate::TextAtlasUpload::Reuse(size)
         );
         assert_eq!(
             text_atlas_upload(
@@ -2142,11 +2157,33 @@ mod tests {
                     width: 32,
                     height: 128,
                 }),
-                None,
-                &frame
+                &frame_with_delta
             ),
-            crate::TextAtlasUpload::Recreate(size, fingerprint)
+            crate::TextAtlasUpload::Recreate(size)
         );
+    }
+
+    #[test]
+    fn text_atlas_delta_preserves_epaint_partial_patch_origin() {
+        let image = epaint::ColorImage::new(
+            [2, 1],
+            vec![
+                epaint::Color32::from_rgba_premultiplied(10, 20, 30, 40),
+                epaint::Color32::from_rgba_premultiplied(50, 60, 70, 80),
+            ],
+        );
+        let delta = epaint::ImageDelta::partial(
+            [12, 34],
+            image,
+            epaint::textures::TextureOptions::default(),
+        );
+
+        let atlas_delta = crate::text_atlas_delta_from_epaint(delta);
+
+        assert_eq!(atlas_delta.pos, Some([12, 34]));
+        assert_eq!(atlas_delta.width, 2);
+        assert_eq!(atlas_delta.height, 1);
+        assert_eq!(atlas_delta.pixels, vec![10, 20, 30, 40, 50, 60, 70, 80]);
     }
 
     #[test]
