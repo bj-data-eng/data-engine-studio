@@ -650,7 +650,53 @@ pub struct GpuRenderer<'window> {
     viewport_buffer: wgpu::Buffer,
     viewport_bind_group: wgpu::BindGroup,
     text_rasterizer: RefCell<TextRasterizer>,
+    text_atlas: Option<GpuTextAtlas>,
     size: PhysicalRenderSize,
+}
+
+struct GpuTextAtlas {
+    size: TextAtlasSize,
+    texture: wgpu::Texture,
+    bind_group: wgpu::BindGroup,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TextAtlasSize {
+    width: u32,
+    height: u32,
+}
+
+impl TextAtlasSize {
+    fn from_frame(frame: &RasterizedTextFrame) -> Option<Self> {
+        if frame.is_empty() {
+            return None;
+        }
+        Some(Self {
+            width: frame.width,
+            height: frame.height,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TextAtlasUpload {
+    Skip,
+    Reuse(TextAtlasSize),
+    Recreate(TextAtlasSize),
+}
+
+fn text_atlas_upload(
+    current: Option<TextAtlasSize>,
+    frame: &RasterizedTextFrame,
+) -> TextAtlasUpload {
+    let Some(next) = TextAtlasSize::from_frame(frame) else {
+        return TextAtlasUpload::Skip;
+    };
+    if current == Some(next) {
+        TextAtlasUpload::Reuse(next)
+    } else {
+        TextAtlasUpload::Recreate(next)
+    }
 }
 
 impl<'window> GpuRenderer<'window> {
@@ -771,6 +817,7 @@ impl<'window> GpuRenderer<'window> {
             viewport_buffer,
             viewport_bind_group,
             text_rasterizer: RefCell::new(TextRasterizer::new()),
+            text_atlas: None,
             size,
         };
         renderer.write_viewport_uniform();
@@ -908,28 +955,20 @@ impl<'window> GpuRenderer<'window> {
         pass.draw_indexed(0..batch.mesh.indices.len() as u32, 0, 0..1);
     }
 
-    fn upload_text_frame(&self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
-        if frame.is_empty() {
-            return None;
-        }
-        let texture_size = wgpu::Extent3d {
-            width: frame.width,
-            height: frame.height,
-            depth_or_array_layers: 1,
+    fn upload_text_frame(&mut self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
+        let current = self.text_atlas.as_ref().map(|atlas| atlas.size);
+        let size = match text_atlas_upload(current, frame) {
+            TextAtlasUpload::Skip => return None,
+            TextAtlasUpload::Reuse(size) => size,
+            TextAtlasUpload::Recreate(size) => {
+                self.text_atlas = Some(self.create_text_atlas(size));
+                size
+            }
         };
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("des-ui text atlas texture"),
-            size: texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
+        let atlas = self.text_atlas.as_ref()?;
         self.queue.write_texture(
             wgpu::TexelCopyTextureInfo {
-                texture: &texture,
+                texture: &atlas.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -937,13 +976,35 @@ impl<'window> GpuRenderer<'window> {
             &frame.pixels,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(frame.width * 4),
-                rows_per_image: Some(frame.height),
+                bytes_per_row: Some(size.width * 4),
+                rows_per_image: Some(size.height),
             },
-            texture_size,
+            wgpu::Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
         );
+        Some(atlas.bind_group.clone())
+    }
+
+    fn create_text_atlas(&self, size: TextAtlasSize) -> GpuTextAtlas {
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("des-ui text atlas texture"),
+            size: wgpu::Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("des-ui text atlas bind group"),
             layout: &self.text_bind_group_layout,
             entries: &[
@@ -960,7 +1021,12 @@ impl<'window> GpuRenderer<'window> {
                     resource: wgpu::BindingResource::Sampler(&self.text_sampler),
                 },
             ],
-        }))
+        });
+        GpuTextAtlas {
+            size,
+            texture,
+            bind_group,
+        }
     }
 
     fn draw_text_batch<'pass>(
@@ -1219,7 +1285,7 @@ mod tests {
     use crate::{
         ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
         RenderOptions, ScissorRect, TextRasterizer, clip_rect_to_scissor, epaint_layout_job,
-        mesh_for_display_list,
+        mesh_for_display_list, text_atlas_upload,
     };
 
     #[test]
@@ -1444,6 +1510,52 @@ mod tests {
                 .vertices
                 .iter()
                 .any(|vertex| vertex.position[1] >= 54.0)
+        );
+    }
+
+    #[test]
+    fn text_atlas_upload_reuses_existing_gpu_texture_until_size_changes() {
+        let empty = crate::RasterizedTextFrame::default();
+        assert_eq!(
+            text_atlas_upload(None, &empty),
+            crate::TextAtlasUpload::Skip
+        );
+
+        let frame = crate::RasterizedTextFrame {
+            width: 64,
+            height: 128,
+            pixels: vec![255; 64 * 128 * 4],
+            batches: vec![crate::TextMesh {
+                vertices: vec![crate::TextVertex {
+                    position: [0.0, 0.0],
+                    uv: [0.0, 0.0],
+                    color: [255, 255, 255, 255],
+                }],
+                indices: vec![0],
+            }],
+        };
+        let size = crate::TextAtlasSize {
+            width: 64,
+            height: 128,
+        };
+
+        assert_eq!(
+            text_atlas_upload(None, &frame),
+            crate::TextAtlasUpload::Recreate(size)
+        );
+        assert_eq!(
+            text_atlas_upload(Some(size), &frame),
+            crate::TextAtlasUpload::Reuse(size)
+        );
+        assert_eq!(
+            text_atlas_upload(
+                Some(crate::TextAtlasSize {
+                    width: 32,
+                    height: 128,
+                }),
+                &frame
+            ),
+            crate::TextAtlasUpload::Recreate(size)
         );
     }
 
