@@ -642,6 +642,56 @@ fn to_epaint_radius(radius: CornerRadii) -> epaint::CornerRadius {
     }
 }
 
+fn exact_epaint_radius(radius: CornerRadii) -> Option<epaint::CornerRadius> {
+    Some(epaint::CornerRadius {
+        nw: exact_u8(radius.top_left)?,
+        ne: exact_u8(radius.top_right)?,
+        sw: exact_u8(radius.bottom_left)?,
+        se: exact_u8(radius.bottom_right)?,
+    })
+}
+
+fn from_epaint_rect(rect: epaint::Rect) -> Rect {
+    Rect::new(rect.min.x, rect.min.y, rect.width(), rect.height())
+}
+
+fn from_epaint_radius(radius: epaint::CornerRadius) -> CornerRadii {
+    CornerRadii {
+        top_left: radius.nw as f32,
+        top_right: radius.ne as f32,
+        bottom_right: radius.se as f32,
+        bottom_left: radius.sw as f32,
+    }
+}
+
+fn exact_i8(value: f32) -> Option<i8> {
+    if !value.is_finite() {
+        return None;
+    }
+    let rounded = value.round();
+    if (value - rounded).abs() > f32::EPSILON {
+        return None;
+    }
+    if !(i8::MIN as f32..=i8::MAX as f32).contains(&rounded) {
+        return None;
+    }
+    Some(rounded as i8)
+}
+
+fn exact_u8(value: f32) -> Option<u8> {
+    if !value.is_finite() {
+        return None;
+    }
+    let rounded = value.round();
+    if (value - rounded).abs() > f32::EPSILON {
+        return None;
+    }
+    if !(0.0..=u8::MAX as f32).contains(&rounded) {
+        return None;
+    }
+    Some(rounded as u8)
+}
+
 fn to_epaint_color(color: Color) -> epaint::Color32 {
     epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
 }
@@ -1199,6 +1249,10 @@ fn append_shadow_command(
     if shadow.color.a == 0 {
         return;
     }
+    if let Some(command) = epaint_shadow_rect_paint(element_id.clone(), rect, radius, shadow) {
+        list.push(PaintCommand::ShadowRect(command));
+        return;
+    }
     let translated = translate_rect(rect, shadow.offset);
     if shadow.blur <= 0.0 {
         list.push(PaintCommand::FillRect(FillRectPaint {
@@ -1216,6 +1270,33 @@ fn append_shadow_command(
         blur_width: shadow.blur,
         color: shadow.color,
     }));
+}
+
+fn epaint_shadow_rect_paint(
+    element_id: ElementId,
+    rect: Rect,
+    radius: CornerRadii,
+    shadow: Shadow,
+) -> Option<ShadowRectPaint> {
+    let offset_x = exact_i8(shadow.offset.x)?;
+    let offset_y = exact_i8(shadow.offset.y)?;
+    let blur = exact_u8(shadow.blur)?;
+    let spread = exact_u8(shadow.spread)?;
+    let radius = exact_epaint_radius(radius)?;
+    let epaint_shadow = epaint::Shadow {
+        offset: [offset_x, offset_y],
+        blur,
+        spread,
+        color: to_epaint_color(shadow.color),
+    };
+    let shape = epaint_shadow.as_shape(to_epaint_rect(rect), radius);
+    Some(ShadowRectPaint {
+        element_id,
+        rect: from_epaint_rect(shape.rect),
+        radius: from_epaint_radius(shape.corner_radius),
+        blur_width: shape.blur_width,
+        color: shadow.color,
+    })
 }
 
 fn append_arrow_shadow_command(
@@ -1666,17 +1747,18 @@ mod tests {
     #[test]
     fn blurred_rect_shadow_uses_epaint_blur_shape() {
         let mut list = DisplayList::new();
+        let shadow = Shadow {
+            offset: Point::new(2.0, 4.0),
+            blur: 18.0,
+            spread: 3.0,
+            color: Color::rgba(20, 10, 30, 96),
+        };
         append_shadow_command(
             &mut list,
             ElementId::new("card"),
             Rect::new(20.0, 30.0, 80.0, 40.0),
             CornerRadii::all(8.0),
-            Shadow {
-                offset: Point::new(2.0, 4.0),
-                blur: 18.0,
-                spread: 3.0,
-                color: Color::rgba(20, 10, 30, 96),
-            },
+            shadow,
         );
 
         assert_eq!(list.commands.len(), 1);
@@ -1691,6 +1773,20 @@ mod tests {
             panic!("shadow rect should convert to an epaint RectShape");
         };
         assert_eq!(shape.blur_width, 18.0);
+        let expected = epaint::Shadow {
+            offset: [2, 4],
+            blur: 18,
+            spread: 3,
+            color: epaint::Color32::from_rgba_unmultiplied(20, 10, 30, 96),
+        }
+        .as_shape(
+            epaint::Rect::from_min_size(epaint::pos2(20.0, 30.0), epaint::vec2(80.0, 40.0)),
+            epaint::CornerRadius::from(8),
+        );
+        assert_eq!(
+            shape, expected,
+            "integer DES shadows should use epaint's own shadow geometry contract"
+        );
 
         let primitives = plan_primitives(&list);
         assert_eq!(
