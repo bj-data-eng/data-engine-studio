@@ -604,8 +604,7 @@ impl TextRasterizer {
             .zip(galleys)
             .map(|(text, galley)| {
                 let text_shape = epaint_text_shape(text, galley);
-                let mut mesh = epaint::Mesh::default();
-                tessellator.tessellate_text(&text_shape, &mut mesh);
+                let mesh = tessellate_text_shape(&mut tessellator, text_shape);
                 Mesh::from_epaint_mesh(&mesh)
             })
             .collect();
@@ -660,6 +659,27 @@ fn epaint_text_shape(
             epaint::Stroke::new(underline.width.max(0.0), to_epaint_color(underline.color));
     }
     shape
+}
+
+fn tessellate_text_shape(
+    tessellator: &mut epaint::Tessellator,
+    text_shape: epaint::TextShape,
+) -> epaint::Mesh {
+    let primitives = tessellator.tessellate_shapes(vec![epaint::ClippedShape {
+        clip_rect: epaint::Rect::EVERYTHING,
+        shape: epaint::Shape::Text(text_shape),
+    }]);
+    let mut mesh = epaint::Mesh::default();
+    for primitive in primitives {
+        let epaint::Primitive::Mesh(primitive_mesh) = primitive.primitive else {
+            continue;
+        };
+        if mesh.is_empty() {
+            mesh.texture_id = primitive_mesh.texture_id;
+        }
+        mesh.append(primitive_mesh);
+    }
+    mesh
 }
 
 fn epaint_layout_job(text: &TextPaint) -> epaint::text::LayoutJob {
@@ -3013,6 +3033,53 @@ mod tests {
         assert!(
             rotated_bounds.max_y - rotated_bounds.min_y > normal_bounds.max_y - normal_bounds.min_y,
             "native text should pass epaint text angle through to tessellation"
+        );
+    }
+
+    #[test]
+    fn text_rasterizer_uses_epaint_shape_path_for_debug_text_rects() {
+        let text = TextPaint {
+            element_id: ElementId::new("debug-text-rect"),
+            rect: Rect::new(12.0, 18.0, 220.0, 72.0),
+            text: "debug rect".into(),
+            color: Color::rgb(18, 26, 38),
+            override_text_color: None,
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
+        };
+        let mut rasterizer = TextRasterizer::new();
+        let plain = rasterizer.rasterize_with_options(
+            &text,
+            1.0,
+            RenderTextOptions::default(),
+            RenderTessellationOptions::default(),
+        );
+        let debug = rasterizer.rasterize_with_options(
+            &text,
+            1.0,
+            RenderTextOptions::default(),
+            RenderTessellationOptions {
+                debug_paint_text_rects: true,
+                ..RenderTessellationOptions::default()
+            },
+        );
+        assert!(
+            debug.mesh.vertices.len() > plain.mesh.vertices.len(),
+            "debug_paint_text_rects should add epaint's text rect stroke vertices"
+        );
+        assert!(
+            debug.mesh.vertices.iter().any(|vertex| {
+                let [r, g, b, _] = vertex.color_array();
+                g > 100 && r < 100 && b < 100
+            }),
+            "native text should enter epaint through Shape::Text so debug text rects render"
         );
     }
 
