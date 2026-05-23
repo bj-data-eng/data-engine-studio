@@ -115,7 +115,7 @@ var text_sampler: sampler;
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
-    @location(2) color: vec4<f32>,
+    @location(2) color: u32,
 };
 
 struct VertexOutput {
@@ -133,7 +133,7 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
     output.position = vec4<f32>(ndc, 0.0, 1.0);
     output.uv = input.uv;
-    output.color = input.color;
+    output.color = unpack_color(input.color);
     return output;
 }
 
@@ -162,6 +162,15 @@ fn dither_interleaved(rgb: vec3<f32>, levels: f32, frag_coord: vec4<f32>) -> vec
     var noise = interleaved_gradient_noise(frag_coord.xy);
     noise = (noise - 0.5) * 0.95;
     return rgb + noise / (levels - 1.0);
+}
+
+fn unpack_color(color: u32) -> vec4<f32> {
+    return vec4<f32>(
+        f32(color & 255u),
+        f32((color >> 8u) & 255u),
+        f32((color >> 16u) & 255u),
+        f32((color >> 24u) & 255u),
+    ) / 255.0;
 }
 
 @fragment
@@ -337,7 +346,7 @@ pub struct RasterizedText {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
-    pub mesh: TextMesh,
+    pub mesh: Mesh,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -345,12 +354,12 @@ pub struct RasterizedTextFrame {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
-    pub batches: Vec<TextMesh>,
+    pub batches: Vec<Mesh>,
 }
 
 impl RasterizedTextFrame {
     pub fn is_empty(&self) -> bool {
-        self.batches.iter().all(TextMesh::is_empty) || self.pixels.is_empty()
+        self.batches.iter().all(Mesh::is_empty) || self.pixels.is_empty()
     }
 
     fn pixel_fingerprint(&self) -> u64 {
@@ -359,54 +368,6 @@ impl RasterizedTextFrame {
         self.height.hash(&mut hasher);
         self.pixels.hash(&mut hasher);
         hasher.finish()
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TextMesh {
-    pub vertices: Vec<TextVertex>,
-    pub indices: Vec<u32>,
-}
-
-impl TextMesh {
-    pub fn is_empty(&self) -> bool {
-        self.indices.is_empty()
-    }
-
-    pub fn from_epaint_mesh(mesh: &epaint::Mesh) -> Self {
-        Self {
-            vertices: mesh
-                .vertices
-                .iter()
-                .map(|vertex| TextVertex {
-                    position: [vertex.pos.x, vertex.pos.y],
-                    uv: [vertex.uv.x, vertex.uv.y],
-                    color: vertex.color.to_array(),
-                })
-                .collect(),
-            indices: mesh.indices.clone(),
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct TextVertex {
-    pub position: [f32; 2],
-    pub uv: [f32; 2],
-    pub color: [u8; 4],
-}
-
-impl TextVertex {
-    pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
-        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Unorm8x4];
-
-    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBUTES,
-        }
     }
 }
 
@@ -467,7 +428,7 @@ impl TextRasterizer {
                 );
                 let mut mesh = epaint::Mesh::default();
                 tessellator.tessellate_text(&text_shape, &mut mesh);
-                TextMesh::from_epaint_mesh(&mesh)
+                Mesh::from_epaint_mesh(&mesh)
             })
             .collect();
         let image = self.fonts.image();
@@ -704,6 +665,19 @@ impl Mesh {
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
     }
+
+    pub fn from_epaint_mesh(mesh: &epaint::Mesh) -> Self {
+        Self {
+            texture_id: Some(mesh.texture_id),
+            vertices: mesh
+                .vertices
+                .iter()
+                .copied()
+                .map(Vertex::from_epaint)
+                .collect(),
+            indices: mesh.indices.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -745,14 +719,8 @@ impl MeshBuilder {
             self.mesh.texture_id = Some(primitive.mesh.texture_id);
         }
         let base = self.mesh.vertices.len() as u32;
-        self.mesh.vertices.extend(
-            primitive
-                .mesh
-                .vertices
-                .iter()
-                .copied()
-                .map(Vertex::from_epaint),
-        );
+        let mesh = Mesh::from_epaint_mesh(&primitive.mesh);
+        self.mesh.vertices.extend(mesh.vertices);
         self.mesh
             .indices
             .extend(primitive.mesh.indices.iter().map(|index| base + *index));
@@ -1526,7 +1494,7 @@ fn create_text_pipeline(
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[TextVertex::layout()],
+            buffers: &[Vertex::layout()],
         },
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: None,
@@ -2035,6 +2003,17 @@ mod tests {
         assert!(rasterized.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
         assert!(!rasterized.mesh.vertices.is_empty());
         assert!(!rasterized.mesh.indices.is_empty());
+        assert_eq!(
+            rasterized.mesh.texture_id,
+            Some(epaint::TextureId::Managed(0))
+        );
+        assert!(
+            rasterized
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color_array()[3] > 0)
+        );
         assert!(
             rasterized
                 .mesh
@@ -2102,11 +2081,12 @@ mod tests {
             width: 64,
             height: 128,
             pixels: vec![255; 64 * 128 * 4],
-            batches: vec![crate::TextMesh {
-                vertices: vec![crate::TextVertex {
+            batches: vec![crate::Mesh {
+                texture_id: Some(epaint::TextureId::Managed(0)),
+                vertices: vec![crate::Vertex {
                     position: [0.0, 0.0],
                     uv: [0.0, 0.0],
-                    color: [255, 255, 255, 255],
+                    color: PackedColor::from(Color::rgb(255, 255, 255)).to_epaint_u32(),
                 }],
                 indices: vec![0],
             }],
