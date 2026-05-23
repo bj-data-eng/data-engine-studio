@@ -214,19 +214,7 @@ pub enum JustifyContent {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Overflow {
     Visible,
-    Clip,
-    Hidden,
     Scroll,
-}
-
-impl Overflow {
-    pub fn clips_contents(self) -> bool {
-        matches!(self, Self::Clip | Self::Hidden | Self::Scroll)
-    }
-
-    pub fn is_scrollable(self) -> bool {
-        matches!(self, Self::Scroll)
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

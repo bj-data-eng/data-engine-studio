@@ -9,12 +9,7 @@ members = [
     "crates/des-ui-document",
     "crates/des-ui-egui",
     "crates/des-ui-lab",
-    "crates/des-ui-render",
-    "crates/des-ui-text",
-    "crates/des-ui-window",
-    "crates/des-ui-wgpu",
     "crates/des-ui-widgets",
-    "crates/des-ui-winit",
 ]
 exclude = ["crates/des-apple-dispatch"]
 resolver = "3"
@@ -34,73 +29,14 @@ des-template = { path = "crates/des-template" }
 des-ui-document = { path = "crates/des-ui-document" }
 des-ui-egui = { path = "crates/des-ui-egui" }
 des-ui-lab = { path = "crates/des-ui-lab" }
-des-ui-render = { path = "crates/des-ui-render" }
-des-ui-text = { path = "crates/des-ui-text" }
-des-ui-window = { path = "crates/des-ui-window" }
-des-ui-wgpu = { path = "crates/des-ui-wgpu" }
 des-ui-widgets = { path = "crates/des-ui-widgets" }
-des-ui-winit = { path = "crates/des-ui-winit" }
-bytemuck = { version = "=1.25.0", features = ["derive"] }
 eframe = { version = "=0.34.1", default-features = true }
 egui = "=0.34.1"
-epaint = "=0.34.1"
 iconflow = { version = "=1.0.0", default-features = false }
 layout-rs = "=0.1.3"
-fontique = { version = "=0.9.0", default-features = false, features = ["libm"] }
-parley = { version = "=0.9.0", default-features = false, features = ["libm"] }
 filetime = "=0.2.29"
-pollster = "=0.4.0"
 pyo3 = { version = "=0.27.2", features = ["extension-module", "abi3-py311"] }
 serde = { version = "=1.0.228", features = ["derive"] }
-wgpu = "=29.0.1"
-winit = "=0.30.13"
 
 [patch.crates-io]
-bitflags = { path = "vendor/text-stack/bitflags-2.11.1" }
-bytemuck = { path = "vendor/text-stack/bytemuck-1.25.0" }
-bytemuck_derive = { path = "vendor/text-stack/bytemuck_derive-1.10.2" }
-core_maths = { path = "vendor/text-stack/core_maths-0.1.1" }
 dispatch = { path = "crates/des-apple-dispatch" }
-displaydoc = { path = "vendor/text-stack/displaydoc-0.2.5" }
-foldhash = { path = "vendor/text-stack/foldhash-0.2.0" }
-font-types = { path = "vendor/text-stack/font-types-0.11.3" }
-fontique = { path = "vendor/text-stack/fontique-0.9.0" }
-harfrust = { path = "vendor/text-stack/harfrust-0.6.0" }
-hashbrown = { path = "vendor/text-stack/hashbrown-0.17.0" }
-icu_collections = { path = "vendor/text-stack/icu_collections-2.2.0" }
-icu_locale = { path = "vendor/text-stack/icu_locale-2.2.0" }
-icu_locale_core = { path = "vendor/text-stack/icu_locale_core-2.2.0" }
-icu_locale_data = { path = "vendor/text-stack/icu_locale_data-2.2.0" }
-icu_normalizer = { path = "vendor/text-stack/icu_normalizer-2.2.0" }
-icu_normalizer_data = { path = "vendor/text-stack/icu_normalizer_data-2.2.0" }
-icu_properties = { path = "vendor/text-stack/icu_properties-2.2.0" }
-icu_properties_data = { path = "vendor/text-stack/icu_properties_data-2.2.0" }
-icu_provider = { path = "vendor/text-stack/icu_provider-2.2.0" }
-icu_segmenter = { path = "vendor/text-stack/icu_segmenter-2.2.0" }
-icu_segmenter_data = { path = "vendor/text-stack/icu_segmenter_data-2.2.0" }
-libm = { path = "vendor/text-stack/libm-0.2.16" }
-linebender_resource_handle = { path = "vendor/text-stack/linebender_resource_handle-0.1.1" }
-litemap = { path = "vendor/text-stack/litemap-0.8.2" }
-parlance = { path = "vendor/text-stack/parlance-0.1.0" }
-parley = { path = "vendor/text-stack/parley-0.9.0" }
-parley_data = { path = "vendor/text-stack/parley_data-0.9.0" }
-potential_utf = { path = "vendor/text-stack/potential_utf-0.1.5" }
-proc-macro2 = { path = "vendor/text-stack/proc-macro2-1.0.106" }
-quote = { path = "vendor/text-stack/quote-1.0.45" }
-read-fonts = { path = "vendor/text-stack/read-fonts-0.39.2" }
-skrifa = { path = "vendor/text-stack/skrifa-0.42.1" }
-smallvec = { path = "vendor/text-stack/smallvec-1.15.1" }
-stable_deref_trait = { path = "vendor/text-stack/stable_deref_trait-1.2.1" }
-syn = { path = "vendor/text-stack/syn-2.0.117" }
-synstructure = { path = "vendor/text-stack/synstructure-0.13.2" }
-tinystr = { path = "vendor/text-stack/tinystr-0.8.3" }
-unicode-ident = { path = "vendor/text-stack/unicode-ident-1.0.24" }
-utf8_iter = { path = "vendor/text-stack/utf8_iter-1.0.4" }
-writeable = { path = "vendor/text-stack/writeable-0.6.3" }
-yoke = { path = "vendor/text-stack/yoke-0.8.2" }
-yoke-derive = { path = "vendor/text-stack/yoke-derive-0.8.2" }
-zerofrom = { path = "vendor/text-stack/zerofrom-0.1.7" }
-zerofrom-derive = { path = "vendor/text-stack/zerofrom-derive-0.1.7" }
-zerotrie = { path = "vendor/text-stack/zerotrie-0.2.4" }
-zerovec = { path = "vendor/text-stack/zerovec-0.11.6" }
-zerovec-derive = { path = "vendor/text-stack/zerovec-derive-0.11.3" }
