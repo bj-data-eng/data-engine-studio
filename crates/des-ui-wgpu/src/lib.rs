@@ -695,6 +695,7 @@ struct ViewportUniform {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Mesh {
+    pub texture_id: Option<epaint::TextureId>,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
 }
@@ -735,7 +736,14 @@ impl MeshBuilder {
         self.mesh
     }
 
+    fn texture_id(&self) -> Option<epaint::TextureId> {
+        self.mesh.texture_id
+    }
+
     fn push_mesh(&mut self, primitive: &EpaintMeshPrimitive) {
+        if self.mesh.texture_id.is_none() {
+            self.mesh.texture_id = Some(primitive.mesh.texture_id);
+        }
         let base = self.mesh.vertices.len() as u32;
         self.mesh.vertices.extend(
             primitive
@@ -1624,8 +1632,15 @@ impl RenderPlanBuilder {
                     self.plan.items.push(RenderItem::Text(batch.clone()));
                     self.plan.text_batches.push(batch);
                 }
-                _ => {
+                PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) => {
                     if !self.current_clip_empty {
+                        if self
+                            .current_mesh
+                            .texture_id()
+                            .is_some_and(|texture_id| texture_id != mesh.mesh.texture_id)
+                        {
+                            self.flush();
+                        }
                         self.current_mesh.push_command(command);
                     }
                 }
@@ -1809,9 +1824,49 @@ mod tests {
         ));
 
         let mesh = builder.finish();
+        assert_eq!(mesh.texture_id, Some(epaint::TextureId::Managed(0)));
         assert_eq!(mesh.vertices[0].position, [4.0, 8.0]);
         assert_eq!(mesh.vertices[0].uv, [0.25, 0.75]);
         assert_eq!(mesh.vertices[0].color_array(), color.to_array());
+    }
+
+    #[test]
+    fn render_plan_splits_epaint_meshes_by_texture_id() {
+        fn primitive(texture_id: epaint::TextureId) -> des_ui_render::PrimitiveCommand {
+            let mut mesh = epaint::Mesh {
+                texture_id,
+                ..epaint::Mesh::default()
+            };
+            mesh.vertices.push(epaint::Vertex {
+                pos: epaint::pos2(0.0, 0.0),
+                uv: epaint::pos2(0.0, 0.0),
+                color: epaint::Color32::WHITE,
+            });
+            mesh.indices.push(0);
+            des_ui_render::PrimitiveCommand::Draw(des_ui_render::RenderPrimitive::Mesh(
+                des_ui_render::EpaintMeshPrimitive {
+                    element_id: ElementId::new("textured"),
+                    mesh,
+                },
+            ))
+        }
+
+        let mut primitives = des_ui_render::PrimitiveList::new();
+        primitives.push(primitive(epaint::TextureId::Managed(0)));
+        primitives.push(primitive(epaint::TextureId::Managed(1)));
+        let mut builder = crate::RenderPlanBuilder::new(RenderOptions::default());
+        builder.push_primitives(&primitives);
+
+        let plan = builder.finish();
+        assert_eq!(plan.batches.len(), 2);
+        assert_eq!(
+            plan.batches[0].mesh.texture_id,
+            Some(epaint::TextureId::Managed(0))
+        );
+        assert_eq!(
+            plan.batches[1].mesh.texture_id,
+            Some(epaint::TextureId::Managed(1))
+        );
     }
 
     #[test]
