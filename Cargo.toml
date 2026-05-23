@@ -26,7 +26,6 @@ license = "MIT"
 repository = "https://github.com/bj-data-eng/data-engine-studio"
 
 [workspace.dependencies]
-ab_glyph = "=0.2.32"
 des-app = { path = "crates/des-app" }
 des-core = { path = "crates/des-core" }
 des-graph-egui = { path = "crates/des-graph-egui" }

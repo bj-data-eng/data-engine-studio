@@ -1077,7 +1077,8 @@ mod tests {
 
     use crate::{
         ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
-        RenderOptions, ScissorRect, TextRasterizer, clip_rect_to_scissor, mesh_for_display_list,
+        RenderOptions, ScissorRect, TextRasterizer, clip_rect_to_scissor, epaint_layout_job,
+        mesh_for_display_list,
     };
 
     #[test]
@@ -1218,6 +1219,38 @@ mod tests {
                 .iter()
                 .any(|vertex| vertex.position[0] >= 12.0 && vertex.position[1] >= 18.0)
         );
+    }
+
+    #[test]
+    fn text_layout_job_maps_document_wrap_modes_to_epaint() {
+        let mut wrap = TextPaint {
+            element_id: ElementId::new("wrap"),
+            rect: Rect::new(0.0, 0.0, 100.0, 40.0),
+            text: "alpha beta gamma".into(),
+            color: Color::rgb(1, 2, 3),
+            font_size: 14.0,
+            wrap_width: 80.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: Some(3),
+            line_height: Some(18.0),
+            selection: None,
+        };
+
+        let wrap_job = epaint_layout_job(&wrap);
+        assert_eq!(wrap_job.wrap.max_width, 80.0);
+        assert_eq!(wrap_job.wrap.max_rows, 3);
+        assert!(!wrap_job.wrap.break_anywhere);
+        assert_eq!(wrap_job.sections[0].format.line_height, Some(18.0));
+
+        wrap.wrap_mode = TextWrapMode::Truncate;
+        wrap.max_lines = None;
+        let truncate_job = epaint_layout_job(&wrap);
+        assert_eq!(truncate_job.wrap.max_rows, 1);
+        assert!(truncate_job.wrap.break_anywhere);
+
+        wrap.wrap_mode = TextWrapMode::Extend;
+        let extend_job = epaint_layout_job(&wrap);
+        assert_eq!(extend_job.wrap.max_width, f32::INFINITY);
     }
 
     #[test]
