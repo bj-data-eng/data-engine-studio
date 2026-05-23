@@ -503,6 +503,14 @@ mod tests {
         assert!(frame_output.render_plan.text_batches.len() >= 4);
         assert!(
             frame_output
+                .display_list
+                .commands
+                .iter()
+                .any(|command| matches!(command, PaintCommand::ShadowRect(_))),
+            "native demo should exercise the epaint blurred shadow path"
+        );
+        assert!(
+            frame_output
                 .render_plan
                 .text_batches
                 .iter()

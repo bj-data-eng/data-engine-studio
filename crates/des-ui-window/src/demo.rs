@@ -2,7 +2,7 @@ use crate::{AppFrame, WindowApp};
 use des_ui_document::{
     AlignItems, Color, Document, DocumentEngine, DocumentEventKind, DocumentInput, DocumentOutput,
     Element, ElementStateSelector, FlexDirection, FlexWrap, Glyph, Insets, JustifyContent, Length,
-    Overflow, Size, Style, StyleSelector, StyleSheet, Transition,
+    Overflow, Point, Shadow, Size, Style, StyleSelector, StyleSheet, Transition,
 };
 
 const ACTION_ID: &str = "native-action";
@@ -161,7 +161,13 @@ fn demo_stylesheet() -> StyleSheet {
                 .background(Color::rgb(255, 252, 255))
                 .border(Color::rgb(194, 184, 203))
                 .border_width(1.5)
-                .radius(18.0),
+                .radius(18.0)
+                .shadow(Shadow {
+                    offset: Point::new(0.0, 10.0),
+                    blur: 22.0,
+                    spread: 0.0,
+                    color: Color::rgba(70, 48, 92, 42),
+                }),
         )
         .viewport_max_width(
             720.0,
