@@ -32,6 +32,7 @@ impl DisplayList {
 pub enum PaintCommand {
     PushClip(Rect),
     PopClip,
+    ShadowRect(ShadowRectPaint),
     FillRect(FillRectPaint),
     StrokeRect(StrokeRectPaint),
     StrokeLine(StrokeLinePaint),
@@ -39,6 +40,15 @@ pub enum PaintCommand {
     FillCircle(FillCirclePaint),
     FillPolygon(FillPolygonPaint),
     Text(TextPaint),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShadowRectPaint {
+    pub element_id: ElementId,
+    pub rect: Rect,
+    pub radius: CornerRadii,
+    pub blur_width: f32,
+    pub color: Color,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -361,6 +371,25 @@ fn tessellate_command(
 
 fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
     match command {
+        PaintCommand::ShadowRect(command) => {
+            if command.rect.size.width <= 0.0
+                || command.rect.size.height <= 0.0
+                || command.color.a == 0
+            {
+                return None;
+            }
+            Some((
+                command.element_id.clone(),
+                epaint::Shape::Rect(
+                    epaint::RectShape::filled(
+                        to_epaint_rect(command.rect),
+                        to_epaint_radius(command.radius),
+                        to_epaint_color(command.color),
+                    )
+                    .with_blur_width(command.blur_width.max(0.0)),
+                ),
+            ))
+        }
         PaintCommand::FillRect(command) => {
             if command.rect.size.width <= 0.0
                 || command.rect.size.height <= 0.0
@@ -1118,27 +1147,13 @@ fn append_shadow_command(
         }));
         return;
     }
-    let sigma = shadow.blur * 0.5;
-    let max_blur_extent = sigma * 3.0;
-    let steps = max_blur_extent.ceil().clamp(10.0, 36.0) as usize;
-    for step in (0..steps).rev() {
-        let outer_distance = max_blur_extent * (step + 1) as f32 / steps as f32;
-        let inner_distance = max_blur_extent * step as f32 / steps as f32;
-        let alpha = shadow_alpha(shadow.color.a, outer_distance, inner_distance, sigma);
-        if alpha == 0 {
-            continue;
-        }
-        let expansion = shadow.spread + outer_distance;
-        list.push(PaintCommand::FillRect(FillRectPaint {
-            element_id: element_id.clone(),
-            rect: expand_rect_safely(translated, expansion),
-            radius: expand_radius(radius, expansion),
-            color: Color {
-                a: alpha,
-                ..shadow.color
-            },
-        }));
-    }
+    list.push(PaintCommand::ShadowRect(ShadowRectPaint {
+        element_id,
+        rect: expand_rect_safely(translated, shadow.spread),
+        radius: expand_radius(radius, shadow.spread),
+        blur_width: shadow.blur,
+        color: shadow.color,
+    }));
 }
 
 fn append_arrow_shadow_command(
@@ -1584,6 +1599,43 @@ mod tests {
         assert!(expanded.points[0].x < arrow.points[0].x);
         assert!(expanded.points[1].x > arrow.points[1].x);
         assert!(expanded.points[2].y < arrow.points[2].y);
+    }
+
+    #[test]
+    fn blurred_rect_shadow_uses_epaint_blur_shape() {
+        let mut list = DisplayList::new();
+        append_shadow_command(
+            &mut list,
+            ElementId::new("card"),
+            Rect::new(20.0, 30.0, 80.0, 40.0),
+            CornerRadii::all(8.0),
+            Shadow {
+                offset: Point::new(2.0, 4.0),
+                blur: 18.0,
+                spread: 3.0,
+                color: Color::rgba(20, 10, 30, 96),
+            },
+        );
+
+        assert_eq!(list.commands.len(), 1);
+        let PaintCommand::ShadowRect(shadow) = &list.commands[0] else {
+            panic!("blurred shadows should use the epaint blur rect path");
+        };
+        assert_eq!(shadow.rect, Rect::new(19.0, 31.0, 86.0, 46.0));
+        assert_eq!(shadow.radius, CornerRadii::all(11.0));
+        assert_eq!(shadow.blur_width, 18.0);
+
+        let Some((_, epaint::Shape::Rect(shape))) = epaint_shape(&list.commands[0]) else {
+            panic!("shadow rect should convert to an epaint RectShape");
+        };
+        assert_eq!(shape.blur_width, 18.0);
+
+        let primitives = plan_primitives(&list);
+        assert_eq!(
+            primitives.commands.len(),
+            1,
+            "epaint blur tessellation should replace the old multi-ring shadow approximation"
+        );
     }
 
     #[test]
