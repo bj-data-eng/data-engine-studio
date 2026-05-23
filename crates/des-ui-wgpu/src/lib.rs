@@ -23,15 +23,15 @@ const TEXTURED_SHADER: &str = r#"
 struct Viewport {
     size: vec2<f32>,
     dithering: u32,
-    _pad: u32,
+    predictable_texture_filtering: u32,
 };
 
 @group(0) @binding(0)
 var<uniform> viewport: Viewport;
 @group(0) @binding(1)
-var text_texture: texture_2d<f32>;
+var paint_texture: texture_2d<f32>;
 @group(0) @binding(2)
-var text_sampler: sampler;
+var paint_sampler: sampler;
 
 struct VertexInput {
     @location(0) position: vec2<f32>,
@@ -60,7 +60,7 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main_gamma_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(text_texture, text_sampler, input.uv) * input.color;
+    var color = sample_texture(input) * input.color;
     if viewport.dithering == 1u {
         color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
     }
@@ -85,6 +85,26 @@ fn dither_interleaved(rgb: vec3<f32>, levels: f32, frag_coord: vec4<f32>) -> vec
     return rgb + noise / (levels - 1.0);
 }
 
+fn sample_texture(input: VertexOutput) -> vec4<f32> {
+    if viewport.predictable_texture_filtering == 0u {
+        return textureSample(paint_texture, paint_sampler, input.uv);
+    }
+
+    let texture_size = vec2<i32>(textureDimensions(paint_texture, 0));
+    let texture_size_f = vec2<f32>(texture_size);
+    let pixel_coord = input.uv * texture_size_f - 0.5;
+    let pixel_fract = fract(pixel_coord);
+    let pixel_floor = vec2<i32>(floor(pixel_coord));
+    let max_coord = texture_size - vec2<i32>(1, 1);
+    let p00 = clamp(pixel_floor + vec2<i32>(0, 0), vec2<i32>(0, 0), max_coord);
+    let p10 = clamp(pixel_floor + vec2<i32>(1, 0), vec2<i32>(0, 0), max_coord);
+    let p01 = clamp(pixel_floor + vec2<i32>(0, 1), vec2<i32>(0, 0), max_coord);
+    let p11 = clamp(pixel_floor + vec2<i32>(1, 1), vec2<i32>(0, 0), max_coord);
+    let top = mix(textureLoad(paint_texture, p00, 0), textureLoad(paint_texture, p10, 0), pixel_fract.x);
+    let bottom = mix(textureLoad(paint_texture, p01, 0), textureLoad(paint_texture, p11, 0), pixel_fract.x);
+    return mix(top, bottom, pixel_fract.y);
+}
+
 fn unpack_color(color: u32) -> vec4<f32> {
     return vec4<f32>(
         f32(color & 255u),
@@ -96,7 +116,7 @@ fn unpack_color(color: u32) -> vec4<f32> {
 
 @fragment
 fn fs_main_linear_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSample(text_texture, text_sampler, input.uv) * input.color;
+    var color = sample_texture(input) * input.color;
     if viewport.dithering == 1u {
         color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
     }
@@ -158,6 +178,7 @@ pub struct RenderOptions {
     pub clear_color: ClearColor,
     pub present_mode: PresentMode,
     pub dithering: bool,
+    pub predictable_texture_filtering: bool,
 }
 
 impl Default for RenderOptions {
@@ -166,6 +187,7 @@ impl Default for RenderOptions {
             clear_color: ClearColor::default(),
             present_mode: PresentMode::default(),
             dithering: true,
+            predictable_texture_filtering: false,
         }
     }
 }
@@ -572,7 +594,7 @@ impl Vertex {
 struct ViewportUniform {
     size: [f32; 2],
     dithering: u32,
-    _pad: u32,
+    predictable_texture_filtering: u32,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -1239,7 +1261,7 @@ fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> Viewpor
             size.logical_height().max(1.0),
         ],
         dithering: u32::from(options.dithering),
-        _pad: 0,
+        predictable_texture_filtering: u32::from(options.predictable_texture_filtering),
     }
 }
 
@@ -1568,6 +1590,7 @@ mod tests {
     #[test]
     fn render_options_default_to_epaint_style_dithering() {
         assert!(RenderOptions::default().dithering);
+        assert!(!RenderOptions::default().predictable_texture_filtering);
     }
 
     #[test]
@@ -1584,7 +1607,28 @@ mod tests {
 
         assert_eq!(enabled.size, [100.0, 50.0]);
         assert_eq!(enabled.dithering, 1);
+        assert_eq!(enabled.predictable_texture_filtering, 0);
         assert_eq!(disabled.dithering, 0);
+    }
+
+    #[test]
+    fn viewport_uniform_carries_predictable_texture_filtering_to_fragment_shader() {
+        let uniform = crate::viewport_uniform(
+            PhysicalRenderSize::new(320, 180, 1.0),
+            RenderOptions {
+                predictable_texture_filtering: true,
+                ..RenderOptions::default()
+            },
+        );
+
+        assert_eq!(uniform.predictable_texture_filtering, 1);
+    }
+
+    #[test]
+    fn shader_contains_epaint_style_predictable_texture_filtering_paths() {
+        assert!(crate::TEXTURED_SHADER.contains("textureSample"));
+        assert!(crate::TEXTURED_SHADER.contains("textureLoad"));
+        assert!(crate::TEXTURED_SHADER.contains("predictable_texture_filtering == 0u"));
     }
 
     #[test]
