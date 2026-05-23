@@ -3365,6 +3365,80 @@ mod tests {
     }
 
     #[test]
+    fn title_text_default_coverage_is_not_lighter_than_light_mode_coverage() {
+        fn alpha_metrics(pixels: &[u8]) -> (u64, usize, usize) {
+            pixels
+                .chunks_exact(4)
+                .map(|rgba| rgba[3])
+                .filter(|alpha| *alpha > 0)
+                .fold((0, 0, 0), |(sum, covered, strong), alpha| {
+                    (
+                        sum + u64::from(alpha),
+                        covered + 1,
+                        strong + usize::from(alpha >= 192),
+                    )
+                })
+        }
+
+        let text = TextPaint {
+            element_id: ElementId::new("native-title"),
+            rect: Rect::new(0.0, 0.0, 320.0, 34.0),
+            text: "Native document text".into(),
+            color: Color::rgb(31, 27, 36),
+            override_text_color: None,
+            font_size: 24.0,
+            wrap_width: 320.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
+        };
+        let light_mode = TextRasterizer::with_text_options(RenderTextOptions {
+            alpha_from_coverage: RenderAlphaFromCoverage::Linear,
+            ..RenderTextOptions::default()
+        })
+        .rasterize_with_options(
+            &text,
+            1.0,
+            RenderTextOptions {
+                alpha_from_coverage: RenderAlphaFromCoverage::Linear,
+                ..RenderTextOptions::default()
+            },
+            RenderTessellationOptions::default(),
+        );
+        let native_default = TextRasterizer::new().rasterize_with_options(
+            &text,
+            1.0,
+            RenderTextOptions::default(),
+            RenderTessellationOptions::default(),
+        );
+
+        let (light_sum, light_covered, light_strong) = alpha_metrics(&light_mode.pixels);
+        let (default_sum, default_covered, default_strong) = alpha_metrics(&native_default.pixels);
+
+        assert_eq!(
+            RenderAlphaFromCoverage::default(),
+            RenderAlphaFromCoverage::TwoCoverageMinusCoverageSq,
+            "native text currently inherits epaint's darker default coverage mapping"
+        );
+        assert!(
+            default_sum > light_sum,
+            "default coverage should add alpha mass at small title sizes: default={default_sum}, light={light_sum}"
+        );
+        assert_eq!(
+            default_covered, light_covered,
+            "coverage mapping should change apparent weight without changing the glyph footprint"
+        );
+        assert!(
+            default_strong >= light_strong,
+            "default coverage should not reduce strongly covered text pixels: default={default_strong}, light={light_strong}"
+        );
+    }
+
+    #[test]
     fn text_rasterizer_lays_out_frame_text_against_one_atlas() {
         let first = TextPaint {
             element_id: ElementId::new("first"),
