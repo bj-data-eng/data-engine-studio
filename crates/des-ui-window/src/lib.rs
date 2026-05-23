@@ -465,7 +465,14 @@ mod tests {
 
         assert!(app.last_output().is_some());
         assert!(index_count > 48);
-        assert!(!frame_output.render_plan.text_batches.is_empty());
+        assert!(frame_output.render_plan.text_batches.len() >= 4);
+        assert!(
+            frame_output
+                .render_plan
+                .text_batches
+                .iter()
+                .any(|batch| batch.text.text.contains("π"))
+        );
         assert_eq!(
             app.last_output().unwrap().layout.rect.size,
             Size::new(980.0, 680.0)

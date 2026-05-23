@@ -87,6 +87,15 @@ fn demo_document(viewport: Size, clicks: u32) -> Document {
     Document::build(viewport, |ui| {
         ui.main("native-shell").children(|ui| {
             ui.section("native-card").children(|ui| {
+                ui.div("text-specimen").children(|ui| {
+                    ui.text("native-title", "Native document text");
+                    ui.text(
+                        "native-copy",
+                        "The non-egui renderer now draws arbitrary document strings, wraps text inside styled elements, and keeps π, Σ, and UTF-8 data visible in the same pass as shapes.",
+                    );
+                    ui.text("native-meta", "Resize the window; this remains document layout text.");
+                });
+
                 ui.div("swatch-row").children(|ui| {
                     for (index, id) in ["swatch-a", "swatch-b", "swatch-c"].iter().enumerate() {
                         let mut swatch = ui.div(*id).class("swatch");
@@ -136,7 +145,7 @@ fn demo_stylesheet() -> StyleSheet {
             StyleSelector::id("native-card"),
             Style::default()
                 .width_percent(0.72)
-                .min_size(460.0, 320.0)
+                .min_size(460.0, 420.0)
                 .max_size(780.0, 560.0)
                 .padding(Insets::all(28.0))
                 .gap(24.0)
@@ -151,6 +160,35 @@ fn demo_stylesheet() -> StyleSheet {
             Style::default()
                 .width_percent(0.92)
                 .padding(Insets::all(18.0)),
+        )
+        .rule(
+            StyleSelector::id("text-specimen"),
+            Style::default().gap(8.0).width_fill(),
+        )
+        .rule(
+            StyleSelector::id("native-title"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(34.0))
+                .font_size(24.0)
+                .text_color(Color::rgb(31, 27, 36)),
+        )
+        .rule(
+            StyleSelector::id("native-copy"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(72.0))
+                .font_size(15.0)
+                .line_height(20.0)
+                .text_color(Color::rgb(91, 82, 101)),
+        )
+        .rule(
+            StyleSelector::id("native-meta"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(22.0))
+                .font_size(13.0)
+                .text_color(Color::rgb(122, 91, 181)),
         )
         .rule(
             StyleSelector::id("swatch-row"),
