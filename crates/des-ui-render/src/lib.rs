@@ -183,17 +183,78 @@ pub struct EpaintMeshPrimitive {
     pub mesh: epaint::Mesh,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderTessellationOptions {
+    pub feathering: bool,
+    pub feathering_size_in_pixels: f32,
+    pub coarse_tessellation_culling: bool,
+    pub prerasterized_discs: bool,
+    pub round_text_to_pixels: bool,
+    pub round_line_segments_to_pixels: bool,
+    pub round_rects_to_pixels: bool,
+    pub debug_paint_clip_rects: bool,
+    pub debug_paint_text_rects: bool,
+    pub debug_ignore_clip_rects: bool,
+    pub bezier_tolerance: f32,
+    pub epsilon: f32,
+    pub parallel_tessellation: bool,
+    pub validate_meshes: bool,
+}
+
+impl Default for RenderTessellationOptions {
+    fn default() -> Self {
+        let options = epaint::TessellationOptions::default();
+        Self {
+            feathering: options.feathering,
+            feathering_size_in_pixels: options.feathering_size_in_pixels,
+            coarse_tessellation_culling: options.coarse_tessellation_culling,
+            prerasterized_discs: options.prerasterized_discs,
+            round_text_to_pixels: options.round_text_to_pixels,
+            round_line_segments_to_pixels: options.round_line_segments_to_pixels,
+            round_rects_to_pixels: options.round_rects_to_pixels,
+            debug_paint_clip_rects: options.debug_paint_clip_rects,
+            debug_paint_text_rects: options.debug_paint_text_rects,
+            debug_ignore_clip_rects: options.debug_ignore_clip_rects,
+            bezier_tolerance: options.bezier_tolerance,
+            epsilon: options.epsilon,
+            parallel_tessellation: options.parallel_tessellation,
+            validate_meshes: options.validate_meshes,
+        }
+    }
+}
+
+impl From<RenderTessellationOptions> for epaint::TessellationOptions {
+    fn from(options: RenderTessellationOptions) -> Self {
+        Self {
+            feathering: options.feathering,
+            feathering_size_in_pixels: options.feathering_size_in_pixels.max(0.0),
+            coarse_tessellation_culling: options.coarse_tessellation_culling,
+            prerasterized_discs: options.prerasterized_discs,
+            round_text_to_pixels: options.round_text_to_pixels,
+            round_line_segments_to_pixels: options.round_line_segments_to_pixels,
+            round_rects_to_pixels: options.round_rects_to_pixels,
+            debug_paint_clip_rects: options.debug_paint_clip_rects,
+            debug_paint_text_rects: options.debug_paint_text_rects,
+            debug_ignore_clip_rects: options.debug_ignore_clip_rects,
+            bezier_tolerance: options.bezier_tolerance.max(0.0),
+            epsilon: options.epsilon.max(0.0),
+            parallel_tessellation: options.parallel_tessellation,
+            validate_meshes: options.validate_meshes,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrimitivePlanner {
     pixels_per_point: f32,
-    options: epaint::TessellationOptions,
+    options: RenderTessellationOptions,
 }
 
 impl PrimitivePlanner {
     pub fn new() -> Self {
         Self {
             pixels_per_point: 1.0,
-            options: epaint::TessellationOptions::default(),
+            options: RenderTessellationOptions::default(),
         }
     }
 
@@ -202,15 +263,16 @@ impl PrimitivePlanner {
         self
     }
 
+    pub fn with_tessellation_options(mut self, options: RenderTessellationOptions) -> Self {
+        self.options = options;
+        self
+    }
+
     pub fn plan_display_list(&self, display_list: &DisplayList) -> PrimitiveList {
         let mut primitives = PrimitiveList::new();
+        let options = epaint::TessellationOptions::from(self.options);
         for command in &display_list.commands {
-            append_primitive_command(
-                &mut primitives,
-                command,
-                self.pixels_per_point,
-                &self.options,
-            );
+            append_primitive_command(&mut primitives, command, self.pixels_per_point, &options);
         }
         primitives
     }
@@ -1653,6 +1715,62 @@ mod tests {
         assert!(matches!(list.commands[0], PaintCommand::StrokeLine(_)));
         assert!(matches!(list.commands[1], PaintCommand::StrokeLine(_)));
         assert_eq!(list.commands.len(), 2);
+    }
+
+    #[test]
+    fn render_tessellation_options_default_to_epaint_contract() {
+        let ours = RenderTessellationOptions::default();
+        let epaint = epaint::TessellationOptions::default();
+
+        assert_eq!(ours.feathering, epaint.feathering);
+        assert_eq!(
+            ours.feathering_size_in_pixels,
+            epaint.feathering_size_in_pixels
+        );
+        assert_eq!(
+            ours.round_line_segments_to_pixels,
+            epaint.round_line_segments_to_pixels
+        );
+        assert_eq!(ours.round_rects_to_pixels, epaint.round_rects_to_pixels);
+        assert_eq!(ours.bezier_tolerance, epaint.bezier_tolerance);
+    }
+
+    #[test]
+    fn primitive_planner_exposes_epaint_feathering_control() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("surface"),
+            rect: Rect::new(10.0, 20.0, 30.0, 40.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgba(10, 20, 30, 220),
+        }));
+
+        let default_primitives = PrimitivePlanner::new().plan_display_list(&list);
+        let sharp_primitives = PrimitivePlanner::new()
+            .with_tessellation_options(RenderTessellationOptions {
+                feathering: false,
+                ..RenderTessellationOptions::default()
+            })
+            .plan_display_list(&list);
+        let default_mesh = first_mesh(&default_primitives);
+        let sharp_mesh = first_mesh(&sharp_primitives);
+
+        assert!(
+            default_mesh
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 0),
+            "default epaint feathering should produce transparent antialias vertices"
+        );
+        assert!(
+            sharp_mesh
+                .mesh
+                .vertices
+                .iter()
+                .all(|vertex| vertex.color.a() == 220),
+            "disabling feathering should flow through to epaint tessellation"
+        );
     }
 
     #[test]

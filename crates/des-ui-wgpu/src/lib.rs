@@ -8,7 +8,7 @@
 use des_ui_document::{Color, Rect, TextWrapMode};
 use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
-    RenderPrimitive, TextPaint,
+    RenderPrimitive, RenderTessellationOptions, TextPaint,
 };
 use std::{cell::RefCell, error, fmt, mem, ops::Range};
 
@@ -166,10 +166,11 @@ impl PresentMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderOptions {
     pub clear_color: ClearColor,
     pub present_mode: PresentMode,
+    pub tessellation: RenderTessellationOptions,
     pub dithering: bool,
     pub predictable_texture_filtering: bool,
 }
@@ -179,6 +180,7 @@ impl Default for RenderOptions {
         Self {
             clear_color: ClearColor::default(),
             present_mode: PresentMode::default(),
+            tessellation: RenderTessellationOptions::default(),
             dithering: true,
             predictable_texture_filtering: false,
         }
@@ -530,6 +532,7 @@ impl DisplayListRenderer {
         let mut builder = RenderPlanBuilder::new(self.options);
         let primitives = PrimitivePlanner::new()
             .with_pixels_per_point(self.pixels_per_point)
+            .with_tessellation_options(self.options.tessellation)
             .plan_display_list(display_list);
         builder.push_primitives(&primitives);
         builder.finish()
@@ -1572,7 +1575,10 @@ mod tests {
         Color, CornerRadii, Document, DocumentEngine, Element, ElementId, Rect, Size, Style,
         StyleSelector, StyleSheet, TextWrapMode,
     };
-    use des_ui_render::{DisplayList, FillRectPaint, PaintCommand, TextPaint, TextSelectionPaint};
+    use des_ui_render::{
+        DisplayList, FillRectPaint, PaintCommand, RenderTessellationOptions, TextPaint,
+        TextSelectionPaint,
+    };
 
     use crate::{
         ClearColor, DisplayListRenderer, Mesh, MeshBuilder, PackedColor, PhysicalRenderSize,
@@ -1636,6 +1642,10 @@ mod tests {
     fn render_options_default_to_epaint_style_dithering() {
         assert!(RenderOptions::default().dithering);
         assert!(!RenderOptions::default().predictable_texture_filtering);
+        assert_eq!(
+            RenderOptions::default().tessellation,
+            RenderTessellationOptions::default()
+        );
     }
 
     #[test]
@@ -1863,6 +1873,35 @@ mod tests {
         assert!(
             min_x(&high_density) > min_x(&low_density),
             "higher pixel density should shrink the antialiasing fringe in logical coordinates"
+        );
+    }
+
+    #[test]
+    fn display_list_renderer_passes_tessellation_options_to_epaint() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("box"),
+            rect: Rect::new(10.0, 20.0, 30.0, 40.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgba(1, 2, 3, 220),
+        }));
+
+        let plan = DisplayListRenderer::new(RenderOptions {
+            tessellation: RenderTessellationOptions {
+                feathering: false,
+                ..RenderTessellationOptions::default()
+            },
+            ..RenderOptions::default()
+        })
+        .build_plan(&display_list);
+
+        assert!(
+            plan.batches[0]
+                .mesh
+                .vertices
+                .iter()
+                .all(|vertex| vertex.color_array()[3] == 220),
+            "native renderer options should preserve the caller's epaint tessellation settings"
         );
     }
 
