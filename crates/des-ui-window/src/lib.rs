@@ -333,7 +333,7 @@ mod tests {
     };
     use des_ui_render::{FillRectPaint, PaintCommand, content_rect};
     use des_ui_wgpu::{ClearColor, PresentMode};
-    use des_ui_winit::HostViewport;
+    use des_ui_winit::{HostViewport, PointerButton, PointerPhase, WinitInputTranslator};
 
     use crate::{AppFrame, FrameOutput, NativeOptions, WindowApp};
 
@@ -637,6 +637,75 @@ mod tests {
         assert_ne!(
             active_swatch_color, inactive_swatch_color,
             "click state should animate swatch paint through the native renderer display list"
+        );
+    }
+
+    #[test]
+    fn native_document_demo_uses_translated_winit_pointer_input() {
+        let viewport = HostViewport::new(980, 680, 1.0);
+        let mut app = crate::demo::NativeDocumentDemo::new();
+        let mut first_frame = AppFrame::new(viewport, DocumentInput::default());
+        app.update(&mut first_frame);
+        let action_rect = app
+            .last_output()
+            .unwrap()
+            .layout
+            .find("native-action")
+            .unwrap()
+            .rect;
+        let action_center = Point::new(
+            action_rect.origin.x + action_rect.size.width * 0.5,
+            action_rect.origin.y + action_rect.size.height * 0.5,
+        );
+        let base_output = first_frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let base_color = fill_rect_color(&base_output, "native-action")
+            .expect("native action should paint before translated input");
+
+        let mut input = WinitInputTranslator::new();
+        input.set_viewport(viewport);
+        input.cursor_moved(action_center, 0.10);
+        let mut hover_frame = AppFrame::new(viewport, input.frame_input());
+        app.update(&mut hover_frame);
+        let hover_output = hover_frame.into_output(des_ui_wgpu::RenderOptions::default());
+        let hover_color = fill_rect_color(&hover_output, "native-action")
+            .expect("translated hover should still paint the native action");
+
+        assert_ne!(
+            hover_color, base_color,
+            "hover should work with the same translated input path used by the native window"
+        );
+
+        input.pointer_button(PointerButton::Primary, PointerPhase::Pressed, 0.20);
+        let mut press_frame = AppFrame::new(viewport, input.frame_input());
+        app.update(&mut press_frame);
+        assert!(
+            app.last_output().unwrap().events.iter().any(|event| {
+                event.target.as_str() == "native-action" && event.kind == DocumentEventKind::Pressed
+            }),
+            "translated primary press should hit the action element"
+        );
+
+        input.pointer_button(PointerButton::Primary, PointerPhase::Released, 0.25);
+        let mut click_frame = AppFrame::new(viewport, input.frame_input());
+        app.update(&mut click_frame);
+
+        assert_eq!(
+            app.clicks(),
+            1,
+            "translated primary release should produce the same click as hand-built document input"
+        );
+        assert!(
+            click_frame
+                .display_list()
+                .commands
+                .iter()
+                .any(|command| matches!(
+                    command,
+                    PaintCommand::Text(text)
+                        if text.element_id.as_str() == "native-action-label"
+                            && text.text == "Clicks: 1"
+                )),
+            "the translated click should update text in the frame that will be rendered"
         );
     }
 

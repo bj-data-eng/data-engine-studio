@@ -3983,6 +3983,67 @@ mod tests {
     }
 
     #[test]
+    fn uploaded_frame_preserves_document_geometry_and_text_draws() {
+        let mut document = Document::build(Size::new(240.0, 140.0), |ui| {
+            ui.div("panel").children(|ui| {
+                ui.text("label", "Visible text");
+            });
+        });
+        let stylesheet = StyleSheet::new()
+            .rule(
+                StyleSelector::Id("panel".into()),
+                Style::default()
+                    .size(160.0, 80.0)
+                    .background(Color::rgb(20, 30, 40)),
+            )
+            .rule(
+                StyleSelector::Element(Element::Text),
+                Style::default()
+                    .size(130.0, 24.0)
+                    .font_size(16.0)
+                    .text_color(Color::rgb(240, 241, 242)),
+            );
+        let output = DocumentEngine::default().update(&mut document, &stylesheet);
+        let plan = DisplayListRenderer::default().build_plan_for_output(&output);
+        let text_paints = plan
+            .text_batches
+            .iter()
+            .map(|batch| batch.text.clone())
+            .collect::<Vec<_>>();
+        let text_frame = TextRasterizer::new().rasterize_frame(&text_paints, 1.0);
+
+        let (uploaded, vertices, indices) = build_uploaded_frame(&plan, &text_frame)
+            .expect("document text batches should upload with matching text meshes");
+
+        assert!(
+            uploaded
+                .draws
+                .iter()
+                .any(|draw| draw.texture == crate::DrawTexture::Solid && draw.index_count > 0),
+            "document geometry should survive into uploaded solid draws"
+        );
+        assert!(
+            uploaded
+                .draws
+                .iter()
+                .any(|draw| draw.texture == crate::DrawTexture::TextAtlas && draw.index_count > 0),
+            "document labels should survive into uploaded text-atlas draws"
+        );
+        assert!(
+            !vertices.is_empty(),
+            "uploaded frame should contain GPU vertices"
+        );
+        assert!(
+            !indices.is_empty(),
+            "uploaded frame should contain GPU indices"
+        );
+        assert!(
+            text_frame.atlas_delta.is_some(),
+            "first visible text frame should carry an epaint atlas upload"
+        );
+    }
+
+    #[test]
     fn render_plan_preserves_mixed_mesh_and_text_order() {
         let mut display_list = DisplayList::new();
         display_list.push(PaintCommand::FillRect(FillRectPaint {
