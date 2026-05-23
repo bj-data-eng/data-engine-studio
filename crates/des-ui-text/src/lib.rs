@@ -16,8 +16,8 @@ use std::{fmt, ops::Range};
 
 pub const DEFAULT_FONT_FAMILY: &str = "Inter";
 
-const INTER_VARIABLE: &[u8] = include_bytes!("../assets/fonts/inter/InterVariable.ttf");
-const INTER_VARIABLE_ITALIC: &[u8] =
+pub const INTER_VARIABLE: &[u8] = include_bytes!("../assets/fonts/inter/InterVariable.ttf");
+pub const INTER_VARIABLE_ITALIC: &[u8] =
     include_bytes!("../assets/fonts/inter/InterVariable-Italic.ttf");
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]

@@ -816,6 +816,7 @@ dependencies = [
  "bytemuck",
  "des-ui-document",
  "des-ui-render",
+ "des-ui-text",
  "epaint",
  "wgpu",
 ]

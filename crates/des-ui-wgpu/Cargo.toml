@@ -10,5 +10,6 @@ description = "wgpu renderer adapter for Data Engine Studio UI paint commands."
 bytemuck = { workspace = true, features = ["derive"] }
 des-ui-document.workspace = true
 des-ui-render.workspace = true
+des-ui-text.workspace = true
 epaint.workspace = true
 wgpu.workspace = true

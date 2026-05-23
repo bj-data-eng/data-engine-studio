@@ -10,7 +10,7 @@ use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
     RenderPrimitive, RenderTessellationOptions, TextPaint,
 };
-use std::{cell::RefCell, collections::HashMap, error, fmt, mem, ops::Range};
+use std::{cell::RefCell, collections::HashMap, error, fmt, mem, ops::Range, sync::Arc};
 
 const TEXTURED_SHADER: &str = r#"
 struct Viewport {
@@ -523,7 +523,7 @@ impl TextRasterizer {
         Self {
             fonts: epaint::Fonts::new(
                 epaint::TextOptions::from(text_options),
-                epaint::text::FontDefinitions::default(),
+                default_font_definitions(),
             ),
         }
     }
@@ -640,6 +640,25 @@ impl Default for TextRasterizer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn default_font_definitions() -> epaint::text::FontDefinitions {
+    let mut fonts = epaint::text::FontDefinitions::default();
+    fonts.font_data.insert(
+        des_ui_text::DEFAULT_FONT_FAMILY.to_owned(),
+        Arc::new(epaint::text::FontData::from_static(
+            des_ui_text::INTER_VARIABLE,
+        )),
+    );
+    fonts
+        .families
+        .entry(epaint::FontFamily::Proportional)
+        .and_modify(|family| {
+            family.retain(|name| name != des_ui_text::DEFAULT_FONT_FAMILY);
+            family.insert(0, des_ui_text::DEFAULT_FONT_FAMILY.to_owned());
+        })
+        .or_insert_with(|| vec![des_ui_text::DEFAULT_FONT_FAMILY.to_owned()]);
+    fonts
 }
 
 fn epaint_text_shape(
@@ -2313,6 +2332,27 @@ mod tests {
             epaint::AlphaFromCoverage::Gamma(0.75)
         );
         assert!(!epaint_options.font_hinting);
+    }
+
+    #[test]
+    fn native_font_definitions_prefer_inter_for_proportional_text() {
+        let fonts = crate::default_font_definitions();
+        let proportional = fonts
+            .families
+            .get(&epaint::FontFamily::Proportional)
+            .expect("native renderer should define a proportional font family");
+
+        assert_eq!(proportional.first().map(String::as_str), Some("Inter"));
+        assert!(
+            fonts.font_data.contains_key("Inter"),
+            "native renderer should embed the bundled Inter font"
+        );
+        assert!(
+            proportional
+                .iter()
+                .any(|font| font == "NotoEmoji-Regular" || font == "emoji-icon-font"),
+            "native renderer should preserve epaint's emoji fallback after Inter"
+        );
     }
 
     #[test]
