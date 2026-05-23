@@ -300,6 +300,7 @@ pub enum RendererError {
     RequestAdapter(wgpu::RequestAdapterError),
     RequestDevice(wgpu::RequestDeviceError),
     UnsupportedSurface,
+    UnsupportedTexture(epaint::TextureId),
     SurfaceFrame(&'static str),
 }
 
@@ -310,6 +311,9 @@ impl fmt::Display for RendererError {
             Self::RequestAdapter(error) => write!(f, "failed to request wgpu adapter: {error}"),
             Self::RequestDevice(error) => write!(f, "failed to request wgpu device: {error}"),
             Self::UnsupportedSurface => f.write_str("surface is not supported by the selected GPU"),
+            Self::UnsupportedTexture(texture_id) => {
+                write!(f, "unsupported native epaint texture id: {texture_id:?}")
+            }
             Self::SurfaceFrame(error) => write!(f, "failed to render surface frame: {error}"),
         }
     }
@@ -906,6 +910,13 @@ fn draw_texture_for_mesh(mesh: &Mesh) -> Option<DrawTexture> {
     }
 }
 
+fn unsupported_texture_for_mesh(mesh: &Mesh) -> Option<epaint::TextureId> {
+    match mesh.texture_id {
+        Some(epaint::TextureId::Managed(0)) | None => None,
+        Some(texture_id) => Some(texture_id),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BufferUpload {
     Skip,
@@ -1152,7 +1163,7 @@ impl<'window> GpuRenderer<'window> {
                     self.options.tessellation,
                 )
         };
-        let uploaded_frame = self.upload_render_frame(plan, &text_frame);
+        let uploaded_frame = self.upload_render_frame(plan, &text_frame)?;
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -1217,46 +1228,15 @@ impl<'window> GpuRenderer<'window> {
         &mut self,
         plan: &RenderPlan,
         frame: &RasterizedTextFrame,
-    ) -> UploadedFrame {
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut draws = Vec::new();
-        let mut text_meshes = frame.batches.iter();
-        for item in &plan.items {
-            match item {
-                RenderItem::Mesh(batch) => {
-                    if let Some(texture) = draw_texture_for_mesh(&batch.mesh) {
-                        draws.push(append_mesh_draw(
-                            &mut vertices,
-                            &mut indices,
-                            batch.clip,
-                            texture,
-                            &batch.mesh.vertices,
-                            &batch.mesh.indices,
-                        ));
-                    }
-                }
-                RenderItem::Text(batch) => {
-                    if let Some(mesh) = text_meshes.next() {
-                        draws.push(append_mesh_draw(
-                            &mut vertices,
-                            &mut indices,
-                            batch.clip,
-                            DrawTexture::TextAtlas,
-                            &mesh.vertices,
-                            &mesh.indices,
-                        ));
-                    }
-                }
-            }
-        }
+    ) -> Result<UploadedFrame, RendererError> {
+        let (uploaded_frame, vertices, indices) = build_uploaded_frame(plan, frame)?;
         self.upload_frame_buffers(
             "des-ui frame vertex buffer",
             "des-ui frame index buffer",
             &vertices,
             &indices,
         );
-        UploadedFrame { draws }
+        Ok(uploaded_frame)
     }
 
     fn upload_frame_buffers<V: bytemuck::Pod>(
@@ -1366,6 +1346,48 @@ impl<'window> GpuRenderer<'window> {
         self.queue
             .write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&uniform));
     }
+}
+
+fn build_uploaded_frame(
+    plan: &RenderPlan,
+    frame: &RasterizedTextFrame,
+) -> Result<(UploadedFrame, Vec<Vertex>, Vec<u32>), RendererError> {
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+    let mut draws = Vec::new();
+    let mut text_meshes = frame.batches.iter();
+    for item in &plan.items {
+        match item {
+            RenderItem::Mesh(batch) => {
+                let Some(texture) = draw_texture_for_mesh(&batch.mesh) else {
+                    let texture_id = unsupported_texture_for_mesh(&batch.mesh)
+                        .expect("unsupported native mesh texture");
+                    return Err(RendererError::UnsupportedTexture(texture_id));
+                };
+                draws.push(append_mesh_draw(
+                    &mut vertices,
+                    &mut indices,
+                    batch.clip,
+                    texture,
+                    &batch.mesh.vertices,
+                    &batch.mesh.indices,
+                ));
+            }
+            RenderItem::Text(batch) => {
+                if let Some(mesh) = text_meshes.next() {
+                    draws.push(append_mesh_draw(
+                        &mut vertices,
+                        &mut indices,
+                        batch.clip,
+                        DrawTexture::TextAtlas,
+                        &mesh.vertices,
+                        &mesh.indices,
+                    ));
+                }
+            }
+        }
+    }
+    Ok((UploadedFrame { draws }, vertices, indices))
 }
 
 fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> ViewportUniform {
@@ -1697,9 +1719,9 @@ mod tests {
 
     use crate::{
         ClearColor, DisplayListRenderer, Mesh, MeshBuilder, PackedColor, PhysicalRenderSize,
-        RenderAlphaFromCoverage, RenderItem, RenderOptions, RenderTextOptions, ScissorRect,
-        TextRasterizer, Vertex, clip_rect_to_scissor, epaint_layout_job, mesh_for_display_list,
-        text_atlas_upload,
+        RenderAlphaFromCoverage, RenderItem, RenderOptions, RenderTextOptions, RendererError,
+        ScissorRect, TextRasterizer, Vertex, build_uploaded_frame, clip_rect_to_scissor,
+        epaint_layout_job, mesh_for_display_list, text_atlas_upload,
     };
 
     #[test]
@@ -1995,6 +2017,29 @@ mod tests {
 
         unsupported.texture_id = Some(epaint::TextureId::User(7));
         assert_eq!(crate::draw_texture_for_mesh(&unsupported), None);
+    }
+
+    #[test]
+    fn uploaded_frame_reports_unsupported_epaint_textures() {
+        let unsupported_mesh = Mesh {
+            texture_id: Some(epaint::TextureId::User(42)),
+            ..Mesh::default()
+        };
+        let plan = crate::RenderPlan {
+            items: vec![RenderItem::Mesh(crate::MeshBatch {
+                clip: None,
+                mesh: unsupported_mesh,
+            })],
+            ..crate::RenderPlan::default()
+        };
+
+        let error = build_uploaded_frame(&plan, &crate::RasterizedTextFrame::default())
+            .expect_err("unsupported epaint textures should be explicit renderer errors");
+
+        assert!(matches!(
+            error,
+            RendererError::UnsupportedTexture(epaint::TextureId::User(42))
+        ));
     }
 
     #[test]
