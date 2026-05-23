@@ -1166,11 +1166,7 @@ mod tests {
 
         let mesh = builder.finish();
         assert_eq!(mesh.vertices.len(), 8);
-        assert_eq!(&mesh.indices[0..6], [0, 1, 2, 0, 2, 3]);
-        assert_eq!(mesh.vertices[0].position, [10.0, 20.0]);
-        assert_eq!(mesh.vertices[1].position, [40.0, 20.0]);
-        assert_eq!(mesh.vertices[2].position, [40.0, 60.0]);
-        assert_eq!(mesh.vertices[3].position, [10.0, 60.0]);
+        assert_eq!(&mesh.indices[0..6], [2, 0, 4, 4, 0, 6]);
         assert!(
             mesh.vertices
                 .iter()
@@ -1180,6 +1176,18 @@ mod tests {
             mesh.vertices
                 .iter()
                 .any(|vertex| vertex.color == [1, 2, 3, 0])
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position[0] > 10.0 && vertex.position[1] > 20.0),
+            "inner fill vertices should inset by half the antialiasing fringe"
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position[0] < 10.0 && vertex.position[1] < 20.0),
+            "outer fringe vertices should expand outside the filled edge"
         );
     }
 

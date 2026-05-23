@@ -712,38 +712,34 @@ fn fill_antialiased_convex_polygon_mesh(
     if fringe_width <= f32::EPSILON {
         return fill_solid_polygon_mesh(element_id, points, color);
     }
-    let edge_normals = polygon_outward_edge_normals(points)?;
+    let normals = polygon_outward_join_normals(points)?;
     let mut vertices = Vec::with_capacity(points.len() * 2);
-    vertices.extend(
-        points
-            .iter()
-            .copied()
-            .map(|position| PrimitiveVertex { position, color }),
-    );
-    vertices.extend(points.iter().enumerate().map(|(index, point)| {
-        let previous = edge_normals[(index + edge_normals.len() - 1) % edge_normals.len()];
-        let next = edge_normals[index];
-        let normal = normalized_or(next, add_points(previous, next));
-        let dot = dot_points(normal, next).abs().max(0.25);
-        let miter_length = (fringe_width / dot).min(fringe_width * 4.0);
-        PrimitiveVertex {
-            position: add_points(*point, scale_point(normal, miter_length)),
+    let fringe = fringe_width * 0.5;
+    for (point, normal) in points.iter().zip(normals.iter()) {
+        vertices.push(PrimitiveVertex {
+            position: sub_points(*point, scale_point(*normal, fringe)),
+            color,
+        });
+        vertices.push(PrimitiveVertex {
+            position: add_points(*point, scale_point(*normal, fringe)),
             color: Color { a: 0, ..color },
-        }
-    }));
+        });
+    }
 
     let count = points.len();
     let mut indices = Vec::with_capacity((count - 2) * 3 + count * 6);
-    for index in 1..count - 1 {
-        indices.extend([0, index as u32, index as u32 + 1]);
+    for index in 2..count {
+        indices.extend([(2 * (index - 1)) as u32, 0, (2 * index) as u32]);
     }
+    let mut previous = count - 1;
     for index in 0..count {
-        let next = (index + 1) % count;
-        let inner_a = index as u32;
-        let inner_b = next as u32;
-        let outer_a = (count + index) as u32;
-        let outer_b = (count + next) as u32;
-        indices.extend([inner_a, inner_b, outer_b, inner_a, outer_b, outer_a]);
+        let inner = (2 * index) as u32;
+        let outer = inner + 1;
+        let previous_inner = (2 * previous) as u32;
+        let previous_outer = previous_inner + 1;
+        indices.extend([inner, previous_inner, previous_outer]);
+        indices.extend([previous_outer, outer, inner]);
+        previous = index;
     }
     Some(TriangleMeshPrimitive {
         element_id,
@@ -776,13 +772,13 @@ fn fill_solid_polygon_mesh(
     })
 }
 
-fn polygon_outward_edge_normals(points: &[Point]) -> Option<Vec<Point>> {
+fn polygon_outward_join_normals(points: &[Point]) -> Option<Vec<Point>> {
     let area = signed_polygon_area(points);
     if area.abs() <= f32::EPSILON {
         return None;
     }
     let clockwise = area > 0.0;
-    let mut normals = Vec::with_capacity(points.len());
+    let mut edge_normals = Vec::with_capacity(points.len());
     for index in 0..points.len() {
         let next = (index + 1) % points.len();
         let edge = sub_points(points[next], points[index]);
@@ -795,9 +791,30 @@ fn polygon_outward_edge_normals(points: &[Point]) -> Option<Vec<Point>> {
         } else {
             Point::new(-edge.y / length, edge.x / length)
         };
-        normals.push(normal);
+        edge_normals.push(normal);
     }
-    Some(normals)
+    Some(
+        edge_normals
+            .iter()
+            .enumerate()
+            .map(|(index, next)| {
+                let previous = edge_normals[(index + edge_normals.len() - 1) % edge_normals.len()];
+                let normal = scale_point(add_points(previous, *next), 0.5);
+                let length_sq = normal.x * normal.x + normal.y * normal.y;
+                if length_sq <= f32::EPSILON {
+                    *next
+                } else {
+                    let miter = scale_point(normal, 1.0 / length_sq);
+                    let miter_length = point_length(miter);
+                    if miter_length > 4.0 {
+                        scale_point(miter, 4.0 / miter_length)
+                    } else {
+                        miter
+                    }
+                }
+            })
+            .collect(),
+    )
 }
 
 fn signed_polygon_area(points: &[Point]) -> f32 {
@@ -835,12 +852,39 @@ fn rounded_rect_points(rect: Rect, radius: CornerRadii) -> Vec<Point> {
     let bottom_right = radius.bottom_right.min(max_x).min(max_y).max(0.0);
     let bottom_left = radius.bottom_left.min(max_x).min(max_y).max(0.0);
     let mut points = Vec::new();
+    let epsilon = f32::EPSILON * rect.size.width.max(rect.size.height);
+    append_corner_arc(
+        &mut points,
+        Point::new(rect.right() - bottom_right, rect.bottom() - bottom_right),
+        bottom_right,
+        0.0,
+        std::f32::consts::FRAC_PI_2,
+    );
+    pop_duplicate_side_endpoint(
+        &mut points,
+        rect.size.width <= bottom_right + bottom_left + epsilon,
+    );
+    append_corner_arc(
+        &mut points,
+        Point::new(rect.origin.x + bottom_left, rect.bottom() - bottom_left),
+        bottom_left,
+        std::f32::consts::FRAC_PI_2,
+        std::f32::consts::PI,
+    );
+    pop_duplicate_side_endpoint(
+        &mut points,
+        rect.size.height <= bottom_left + top_left + epsilon,
+    );
     append_corner_arc(
         &mut points,
         Point::new(rect.origin.x + top_left, rect.origin.y + top_left),
         top_left,
         std::f32::consts::PI,
         std::f32::consts::PI * 1.5,
+    );
+    pop_duplicate_side_endpoint(
+        &mut points,
+        rect.size.width <= top_left + top_right + epsilon,
     );
     append_corner_arc(
         &mut points,
@@ -849,19 +893,9 @@ fn rounded_rect_points(rect: Rect, radius: CornerRadii) -> Vec<Point> {
         std::f32::consts::PI * 1.5,
         std::f32::consts::TAU,
     );
-    append_corner_arc(
+    pop_duplicate_side_endpoint(
         &mut points,
-        Point::new(rect.right() - bottom_right, rect.bottom() - bottom_right),
-        bottom_right,
-        0.0,
-        std::f32::consts::FRAC_PI_2,
-    );
-    append_corner_arc(
-        &mut points,
-        Point::new(rect.origin.x + bottom_left, rect.bottom() - bottom_left),
-        bottom_left,
-        std::f32::consts::FRAC_PI_2,
-        std::f32::consts::PI,
+        rect.size.height <= top_right + bottom_right + epsilon,
     );
     points
 }
@@ -879,6 +913,12 @@ fn append_corner_arc(points: &mut Vec<Point>, center: Point, radius: f32, start:
             center.x + angle.cos() * radius,
             center.y + angle.sin() * radius,
         ));
+    }
+}
+
+fn pop_duplicate_side_endpoint(points: &mut Vec<Point>, side_is_all_rounding: bool) {
+    if side_is_all_rounding {
+        points.pop();
     }
 }
 
@@ -2243,5 +2283,23 @@ mod tests {
             1,
             "pill-shaped rounded rectangles should still tessellate when arc endpoints meet"
         );
+    }
+
+    #[test]
+    fn rounded_rect_points_avoid_left_side_degenerate_start_seam() {
+        let rect = Rect::new(0.0, 0.0, 120.0, 32.0);
+        let points = rounded_rect_points(rect, CornerRadii::all(999.0));
+
+        assert!(
+            points[0].x > rect.origin.x + rect.size.width * 0.5,
+            "rounded rect paths should start away from the collapsed left-side arc seam"
+        );
+        for index in 0..points.len() {
+            let next = (index + 1) % points.len();
+            assert!(
+                !points_are_near(points[index], points[next]),
+                "rounded rect path should not contain adjacent duplicate points at index {index}"
+            );
+        }
     }
 }
