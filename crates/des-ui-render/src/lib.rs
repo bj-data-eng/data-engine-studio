@@ -449,7 +449,7 @@ fn append_primitive_command(
             )));
         }
         command => {
-            if let Some(primitive) = tessellate_command(command, tessellator, clip_stack) {
+            for primitive in tessellate_command(command, tessellator, clip_stack) {
                 primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Mesh(primitive)));
             }
         }
@@ -460,17 +460,29 @@ fn tessellate_command(
     command: &PaintCommand,
     tessellator: &mut epaint::Tessellator,
     clip_stack: &[Rect],
-) -> Option<EpaintMeshPrimitive> {
+) -> Vec<EpaintMeshPrimitive> {
     let Some((element_id, shape)) = epaint_shape(command) else {
-        return None;
+        return Vec::new();
     };
-    let mut mesh = epaint::Mesh::default();
-    tessellator.set_clip_rect(active_epaint_clip(clip_stack));
-    tessellator.tessellate_shape(shape, &mut mesh);
-    if mesh.is_empty() {
-        return None;
-    }
-    Some(EpaintMeshPrimitive { element_id, mesh })
+    tessellator
+        .tessellate_shapes(vec![epaint::ClippedShape {
+            clip_rect: active_epaint_clip(clip_stack),
+            shape,
+        }])
+        .into_iter()
+        .filter_map(|primitive| {
+            let epaint::Primitive::Mesh(mesh) = primitive.primitive else {
+                return None;
+            };
+            if mesh.is_empty() {
+                return None;
+            }
+            Some(EpaintMeshPrimitive {
+                element_id: element_id.clone(),
+                mesh,
+            })
+        })
+        .collect()
 }
 
 fn active_epaint_clip(clip_stack: &[Rect]) -> epaint::Rect {
@@ -2000,6 +2012,53 @@ mod tests {
                 .iter()
                 .all(|vertex| vertex.color.a() == 220),
             "disabling feathering should flow through to epaint tessellation"
+        );
+    }
+
+    #[test]
+    fn primitive_planner_uses_epaint_shape_path_for_debug_clip_rects() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::PushClip(Rect::new(0.0, 0.0, 60.0, 40.0)));
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("surface"),
+            rect: Rect::new(8.0, 8.0, 20.0, 12.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(10, 20, 30),
+        }));
+        list.push(PaintCommand::PopClip);
+
+        let plain = PrimitivePlanner::new().plan_display_list(&list);
+        let debug = PrimitivePlanner::new()
+            .with_tessellation_options(RenderTessellationOptions {
+                debug_paint_clip_rects: true,
+                ..RenderTessellationOptions::default()
+            })
+            .plan_display_list(&list);
+        let plain_mesh_count = plain
+            .commands
+            .iter()
+            .filter(|command| matches!(command, PrimitiveCommand::Draw(RenderPrimitive::Mesh(_))))
+            .count();
+        let debug_meshes = debug
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) => Some(mesh),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert!(
+            debug_meshes.len() > plain_mesh_count,
+            "debug_paint_clip_rects should use epaint's clipped-shape path and emit clip outline meshes"
+        );
+        assert!(
+            debug_meshes.iter().any(|mesh| {
+                mesh.mesh.vertices.iter().any(|vertex| {
+                    vertex.color.g() > 150 && vertex.color.r() < 200 && vertex.color.b() < 200
+                })
+            }),
+            "epaint debug clip outlines should be present in DES primitive planning"
         );
     }
 
