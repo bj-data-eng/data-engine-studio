@@ -324,7 +324,20 @@ impl TextRasterizer {
     }
 
     pub fn rasterize(&mut self, text: &TextPaint, scale_factor: f32) -> RasterizedText {
-        let frame = self.rasterize_frame(std::slice::from_ref(text), scale_factor);
+        self.rasterize_with_options(text, scale_factor, RenderTessellationOptions::default())
+    }
+
+    pub fn rasterize_with_options(
+        &mut self,
+        text: &TextPaint,
+        scale_factor: f32,
+        tessellation: RenderTessellationOptions,
+    ) -> RasterizedText {
+        let frame = self.rasterize_frame_with_options(
+            std::slice::from_ref(text),
+            scale_factor,
+            tessellation,
+        );
         RasterizedText {
             width: frame.width,
             height: frame.height,
@@ -341,6 +354,19 @@ impl TextRasterizer {
         text_batches: &[TextPaint],
         scale_factor: f32,
     ) -> RasterizedTextFrame {
+        self.rasterize_frame_with_options(
+            text_batches,
+            scale_factor,
+            RenderTessellationOptions::default(),
+        )
+    }
+
+    pub fn rasterize_frame_with_options(
+        &mut self,
+        text_batches: &[TextPaint],
+        scale_factor: f32,
+        tessellation: RenderTessellationOptions,
+    ) -> RasterizedTextFrame {
         let scale_factor = scale_factor.max(0.000_001);
         self.fonts.begin_pass(epaint::TextOptions::default());
         let galleys = {
@@ -354,7 +380,7 @@ impl TextRasterizer {
         let prepared_discs = self.fonts.texture_atlas().prepared_discs();
         let mut tessellator = epaint::Tessellator::new(
             scale_factor,
-            epaint::TessellationOptions::default(),
+            epaint::TessellationOptions::from(tessellation),
             font_image_size,
             prepared_discs,
         );
@@ -1035,7 +1061,11 @@ impl<'window> GpuRenderer<'window> {
         } else {
             self.text_rasterizer
                 .borrow_mut()
-                .rasterize_frame(&text_paints, self.size.scale_factor as f32)
+                .rasterize_frame_with_options(
+                    &text_paints,
+                    self.size.scale_factor as f32,
+                    self.options.tessellation,
+                )
         };
         let uploaded_frame = self.upload_render_frame(plan, &text_frame);
         let frame = match self.surface.get_current_texture() {
@@ -2190,6 +2220,46 @@ mod tests {
     }
 
     #[test]
+    fn text_rasterizer_passes_round_text_option_to_epaint() {
+        let text = TextPaint {
+            element_id: ElementId::new("fractional-text"),
+            rect: Rect::new(12.35, 18.25, 220.0, 72.0),
+            text: "Fractional text".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+        let mut rasterizer = TextRasterizer::new();
+        let rounded = rasterizer.rasterize_with_options(
+            &text,
+            1.0,
+            RenderTessellationOptions {
+                round_text_to_pixels: true,
+                ..RenderTessellationOptions::default()
+            },
+        );
+        let unrounded = rasterizer.rasterize_with_options(
+            &text,
+            1.0,
+            RenderTessellationOptions {
+                round_text_to_pixels: false,
+                ..RenderTessellationOptions::default()
+            },
+        );
+        let rounded_bounds = mesh_bounds(&rounded.mesh).expect("rounded text mesh");
+        let unrounded_bounds = mesh_bounds(&unrounded.mesh).expect("unrounded text mesh");
+
+        assert!(
+            (rounded_bounds.min_x - unrounded_bounds.min_x).abs() > 0.1,
+            "native text rasterization should pass round_text_to_pixels through to epaint"
+        );
+    }
+
+    #[test]
     fn text_rasterizer_lays_out_frame_text_against_one_atlas() {
         let first = TextPaint {
             element_id: ElementId::new("first"),
@@ -2474,6 +2544,7 @@ mod tests {
 
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct MeshBounds {
+        min_x: f32,
         max_x: f32,
         max_y: f32,
     }
@@ -2481,13 +2552,19 @@ mod tests {
     fn mesh_bounds(mesh: &Mesh) -> Option<MeshBounds> {
         let mut vertices = mesh.vertices.iter();
         let first = vertices.next()?;
+        let mut min_x = first.position[0];
         let mut max_x = first.position[0];
         let mut max_y = first.position[1];
         for vertex in vertices {
+            min_x = min_x.min(vertex.position[0]);
             max_x = max_x.max(vertex.position[0]);
             max_y = max_y.max(vertex.position[1]);
         }
-        Some(MeshBounds { max_x, max_y })
+        Some(MeshBounds {
+            min_x,
+            max_x,
+            max_y,
+        })
     }
 
     #[test]
