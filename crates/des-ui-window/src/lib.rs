@@ -317,8 +317,8 @@ fn render_size_from_viewport(viewport: HostViewport) -> PhysicalRenderSize {
 #[cfg(test)]
 mod tests {
     use des_ui_document::{
-        Color, CornerRadii, Document, DocumentEngine, DocumentInput, Element, ElementId, Point,
-        Rect, Size, Style, StyleSelector, StyleSheet,
+        Color, CornerRadii, Document, DocumentEngine, DocumentEventKind, DocumentInput, Element,
+        ElementId, Point, Rect, Size, Style, StyleSelector, StyleSheet,
     };
     use des_ui_render::{FillRectPaint, PaintCommand};
     use des_ui_wgpu::ClearColor;
@@ -538,5 +538,75 @@ mod tests {
 
         assert_eq!(app.clicks(), 1);
         assert!(click_frame.repaint_requested());
+    }
+
+    #[test]
+    fn native_document_demo_hover_animates_button_into_render_plan() {
+        let mut app = crate::demo::NativeDocumentDemo::new();
+        let mut frame = AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
+        app.update(&mut frame);
+        let base_rect = app
+            .last_output()
+            .unwrap()
+            .layout
+            .find("native-action")
+            .unwrap()
+            .rect;
+        let hover_position = Point::new(
+            base_rect.origin.x + base_rect.size.width * 0.5,
+            base_rect.origin.y + base_rect.size.height * 0.5,
+        );
+        let mut hover_frame = AppFrame::new(
+            HostViewport::new(980, 680, 1.0),
+            crate::demo::hover_input_at(hover_position, 0.20),
+        );
+
+        app.update(&mut hover_frame);
+
+        let hover_output = app.last_output().unwrap();
+        let hover_rect = hover_output.layout.find("native-action").unwrap().rect;
+        assert!(hover_output.animating);
+        assert!(hover_output.metrics.animation_changed_layout);
+        assert!(hover_frame.repaint_requested());
+        assert!(hover_rect.size.width > base_rect.size.width);
+
+        let frame_output = hover_frame.into_output(des_ui_wgpu::RenderOptions::default());
+        assert!(!frame_output.render_plan.is_empty());
+        assert!(!frame_output.render_plan.batches.is_empty());
+        assert!(!frame_output.render_plan.text_batches.is_empty());
+    }
+
+    #[test]
+    fn native_document_demo_press_animates_button_style() {
+        let mut app = crate::demo::NativeDocumentDemo::new();
+        let mut frame = AppFrame::new(HostViewport::new(980, 680, 1.0), DocumentInput::default());
+        app.update(&mut frame);
+        let base_rect = app
+            .last_output()
+            .unwrap()
+            .layout
+            .find("native-action")
+            .unwrap()
+            .rect;
+        let press_position = Point::new(
+            base_rect.origin.x + base_rect.size.width * 0.5,
+            base_rect.origin.y + base_rect.size.height * 0.5,
+        );
+        let mut press_frame = AppFrame::new(
+            HostViewport::new(980, 680, 1.0),
+            crate::demo::press_input_at(press_position, 0.20),
+        );
+
+        app.update(&mut press_frame);
+
+        let press_output = app.last_output().unwrap();
+        let press_rect = press_output.layout.find("native-action").unwrap().rect;
+        assert!(press_output.animating);
+        assert!(press_output.metrics.animation_changed_layout);
+        assert!(press_frame.repaint_requested());
+        assert!(press_rect.size.width < base_rect.size.width);
+        assert!(press_output.events.iter().any(|event| {
+            event.target.as_str() == "native-action" && event.kind == DocumentEventKind::Pressed
+        }));
     }
 }

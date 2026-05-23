@@ -300,14 +300,36 @@ fn demo_stylesheet() -> StyleSheet {
 
 #[cfg(test)]
 pub(crate) fn click_input_at(position: des_ui_document::Point, time_seconds: f64) -> DocumentInput {
+    pointer_input_at(position, time_seconds, false, false, true, 1)
+}
+
+#[cfg(test)]
+pub(crate) fn hover_input_at(position: des_ui_document::Point, time_seconds: f64) -> DocumentInput {
+    pointer_input_at(position, time_seconds, false, false, false, 0)
+}
+
+#[cfg(test)]
+pub(crate) fn press_input_at(position: des_ui_document::Point, time_seconds: f64) -> DocumentInput {
+    pointer_input_at(position, time_seconds, true, true, false, 0)
+}
+
+#[cfg(test)]
+fn pointer_input_at(
+    position: des_ui_document::Point,
+    time_seconds: f64,
+    primary_down: bool,
+    primary_pressed: bool,
+    primary_clicked: bool,
+    primary_click_count: u8,
+) -> DocumentInput {
     DocumentInput {
         pointer: Some(des_ui_document::PointerInput {
             position,
             primary_delta: des_ui_document::Point::ZERO,
-            primary_down: false,
-            primary_pressed: false,
-            primary_clicked: true,
-            primary_click_count: 1,
+            primary_down,
+            primary_pressed,
+            primary_clicked,
+            primary_click_count,
             secondary_clicked: false,
             time_seconds,
         }),
