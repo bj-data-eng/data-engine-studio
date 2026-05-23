@@ -67,6 +67,7 @@ pub struct StrokeLinePaint {
     pub to: Point,
     pub width: f32,
     pub color: Color,
+    pub cap: StrokeCap,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,6 +77,24 @@ pub struct StrokePathPaint {
     pub width: f32,
     pub color: Color,
     pub closed: bool,
+    pub cap: StrokeCap,
+    pub join: StrokeJoin,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum StrokeCap {
+    #[default]
+    Butt,
+    Square,
+    Round,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum StrokeJoin {
+    #[default]
+    Miter,
+    Bevel,
+    Round,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -308,6 +327,7 @@ fn append_primitive_command(primitives: &mut PrimitiveList, command: &PaintComma
                 command.to,
                 command.width,
                 command.color,
+                command.cap,
             ) {
                 primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
             }
@@ -372,6 +392,8 @@ fn stroke_rect_meshes(command: &StrokeRectPaint) -> Vec<TriangleMeshPrimitive> {
         command.width,
         command.color,
         true,
+        StrokeCap::Butt,
+        StrokeJoin::Miter,
     )
     .into_iter()
     .collect()
@@ -387,9 +409,47 @@ fn stroke_path_meshes(command: &StrokePathPaint) -> Vec<TriangleMeshPrimitive> {
         command.width,
         command.color,
         command.closed,
+        command.cap,
+        command.join,
     )
     .into_iter()
+    .chain(round_join_meshes(
+        command.element_id.clone(),
+        &command.points,
+        command.width,
+        command.color,
+        command.closed,
+        command.join,
+    ))
     .collect()
+}
+
+fn round_join_meshes(
+    element_id: ElementId,
+    points: &[Point],
+    width: f32,
+    color: Color,
+    closed: bool,
+    join: StrokeJoin,
+) -> Vec<TriangleMeshPrimitive> {
+    if join != StrokeJoin::Round || width <= 0.0 || color.a == 0 || points.len() < 3 {
+        return Vec::new();
+    }
+    let range: Box<dyn Iterator<Item = usize>> = if closed {
+        Box::new(0..points.len())
+    } else {
+        Box::new(1..points.len() - 1)
+    };
+    range
+        .filter_map(|index| {
+            fill_circle_mesh(&FillCirclePaint {
+                element_id: element_id.clone(),
+                center: points[index],
+                radius: width * 0.5,
+                color,
+            })
+        })
+        .collect()
 }
 
 fn joined_stroke_polyline_mesh(
@@ -398,6 +458,8 @@ fn joined_stroke_polyline_mesh(
     width: f32,
     color: Color,
     closed: bool,
+    cap: StrokeCap,
+    join: StrokeJoin,
 ) -> Option<TriangleMeshPrimitive> {
     if width <= 0.0 || color.a == 0 || points.len() < 2 {
         return None;
@@ -426,6 +488,8 @@ fn joined_stroke_polyline_mesh(
             outgoing
         } else if point_length(outgoing) <= f32::EPSILON {
             incoming
+        } else if join == StrokeJoin::Bevel {
+            outgoing
         } else {
             normalized_or(incoming, add_points(incoming, outgoing))
         };
@@ -445,9 +509,19 @@ fn joined_stroke_polyline_mesh(
         right.push(sub_points(points[index], scale_point(normal, miter)));
     }
 
-    let mut outline = Vec::with_capacity(points.len() * 2);
+    if !closed && cap == StrokeCap::Square {
+        apply_square_caps(points, half_width, &mut left, &mut right);
+    }
+
+    let mut outline = Vec::with_capacity(points.len() * 2 + stroke_cap_segments(width) * 2);
     outline.extend(left);
-    outline.extend(right.into_iter().rev());
+    if !closed {
+        append_end_cap_points(&mut outline, points, half_width, cap);
+    }
+    outline.extend(right.iter().rev().copied());
+    if !closed {
+        append_start_cap_points(&mut outline, points, half_width, cap);
+    }
     fill_polygon_mesh(element_id, outline, color)
 }
 
@@ -457,8 +531,115 @@ fn stroke_line_mesh(
     to: Point,
     width: f32,
     color: Color,
+    cap: StrokeCap,
 ) -> Option<TriangleMeshPrimitive> {
-    joined_stroke_polyline_mesh(element_id, &[from, to], width, color, false)
+    joined_stroke_polyline_mesh(
+        element_id,
+        &[from, to],
+        width,
+        color,
+        false,
+        cap,
+        StrokeJoin::Miter,
+    )
+}
+
+fn append_end_cap_points(
+    outline: &mut Vec<Point>,
+    points: &[Point],
+    half_width: f32,
+    cap: StrokeCap,
+) {
+    let Some(direction) = terminal_direction(points, false) else {
+        return;
+    };
+    let center = *points.last().expect("checked line point count");
+    match cap {
+        StrokeCap::Butt => {}
+        StrokeCap::Square => {}
+        StrokeCap::Round => {
+            let normal = Point::new(-direction.y, direction.x);
+            append_cap_arc(outline, center, direction, normal, half_width);
+        }
+    }
+}
+
+fn append_start_cap_points(
+    outline: &mut Vec<Point>,
+    points: &[Point],
+    half_width: f32,
+    cap: StrokeCap,
+) {
+    let Some(direction) = terminal_direction(points, true) else {
+        return;
+    };
+    let center = points[0];
+    match cap {
+        StrokeCap::Butt => {}
+        StrokeCap::Square => {}
+        StrokeCap::Round => {
+            let normal = Point::new(direction.y, -direction.x);
+            append_cap_arc(outline, center, direction, normal, half_width);
+        }
+    }
+}
+
+fn apply_square_caps(points: &[Point], half_width: f32, left: &mut [Point], right: &mut [Point]) {
+    let Some(start_direction) = terminal_direction(points, true) else {
+        return;
+    };
+    let Some(end_direction) = terminal_direction(points, false) else {
+        return;
+    };
+    let start_offset = scale_point(start_direction, half_width);
+    let end_offset = scale_point(end_direction, half_width);
+    left[0] = add_points(left[0], start_offset);
+    right[0] = add_points(right[0], start_offset);
+    let last = points.len() - 1;
+    left[last] = add_points(left[last], end_offset);
+    right[last] = add_points(right[last], end_offset);
+}
+
+fn append_cap_arc(
+    outline: &mut Vec<Point>,
+    center: Point,
+    direction: Point,
+    start_normal: Point,
+    radius: f32,
+) {
+    let segments = stroke_cap_segments(radius * 2.0);
+    for index in 1..segments {
+        let angle = std::f32::consts::PI * index as f32 / segments as f32;
+        let normal_part = scale_point(start_normal, angle.cos() * radius);
+        let direction_part = scale_point(direction, angle.sin() * radius);
+        outline.push(add_points(center, add_points(normal_part, direction_part)));
+    }
+}
+
+fn terminal_direction(points: &[Point], start: bool) -> Option<Point> {
+    let vector = if start {
+        sub_points(points[0], points[1])
+    } else {
+        sub_points(
+            *points.last().expect("checked line point count"),
+            points[points.len() - 2],
+        )
+    };
+    let length = point_length(vector);
+    if length <= f32::EPSILON {
+        None
+    } else {
+        Some(scale_point(vector, 1.0 / length))
+    }
+}
+
+fn stroke_cap_segments(width: f32) -> usize {
+    let segments = ((width * 1.25).ceil() as usize).clamp(6, 24);
+    if segments % 2 == 0 {
+        segments
+    } else {
+        (segments + 1).min(24)
+    }
 }
 
 fn fill_circle_mesh(command: &FillCirclePaint) -> Option<TriangleMeshPrimitive> {
@@ -1001,6 +1182,8 @@ fn append_corner_preserved_dashed_border(
             width,
             color,
             closed: false,
+            cap: StrokeCap::Butt,
+            join: StrokeJoin::Miter,
         }));
     }
     append_distributed_dashes(
@@ -1130,6 +1313,7 @@ fn append_distributed_dashes(
             to: add_points(start, scale_point(direction, cursor + pattern.dash)),
             width,
             color,
+            cap: StrokeCap::Butt,
         }));
         cursor += pattern.dash + pattern.gap;
     }
@@ -1319,6 +1503,8 @@ fn append_arrow_border_command(
         width,
         color: border.color,
         closed: true,
+        cap: StrokeCap::Butt,
+        join: StrokeJoin::Miter,
     }));
 }
 
@@ -1426,6 +1612,7 @@ fn append_glyph_line(
         to,
         width,
         color,
+        cap: StrokeCap::Round,
     }));
 }
 
@@ -1830,6 +2017,8 @@ mod tests {
             width: 4.0,
             color: Color::rgba(40, 50, 60, 230),
             closed: false,
+            cap: StrokeCap::Butt,
+            join: StrokeJoin::Miter,
         }));
 
         let primitives = plan_primitives(&list);
@@ -1846,6 +2035,111 @@ mod tests {
         assert_eq!(mesh.element_id.as_str(), "joined");
         assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
         assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 230));
+    }
+
+    #[test]
+    fn round_line_cap_extends_stroke_with_semicircle_geometry() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::StrokeLine(StrokeLinePaint {
+            element_id: ElementId::new("round-cap"),
+            from: Point::new(10.0, 20.0),
+            to: Point::new(50.0, 20.0),
+            width: 10.0,
+            color: Color::rgb(90, 80, 70),
+            cap: StrokeCap::Round,
+        }));
+
+        let primitives = plan_primitives(&list);
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected capped line mesh");
+        };
+
+        assert!(
+            mesh.vertices.iter().any(|vertex| vertex.position.x <= 5.0),
+            "round cap should extend by half stroke width before the start point"
+        );
+        assert!(
+            mesh.vertices.iter().any(|vertex| vertex.position.x >= 55.0),
+            "round cap should extend by half stroke width after the end point"
+        );
+        assert!(
+            mesh.vertices.len() > 16,
+            "round caps should add semicircle samples beyond the stroke body"
+        );
+    }
+
+    #[test]
+    fn square_line_cap_extends_both_stroke_sides() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::StrokeLine(StrokeLinePaint {
+            element_id: ElementId::new("square-cap"),
+            from: Point::new(10.0, 20.0),
+            to: Point::new(50.0, 20.0),
+            width: 10.0,
+            color: Color::rgb(90, 80, 70),
+            cap: StrokeCap::Square,
+        }));
+
+        let primitives = plan_primitives(&list);
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected capped line mesh");
+        };
+
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position.x <= 5.0 && vertex.position.y <= 15.0)
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position.x <= 5.0 && vertex.position.y >= 25.0)
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position.x >= 55.0 && vertex.position.y <= 15.0)
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position.x >= 55.0 && vertex.position.y >= 25.0)
+        );
+    }
+
+    #[test]
+    fn round_stroke_join_adds_antialiased_joint_coverage() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::StrokePath(StrokePathPaint {
+            element_id: ElementId::new("round-join"),
+            points: vec![
+                Point::new(0.0, 0.0),
+                Point::new(20.0, 0.0),
+                Point::new(20.0, 20.0),
+            ],
+            width: 10.0,
+            color: Color::rgb(10, 20, 30),
+            closed: false,
+            cap: StrokeCap::Butt,
+            join: StrokeJoin::Round,
+        }));
+
+        let primitives = plan_primitives(&list);
+
+        assert_eq!(
+            primitives.commands.len(),
+            2,
+            "round joins should add explicit joint coverage over the stroke strip"
+        );
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(joint)) = &primitives.commands[1]
+        else {
+            panic!("expected round join mesh");
+        };
+        assert_eq!(joint.element_id.as_str(), "round-join");
+        assert!(joint.vertices.iter().any(|vertex| vertex.color.a == 0));
+        assert!(joint.vertices.iter().any(|vertex| vertex.color.a == 255));
     }
 
     #[test]
