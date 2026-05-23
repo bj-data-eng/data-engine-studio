@@ -1466,14 +1466,19 @@ pub fn clip_rect_to_scissor(clip: Option<Rect>, size: PhysicalRenderSize) -> Opt
     }
     let scale = size.scale_factor as f32;
     let (left, top, right, bottom) = if let Some(clip) = clip {
-        (
-            (clip.origin.x * scale).floor().max(0.0),
-            (clip.origin.y * scale).floor().max(0.0),
-            (clip.right() * scale).ceil().min(size.width as f32),
-            (clip.bottom() * scale).ceil().min(size.height as f32),
-        )
+        let screen_width = size.width as i32;
+        let screen_height = size.height as i32;
+        let left = (clip.origin.x * scale).round() as i32;
+        let top = (clip.origin.y * scale).round() as i32;
+        let right = (clip.right() * scale).round() as i32;
+        let bottom = (clip.bottom() * scale).round() as i32;
+        let left = left.clamp(0, screen_width);
+        let right = right.clamp(left, screen_width);
+        let top = top.clamp(0, screen_height);
+        let bottom = bottom.clamp(top, screen_height);
+        (left, top, right, bottom)
     } else {
-        (0.0, 0.0, size.width as f32, size.height as f32)
+        (0, 0, size.width as i32, size.height as i32)
     };
     if right <= left || bottom <= top {
         return None;
@@ -2173,6 +2178,50 @@ mod tests {
                 y: 41,
                 width: 60,
                 height: 80,
+            })
+        );
+    }
+
+    #[test]
+    fn clip_rect_rounds_to_physical_pixels_like_epaint_viewport() {
+        let scissor = clip_rect_to_scissor(
+            Some(Rect::new(10.25, 20.25, 30.25, 40.25)),
+            PhysicalRenderSize {
+                width: 200,
+                height: 200,
+                scale_factor: 2.0,
+            },
+        );
+
+        assert_eq!(
+            scissor,
+            Some(ScissorRect {
+                x: 21,
+                y: 41,
+                width: 60,
+                height: 80,
+            })
+        );
+    }
+
+    #[test]
+    fn clip_rect_rounds_and_clamps_to_surface_bounds() {
+        let scissor = clip_rect_to_scissor(
+            Some(Rect::new(-1.4, -1.4, 5.6, 5.6)),
+            PhysicalRenderSize {
+                width: 8,
+                height: 8,
+                scale_factor: 1.0,
+            },
+        );
+
+        assert_eq!(
+            scissor,
+            Some(ScissorRect {
+                x: 0,
+                y: 0,
+                width: 4,
+                height: 4,
             })
         );
     }
