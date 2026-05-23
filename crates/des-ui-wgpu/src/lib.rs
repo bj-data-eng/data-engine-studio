@@ -201,6 +201,93 @@ impl From<RenderAlphaFromCoverage> for epaint::AlphaFromCoverage {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextureFilter {
+    Nearest,
+    #[default]
+    Linear,
+}
+
+impl From<epaint::textures::TextureFilter> for TextureFilter {
+    fn from(value: epaint::textures::TextureFilter) -> Self {
+        match value {
+            epaint::textures::TextureFilter::Nearest => Self::Nearest,
+            epaint::textures::TextureFilter::Linear => Self::Linear,
+        }
+    }
+}
+
+impl From<TextureFilter> for wgpu::FilterMode {
+    fn from(value: TextureFilter) -> Self {
+        match value {
+            TextureFilter::Nearest => Self::Nearest,
+            TextureFilter::Linear => Self::Linear,
+        }
+    }
+}
+
+impl From<TextureFilter> for wgpu::MipmapFilterMode {
+    fn from(value: TextureFilter) -> Self {
+        match value {
+            TextureFilter::Nearest => Self::Nearest,
+            TextureFilter::Linear => Self::Linear,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextureWrapMode {
+    #[default]
+    ClampToEdge,
+    Repeat,
+    MirroredRepeat,
+}
+
+impl From<epaint::textures::TextureWrapMode> for TextureWrapMode {
+    fn from(value: epaint::textures::TextureWrapMode) -> Self {
+        match value {
+            epaint::textures::TextureWrapMode::ClampToEdge => Self::ClampToEdge,
+            epaint::textures::TextureWrapMode::Repeat => Self::Repeat,
+            epaint::textures::TextureWrapMode::MirroredRepeat => Self::MirroredRepeat,
+        }
+    }
+}
+
+impl From<TextureWrapMode> for wgpu::AddressMode {
+    fn from(value: TextureWrapMode) -> Self {
+        match value {
+            TextureWrapMode::ClampToEdge => Self::ClampToEdge,
+            TextureWrapMode::Repeat => Self::Repeat,
+            TextureWrapMode::MirroredRepeat => Self::MirrorRepeat,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TextureOptions {
+    pub magnification: TextureFilter,
+    pub minification: TextureFilter,
+    pub wrap_mode: TextureWrapMode,
+    pub mipmap_mode: Option<TextureFilter>,
+}
+
+impl Default for TextureOptions {
+    fn default() -> Self {
+        epaint::textures::TextureOptions::default().into()
+    }
+}
+
+impl From<epaint::textures::TextureOptions> for TextureOptions {
+    fn from(value: epaint::textures::TextureOptions) -> Self {
+        Self {
+            magnification: value.magnification.into(),
+            minification: value.minification.into(),
+            wrap_mode: value.wrap_mode.into(),
+            mipmap_mode: value.mipmap_mode.map(Into::into),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderTextOptions {
     pub max_texture_side: usize,
@@ -385,6 +472,7 @@ pub struct TextAtlasDelta {
     pub pos: Option<[u32; 2]>,
     pub width: u32,
     pub height: u32,
+    pub options: TextureOptions,
     pub pixels: Vec<u8>,
 }
 
@@ -620,6 +708,7 @@ fn text_atlas_delta_from_epaint(delta: epaint::ImageDelta) -> TextAtlasDelta {
         pos: delta.pos.map(|[x, y]| [x as u32, y as u32]),
         width,
         height,
+        options: delta.options.into(),
         pixels,
     }
 }
@@ -1091,16 +1180,10 @@ impl<'window> GpuRenderer<'window> {
                     },
                 ],
             });
-        let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("des-ui texture sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
-            ..Default::default()
-        });
+        let texture_sampler = device.create_sampler(&texture_sampler_descriptor(
+            "des-ui texture sampler",
+            TextureOptions::default(),
+        ));
         let pipeline = create_pipeline(&device, config.format, &texture_bind_group_layout);
         let solid_texture = create_rgba_texture(
             &device,
@@ -1443,6 +1526,24 @@ fn write_text_atlas_delta(queue: &wgpu::Queue, texture: &wgpu::Texture, delta: &
     );
 }
 
+fn texture_sampler_descriptor(
+    label: &'static str,
+    options: TextureOptions,
+) -> wgpu::SamplerDescriptor<'static> {
+    wgpu::SamplerDescriptor {
+        label: Some(label),
+        address_mode_u: options.wrap_mode.into(),
+        address_mode_v: options.wrap_mode.into(),
+        address_mode_w: options.wrap_mode.into(),
+        mag_filter: options.magnification.into(),
+        min_filter: options.minification.into(),
+        mipmap_filter: options
+            .mipmap_mode
+            .map_or(wgpu::MipmapFilterMode::Nearest, Into::into),
+        ..Default::default()
+    }
+}
+
 fn create_rgba_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -1736,8 +1837,9 @@ mod tests {
     use crate::{
         ClearColor, DisplayListRenderer, Mesh, MeshBuilder, PackedColor, PhysicalRenderSize,
         RenderAlphaFromCoverage, RenderItem, RenderOptions, RenderTextOptions, RendererError,
-        ScissorRect, TextRasterizer, Vertex, build_uploaded_frame, clip_rect_to_scissor,
-        epaint_layout_job, mesh_for_display_list, text_atlas_upload,
+        ScissorRect, TextRasterizer, TextureFilter, TextureOptions, TextureWrapMode, Vertex,
+        build_uploaded_frame, clip_rect_to_scissor, epaint_layout_job, mesh_for_display_list,
+        text_atlas_upload,
     };
 
     #[test]
@@ -2588,6 +2690,7 @@ mod tests {
                 pos: None,
                 width: 64,
                 height: 128,
+                options: TextureOptions::default(),
                 pixels: vec![255; 64 * 128 * 4],
             }),
             batches: vec![crate::Mesh {
@@ -2634,7 +2737,7 @@ mod tests {
     }
 
     #[test]
-    fn text_atlas_delta_preserves_epaint_partial_patch_origin() {
+    fn text_atlas_delta_preserves_epaint_partial_patch_contract() {
         let image = epaint::ColorImage::new(
             [2, 1],
             vec![
@@ -2645,7 +2748,7 @@ mod tests {
         let delta = epaint::ImageDelta::partial(
             [12, 34],
             image,
-            epaint::textures::TextureOptions::default(),
+            epaint::textures::TextureOptions::NEAREST_REPEAT,
         );
 
         let atlas_delta = crate::text_atlas_delta_from_epaint(delta);
@@ -2653,7 +2756,34 @@ mod tests {
         assert_eq!(atlas_delta.pos, Some([12, 34]));
         assert_eq!(atlas_delta.width, 2);
         assert_eq!(atlas_delta.height, 1);
+        assert_eq!(
+            atlas_delta.options,
+            TextureOptions {
+                magnification: TextureFilter::Nearest,
+                minification: TextureFilter::Nearest,
+                wrap_mode: TextureWrapMode::Repeat,
+                mipmap_mode: None,
+            }
+        );
         assert_eq!(atlas_delta.pixels, vec![10, 20, 30, 40, 50, 60, 70, 80]);
+    }
+
+    #[test]
+    fn texture_sampler_descriptor_maps_epaint_texture_options_to_wgpu() {
+        let descriptor = crate::texture_sampler_descriptor(
+            "texture options",
+            epaint::textures::TextureOptions::LINEAR_MIRRORED_REPEAT
+                .with_mipmap_mode(Some(epaint::textures::TextureFilter::Linear))
+                .into(),
+        );
+
+        assert_eq!(descriptor.label, Some("texture options"));
+        assert_eq!(descriptor.address_mode_u, wgpu::AddressMode::MirrorRepeat);
+        assert_eq!(descriptor.address_mode_v, wgpu::AddressMode::MirrorRepeat);
+        assert_eq!(descriptor.address_mode_w, wgpu::AddressMode::MirrorRepeat);
+        assert_eq!(descriptor.mag_filter, wgpu::FilterMode::Linear);
+        assert_eq!(descriptor.min_filter, wgpu::FilterMode::Linear);
+        assert_eq!(descriptor.mipmap_filter, wgpu::MipmapFilterMode::Linear);
     }
 
     #[test]
