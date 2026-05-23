@@ -1010,6 +1010,12 @@ struct GpuTexture {
     bind_group: wgpu::BindGroup,
 }
 
+impl GpuTexture {
+    fn destroy(self) {
+        self.texture.destroy();
+    }
+}
+
 struct TextureUpload<'a> {
     width: u32,
     height: u32,
@@ -1048,6 +1054,13 @@ enum TextAtlasUpload {
     Unchanged(TextureDescriptor),
     Reuse(TextureDescriptor),
     Recreate(TextureDescriptor),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TextureDeltaUpload {
+    Allocate(TextureDescriptor),
+    Patch,
+    PatchAndRebind(TextureDescriptor),
 }
 
 #[derive(Default)]
@@ -1139,6 +1152,34 @@ fn text_atlas_upload(
         }
     } else {
         TextAtlasUpload::Recreate(next)
+    }
+}
+
+fn texture_delta_upload(
+    current: Option<TextureDescriptor>,
+    delta: &TextureDelta,
+    texture_id: epaint::TextureId,
+) -> Result<TextureDeltaUpload, RendererError> {
+    let next = TextureDescriptor {
+        width: delta.width,
+        height: delta.height,
+        options: delta.options,
+    };
+    if delta.pos.is_none() {
+        return Ok(TextureDeltaUpload::Allocate(next));
+    }
+    let Some(current) = current else {
+        return Err(RendererError::PartialTextureUpdateMissingTexture(
+            texture_id,
+        ));
+    };
+    if current.options == delta.options {
+        Ok(TextureDeltaUpload::Patch)
+    } else {
+        Ok(TextureDeltaUpload::PatchAndRebind(TextureDescriptor {
+            options: delta.options,
+            ..current
+        }))
     }
 }
 
@@ -1386,7 +1427,9 @@ impl<'window> GpuRenderer<'window> {
     }
 
     pub fn remove_texture(&mut self, texture_id: epaint::TextureId) {
-        self.textures.remove(&texture_id);
+        if let Some(texture) = self.textures.remove(&texture_id) {
+            texture.gpu.destroy();
+        }
     }
 
     fn apply_texture_delta(
@@ -1394,28 +1437,27 @@ impl<'window> GpuRenderer<'window> {
         texture_id: epaint::TextureId,
         delta: &TextureDelta,
     ) -> Result<(), RendererError> {
-        if delta.pos.is_some() {
-            let needs_sampler = self
-                .textures
-                .get(&texture_id)
-                .ok_or(RendererError::PartialTextureUpdateMissingTexture(
-                    texture_id,
-                ))?
-                .descriptor
-                .options
-                != delta.options;
-            let sampler = needs_sampler.then(|| {
-                cached_sampler(
+        let current = self
+            .textures
+            .get(&texture_id)
+            .map(|texture| texture.descriptor);
+        match texture_delta_upload(current, delta, texture_id)? {
+            TextureDeltaUpload::Patch => {
+                let texture = self.textures.get_mut(&texture_id).ok_or(
+                    RendererError::PartialTextureUpdateMissingTexture(texture_id),
+                )?;
+                write_rgba_texture_delta(&self.queue, &texture.gpu.texture, delta);
+            }
+            TextureDeltaUpload::PatchAndRebind(descriptor) => {
+                let sampler = cached_sampler(
                     &self.device,
                     &mut self.samplers,
                     "des-ui registered texture sampler",
-                    delta.options,
-                )
-            });
-            let texture = self.textures.get_mut(&texture_id).ok_or(
-                RendererError::PartialTextureUpdateMissingTexture(texture_id),
-            )?;
-            if let Some(sampler) = sampler {
+                    descriptor.options,
+                );
+                let texture = self.textures.get_mut(&texture_id).ok_or(
+                    RendererError::PartialTextureUpdateMissingTexture(texture_id),
+                )?;
                 texture.gpu.bind_group = create_texture_bind_group(
                     &self.device,
                     &self.texture_bind_group_layout,
@@ -1423,37 +1465,36 @@ impl<'window> GpuRenderer<'window> {
                     &sampler,
                     "des-ui registered texture",
                 );
-                texture.descriptor.options = delta.options;
+                texture.descriptor = descriptor;
+                write_rgba_texture_delta(&self.queue, &texture.gpu.texture, delta);
             }
-            write_rgba_texture_delta(&self.queue, &texture.gpu.texture, delta);
-            return Ok(());
+            TextureDeltaUpload::Allocate(descriptor) => {
+                let sampler = cached_sampler(
+                    &self.device,
+                    &mut self.samplers,
+                    "des-ui registered texture sampler",
+                    descriptor.options,
+                );
+                let gpu = create_rgba_texture(
+                    &self.device,
+                    &self.queue,
+                    &self.texture_bind_group_layout,
+                    &sampler,
+                    "des-ui registered texture",
+                    TextureUpload {
+                        width: delta.width,
+                        height: delta.height,
+                        pixels: &delta.pixels,
+                    },
+                );
+                if let Some(old) = self
+                    .textures
+                    .insert(texture_id, GpuRegisteredTexture { descriptor, gpu })
+                {
+                    old.gpu.destroy();
+                }
+            }
         }
-
-        let descriptor = TextureDescriptor {
-            width: delta.width,
-            height: delta.height,
-            options: delta.options,
-        };
-        let sampler = cached_sampler(
-            &self.device,
-            &mut self.samplers,
-            "des-ui registered texture sampler",
-            delta.options,
-        );
-        let gpu = create_rgba_texture(
-            &self.device,
-            &self.queue,
-            &self.texture_bind_group_layout,
-            &sampler,
-            "des-ui registered texture",
-            TextureUpload {
-                width: delta.width,
-                height: delta.height,
-                pixels: &delta.pixels,
-            },
-        );
-        self.textures
-            .insert(texture_id, GpuRegisteredTexture { descriptor, gpu });
         Ok(())
     }
 
@@ -1547,7 +1588,6 @@ impl<'window> GpuRenderer<'window> {
         frame.present();
         Ok(())
     }
-
     fn upload_render_frame(
         &mut self,
         plan: &RenderPlan,
@@ -1638,6 +1678,9 @@ impl<'window> GpuRenderer<'window> {
             TextAtlasUpload::Unchanged(_) => {}
             TextAtlasUpload::Reuse(_) => {}
             TextAtlasUpload::Recreate(descriptor) => {
+                if let Some(atlas) = self.text_atlas.take() {
+                    atlas.gpu.destroy();
+                }
                 self.text_atlas = Some(self.create_text_atlas(descriptor));
             }
         }
@@ -3248,6 +3291,70 @@ mod tests {
             text_atlas_upload(Some(current), &frame),
             crate::TextAtlasUpload::Recreate(next)
         );
+    }
+
+    #[test]
+    fn texture_delta_upload_matches_epaint_allocation_patch_and_rebind_contracts() {
+        let nearest = TextureOptions {
+            magnification: TextureFilter::Nearest,
+            minification: TextureFilter::Nearest,
+            wrap_mode: TextureWrapMode::ClampToEdge,
+            mipmap_mode: None,
+        };
+        let current = crate::TextureDescriptor {
+            width: 64,
+            height: 64,
+            options: TextureOptions::default(),
+        };
+        let full = crate::TextureDelta {
+            pos: None,
+            width: 16,
+            height: 32,
+            options: nearest,
+            pixels: vec![255; 16 * 32 * 4],
+        };
+        let patch = crate::TextureDelta {
+            pos: Some([4, 8]),
+            width: 8,
+            height: 8,
+            options: TextureOptions::default(),
+            pixels: vec![128; 8 * 8 * 4],
+        };
+        let patch_with_new_options = crate::TextureDelta {
+            options: nearest,
+            ..patch.clone()
+        };
+
+        assert_eq!(
+            crate::texture_delta_upload(None, &full, epaint::TextureId::User(1)).unwrap(),
+            crate::TextureDeltaUpload::Allocate(crate::TextureDescriptor {
+                width: 16,
+                height: 32,
+                options: nearest,
+            })
+        );
+        assert_eq!(
+            crate::texture_delta_upload(Some(current), &patch, epaint::TextureId::User(1)).unwrap(),
+            crate::TextureDeltaUpload::Patch
+        );
+        assert_eq!(
+            crate::texture_delta_upload(
+                Some(current),
+                &patch_with_new_options,
+                epaint::TextureId::User(1)
+            )
+            .unwrap(),
+            crate::TextureDeltaUpload::PatchAndRebind(crate::TextureDescriptor {
+                options: nearest,
+                ..current
+            })
+        );
+        assert!(matches!(
+            crate::texture_delta_upload(None, &patch, epaint::TextureId::User(7)),
+            Err(RendererError::PartialTextureUpdateMissingTexture(
+                epaint::TextureId::User(7)
+            ))
+        ));
     }
 
     #[test]
