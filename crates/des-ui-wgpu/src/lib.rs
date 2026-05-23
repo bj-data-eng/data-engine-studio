@@ -10,7 +10,14 @@ use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
     RenderPrimitive, TextPaint, plan_primitives,
 };
-use std::{cell::RefCell, error, fmt, mem, ops::Range};
+use std::{
+    cell::RefCell,
+    collections::hash_map::DefaultHasher,
+    error, fmt,
+    hash::{Hash, Hasher},
+    mem,
+    ops::Range,
+};
 
 const SHADER: &str = r#"
 struct Viewport {
@@ -291,6 +298,14 @@ pub struct RasterizedTextFrame {
 impl RasterizedTextFrame {
     pub fn is_empty(&self) -> bool {
         self.batches.iter().all(TextMesh::is_empty) || self.pixels.is_empty()
+    }
+
+    fn pixel_fingerprint(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.width.hash(&mut hasher);
+        self.height.hash(&mut hasher);
+        self.pixels.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -683,6 +698,7 @@ pub struct GpuRenderer<'window> {
 
 struct GpuTextAtlas {
     size: TextAtlasSize,
+    fingerprint: u64,
     texture: wgpu::Texture,
     bind_group: wgpu::BindGroup,
 }
@@ -708,8 +724,9 @@ impl TextAtlasSize {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TextAtlasUpload {
     Skip,
-    Reuse(TextAtlasSize),
-    Recreate(TextAtlasSize),
+    Unchanged(TextAtlasSize),
+    Reuse(TextAtlasSize, u64),
+    Recreate(TextAtlasSize, u64),
 }
 
 #[derive(Default)]
@@ -757,15 +774,21 @@ enum FrameBufferSlot {
 
 fn text_atlas_upload(
     current: Option<TextAtlasSize>,
+    current_fingerprint: Option<u64>,
     frame: &RasterizedTextFrame,
 ) -> TextAtlasUpload {
     let Some(next) = TextAtlasSize::from_frame(frame) else {
         return TextAtlasUpload::Skip;
     };
+    let next_fingerprint = frame.pixel_fingerprint();
     if current == Some(next) {
-        TextAtlasUpload::Reuse(next)
+        if current_fingerprint == Some(next_fingerprint) {
+            TextAtlasUpload::Unchanged(next)
+        } else {
+            TextAtlasUpload::Reuse(next, next_fingerprint)
+        }
     } else {
-        TextAtlasUpload::Recreate(next)
+        TextAtlasUpload::Recreate(next, next_fingerprint)
     }
 }
 
@@ -1207,38 +1230,49 @@ impl<'window> GpuRenderer<'window> {
 
     fn upload_text_frame(&mut self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
         let current = self.text_atlas.as_ref().map(|atlas| atlas.size);
-        let size = match text_atlas_upload(current, frame) {
-            TextAtlasUpload::Skip => return None,
-            TextAtlasUpload::Reuse(size) => size,
-            TextAtlasUpload::Recreate(size) => {
-                self.text_atlas = Some(self.create_text_atlas(size));
-                size
+        let current_fingerprint = self.text_atlas.as_ref().map(|atlas| atlas.fingerprint);
+        let (size, fingerprint, write_pixels) =
+            match text_atlas_upload(current, current_fingerprint, frame) {
+                TextAtlasUpload::Skip => return None,
+                TextAtlasUpload::Unchanged(size) => {
+                    let fingerprint = self.text_atlas.as_ref()?.fingerprint;
+                    (size, fingerprint, false)
+                }
+                TextAtlasUpload::Reuse(size, fingerprint) => (size, fingerprint, true),
+                TextAtlasUpload::Recreate(size, fingerprint) => {
+                    self.text_atlas = Some(self.create_text_atlas(size, fingerprint));
+                    (size, fingerprint, true)
+                }
+            };
+        if write_pixels {
+            let atlas = self.text_atlas.as_ref()?;
+            self.queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &atlas.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &frame.pixels,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(size.width * 4),
+                    rows_per_image: Some(size.height),
+                },
+                wgpu::Extent3d {
+                    width: size.width,
+                    height: size.height,
+                    depth_or_array_layers: 1,
+                },
+            );
+            if let Some(atlas) = self.text_atlas.as_mut() {
+                atlas.fingerprint = fingerprint;
             }
-        };
-        let atlas = self.text_atlas.as_ref()?;
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &atlas.texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &frame.pixels,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(size.width * 4),
-                rows_per_image: Some(size.height),
-            },
-            wgpu::Extent3d {
-                width: size.width,
-                height: size.height,
-                depth_or_array_layers: 1,
-            },
-        );
-        Some(atlas.bind_group.clone())
+        }
+        Some(self.text_atlas.as_ref()?.bind_group.clone())
     }
 
-    fn create_text_atlas(&self, size: TextAtlasSize) -> GpuTextAtlas {
+    fn create_text_atlas(&self, size: TextAtlasSize, fingerprint: u64) -> GpuTextAtlas {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("des-ui text atlas texture"),
             size: wgpu::Extent3d {
@@ -1274,6 +1308,7 @@ impl<'window> GpuRenderer<'window> {
         });
         GpuTextAtlas {
             size,
+            fingerprint,
             texture,
             bind_group,
         }
@@ -1781,7 +1816,7 @@ mod tests {
     fn text_atlas_upload_reuses_existing_gpu_texture_until_size_changes() {
         let empty = crate::RasterizedTextFrame::default();
         assert_eq!(
-            text_atlas_upload(None, &empty),
+            text_atlas_upload(None, None, &empty),
             crate::TextAtlasUpload::Skip
         );
 
@@ -1802,14 +1837,19 @@ mod tests {
             width: 64,
             height: 128,
         };
+        let fingerprint = frame.pixel_fingerprint();
 
         assert_eq!(
-            text_atlas_upload(None, &frame),
-            crate::TextAtlasUpload::Recreate(size)
+            text_atlas_upload(None, None, &frame),
+            crate::TextAtlasUpload::Recreate(size, fingerprint)
         );
         assert_eq!(
-            text_atlas_upload(Some(size), &frame),
-            crate::TextAtlasUpload::Reuse(size)
+            text_atlas_upload(Some(size), Some(fingerprint), &frame),
+            crate::TextAtlasUpload::Unchanged(size)
+        );
+        assert_eq!(
+            text_atlas_upload(Some(size), Some(fingerprint.wrapping_add(1)), &frame),
+            crate::TextAtlasUpload::Reuse(size, fingerprint)
         );
         assert_eq!(
             text_atlas_upload(
@@ -1817,9 +1857,10 @@ mod tests {
                     width: 32,
                     height: 128,
                 }),
+                None,
                 &frame
             ),
-            crate::TextAtlasUpload::Recreate(size)
+            crate::TextAtlasUpload::Recreate(size, fingerprint)
         );
     }
 
