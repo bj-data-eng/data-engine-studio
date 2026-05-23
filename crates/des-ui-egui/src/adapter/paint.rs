@@ -1,8 +1,9 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_ui_document::{Color, CornerRadii, DocumentOutput, Point, Rect, TextLayoutRequest};
 use des_ui_render::{
-    DisplayList, FillCirclePaint, FillPolygonPaint, FillRectPaint, PaintCommand, StrokeLinePaint,
-    StrokePathPaint, StrokeRectPaint, TextPaint, plan_paint,
+    DashedLinePaint, DisplayList, DottedLinePaint, FillCirclePaint, FillPolygonPaint,
+    FillRectPaint, PaintCommand, ShadowRectPaint, StrokeLinePaint, StrokePathPaint,
+    StrokeRectPaint, TextPaint, plan_paint,
 };
 use eframe::egui;
 
@@ -29,6 +30,10 @@ pub fn paint_display_list(ui: &mut egui::Ui, origin: egui::Pos2, display_list: &
                 let painter = clipped_painter(ui, &clip_stack);
                 paint_fill_rect(&painter, origin, command);
             }
+            PaintCommand::ShadowRect(command) => {
+                let painter = clipped_painter(ui, &clip_stack);
+                paint_shadow_rect(&painter, origin, command);
+            }
             PaintCommand::StrokeRect(command) => {
                 let painter = clipped_painter(ui, &clip_stack);
                 paint_stroke_rect(&painter, origin, command);
@@ -36,6 +41,14 @@ pub fn paint_display_list(ui: &mut egui::Ui, origin: egui::Pos2, display_list: &
             PaintCommand::StrokeLine(command) => {
                 let painter = clipped_painter(ui, &clip_stack);
                 paint_stroke_line(&painter, origin, command);
+            }
+            PaintCommand::DashedLine(command) => {
+                let painter = clipped_painter(ui, &clip_stack);
+                paint_dashed_line(&painter, origin, command);
+            }
+            PaintCommand::DottedLine(command) => {
+                let painter = clipped_painter(ui, &clip_stack);
+                paint_dotted_line(&painter, origin, command);
             }
             PaintCommand::StrokePath(command) => {
                 let painter = clipped_painter(ui, &clip_stack);
@@ -70,6 +83,20 @@ fn paint_fill_rect(painter: &egui::Painter, origin: egui::Pos2, command: &FillRe
     );
 }
 
+fn paint_shadow_rect(painter: &egui::Painter, origin: egui::Pos2, command: &ShadowRectPaint) {
+    if command.rect.size.width <= 0.0 || command.rect.size.height <= 0.0 || command.color.a == 0 {
+        return;
+    }
+    painter.add(egui::Shape::Rect(
+        egui::epaint::RectShape::filled(
+            document_rect_to_egui(origin, command.rect),
+            to_egui_radius(command.radius),
+            to_egui_color(command.color),
+        )
+        .with_blur_width(command.blur_width.max(0.0)),
+    ));
+}
+
 fn paint_stroke_rect(painter: &egui::Painter, origin: egui::Pos2, command: &StrokeRectPaint) {
     if command.width <= 0.0 {
         return;
@@ -93,6 +120,40 @@ fn paint_stroke_line(painter: &egui::Painter, origin: egui::Pos2, command: &Stro
         ],
         egui::Stroke::new(command.width, to_egui_color(command.color)),
     );
+}
+
+fn paint_dashed_line(painter: &egui::Painter, origin: egui::Pos2, command: &DashedLinePaint) {
+    if command.width <= 0.0 || command.dash <= 0.0 || command.gap < 0.0 {
+        return;
+    }
+    let path = [
+        document_point_to_egui(origin, command.from),
+        document_point_to_egui(origin, command.to),
+    ];
+    let shapes = egui::Shape::dashed_line_with_offset(
+        &path,
+        egui::Stroke::new(command.width, to_egui_color(command.color)),
+        &[command.dash],
+        &[command.gap],
+        command.offset.max(0.0),
+    );
+    painter.extend(shapes);
+}
+
+fn paint_dotted_line(painter: &egui::Painter, origin: egui::Pos2, command: &DottedLinePaint) {
+    if command.radius <= 0.0 || command.spacing <= 0.0 {
+        return;
+    }
+    let path = [
+        document_point_to_egui(origin, command.from),
+        document_point_to_egui(origin, command.to),
+    ];
+    painter.extend(egui::Shape::dotted_line(
+        &path,
+        to_egui_color(command.color),
+        command.spacing,
+        command.radius,
+    ));
 }
 
 fn paint_stroke_path(painter: &egui::Painter, origin: egui::Pos2, command: &StrokePathPaint) {
