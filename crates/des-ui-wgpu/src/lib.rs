@@ -22,6 +22,8 @@ use std::{
 const SHADER: &str = r#"
 struct Viewport {
     size: vec2<f32>,
+    dithering: u32,
+    _pad: u32,
 };
 
 @group(0) @binding(0)
@@ -52,7 +54,11 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main_gamma_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    return input.color;
+    var color = input.color;
+    if viewport.dithering == 1u {
+        color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
+    }
+    return color;
 }
 
 fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
@@ -60,6 +66,17 @@ fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
     let lower = srgb / vec3<f32>(12.92);
     let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
     return select(higher, lower, cutoff);
+}
+
+fn interleaved_gradient_noise(n: vec2<f32>) -> f32 {
+    let f = 0.06711056 * n.x + 0.00583715 * n.y;
+    return fract(52.9829189 * fract(f));
+}
+
+fn dither_interleaved(rgb: vec3<f32>, levels: f32, frag_coord: vec4<f32>) -> vec3<f32> {
+    var noise = interleaved_gradient_noise(frag_coord.xy);
+    noise = (noise - 0.5) * 0.95;
+    return rgb + noise / (levels - 1.0);
 }
 
 fn unpack_color(color: u32) -> vec4<f32> {
@@ -73,13 +90,19 @@ fn unpack_color(color: u32) -> vec4<f32> {
 
 @fragment
 fn fs_main_linear_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(linear_from_gamma_rgb(input.color.rgb), input.color.a);
+    var color = input.color;
+    if viewport.dithering == 1u {
+        color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
+    }
+    return vec4<f32>(linear_from_gamma_rgb(color.rgb), color.a);
 }
 "#;
 
 const TEXT_SHADER: &str = r#"
 struct Viewport {
     size: vec2<f32>,
+    dithering: u32,
+    _pad: u32,
 };
 
 @group(0) @binding(0)
@@ -116,7 +139,11 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main_gamma_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(text_texture, text_sampler, input.uv) * input.color;
+    var color = textureSample(text_texture, text_sampler, input.uv) * input.color;
+    if viewport.dithering == 1u {
+        color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
+    }
+    return color;
 }
 
 fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
@@ -126,9 +153,23 @@ fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
     return select(higher, lower, cutoff);
 }
 
+fn interleaved_gradient_noise(n: vec2<f32>) -> f32 {
+    let f = 0.06711056 * n.x + 0.00583715 * n.y;
+    return fract(52.9829189 * fract(f));
+}
+
+fn dither_interleaved(rgb: vec3<f32>, levels: f32, frag_coord: vec4<f32>) -> vec3<f32> {
+    var noise = interleaved_gradient_noise(frag_coord.xy);
+    noise = (noise - 0.5) * 0.95;
+    return rgb + noise / (levels - 1.0);
+}
+
 @fragment
 fn fs_main_linear_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(text_texture, text_sampler, input.uv) * input.color;
+    var color = textureSample(text_texture, text_sampler, input.uv) * input.color;
+    if viewport.dithering == 1u {
+        color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
+    }
     return vec4<f32>(linear_from_gamma_rgb(color.rgb), color.a);
 }
 "#;
@@ -186,6 +227,7 @@ impl PresentMode {
 pub struct RenderOptions {
     pub clear_color: ClearColor,
     pub present_mode: PresentMode,
+    pub dithering: bool,
 }
 
 impl Default for RenderOptions {
@@ -193,6 +235,7 @@ impl Default for RenderOptions {
         Self {
             clear_color: ClearColor::default(),
             present_mode: PresentMode::default(),
+            dithering: true,
         }
     }
 }
@@ -646,7 +689,8 @@ impl Vertex {
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 struct ViewportUniform {
     size: [f32; 2],
-    _pad: [f32; 2],
+    dithering: u32,
+    _pad: u32,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -718,6 +762,7 @@ pub struct GpuRenderer<'window> {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    options: RenderOptions,
     pipeline: wgpu::RenderPipeline,
     text_pipeline: wgpu::RenderPipeline,
     text_bind_group_layout: wgpu::BindGroupLayout,
@@ -936,7 +981,7 @@ impl<'window> GpuRenderer<'window> {
                 label: Some("des-ui viewport bind group layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -959,7 +1004,7 @@ impl<'window> GpuRenderer<'window> {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
@@ -1002,6 +1047,7 @@ impl<'window> GpuRenderer<'window> {
             device,
             queue,
             config,
+            options,
             pipeline,
             text_pipeline,
             text_bind_group_layout,
@@ -1378,15 +1424,20 @@ impl<'window> GpuRenderer<'window> {
     }
 
     fn write_viewport_uniform(&self) {
-        let uniform = ViewportUniform {
-            size: [
-                self.size.logical_width().max(1.0),
-                self.size.logical_height().max(1.0),
-            ],
-            _pad: [0.0, 0.0],
-        };
+        let uniform = viewport_uniform(self.size, self.options);
         self.queue
             .write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&uniform));
+    }
+}
+
+fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> ViewportUniform {
+    ViewportUniform {
+        size: [
+            size.logical_width().max(1.0),
+            size.logical_height().max(1.0),
+        ],
+        dithering: u32::from(options.dithering),
+        _pad: 0,
     }
 }
 
@@ -1675,6 +1726,28 @@ mod tests {
             crate::fragment_entry_point(wgpu::TextureFormat::Bgra8Unorm),
             "fs_main_gamma_framebuffer"
         );
+    }
+
+    #[test]
+    fn render_options_default_to_epaint_style_dithering() {
+        assert!(RenderOptions::default().dithering);
+    }
+
+    #[test]
+    fn viewport_uniform_carries_dithering_to_fragment_shader() {
+        let size = PhysicalRenderSize::new(200, 100, 2.0);
+        let enabled = crate::viewport_uniform(size, RenderOptions::default());
+        let disabled = crate::viewport_uniform(
+            size,
+            RenderOptions {
+                dithering: false,
+                ..RenderOptions::default()
+            },
+        );
+
+        assert_eq!(enabled.size, [100.0, 50.0]);
+        assert_eq!(enabled.dithering, 1);
+        assert_eq!(disabled.dithering, 0);
     }
 
     #[test]
