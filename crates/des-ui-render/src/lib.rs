@@ -293,10 +293,19 @@ impl PrimitivePlanner {
     }
 
     pub fn plan_display_list(&self, display_list: &DisplayList) -> PrimitiveList {
-        let mut primitives = PrimitiveList::new();
         let options = epaint::TessellationOptions::from(self.options);
-        let mut tessellator =
-            epaint::Tessellator::new(self.pixels_per_point, options, [1, 1], Vec::new());
+        self.plan_display_list_with_tessellator(
+            display_list,
+            epaint::Tessellator::new(self.pixels_per_point, options, [1, 1], Vec::new()),
+        )
+    }
+
+    pub fn plan_display_list_with_tessellator(
+        &self,
+        display_list: &DisplayList,
+        mut tessellator: epaint::Tessellator,
+    ) -> PrimitiveList {
+        let mut primitives = PrimitiveList::new();
         let mut clip_stack = Vec::new();
         for command in &display_list.commands {
             append_primitive_command(&mut primitives, command, &mut tessellator, &mut clip_stack);

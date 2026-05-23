@@ -592,6 +592,19 @@ impl TextRasterizer {
             batches,
         }
     }
+
+    pub fn shape_tessellator(
+        &self,
+        scale_factor: f32,
+        tessellation: RenderTessellationOptions,
+    ) -> epaint::Tessellator {
+        epaint::Tessellator::new(
+            scale_factor.max(0.000_001),
+            epaint::TessellationOptions::from(tessellation),
+            self.fonts.font_image_size(),
+            self.fonts.texture_atlas().prepared_discs(),
+        )
+    }
 }
 
 impl Default for TextRasterizer {
@@ -738,10 +751,13 @@ impl DisplayListRenderer {
 
     pub fn build_plan(&self, display_list: &DisplayList) -> RenderPlan {
         let mut builder = RenderPlanBuilder::new(self.options);
+        let text_rasterizer = TextRasterizer::with_text_options(self.options.text);
+        let tessellator =
+            text_rasterizer.shape_tessellator(self.pixels_per_point, self.options.tessellation);
         let primitives = PrimitivePlanner::new()
             .with_pixels_per_point(self.pixels_per_point)
             .with_tessellation_options(self.options.tessellation)
-            .plan_display_list(display_list);
+            .plan_display_list_with_tessellator(display_list, tessellator);
         builder.push_primitives(&primitives);
         builder.finish()
     }
@@ -1847,12 +1863,12 @@ mod tests {
     use std::mem;
 
     use des_ui_document::{
-        Color, CornerRadii, Document, DocumentEngine, Element, ElementId, Rect, Size, Style,
+        Color, CornerRadii, Document, DocumentEngine, Element, ElementId, Point, Rect, Size, Style,
         StyleSelector, StyleSheet, TextWrapMode,
     };
     use des_ui_render::{
-        DisplayList, FillRectPaint, PaintCommand, RenderTessellationOptions, TextPaint,
-        TextSelectionPaint,
+        DisplayList, FillCirclePaint, FillRectPaint, PaintCommand, RenderTessellationOptions,
+        TextPaint, TextSelectionPaint,
     };
 
     use crate::{
@@ -1860,7 +1876,7 @@ mod tests {
         RenderAlphaFromCoverage, RenderItem, RenderOptions, RenderTextOptions, RendererError,
         ScissorRect, TextRasterizer, TextureFilter, TextureOptions, TextureWrapMode, Vertex,
         build_uploaded_frame, clip_rect_to_scissor, epaint_layout_job, mesh_for_display_list,
-        text_atlas_upload,
+        mesh_uses_paint_atlas, render_plan_needs_text_atlas, text_atlas_upload,
     };
 
     #[test]
@@ -2293,6 +2309,28 @@ mod tests {
         assert!(
             min_x(&high_density) > min_x(&low_density),
             "higher pixel density should shrink the antialiasing fringe in logical coordinates"
+        );
+    }
+
+    #[test]
+    fn display_list_renderer_uses_epaint_prepared_disc_atlas_for_circles() {
+        let mut display_list = DisplayList::new();
+        display_list.push(PaintCommand::FillCircle(FillCirclePaint {
+            element_id: ElementId::new("disc"),
+            center: Point::new(12.0, 12.0),
+            radius: 4.0,
+            color: Color::rgb(120, 90, 180),
+        }));
+
+        let plan = DisplayListRenderer::default().build_plan(&display_list);
+
+        assert!(render_plan_needs_text_atlas(&plan));
+        assert!(
+            plan.items.iter().any(|item| matches!(
+                item,
+                RenderItem::Mesh(batch) if mesh_uses_paint_atlas(&batch.mesh)
+            )),
+            "native shape planning should seed epaint with prepared atlas discs instead of falling back to hand-tessellated circle fans"
         );
     }
 
