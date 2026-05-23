@@ -29,7 +29,8 @@ var<uniform> viewport: Viewport;
 
 struct VertexInput {
     @location(0) position: vec2<f32>,
-    @location(1) color: vec4<f32>,
+    @location(1) uv: vec2<f32>,
+    @location(2) color: u32,
 };
 
 struct VertexOutput {
@@ -45,7 +46,7 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     );
     var output: VertexOutput;
     output.position = vec4<f32>(ndc, 0.0, 1.0);
-    output.color = input.color;
+    output.color = unpack_color(input.color);
     return output;
 }
 
@@ -59,6 +60,15 @@ fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
     let lower = srgb / vec3<f32>(12.92);
     let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
     return select(higher, lower, cutoff);
+}
+
+fn unpack_color(color: u32) -> vec4<f32> {
+    return vec4<f32>(
+        f32(color & 255u),
+        f32((color >> 8u) & 255u),
+        f32((color >> 16u) & 255u),
+        f32((color >> 24u) & 255u),
+    ) / 255.0;
 }
 
 @fragment
@@ -581,6 +591,11 @@ impl PackedColor {
     pub const fn to_array(self) -> [u8; 4] {
         self.0
     }
+
+    pub const fn to_epaint_u32(self) -> u32 {
+        let [r, g, b, a] = self.0;
+        r as u32 | ((g as u32) << 8) | ((b as u32) << 16) | ((a as u32) << 24)
+    }
 }
 
 impl From<Color> for PackedColor {
@@ -593,12 +608,13 @@ impl From<Color> for PackedColor {
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub position: [f32; 2],
-    pub color: [u8; 4],
+    pub uv: [f32; 2],
+    pub color: u32,
 }
 
 impl Vertex {
-    pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x2, 1 => Unorm8x4];
+    pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Uint32];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -606,6 +622,23 @@ impl Vertex {
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &Self::ATTRIBUTES,
         }
+    }
+
+    pub fn from_epaint(vertex: epaint::Vertex) -> Self {
+        Self {
+            position: [vertex.pos.x, vertex.pos.y],
+            uv: [vertex.uv.x, vertex.uv.y],
+            color: PackedColor(vertex.color.to_array()).to_epaint_u32(),
+        }
+    }
+
+    pub fn color_array(self) -> [u8; 4] {
+        [
+            (self.color & 255) as u8,
+            ((self.color >> 8) & 255) as u8,
+            ((self.color >> 16) & 255) as u8,
+            ((self.color >> 24) & 255) as u8,
+        ]
     }
 }
 
@@ -660,12 +693,14 @@ impl MeshBuilder {
 
     fn push_mesh(&mut self, primitive: &EpaintMeshPrimitive) {
         let base = self.mesh.vertices.len() as u32;
-        self.mesh
-            .vertices
-            .extend(primitive.mesh.vertices.iter().map(|vertex| Vertex {
-                position: [vertex.pos.x, vertex.pos.y],
-                color: vertex.color.to_array(),
-            }));
+        self.mesh.vertices.extend(
+            primitive
+                .mesh
+                .vertices
+                .iter()
+                .copied()
+                .map(Vertex::from_epaint),
+        );
         self.mesh
             .indices
             .extend(primitive.mesh.indices.iter().map(|index| base + *index));
@@ -1615,10 +1650,9 @@ mod tests {
 
     #[test]
     fn packed_color_preserves_rgba_channel_order() {
-        assert_eq!(
-            PackedColor::from(Color::rgba(10, 20, 30, 40)).to_array(),
-            [10, 20, 30, 40]
-        );
+        let color = PackedColor::from(Color::rgba(10, 20, 30, 40));
+        assert_eq!(color.to_array(), [10, 20, 30, 40]);
+        assert_eq!(color.to_epaint_u32(), 0x281e_140a);
     }
 
     #[test]
@@ -1661,9 +1695,13 @@ mod tests {
         assert!(
             mesh.vertices
                 .iter()
-                .any(|vertex| vertex.color == [1, 2, 3, 255])
+                .any(|vertex| vertex.color_array() == [1, 2, 3, 255])
         );
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color[3] == 0));
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.color_array()[3] == 0)
+        );
         assert!(
             mesh.vertices
                 .iter()
@@ -1676,6 +1714,31 @@ mod tests {
                 .any(|vertex| vertex.position[0] < 10.0 && vertex.position[1] < 20.0),
             "outer fringe vertices should expand outside the filled edge"
         );
+    }
+
+    #[test]
+    fn mesh_builder_preserves_epaint_vertex_payload() {
+        let mut epaint_mesh = epaint::Mesh::default();
+        let color = epaint::Color32::from_rgba_unmultiplied(10, 20, 30, 40);
+        epaint_mesh.vertices.push(epaint::Vertex {
+            pos: epaint::pos2(4.0, 8.0),
+            uv: epaint::pos2(0.25, 0.75),
+            color,
+        });
+        epaint_mesh.indices.push(0);
+
+        let mut builder = MeshBuilder::new();
+        builder.push_command(&des_ui_render::PrimitiveCommand::Draw(
+            des_ui_render::RenderPrimitive::Mesh(des_ui_render::EpaintMeshPrimitive {
+                element_id: ElementId::new("payload"),
+                mesh: epaint_mesh,
+            }),
+        ));
+
+        let mesh = builder.finish();
+        assert_eq!(mesh.vertices[0].position, [4.0, 8.0]);
+        assert_eq!(mesh.vertices[0].uv, [0.25, 0.75]);
+        assert_eq!(mesh.vertices[0].color_array(), color.to_array());
     }
 
     #[test]
@@ -1984,11 +2047,13 @@ mod tests {
             &[
                 Vertex {
                     position: [0.0, 0.0],
-                    color: [255, 0, 0, 255],
+                    uv: [0.0, 0.0],
+                    color: PackedColor::from(Color::rgb(255, 0, 0)).to_epaint_u32(),
                 },
                 Vertex {
                     position: [1.0, 0.0],
-                    color: [255, 0, 0, 255],
+                    uv: [1.0, 0.0],
+                    color: PackedColor::from(Color::rgb(255, 0, 0)).to_epaint_u32(),
                 },
             ],
             &[0, 1],
@@ -1999,7 +2064,8 @@ mod tests {
             None,
             &[Vertex {
                 position: [2.0, 0.0],
-                color: [0, 0, 255, 255],
+                uv: [0.0, 1.0],
+                color: PackedColor::from(Color::rgb(0, 0, 255)).to_epaint_u32(),
             }],
             &[0],
         );
@@ -2240,7 +2306,15 @@ mod tests {
 
         assert!(mesh.vertices.len() > 4);
         assert!(mesh.indices.len() > 6);
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color[3] == 10));
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color[3] == 0));
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.color_array()[3] == 10)
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.color_array()[3] == 0)
+        );
     }
 }
