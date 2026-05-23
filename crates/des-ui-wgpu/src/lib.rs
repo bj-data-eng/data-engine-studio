@@ -10,7 +10,7 @@ use des_ui_render::{
     DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, PrimitivePlanner,
     RenderPrimitive, TextPaint, plan_primitives,
 };
-use std::{cell::RefCell, error, fmt, mem};
+use std::{cell::RefCell, error, fmt, mem, ops::Range};
 
 const SHADER: &str = r#"
 struct Viewport {
@@ -676,6 +676,8 @@ pub struct GpuRenderer<'window> {
     viewport_bind_group: wgpu::BindGroup,
     text_rasterizer: RefCell<TextRasterizer>,
     text_atlas: Option<GpuTextAtlas>,
+    mesh_buffers: GpuFrameBuffers,
+    text_buffers: GpuFrameBuffers,
     size: PhysicalRenderSize,
 }
 
@@ -710,6 +712,49 @@ enum TextAtlasUpload {
     Recreate(TextAtlasSize),
 }
 
+#[derive(Default)]
+struct GpuFrameBuffers {
+    vertex: Option<GpuBuffer>,
+    index: Option<GpuBuffer>,
+}
+
+struct GpuBuffer {
+    buffer: wgpu::Buffer,
+    capacity: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct UploadedFrame {
+    draws: Vec<UploadedDraw>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct UploadedDraw {
+    clip: Option<Rect>,
+    vertex_range: Range<u64>,
+    index_range: Range<u64>,
+    index_count: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BufferUpload {
+    Skip,
+    Reuse(u64),
+    Recreate(u64),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FrameBufferKind {
+    Mesh,
+    Text,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FrameBufferSlot {
+    Vertex,
+    Index,
+}
+
 fn text_atlas_upload(
     current: Option<TextAtlasSize>,
     frame: &RasterizedTextFrame,
@@ -721,6 +766,70 @@ fn text_atlas_upload(
         TextAtlasUpload::Reuse(next)
     } else {
         TextAtlasUpload::Recreate(next)
+    }
+}
+
+fn buffer_upload(current_capacity: Option<u64>, required_size: u64) -> BufferUpload {
+    if required_size == 0 {
+        return BufferUpload::Skip;
+    }
+    let Some(current_capacity) = current_capacity else {
+        return BufferUpload::Recreate(required_size);
+    };
+    if current_capacity >= required_size {
+        BufferUpload::Reuse(current_capacity)
+    } else {
+        BufferUpload::Recreate((current_capacity * 2).max(required_size))
+    }
+}
+
+fn append_mesh_draw<V: Copy>(
+    vertices: &mut Vec<V>,
+    indices: &mut Vec<u32>,
+    clip: Option<Rect>,
+    next_vertices: &[V],
+    next_indices: &[u32],
+) -> UploadedDraw {
+    let vertex_start = (vertices.len() * mem::size_of::<V>()) as u64;
+    let index_start = (indices.len() * mem::size_of::<u32>()) as u64;
+    vertices.extend_from_slice(next_vertices);
+    indices.extend_from_slice(next_indices);
+    UploadedDraw {
+        clip,
+        vertex_range: vertex_start..(vertices.len() * mem::size_of::<V>()) as u64,
+        index_range: index_start..(indices.len() * mem::size_of::<u32>()) as u64,
+        index_count: next_indices.len() as u32,
+    }
+}
+
+fn ensure_frame_buffer(
+    device: &wgpu::Device,
+    buffers: &mut GpuFrameBuffers,
+    slot: FrameBufferSlot,
+    label: &'static str,
+    usage: wgpu::BufferUsages,
+    required_size: u64,
+) {
+    let current_capacity = match slot {
+        FrameBufferSlot::Vertex => buffers.vertex.as_ref().map(|buffer| buffer.capacity),
+        FrameBufferSlot::Index => buffers.index.as_ref().map(|buffer| buffer.capacity),
+    };
+    let capacity = match buffer_upload(current_capacity, required_size) {
+        BufferUpload::Skip | BufferUpload::Reuse(_) => return,
+        BufferUpload::Recreate(capacity) => capacity,
+    };
+    let buffer = GpuBuffer {
+        buffer: device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(label),
+            size: capacity,
+            usage,
+            mapped_at_creation: false,
+        }),
+        capacity,
+    };
+    match slot {
+        FrameBufferSlot::Vertex => buffers.vertex = Some(buffer),
+        FrameBufferSlot::Index => buffers.index = Some(buffer),
     }
 }
 
@@ -843,6 +952,8 @@ impl<'window> GpuRenderer<'window> {
             viewport_bind_group,
             text_rasterizer: RefCell::new(TextRasterizer::new()),
             text_atlas: None,
+            mesh_buffers: GpuFrameBuffers::default(),
+            text_buffers: GpuFrameBuffers::default(),
             size,
         };
         renderer.write_viewport_uniform();
@@ -877,6 +988,8 @@ impl<'window> GpuRenderer<'window> {
                 .borrow_mut()
                 .rasterize_frame(&text_paints, self.size.scale_factor as f32)
         };
+        let mesh_frame = self.upload_mesh_frame(plan);
+        let uploaded_text_frame = self.upload_text_meshes(plan, &text_frame);
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -920,21 +1033,25 @@ impl<'window> GpuRenderer<'window> {
             });
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.viewport_bind_group, &[]);
+            let mut mesh_index = 0;
             let mut text_index = 0;
             for item in &plan.items {
                 match item {
-                    RenderItem::Mesh(batch) => {
+                    RenderItem::Mesh(_) => {
                         pass.set_pipeline(&self.pipeline);
                         pass.set_bind_group(0, &self.viewport_bind_group, &[]);
-                        self.draw_mesh_batch(&mut pass, batch);
-                    }
-                    RenderItem::Text(batch) => {
-                        pass.set_pipeline(&self.text_pipeline);
-                        let mesh = text_frame.batches.get(text_index);
-                        text_index += 1;
-                        if let (Some(mesh), Some(bind_group)) = (mesh, text_bind_group.as_ref()) {
-                            self.draw_text_batch(&mut pass, batch, mesh, bind_group);
+                        if let Some(draw) = mesh_frame.draws.get(mesh_index) {
+                            self.draw_mesh_batch(&mut pass, draw);
                         }
+                        mesh_index += 1;
+                    }
+                    RenderItem::Text(_) => {
+                        pass.set_pipeline(&self.text_pipeline);
+                        let draw = uploaded_text_frame.draws.get(text_index);
+                        if let (Some(draw), Some(bind_group)) = (draw, text_bind_group.as_ref()) {
+                            self.draw_text_batch(&mut pass, draw, bind_group);
+                        }
+                        text_index += 1;
                     }
                 }
             }
@@ -944,40 +1061,148 @@ impl<'window> GpuRenderer<'window> {
         Ok(())
     }
 
+    fn upload_mesh_frame(&mut self, plan: &RenderPlan) -> UploadedFrame {
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let mut draws = Vec::new();
+        for item in &plan.items {
+            let RenderItem::Mesh(batch) = item else {
+                continue;
+            };
+            let draw = append_mesh_draw(
+                &mut vertices,
+                &mut indices,
+                batch.clip,
+                &batch.mesh.vertices,
+                &batch.mesh.indices,
+            );
+            draws.push(draw);
+        }
+        self.upload_frame_buffers(
+            "des-ui mesh vertex buffer",
+            "des-ui mesh index buffer",
+            &vertices,
+            &indices,
+            FrameBufferKind::Mesh,
+        );
+        UploadedFrame { draws }
+    }
+
+    fn upload_text_meshes(
+        &mut self,
+        plan: &RenderPlan,
+        frame: &RasterizedTextFrame,
+    ) -> UploadedFrame {
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let mut text_meshes = frame.batches.iter();
+        let draws = plan
+            .items
+            .iter()
+            .filter_map(|item| {
+                let RenderItem::Text(batch) = item else {
+                    return None;
+                };
+                let mesh = text_meshes.next()?;
+                Some(append_mesh_draw(
+                    &mut vertices,
+                    &mut indices,
+                    batch.clip,
+                    &mesh.vertices,
+                    &mesh.indices,
+                ))
+            })
+            .collect::<Vec<_>>();
+        self.upload_frame_buffers(
+            "des-ui text vertex buffer",
+            "des-ui text index buffer",
+            &vertices,
+            &indices,
+            FrameBufferKind::Text,
+        );
+        UploadedFrame { draws }
+    }
+
+    fn upload_frame_buffers<V: bytemuck::Pod>(
+        &mut self,
+        vertex_label: &'static str,
+        index_label: &'static str,
+        vertices: &[V],
+        indices: &[u32],
+        kind: FrameBufferKind,
+    ) {
+        let required_vertex_size = mem::size_of_val(vertices) as u64;
+        let required_index_size = mem::size_of_val(indices) as u64;
+        let device = self.device.clone();
+        ensure_frame_buffer(
+            &device,
+            self.frame_buffers_mut(kind),
+            FrameBufferSlot::Vertex,
+            vertex_label,
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            required_vertex_size,
+        );
+        ensure_frame_buffer(
+            &device,
+            self.frame_buffers_mut(kind),
+            FrameBufferSlot::Index,
+            index_label,
+            wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            required_index_size,
+        );
+        let buffers = self.frame_buffers(kind);
+        if required_vertex_size > 0
+            && let Some(buffer) = buffers.vertex.as_ref()
+        {
+            self.queue
+                .write_buffer(&buffer.buffer, 0, bytemuck::cast_slice(vertices));
+        }
+        if required_index_size > 0
+            && let Some(buffer) = buffers.index.as_ref()
+        {
+            self.queue
+                .write_buffer(&buffer.buffer, 0, bytemuck::cast_slice(indices));
+        }
+    }
+
+    fn frame_buffers(&self, kind: FrameBufferKind) -> &GpuFrameBuffers {
+        match kind {
+            FrameBufferKind::Mesh => &self.mesh_buffers,
+            FrameBufferKind::Text => &self.text_buffers,
+        }
+    }
+
+    fn frame_buffers_mut(&mut self, kind: FrameBufferKind) -> &mut GpuFrameBuffers {
+        match kind {
+            FrameBufferKind::Mesh => &mut self.mesh_buffers,
+            FrameBufferKind::Text => &mut self.text_buffers,
+        }
+    }
+
     fn draw_mesh_batch<'pass>(
         &'pass self,
         pass: &mut wgpu::RenderPass<'pass>,
-        batch: &'pass MeshBatch,
+        draw: &'pass UploadedDraw,
     ) {
-        if batch.mesh.is_empty() {
+        if draw.index_count == 0 {
             return;
         }
-        let Some(scissor) = clip_rect_to_scissor(batch.clip, self.size) else {
+        let Some(scissor) = clip_rect_to_scissor(draw.clip, self.size) else {
+            return;
+        };
+        let Some(vertex_buffer) = self.mesh_buffers.vertex.as_ref() else {
+            return;
+        };
+        let Some(index_buffer) = self.mesh_buffers.index.as_ref() else {
             return;
         };
         pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
-        let vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("des-ui mesh vertex buffer"),
-            size: (batch.mesh.vertices.len() * mem::size_of::<Vertex>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let index_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("des-ui mesh index buffer"),
-            size: (batch.mesh.indices.len() * mem::size_of::<u32>()) as u64,
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        self.queue.write_buffer(
-            &vertex_buffer,
-            0,
-            bytemuck::cast_slice(&batch.mesh.vertices),
+        pass.set_vertex_buffer(0, vertex_buffer.buffer.slice(draw.vertex_range.clone()));
+        pass.set_index_buffer(
+            index_buffer.buffer.slice(draw.index_range.clone()),
+            wgpu::IndexFormat::Uint32,
         );
-        self.queue
-            .write_buffer(&index_buffer, 0, bytemuck::cast_slice(&batch.mesh.indices));
-        pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        pass.draw_indexed(0..batch.mesh.indices.len() as u32, 0, 0..1);
+        pass.draw_indexed(0..draw.index_count, 0, 0..1);
     }
 
     fn upload_text_frame(&mut self, frame: &RasterizedTextFrame) -> Option<wgpu::BindGroup> {
@@ -1057,37 +1282,29 @@ impl<'window> GpuRenderer<'window> {
     fn draw_text_batch<'pass>(
         &'pass self,
         pass: &mut wgpu::RenderPass<'pass>,
-        batch: &'pass TextBatch,
-        mesh: &'pass TextMesh,
+        draw: &'pass UploadedDraw,
         bind_group: &'pass wgpu::BindGroup,
     ) {
-        if mesh.is_empty() {
+        if draw.index_count == 0 {
             return;
         }
-        let Some(scissor) = clip_rect_to_scissor(batch.clip, self.size) else {
+        let Some(scissor) = clip_rect_to_scissor(draw.clip, self.size) else {
+            return;
+        };
+        let Some(vertex_buffer) = self.text_buffers.vertex.as_ref() else {
+            return;
+        };
+        let Some(index_buffer) = self.text_buffers.index.as_ref() else {
             return;
         };
         pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
-        let vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("des-ui text vertex buffer"),
-            size: (mesh.vertices.len() * mem::size_of::<TextVertex>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let index_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("des-ui text index buffer"),
-            size: (mesh.indices.len() * mem::size_of::<u32>()) as u64,
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        self.queue
-            .write_buffer(&vertex_buffer, 0, bytemuck::cast_slice(&mesh.vertices));
-        self.queue
-            .write_buffer(&index_buffer, 0, bytemuck::cast_slice(&mesh.indices));
         pass.set_bind_group(0, bind_group, &[]);
-        pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
+        pass.set_vertex_buffer(0, vertex_buffer.buffer.slice(draw.vertex_range.clone()));
+        pass.set_index_buffer(
+            index_buffer.buffer.slice(draw.index_range.clone()),
+            wgpu::IndexFormat::Uint32,
+        );
+        pass.draw_indexed(0..draw.index_count, 0, 0..1);
     }
 
     fn write_viewport_uniform(&self) {
@@ -1309,6 +1526,8 @@ impl RenderPlanBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::mem;
+
     use des_ui_document::{
         Color, CornerRadii, Document, DocumentEngine, Element, ElementId, Rect, Size, Style,
         StyleSelector, StyleSheet, TextWrapMode,
@@ -1317,8 +1536,8 @@ mod tests {
 
     use crate::{
         ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
-        RenderOptions, ScissorRect, TextRasterizer, clip_rect_to_scissor, epaint_layout_job,
-        mesh_for_display_list, text_atlas_upload,
+        RenderOptions, ScissorRect, TextRasterizer, Vertex, clip_rect_to_scissor,
+        epaint_layout_job, mesh_for_display_list, text_atlas_upload,
     };
 
     #[test]
@@ -1602,6 +1821,75 @@ mod tests {
             ),
             crate::TextAtlasUpload::Recreate(size)
         );
+    }
+
+    #[test]
+    fn frame_buffer_upload_reuses_capacity_and_doubles_when_growing() {
+        assert_eq!(crate::buffer_upload(None, 0), crate::BufferUpload::Skip);
+        assert_eq!(
+            crate::buffer_upload(None, 128),
+            crate::BufferUpload::Recreate(128)
+        );
+        assert_eq!(
+            crate::buffer_upload(Some(256), 128),
+            crate::BufferUpload::Reuse(256)
+        );
+        assert_eq!(
+            crate::buffer_upload(Some(256), 300),
+            crate::BufferUpload::Recreate(512)
+        );
+        assert_eq!(
+            crate::buffer_upload(Some(256), 900),
+            crate::BufferUpload::Recreate(900)
+        );
+    }
+
+    #[test]
+    fn uploaded_draw_ranges_track_frame_buffer_slices() {
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let first_clip = Some(Rect::new(1.0, 2.0, 3.0, 4.0));
+        let first = crate::append_mesh_draw(
+            &mut vertices,
+            &mut indices,
+            first_clip,
+            &[
+                Vertex {
+                    position: [0.0, 0.0],
+                    color: [255, 0, 0, 255],
+                },
+                Vertex {
+                    position: [1.0, 0.0],
+                    color: [255, 0, 0, 255],
+                },
+            ],
+            &[0, 1],
+        );
+        let second = crate::append_mesh_draw(
+            &mut vertices,
+            &mut indices,
+            None,
+            &[Vertex {
+                position: [2.0, 0.0],
+                color: [0, 0, 255, 255],
+            }],
+            &[0],
+        );
+
+        assert_eq!(first.clip, first_clip);
+        assert_eq!(first.vertex_range, 0..(2 * mem::size_of::<Vertex>()) as u64);
+        assert_eq!(first.index_range, 0..(2 * mem::size_of::<u32>()) as u64);
+        assert_eq!(first.index_count, 2);
+        assert_eq!(
+            second.vertex_range,
+            (2 * mem::size_of::<Vertex>()) as u64..(3 * mem::size_of::<Vertex>()) as u64
+        );
+        assert_eq!(
+            second.index_range,
+            (2 * mem::size_of::<u32>()) as u64..(3 * mem::size_of::<u32>()) as u64
+        );
+        assert_eq!(vertices.len(), 3);
+        assert_eq!(indices.len(), 3);
     }
 
     #[test]
