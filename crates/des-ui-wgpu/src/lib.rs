@@ -603,11 +603,7 @@ impl TextRasterizer {
             .iter()
             .zip(galleys)
             .map(|(text, galley)| {
-                let text_shape = epaint::TextShape::new(
-                    epaint::pos2(text.rect.origin.x, text.rect.origin.y),
-                    galley,
-                    to_epaint_color(text.color),
-                );
+                let text_shape = epaint_text_shape(text, galley);
                 let mut mesh = epaint::Mesh::default();
                 tessellator.tessellate_text(&text_shape, &mut mesh);
                 Mesh::from_epaint_mesh(&mesh)
@@ -645,6 +641,25 @@ impl Default for TextRasterizer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn epaint_text_shape(
+    text: &TextPaint,
+    galley: std::sync::Arc<epaint::Galley>,
+) -> epaint::TextShape {
+    let mut shape = epaint::TextShape::new(
+        epaint::pos2(text.rect.origin.x, text.rect.origin.y),
+        galley,
+        to_epaint_color(text.color),
+    );
+    shape.override_text_color = text.override_text_color.map(to_epaint_color);
+    shape.opacity_factor = text.opacity_factor;
+    shape.angle = text.angle;
+    if let Some(underline) = text.underline {
+        shape.underline =
+            epaint::Stroke::new(underline.width.max(0.0), to_epaint_color(underline.color));
+    }
+    shape
 }
 
 fn epaint_layout_job(text: &TextPaint) -> epaint::text::LayoutJob {
@@ -2165,7 +2180,7 @@ mod tests {
     };
     use des_ui_render::{
         DisplayList, FillCirclePaint, FillRectPaint, PaintCommand, RenderTessellationOptions,
-        TextPaint, TextSelectionPaint,
+        TextPaint, TextSelectionPaint, TextUnderlinePaint,
     };
 
     use crate::{
@@ -2597,12 +2612,16 @@ mod tests {
                     rect: Rect::new(0.0, 0.0, 100.0, 24.0),
                     text: "Missing mesh".into(),
                     color: Color::rgb(1, 2, 3),
+                    override_text_color: None,
                     font_size: 12.0,
                     wrap_width: 100.0,
                     wrap_mode: TextWrapMode::Extend,
                     max_lines: None,
                     line_height: None,
                     selection: None,
+                    underline: None,
+                    opacity_factor: 1.0,
+                    angle: 0.0,
                 },
             })],
             ..crate::RenderPlan::default()
@@ -2741,12 +2760,16 @@ mod tests {
             rect: Rect::new(4.0, 5.0, 20.0, 10.0),
             text: "Ready".into(),
             color: Color::rgb(1, 2, 3),
+            override_text_color: None,
             font_size: 12.0,
             wrap_width: 20.0,
             wrap_mode: TextWrapMode::Extend,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         }));
         display_list.push(PaintCommand::PopClip);
 
@@ -2818,12 +2841,16 @@ mod tests {
             rect: Rect::new(12.0, 18.0, 220.0, 72.0),
             text: "Hello native text: π Σ data".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 220.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let rasterized = TextRasterizer::new().rasterize(&text, 2.0);
@@ -2864,6 +2891,7 @@ mod tests {
             rect: Rect::new(12.0, 18.0, 220.0, 72.0),
             text: "alpha beta gamma".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 220.0,
             wrap_mode: TextWrapMode::Wrap,
@@ -2875,6 +2903,9 @@ mod tests {
                 background: Color::rgb(234, 221, 255),
                 color: Color::rgb(29, 27, 32),
             }),
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let rasterized = TextRasterizer::new().rasterize(&text, 2.0);
@@ -2900,18 +2931,108 @@ mod tests {
     }
 
     #[test]
+    fn text_rasterizer_preserves_epaint_text_shape_color_and_underline_controls() {
+        let text = TextPaint {
+            element_id: ElementId::new("effects"),
+            rect: Rect::new(12.0, 18.0, 220.0, 72.0),
+            text: "shape effects".into(),
+            color: Color::rgb(18, 26, 38),
+            override_text_color: Some(Color::rgb(220, 40, 80)),
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+            underline: Some(TextUnderlinePaint {
+                width: 2.0,
+                color: Color::rgb(20, 140, 90),
+            }),
+            opacity_factor: 1.0,
+            angle: 0.0,
+        };
+
+        let rasterized = TextRasterizer::new().rasterize(&text, 2.0);
+        let override_color = epaint::Color32::from_rgb(220, 40, 80).to_array();
+        let underline_color = epaint::Color32::from_rgb(20, 140, 90).to_array();
+
+        assert!(
+            rasterized
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color_array() == override_color),
+            "native text should pass epaint override_text_color through to glyph vertices"
+        );
+        assert!(
+            rasterized
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color_array() == underline_color),
+            "native text should pass epaint underline stroke through to tessellation"
+        );
+    }
+
+    #[test]
+    fn text_rasterizer_preserves_epaint_text_shape_opacity_and_rotation_controls() {
+        let base = TextPaint {
+            element_id: ElementId::new("rotated"),
+            rect: Rect::new(12.0, 18.0, 220.0, 72.0),
+            text: "rotation".into(),
+            color: Color::rgba(18, 26, 38, 240),
+            override_text_color: None,
+            font_size: 28.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Extend,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
+        };
+        let mut shaped = base.clone();
+        shaped.opacity_factor = 0.5;
+        shaped.angle = std::f32::consts::FRAC_PI_2;
+
+        let mut rasterizer = TextRasterizer::new();
+        let normal = rasterizer.rasterize(&base, 1.0);
+        let rotated = rasterizer.rasterize(&shaped, 1.0);
+        let normal_bounds = mesh_bounds(&normal.mesh).expect("normal text mesh");
+        let rotated_bounds = mesh_bounds(&rotated.mesh).expect("rotated text mesh");
+
+        assert!(
+            rotated
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color_array()[3] < base.color.a),
+            "native text should pass epaint opacity_factor through to tessellated vertices"
+        );
+        assert!(
+            rotated_bounds.max_y - rotated_bounds.min_y > normal_bounds.max_y - normal_bounds.min_y,
+            "native text should pass epaint text angle through to tessellation"
+        );
+    }
+
+    #[test]
     fn text_rasterizer_honors_epaint_truncation_layout_bounds() {
         let text = TextPaint {
             element_id: ElementId::new("truncated"),
             rect: Rect::new(24.0, 30.0, 72.0, 24.0),
             text: "this label should not extend forever".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 72.0,
             wrap_mode: TextWrapMode::Truncate,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let rasterized = TextRasterizer::new().rasterize(&text, 1.0);
@@ -2935,12 +3056,16 @@ mod tests {
             rect: Rect::new(24.0, 30.0, 96.0, 24.0),
             text: "first line\nsecond line should not render".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 96.0,
             wrap_mode: TextWrapMode::Truncate,
             max_lines: None,
             line_height: Some(22.0),
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let rasterized = TextRasterizer::new().rasterize(&text, 1.0);
@@ -2963,12 +3088,16 @@ mod tests {
             rect: Rect::new(8.0, 12.0, 0.0, 24.0),
             text: "a".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 0.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let job = epaint_layout_job(&text);
@@ -2991,12 +3120,16 @@ mod tests {
             rect: Rect::new(12.35, 18.25, 220.0, 72.0),
             text: "Fractional text".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 220.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
         let mut rasterizer = TextRasterizer::new();
         let rounded = rasterizer.rasterize_with_options(
@@ -3033,12 +3166,16 @@ mod tests {
             rect: Rect::new(8.0, 12.0, 240.0, 64.0),
             text: "coverage".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 28.0,
             wrap_width: 240.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
         let mut linear_rasterizer = TextRasterizer::with_text_options(RenderTextOptions {
             alpha_from_coverage: RenderAlphaFromCoverage::Linear,
@@ -3081,24 +3218,32 @@ mod tests {
             rect: Rect::new(12.0, 18.0, 220.0, 72.0),
             text: "First label".into(),
             color: Color::rgb(18, 26, 38),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 220.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
         let second = TextPaint {
             element_id: ElementId::new("second"),
             rect: Rect::new(12.0, 54.0, 220.0, 72.0),
             text: "Second label".into(),
             color: Color::rgb(96, 72, 154),
+            override_text_color: None,
             font_size: 18.0,
             wrap_width: 220.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let frame = TextRasterizer::new().rasterize_frame(&[first, second], 2.0);
@@ -3554,12 +3699,16 @@ mod tests {
             rect: Rect::new(0.0, 0.0, 100.0, 40.0),
             text: "alpha beta gamma".into(),
             color: Color::rgb(1, 2, 3),
+            override_text_color: None,
             font_size: 14.0,
             wrap_width: 80.0,
             wrap_mode: TextWrapMode::Wrap,
             max_lines: Some(3),
             line_height: Some(18.0),
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let wrap_job = epaint_layout_job(&wrap);
@@ -3586,6 +3735,7 @@ mod tests {
             rect: Rect::new(0.0, 0.0, 160.0, 40.0),
             text: "alpha π beta".into(),
             color: Color::rgb(20, 21, 22),
+            override_text_color: None,
             font_size: 14.0,
             wrap_width: 160.0,
             wrap_mode: TextWrapMode::Wrap,
@@ -3597,6 +3747,9 @@ mod tests {
                 background: Color::rgb(234, 221, 255),
                 color: Color::rgb(29, 27, 32),
             }),
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         };
 
         let job = epaint_layout_job(&text);
@@ -3625,6 +3778,7 @@ mod tests {
     struct MeshBounds {
         min_x: f32,
         max_x: f32,
+        min_y: f32,
         max_y: f32,
     }
 
@@ -3633,15 +3787,18 @@ mod tests {
         let first = vertices.next()?;
         let mut min_x = first.position[0];
         let mut max_x = first.position[0];
+        let mut min_y = first.position[1];
         let mut max_y = first.position[1];
         for vertex in vertices {
             min_x = min_x.min(vertex.position[0]);
             max_x = max_x.max(vertex.position[0]);
+            min_y = min_y.min(vertex.position[1]);
             max_y = max_y.max(vertex.position[1]);
         }
         Some(MeshBounds {
             min_x,
             max_x,
+            min_y,
             max_y,
         })
     }
@@ -3689,12 +3846,16 @@ mod tests {
             rect: Rect::new(4.0, 5.0, 20.0, 10.0),
             text: "Layered".into(),
             color: Color::rgb(1, 2, 3),
+            override_text_color: None,
             font_size: 12.0,
             wrap_width: 20.0,
             wrap_mode: TextWrapMode::Extend,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         }));
         display_list.push(PaintCommand::FillRect(FillRectPaint {
             element_id: ElementId::new("overlay"),

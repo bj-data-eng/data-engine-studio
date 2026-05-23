@@ -153,12 +153,16 @@ pub struct TextPaint {
     pub rect: Rect,
     pub text: String,
     pub color: Color,
+    pub override_text_color: Option<Color>,
     pub font_size: f32,
     pub wrap_width: f32,
     pub wrap_mode: TextWrapMode,
     pub max_lines: Option<usize>,
     pub line_height: Option<f32>,
     pub selection: Option<TextSelectionPaint>,
+    pub underline: Option<TextUnderlinePaint>,
+    pub opacity_factor: f32,
+    pub angle: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -166,6 +170,12 @@ pub struct TextSelectionPaint {
     pub anchor_index: usize,
     pub focus_index: usize,
     pub background: Color,
+    pub color: Color,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextUnderlinePaint {
+    pub width: f32,
     pub color: Color,
 }
 
@@ -832,6 +842,7 @@ fn text_paint(frame: &ResolvedElement, text: &str, output: &DocumentOutput) -> T
         rect,
         text: text.to_owned(),
         color: frame.style.text_color,
+        override_text_color: None,
         font_size: frame.style.font_size,
         wrap_width: if frame.style.text_wrap == TextWrapMode::Extend {
             f32::INFINITY
@@ -842,6 +853,9 @@ fn text_paint(frame: &ResolvedElement, text: &str, output: &DocumentOutput) -> T
         max_lines: frame.style.max_lines,
         line_height: frame.style.line_height,
         selection,
+        underline: None,
+        opacity_factor: 1.0,
+        angle: 0.0,
     }
 }
 
@@ -2004,12 +2018,16 @@ mod tests {
             rect: Rect::new(8.0, 9.0, 20.0, 10.0),
             text: "Hello".into(),
             color: Color::rgb(1, 2, 3),
+            override_text_color: None,
             font_size: 12.0,
             wrap_width: 20.0,
             wrap_mode: TextWrapMode::Extend,
             max_lines: None,
             line_height: None,
             selection: None,
+            underline: None,
+            opacity_factor: 1.0,
+            angle: 0.0,
         }));
         list.push(PaintCommand::PopClip);
 
