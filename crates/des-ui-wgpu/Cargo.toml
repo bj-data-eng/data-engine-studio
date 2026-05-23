@@ -7,6 +7,7 @@ repository.workspace = true
 description = "wgpu renderer adapter for Data Engine Studio UI paint commands."
 
 [dependencies]
+ab_glyph.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
 des-ui-document.workspace = true
 des-ui-render.workspace = true

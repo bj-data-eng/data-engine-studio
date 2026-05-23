@@ -5,12 +5,16 @@
 //! semantics: document/style/layout produce paint commands, and this crate
 //! turns the supported commands into meshes and, later, `wgpu` draw calls.
 
-use des_ui_document::{Color, Rect};
+use ab_glyph::{Font, FontArc, GlyphId, PxScale, ScaleFont, point};
+use des_ui_document::{Color, Rect, TextWrapMode};
 use des_ui_render::{
     DisplayList, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
     TriangleMeshPrimitive, plan_primitives,
 };
 use std::{error, fmt, mem};
+
+const INTER_VARIABLE: &[u8] =
+    include_bytes!("../../des-ui-text/assets/fonts/inter/InterVariable.ttf");
 
 const SHADER: &str = r#"
 struct Viewport {
@@ -202,6 +206,225 @@ pub struct MeshBatch {
 pub struct TextBatch {
     pub clip: Option<Rect>,
     pub text: TextPaint,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RasterizedText {
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+    pub mesh: TextMesh,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TextMesh {
+    pub vertices: Vec<TextVertex>,
+    pub indices: Vec<u32>,
+}
+
+impl TextMesh {
+    pub fn is_empty(&self) -> bool {
+        self.indices.is_empty()
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct TextVertex {
+    pub position: [f32; 2],
+    pub uv: [f32; 2],
+}
+
+impl TextVertex {
+    pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+        wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2];
+
+    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TextRasterizer {
+    font: FontArc,
+}
+
+impl TextRasterizer {
+    pub fn new() -> Self {
+        Self {
+            font: FontArc::try_from_slice(INTER_VARIABLE)
+                .expect("bundled Inter font must load for native text rendering"),
+        }
+    }
+
+    pub fn rasterize(&self, text: &TextPaint, scale_factor: f32) -> RasterizedText {
+        let scale_factor = scale_factor.max(0.000_001);
+        let width = (text.rect.size.width * scale_factor).ceil().max(1.0) as u32;
+        let height = (text.rect.size.height * scale_factor).ceil().max(1.0) as u32;
+        let mut pixels = vec![0; width as usize * height as usize * 4];
+        let layout = self.layout_text(text, scale_factor, width as f32);
+
+        for glyph in layout.glyphs {
+            let Some(outlined) = self.font.outline_glyph(glyph) else {
+                continue;
+            };
+            let bounds = outlined.px_bounds();
+            outlined.draw(|x, y, coverage| {
+                let pixel_x = bounds.min.x.floor() as i32 + x as i32;
+                let pixel_y = bounds.min.y.floor() as i32 + y as i32;
+                if pixel_x < 0 || pixel_y < 0 || pixel_x >= width as i32 || pixel_y >= height as i32
+                {
+                    return;
+                }
+                let index = (pixel_y as u32 * width + pixel_x as u32) as usize * 4;
+                let alpha = (text.color.a as f32 * coverage).round().clamp(0.0, 255.0) as u8;
+                blend_pixel(
+                    &mut pixels[index..index + 4],
+                    [text.color.r, text.color.g, text.color.b, alpha],
+                );
+            });
+        }
+
+        RasterizedText {
+            width,
+            height,
+            pixels,
+            mesh: text_quad(text.rect),
+        }
+    }
+
+    fn layout_text(
+        &self,
+        text: &TextPaint,
+        scale_factor: f32,
+        physical_wrap_width: f32,
+    ) -> RasterTextLayout {
+        let scale = PxScale::from(text.font_size * scale_factor);
+        let scaled = self.font.as_scaled(scale);
+        let line_height = text
+            .line_height
+            .unwrap_or_else(|| text.font_size * 1.2)
+            .max(1.0)
+            * scale_factor;
+        let max_lines = text.max_lines.unwrap_or(usize::MAX);
+        let wrap_width = match text.wrap_mode {
+            TextWrapMode::Extend => f32::INFINITY,
+            TextWrapMode::Wrap => (text.wrap_width * scale_factor)
+                .min(physical_wrap_width)
+                .max(1.0),
+            TextWrapMode::Truncate => physical_wrap_width.max(1.0),
+        };
+        let mut glyphs = Vec::new();
+        let mut line = 0usize;
+        let mut x = 0.0;
+        let mut baseline = scaled.ascent().ceil();
+        let mut previous: Option<GlyphId> = None;
+
+        for ch in text.text.chars() {
+            if ch == '\n' {
+                if !advance_line(&mut line, max_lines, &mut x, &mut baseline, line_height) {
+                    break;
+                }
+                previous = None;
+                continue;
+            }
+            let glyph_id = self.font.glyph_id(ch);
+            let advance = scaled.h_advance(glyph_id);
+            if x > 0.0 && x + advance > wrap_width {
+                if !advance_line(&mut line, max_lines, &mut x, &mut baseline, line_height) {
+                    break;
+                }
+                previous = None;
+            }
+            if let Some(previous) = previous {
+                x += scaled.kern(previous, glyph_id);
+            }
+            let glyph = glyph_id.with_scale_and_position(scale, point(x, baseline));
+            glyphs.push(glyph);
+            x += advance;
+            previous = Some(glyph_id);
+        }
+
+        RasterTextLayout { glyphs }
+    }
+}
+
+impl Default for TextRasterizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct RasterTextLayout {
+    glyphs: Vec<ab_glyph::Glyph>,
+}
+
+fn advance_line(
+    line: &mut usize,
+    max_lines: usize,
+    x: &mut f32,
+    baseline: &mut f32,
+    line_height: f32,
+) -> bool {
+    *line += 1;
+    if *line >= max_lines {
+        return false;
+    }
+    *x = 0.0;
+    *baseline += line_height;
+    true
+}
+
+fn text_quad(rect: Rect) -> TextMesh {
+    let left = rect.origin.x;
+    let top = rect.origin.y;
+    let right = rect.right();
+    let bottom = rect.bottom();
+    TextMesh {
+        vertices: vec![
+            TextVertex {
+                position: [left, top],
+                uv: [0.0, 0.0],
+            },
+            TextVertex {
+                position: [right, top],
+                uv: [1.0, 0.0],
+            },
+            TextVertex {
+                position: [right, bottom],
+                uv: [1.0, 1.0],
+            },
+            TextVertex {
+                position: [left, bottom],
+                uv: [0.0, 1.0],
+            },
+        ],
+        indices: vec![0, 1, 2, 0, 2, 3],
+    }
+}
+
+fn blend_pixel(destination: &mut [u8], source: [u8; 4]) {
+    let source_alpha = source[3] as f32 / 255.0;
+    let destination_alpha = destination[3] as f32 / 255.0;
+    let out_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+    if out_alpha <= f32::EPSILON {
+        destination.copy_from_slice(&[0, 0, 0, 0]);
+        return;
+    }
+    for channel in 0..3 {
+        let source_value = source[channel] as f32 / 255.0;
+        let destination_value = destination[channel] as f32 / 255.0;
+        let out = (source_value * source_alpha
+            + destination_value * destination_alpha * (1.0 - source_alpha))
+            / out_alpha;
+        destination[channel] = (out * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
+    destination[3] = (out_alpha * 255.0).round().clamp(0.0, 255.0) as u8;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -685,7 +908,7 @@ mod tests {
 
     use crate::{
         ClearColor, DisplayListRenderer, MeshBuilder, PackedColor, PhysicalRenderSize, RenderItem,
-        RenderOptions, ScissorRect, clip_rect_to_scissor, mesh_for_display_list,
+        RenderOptions, ScissorRect, TextRasterizer, clip_rect_to_scissor, mesh_for_display_list,
     };
 
     #[test]
@@ -782,6 +1005,34 @@ mod tests {
         assert_eq!(plan.text_batches[0].text.text, "Ready");
         assert!(plan.batches.is_empty());
         assert!(!plan.is_empty());
+    }
+
+    #[test]
+    fn text_rasterizer_draws_arbitrary_text_into_rgba_pixels() {
+        let text = TextPaint {
+            element_id: ElementId::new("label"),
+            rect: Rect::new(12.0, 18.0, 220.0, 72.0),
+            text: "Hello native text: π Σ data".into(),
+            color: Color::rgb(18, 26, 38),
+            font_size: 18.0,
+            wrap_width: 220.0,
+            wrap_mode: TextWrapMode::Wrap,
+            max_lines: None,
+            line_height: None,
+            selection: None,
+        };
+
+        let rasterized = TextRasterizer::new().rasterize(&text, 2.0);
+
+        assert!(rasterized.width > 0);
+        assert!(rasterized.height > 0);
+        assert_eq!(
+            rasterized.pixels.len(),
+            rasterized.width as usize * rasterized.height as usize * 4
+        );
+        assert!(rasterized.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+        assert_eq!(rasterized.mesh.vertices[0].position, [12.0, 18.0]);
+        assert_eq!(rasterized.mesh.indices, [0, 1, 2, 0, 2, 3]);
     }
 
     #[test]
