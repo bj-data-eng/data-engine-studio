@@ -381,7 +381,7 @@ mod tests {
             ClearColor::rgb(250, 249, 247)
         );
         assert_eq!(output.render_plan.batches.len(), 1);
-        assert_eq!(output.render_plan.batches[0].mesh.indices.len(), 6);
+        assert_eq!(output.render_plan.batches[0].mesh.indices.len(), 30);
     }
 
     #[test]

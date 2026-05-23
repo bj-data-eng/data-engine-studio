@@ -9,6 +9,8 @@ use des_ui_document::{
     Overflow, Point, Rect, ResolvedElement, ScrollAxis, ScrollChrome, Shadow, TextWrapMode,
 };
 
+const DEFAULT_ANTIALIASING_FRINGE: f32 = 1.0;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DisplayList {
     pub commands: Vec<PaintCommand>,
@@ -478,6 +480,69 @@ fn fill_polygon_mesh(
     if points.len() < 3 || color.a == 0 {
         return None;
     }
+    fill_antialiased_convex_polygon_mesh(element_id, &points, color, DEFAULT_ANTIALIASING_FRINGE)
+}
+
+fn fill_antialiased_convex_polygon_mesh(
+    element_id: ElementId,
+    points: &[Point],
+    color: Color,
+    fringe_width: f32,
+) -> Option<TriangleMeshPrimitive> {
+    if points.len() < 3 || color.a == 0 {
+        return None;
+    }
+    if fringe_width <= f32::EPSILON {
+        return fill_solid_polygon_mesh(element_id, points, color);
+    }
+    let edge_normals = polygon_outward_edge_normals(points)?;
+    let mut vertices = Vec::with_capacity(points.len() * 2);
+    vertices.extend(
+        points
+            .iter()
+            .copied()
+            .map(|position| PrimitiveVertex { position, color }),
+    );
+    vertices.extend(points.iter().enumerate().map(|(index, point)| {
+        let previous = edge_normals[(index + edge_normals.len() - 1) % edge_normals.len()];
+        let next = edge_normals[index];
+        let normal = normalized_or(next, add_points(previous, next));
+        let dot = dot_points(normal, next).abs().max(0.25);
+        let miter_length = (fringe_width / dot).min(fringe_width * 4.0);
+        PrimitiveVertex {
+            position: add_points(*point, scale_point(normal, miter_length)),
+            color: Color { a: 0, ..color },
+        }
+    }));
+
+    let count = points.len();
+    let mut indices = Vec::with_capacity((count - 2) * 3 + count * 6);
+    for index in 1..count - 1 {
+        indices.extend([0, index as u32, index as u32 + 1]);
+    }
+    for index in 0..count {
+        let next = (index + 1) % count;
+        let inner_a = index as u32;
+        let inner_b = next as u32;
+        let outer_a = (count + index) as u32;
+        let outer_b = (count + next) as u32;
+        indices.extend([inner_a, inner_b, outer_b, inner_a, outer_b, outer_a]);
+    }
+    Some(TriangleMeshPrimitive {
+        element_id,
+        vertices,
+        indices,
+    })
+}
+
+fn fill_solid_polygon_mesh(
+    element_id: ElementId,
+    points: &[Point],
+    color: Color,
+) -> Option<TriangleMeshPrimitive> {
+    if points.len() < 3 || color.a == 0 {
+        return None;
+    }
     let vertices = points
         .iter()
         .copied()
@@ -492,6 +557,48 @@ fn fill_polygon_mesh(
         vertices,
         indices,
     })
+}
+
+fn polygon_outward_edge_normals(points: &[Point]) -> Option<Vec<Point>> {
+    let area = signed_polygon_area(points);
+    if area.abs() <= f32::EPSILON {
+        return None;
+    }
+    let clockwise = area > 0.0;
+    let mut normals = Vec::with_capacity(points.len());
+    for index in 0..points.len() {
+        let next = (index + 1) % points.len();
+        let edge = sub_points(points[next], points[index]);
+        let length = point_length(edge);
+        if length <= f32::EPSILON {
+            return None;
+        }
+        let normal = if clockwise {
+            Point::new(edge.y / length, -edge.x / length)
+        } else {
+            Point::new(-edge.y / length, edge.x / length)
+        };
+        normals.push(normal);
+    }
+    Some(normals)
+}
+
+fn signed_polygon_area(points: &[Point]) -> f32 {
+    let mut area = 0.0;
+    for index in 0..points.len() {
+        let next = (index + 1) % points.len();
+        area += points[index].x * points[next].y - points[next].x * points[index].y;
+    }
+    area * 0.5
+}
+
+fn normalized_or(fallback: Point, point: Point) -> Point {
+    let length = point_length(point);
+    if length <= f32::EPSILON {
+        fallback
+    } else {
+        scale_point(point, 1.0 / length)
+    }
 }
 
 fn rect_points(rect: Rect) -> Vec<Point> {
@@ -1449,6 +1556,10 @@ fn scale_point(point: Point, scale: f32) -> Point {
     Point::new(point.x * scale, point.y * scale)
 }
 
+fn dot_points(lhs: Point, rhs: Point) -> f32 {
+    lhs.x * rhs.x + lhs.y * rhs.y
+}
+
 fn point_length(point: Point) -> f32 {
     (point.x * point.x + point.y * point.y).sqrt()
 }
@@ -1661,5 +1772,67 @@ mod tests {
         assert!(mesh.vertices.len() > 4);
         assert!(mesh.indices.len() > 6);
         assert_eq!(mesh.element_id.as_str(), "rounded");
+    }
+
+    #[test]
+    fn filled_rect_primitives_include_antialiasing_fringe() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("soft"),
+            rect: Rect::new(10.0, 20.0, 30.0, 40.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgba(10, 20, 30, 220),
+        }));
+
+        let primitives = plan_primitives(&list);
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected antialiased rect mesh");
+        };
+
+        assert!(
+            mesh.vertices.iter().any(|vertex| vertex.color.a == 0),
+            "antialiasing requires transparent fringe vertices"
+        );
+        assert!(
+            mesh.vertices.iter().any(|vertex| vertex.color.a == 220),
+            "filled shape must retain opaque interior vertices"
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position.x < 10.0 || vertex.position.y < 20.0),
+            "fringe should expand outside the shape on leading edges"
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.position.x > 40.0 || vertex.position.y > 60.0),
+            "fringe should expand outside the shape on trailing edges"
+        );
+    }
+
+    #[test]
+    fn rounded_rect_antialiasing_preserves_curved_edge_coverage() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("soft-rounded"),
+            rect: Rect::new(0.0, 0.0, 40.0, 24.0),
+            radius: CornerRadii::all(6.0),
+            color: Color::rgb(10, 20, 30),
+        }));
+
+        let primitives = plan_primitives(&list);
+        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
+        else {
+            panic!("expected antialiased rounded rect mesh");
+        };
+
+        assert!(
+            mesh.vertices.len() >= 2 * rounded_rect_points(Rect::new(0.0, 0.0, 40.0, 24.0), CornerRadii::all(6.0)).len(),
+            "rounded rect should keep its curve samples and add an antialiasing fringe"
+        );
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 255));
     }
 }

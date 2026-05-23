@@ -1153,7 +1153,7 @@ mod tests {
     }
 
     #[test]
-    fn fill_rect_generates_two_triangles_in_document_coordinates() {
+    fn fill_rect_generates_antialiased_triangles_in_document_coordinates() {
         let mut display_list = DisplayList::new();
         display_list.push(PaintCommand::FillRect(FillRectPaint {
             element_id: ElementId::new("box"),
@@ -1165,8 +1165,8 @@ mod tests {
         builder.push_display_list(&display_list);
 
         let mesh = builder.finish();
-        assert_eq!(mesh.vertices.len(), 4);
-        assert_eq!(mesh.indices, [0, 1, 2, 0, 2, 3]);
+        assert_eq!(mesh.vertices.len(), 8);
+        assert_eq!(&mesh.indices[0..6], [0, 1, 2, 0, 2, 3]);
         assert_eq!(mesh.vertices[0].position, [10.0, 20.0]);
         assert_eq!(mesh.vertices[1].position, [40.0, 20.0]);
         assert_eq!(mesh.vertices[2].position, [40.0, 60.0]);
@@ -1174,7 +1174,12 @@ mod tests {
         assert!(
             mesh.vertices
                 .iter()
-                .all(|vertex| vertex.color == [1, 2, 3, 4])
+                .any(|vertex| vertex.color == [1, 2, 3, 4])
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.color == [1, 2, 3, 0])
         );
     }
 
@@ -1206,8 +1211,8 @@ mod tests {
         assert_eq!(plan.batches.len(), 2);
         assert_eq!(plan.batches[0].clip, None);
         assert_eq!(plan.batches[1].clip, Some(Rect::new(4.0, 5.0, 6.0, 7.0)));
-        assert_eq!(plan.batches[0].mesh.indices.len(), 6);
-        assert_eq!(plan.batches[1].mesh.indices.len(), 6);
+        assert_eq!(plan.batches[0].mesh.indices.len(), 30);
+        assert_eq!(plan.batches[1].mesh.indices.len(), 30);
     }
 
     #[test]
@@ -1373,7 +1378,12 @@ mod tests {
         assert!(
             mesh.vertices
                 .iter()
-                .all(|vertex| vertex.color == [7, 8, 9, 10])
+                .any(|vertex| vertex.color == [7, 8, 9, 10])
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|vertex| vertex.color == [7, 8, 9, 0])
         );
     }
 }
