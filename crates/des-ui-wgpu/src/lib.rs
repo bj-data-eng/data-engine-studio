@@ -667,8 +667,7 @@ pub struct GpuRenderer<'window> {
     solid_texture: GpuTexture,
     text_rasterizer: RefCell<TextRasterizer>,
     text_atlas: Option<GpuTextAtlas>,
-    mesh_buffers: GpuFrameBuffers,
-    text_buffers: GpuFrameBuffers,
+    frame_buffers: GpuFrameBuffers,
     size: PhysicalRenderSize,
 }
 
@@ -732,12 +731,19 @@ struct UploadedFrame {
     draws: Vec<UploadedDraw>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct UploadedDraw {
     clip: Option<Rect>,
+    texture: DrawTexture,
     vertex_range: Range<u64>,
     index_range: Range<u64>,
     index_count: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DrawTexture {
+    Solid,
+    TextAtlas,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -745,12 +751,6 @@ enum BufferUpload {
     Skip,
     Reuse(u64),
     Recreate(u64),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FrameBufferKind {
-    Mesh,
-    Text,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -797,6 +797,7 @@ fn append_mesh_draw<V: Copy>(
     vertices: &mut Vec<V>,
     indices: &mut Vec<u32>,
     clip: Option<Rect>,
+    texture: DrawTexture,
     next_vertices: &[V],
     next_indices: &[u32],
 ) -> UploadedDraw {
@@ -806,6 +807,7 @@ fn append_mesh_draw<V: Copy>(
     indices.extend_from_slice(next_indices);
     UploadedDraw {
         clip,
+        texture,
         vertex_range: vertex_start..(vertices.len() * mem::size_of::<V>()) as u64,
         index_range: index_start..(indices.len() * mem::size_of::<u32>()) as u64,
         index_count: next_indices.len() as u32,
@@ -952,8 +954,7 @@ impl<'window> GpuRenderer<'window> {
             solid_texture,
             text_rasterizer: RefCell::new(TextRasterizer::new()),
             text_atlas: None,
-            mesh_buffers: GpuFrameBuffers::default(),
-            text_buffers: GpuFrameBuffers::default(),
+            frame_buffers: GpuFrameBuffers::default(),
             size,
         };
         renderer.write_viewport_uniform();
@@ -988,8 +989,7 @@ impl<'window> GpuRenderer<'window> {
                 .borrow_mut()
                 .rasterize_frame(&text_paints, self.size.scale_factor as f32)
         };
-        let mesh_frame = self.upload_mesh_frame(plan);
-        let uploaded_text_frame = self.upload_text_meshes(plan, &text_frame);
+        let uploaded_frame = self.upload_render_frame(plan, &text_frame);
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -1032,22 +1032,15 @@ impl<'window> GpuRenderer<'window> {
                 multiview_mask: None,
             });
             pass.set_pipeline(&self.pipeline);
-            let mut mesh_index = 0;
-            let mut text_index = 0;
-            for item in &plan.items {
-                match item {
-                    RenderItem::Mesh(_) => {
-                        if let Some(draw) = mesh_frame.draws.get(mesh_index) {
-                            self.draw_mesh_batch(&mut pass, draw, &self.solid_texture.bind_group);
-                        }
-                        mesh_index += 1;
+            for draw in &uploaded_frame.draws {
+                match draw.texture {
+                    DrawTexture::Solid => {
+                        self.draw_batch(&mut pass, draw, &self.solid_texture.bind_group);
                     }
-                    RenderItem::Text(_) => {
-                        let draw = uploaded_text_frame.draws.get(text_index);
-                        if let (Some(draw), Some(bind_group)) = (draw, text_bind_group.as_ref()) {
-                            self.draw_text_batch(&mut pass, draw, bind_group);
+                    DrawTexture::TextAtlas => {
+                        if let Some(bind_group) = text_bind_group.as_ref() {
+                            self.draw_batch(&mut pass, draw, bind_group);
                         }
-                        text_index += 1;
                     }
                 }
             }
@@ -1057,64 +1050,44 @@ impl<'window> GpuRenderer<'window> {
         Ok(())
     }
 
-    fn upload_mesh_frame(&mut self, plan: &RenderPlan) -> UploadedFrame {
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut draws = Vec::new();
-        for item in &plan.items {
-            let RenderItem::Mesh(batch) = item else {
-                continue;
-            };
-            let draw = append_mesh_draw(
-                &mut vertices,
-                &mut indices,
-                batch.clip,
-                &batch.mesh.vertices,
-                &batch.mesh.indices,
-            );
-            draws.push(draw);
-        }
-        self.upload_frame_buffers(
-            "des-ui mesh vertex buffer",
-            "des-ui mesh index buffer",
-            &vertices,
-            &indices,
-            FrameBufferKind::Mesh,
-        );
-        UploadedFrame { draws }
-    }
-
-    fn upload_text_meshes(
+    fn upload_render_frame(
         &mut self,
         plan: &RenderPlan,
         frame: &RasterizedTextFrame,
     ) -> UploadedFrame {
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
+        let mut draws = Vec::new();
         let mut text_meshes = frame.batches.iter();
-        let draws = plan
-            .items
-            .iter()
-            .filter_map(|item| {
-                let RenderItem::Text(batch) = item else {
-                    return None;
-                };
-                let mesh = text_meshes.next()?;
-                Some(append_mesh_draw(
+        for item in &plan.items {
+            match item {
+                RenderItem::Mesh(batch) => draws.push(append_mesh_draw(
                     &mut vertices,
                     &mut indices,
                     batch.clip,
-                    &mesh.vertices,
-                    &mesh.indices,
-                ))
-            })
-            .collect::<Vec<_>>();
+                    DrawTexture::Solid,
+                    &batch.mesh.vertices,
+                    &batch.mesh.indices,
+                )),
+                RenderItem::Text(batch) => {
+                    if let Some(mesh) = text_meshes.next() {
+                        draws.push(append_mesh_draw(
+                            &mut vertices,
+                            &mut indices,
+                            batch.clip,
+                            DrawTexture::TextAtlas,
+                            &mesh.vertices,
+                            &mesh.indices,
+                        ));
+                    }
+                }
+            }
+        }
         self.upload_frame_buffers(
-            "des-ui text vertex buffer",
-            "des-ui text index buffer",
+            "des-ui frame vertex buffer",
+            "des-ui frame index buffer",
             &vertices,
             &indices,
-            FrameBufferKind::Text,
         );
         UploadedFrame { draws }
     }
@@ -1125,14 +1098,13 @@ impl<'window> GpuRenderer<'window> {
         index_label: &'static str,
         vertices: &[V],
         indices: &[u32],
-        kind: FrameBufferKind,
     ) {
         let required_vertex_size = mem::size_of_val(vertices) as u64;
         let required_index_size = mem::size_of_val(indices) as u64;
         let device = self.device.clone();
         ensure_frame_buffer(
             &device,
-            self.frame_buffers_mut(kind),
+            &mut self.frame_buffers,
             FrameBufferSlot::Vertex,
             vertex_label,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
@@ -1140,42 +1112,27 @@ impl<'window> GpuRenderer<'window> {
         );
         ensure_frame_buffer(
             &device,
-            self.frame_buffers_mut(kind),
+            &mut self.frame_buffers,
             FrameBufferSlot::Index,
             index_label,
             wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             required_index_size,
         );
-        let buffers = self.frame_buffers(kind);
         if required_vertex_size > 0
-            && let Some(buffer) = buffers.vertex.as_ref()
+            && let Some(buffer) = self.frame_buffers.vertex.as_ref()
         {
             self.queue
                 .write_buffer(&buffer.buffer, 0, bytemuck::cast_slice(vertices));
         }
         if required_index_size > 0
-            && let Some(buffer) = buffers.index.as_ref()
+            && let Some(buffer) = self.frame_buffers.index.as_ref()
         {
             self.queue
                 .write_buffer(&buffer.buffer, 0, bytemuck::cast_slice(indices));
         }
     }
 
-    fn frame_buffers(&self, kind: FrameBufferKind) -> &GpuFrameBuffers {
-        match kind {
-            FrameBufferKind::Mesh => &self.mesh_buffers,
-            FrameBufferKind::Text => &self.text_buffers,
-        }
-    }
-
-    fn frame_buffers_mut(&mut self, kind: FrameBufferKind) -> &mut GpuFrameBuffers {
-        match kind {
-            FrameBufferKind::Mesh => &mut self.mesh_buffers,
-            FrameBufferKind::Text => &mut self.text_buffers,
-        }
-    }
-
-    fn draw_mesh_batch<'pass>(
+    fn draw_batch<'pass>(
         &'pass self,
         pass: &mut wgpu::RenderPass<'pass>,
         draw: &'pass UploadedDraw,
@@ -1187,10 +1144,10 @@ impl<'window> GpuRenderer<'window> {
         let Some(scissor) = clip_rect_to_scissor(draw.clip, self.size) else {
             return;
         };
-        let Some(vertex_buffer) = self.mesh_buffers.vertex.as_ref() else {
+        let Some(vertex_buffer) = self.frame_buffers.vertex.as_ref() else {
             return;
         };
-        let Some(index_buffer) = self.mesh_buffers.index.as_ref() else {
+        let Some(index_buffer) = self.frame_buffers.index.as_ref() else {
             return;
         };
         pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
@@ -1266,34 +1223,6 @@ impl<'window> GpuRenderer<'window> {
             fingerprint,
             gpu,
         }
-    }
-
-    fn draw_text_batch<'pass>(
-        &'pass self,
-        pass: &mut wgpu::RenderPass<'pass>,
-        draw: &'pass UploadedDraw,
-        bind_group: &'pass wgpu::BindGroup,
-    ) {
-        if draw.index_count == 0 {
-            return;
-        }
-        let Some(scissor) = clip_rect_to_scissor(draw.clip, self.size) else {
-            return;
-        };
-        let Some(vertex_buffer) = self.text_buffers.vertex.as_ref() else {
-            return;
-        };
-        let Some(index_buffer) = self.text_buffers.index.as_ref() else {
-            return;
-        };
-        pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
-        pass.set_bind_group(0, bind_group, &[]);
-        pass.set_vertex_buffer(0, vertex_buffer.buffer.slice(draw.vertex_range.clone()));
-        pass.set_index_buffer(
-            index_buffer.buffer.slice(draw.index_range.clone()),
-            wgpu::IndexFormat::Uint32,
-        );
-        pass.draw_indexed(0..draw.index_count, 0, 0..1);
     }
 
     fn write_viewport_uniform(&self) {
@@ -2077,6 +2006,7 @@ mod tests {
             &mut vertices,
             &mut indices,
             first_clip,
+            crate::DrawTexture::Solid,
             &[
                 Vertex {
                     position: [0.0, 0.0],
@@ -2095,6 +2025,7 @@ mod tests {
             &mut vertices,
             &mut indices,
             None,
+            crate::DrawTexture::TextAtlas,
             &[Vertex {
                 position: [2.0, 0.0],
                 uv: [0.0, 1.0],
@@ -2104,6 +2035,7 @@ mod tests {
         );
 
         assert_eq!(first.clip, first_clip);
+        assert_eq!(first.texture, crate::DrawTexture::Solid);
         assert_eq!(first.vertex_range, 0..(2 * mem::size_of::<Vertex>()) as u64);
         assert_eq!(first.index_range, 0..(2 * mem::size_of::<u32>()) as u64);
         assert_eq!(first.index_count, 2);
@@ -2111,6 +2043,7 @@ mod tests {
             second.vertex_range,
             (2 * mem::size_of::<Vertex>()) as u64..(3 * mem::size_of::<Vertex>()) as u64
         );
+        assert_eq!(second.texture, crate::DrawTexture::TextAtlas);
         assert_eq!(
             second.index_range,
             (2 * mem::size_of::<u32>()) as u64..(3 * mem::size_of::<u32>()) as u64
