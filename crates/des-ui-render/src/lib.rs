@@ -2011,6 +2011,57 @@ mod tests {
     }
 
     #[test]
+    fn stroked_path_vertices_stay_inside_epaint_bounding_contract() {
+        let width = 10.0;
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::StrokePath(StrokePathPaint {
+            element_id: ElementId::new("bounded-path"),
+            points: vec![
+                Point::new(0.0, 0.0),
+                Point::new(2.0, 0.0),
+                Point::new(5.0, 5.0),
+                Point::new(0.0, 5.0),
+                Point::new(0.0, 7.0),
+                Point::new(10.0, 10.0),
+            ],
+            width,
+            color: Color::rgb(255, 255, 255),
+            closed: true,
+            cap: StrokeCap::Butt,
+        }));
+
+        let primitives = plan_primitives(&list);
+        let mesh = first_mesh(&primitives);
+        let mut expected_mesh = epaint::Mesh::default();
+        let mut tessellator = epaint::Tessellator::new(
+            1.0,
+            epaint::TessellationOptions::default(),
+            [1, 1],
+            Vec::new(),
+        );
+        tessellator.tessellate_path(
+            &epaint::PathShape::closed_line(
+                vec![
+                    epaint::pos2(0.0, 0.0),
+                    epaint::pos2(2.0, 0.0),
+                    epaint::pos2(5.0, 5.0),
+                    epaint::pos2(0.0, 5.0),
+                    epaint::pos2(0.0, 7.0),
+                    epaint::pos2(10.0, 10.0),
+                ],
+                epaint::Stroke::new(width, epaint::Color32::WHITE),
+            ),
+            &mut expected_mesh,
+        );
+
+        assert_eq!(
+            epaint_mesh_bounds(&mesh.mesh),
+            epaint_mesh_bounds(&expected_mesh),
+            "DES path tessellation should preserve epaint's stroked-path geometry"
+        );
+    }
+
+    #[test]
     fn stroke_line_round_cap_is_composed_from_epaint_shapes() {
         let Some((_, shape)) = epaint_shape(&PaintCommand::StrokeLine(StrokeLinePaint {
             element_id: ElementId::new("round-line"),
@@ -2164,5 +2215,19 @@ mod tests {
             panic!("expected epaint mesh primitive");
         };
         mesh
+    }
+
+    fn epaint_mesh_bounds(mesh: &epaint::Mesh) -> Option<epaint::Rect> {
+        let mut vertices = mesh.vertices.iter();
+        let first = vertices.next()?;
+        let mut min = first.pos;
+        let mut max = first.pos;
+        for vertex in vertices {
+            min.x = min.x.min(vertex.pos.x);
+            min.y = min.y.min(vertex.pos.y);
+            max.x = max.x.max(vertex.pos.x);
+            max.y = max.y.max(vertex.pos.y);
+        }
+        Some(epaint::Rect::from_min_max(min, max))
     }
 }
