@@ -635,23 +635,24 @@ impl Mesh {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct MeshBuilder {
+struct MeshBuilder {
     mesh: Mesh,
 }
 
 impl MeshBuilder {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self::default()
     }
 
-    pub fn push_display_list(&mut self, display_list: &DisplayList) {
+    #[cfg(test)]
+    fn push_display_list(&mut self, display_list: &DisplayList) {
         let primitives = plan_primitives(display_list);
         for command in &primitives.commands {
             self.push_command(command);
         }
     }
 
-    pub fn push_command(&mut self, command: &PrimitiveCommand) {
+    fn push_command(&mut self, command: &PrimitiveCommand) {
         match command {
             PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) => self.push_mesh(mesh),
             PrimitiveCommand::Draw(RenderPrimitive::Text(_))
@@ -660,7 +661,7 @@ impl MeshBuilder {
         }
     }
 
-    pub fn finish(self) -> Mesh {
+    fn finish(self) -> Mesh {
         self.mesh
     }
 
@@ -669,8 +670,14 @@ impl MeshBuilder {
     }
 
     fn push_mesh(&mut self, primitive: &EpaintMeshPrimitive) {
-        if self.mesh.texture_id.is_none() {
-            self.mesh.texture_id = Some(primitive.mesh.texture_id);
+        match self.mesh.texture_id {
+            Some(texture_id) => assert_eq!(
+                texture_id, primitive.mesh.texture_id,
+                "single mesh batches cannot merge different epaint texture ids"
+            ),
+            None => {
+                self.mesh.texture_id = Some(primitive.mesh.texture_id);
+            }
         }
         let base = self.mesh.vertices.len() as u32;
         let mesh = Mesh::from_epaint_mesh(&primitive.mesh);
@@ -681,7 +688,8 @@ impl MeshBuilder {
     }
 }
 
-pub fn mesh_for_display_list(display_list: &DisplayList) -> Mesh {
+#[cfg(test)]
+fn mesh_for_display_list(display_list: &DisplayList) -> Mesh {
     let mut builder = MeshBuilder::new();
     builder.push_display_list(display_list);
     builder.finish()
@@ -1769,6 +1777,39 @@ mod tests {
         assert_eq!(
             plan.batches[1].mesh.texture_id,
             Some(epaint::TextureId::Managed(1))
+        );
+    }
+
+    #[test]
+    fn mesh_builder_rejects_mixed_epaint_texture_ids() {
+        fn primitive(texture_id: epaint::TextureId) -> des_ui_render::PrimitiveCommand {
+            let mut mesh = epaint::Mesh {
+                texture_id,
+                ..epaint::Mesh::default()
+            };
+            mesh.vertices.push(epaint::Vertex {
+                pos: epaint::pos2(0.0, 0.0),
+                uv: epaint::pos2(0.0, 0.0),
+                color: epaint::Color32::WHITE,
+            });
+            mesh.indices.push(0);
+            des_ui_render::PrimitiveCommand::Draw(des_ui_render::RenderPrimitive::Mesh(
+                des_ui_render::EpaintMeshPrimitive {
+                    element_id: ElementId::new("textured"),
+                    mesh,
+                },
+            ))
+        }
+
+        let mut builder = MeshBuilder::new();
+        builder.push_command(&primitive(epaint::TextureId::Managed(0)));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            builder.push_command(&primitive(epaint::TextureId::Managed(1)));
+        }));
+
+        assert!(
+            result.is_err(),
+            "single mesh batches must preserve epaint texture identity"
         );
     }
 
