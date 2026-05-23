@@ -798,6 +798,7 @@ name = "des-ui-render"
 version = "0.1.0"
 dependencies = [
  "des-ui-document",
+ "epaint",
 ]
 
 [[package]]
@@ -816,6 +817,7 @@ dependencies = [
  "bytemuck",
  "des-ui-document",
  "des-ui-render",
+ "epaint",
  "wgpu",
 ]
 

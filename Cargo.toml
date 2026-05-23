@@ -44,6 +44,7 @@ des-ui-winit = { path = "crates/des-ui-winit" }
 bytemuck = { version = "=1.25.0", features = ["derive"] }
 eframe = { version = "=0.34.1", default-features = true }
 egui = "=0.34.1"
+epaint = "=0.34.1"
 iconflow = { version = "=1.0.0", default-features = false }
 layout-rs = "=0.1.3"
 fontique = { version = "=0.9.0", default-features = false, features = ["libm"] }

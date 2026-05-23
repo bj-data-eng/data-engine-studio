@@ -11,4 +11,5 @@ ab_glyph.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
 des-ui-document.workspace = true
 des-ui-render.workspace = true
+epaint.workspace = true
 wgpu.workspace = true

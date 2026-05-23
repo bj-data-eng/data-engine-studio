@@ -8,8 +8,8 @@
 use ab_glyph::{Font, FontArc, GlyphId, PxScale, ScaleFont, point};
 use des_ui_document::{Color, Rect, TextWrapMode};
 use des_ui_render::{
-    DisplayList, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
-    TriangleMeshPrimitive, plan_primitives,
+    DisplayList, EpaintMeshPrimitive, PrimitiveCommand, PrimitiveList, RenderPrimitive, TextPaint,
+    plan_primitives,
 };
 use std::{error, fmt, mem};
 
@@ -561,7 +561,7 @@ impl MeshBuilder {
 
     pub fn push_command(&mut self, command: &PrimitiveCommand) {
         match command {
-            PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) => self.push_triangles(mesh),
+            PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) => self.push_mesh(mesh),
             PrimitiveCommand::Draw(RenderPrimitive::Text(_))
             | PrimitiveCommand::PushClip(_)
             | PrimitiveCommand::PopClip => {}
@@ -572,17 +572,17 @@ impl MeshBuilder {
         self.mesh
     }
 
-    fn push_triangles(&mut self, primitive: &TriangleMeshPrimitive) {
+    fn push_mesh(&mut self, primitive: &EpaintMeshPrimitive) {
         let base = self.mesh.vertices.len() as u32;
         self.mesh
             .vertices
-            .extend(primitive.vertices.iter().map(|vertex| Vertex {
-                position: [vertex.position.x, vertex.position.y],
-                color: PackedColor::from(vertex.color).to_array(),
+            .extend(primitive.mesh.vertices.iter().map(|vertex| Vertex {
+                position: [vertex.pos.x, vertex.pos.y],
+                color: vertex.color.to_array(),
             }));
         self.mesh
             .indices
-            .extend(primitive.indices.iter().map(|index| base + *index));
+            .extend(primitive.mesh.indices.iter().map(|index| base + *index));
     }
 }
 
@@ -982,13 +982,28 @@ fn create_pipeline(
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                blend: Some(premultiplied_alpha_blend()),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
         multiview_mask: None,
         cache: None,
     })
+}
+
+fn premultiplied_alpha_blend() -> wgpu::BlendState {
+    wgpu::BlendState {
+        color: wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::One,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        },
+        alpha: wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::One,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        },
+    }
 }
 
 fn create_text_pipeline(
@@ -1153,30 +1168,26 @@ mod tests {
     }
 
     #[test]
-    fn fill_rect_generates_antialiased_triangles_in_document_coordinates() {
+    fn fill_rect_uses_epaint_tessellation_in_document_coordinates() {
         let mut display_list = DisplayList::new();
         display_list.push(PaintCommand::FillRect(FillRectPaint {
             element_id: ElementId::new("box"),
             rect: Rect::new(10.0, 20.0, 30.0, 40.0),
             radius: CornerRadii::ZERO,
-            color: Color::rgba(1, 2, 3, 4),
+            color: Color::rgb(1, 2, 3),
         }));
         let mut builder = MeshBuilder::new();
         builder.push_display_list(&display_list);
 
         let mesh = builder.finish();
-        assert_eq!(mesh.vertices.len(), 8);
-        assert_eq!(&mesh.indices[0..6], [2, 0, 4, 4, 0, 6]);
+        assert!(mesh.vertices.len() >= 8);
+        assert!(mesh.indices.len() >= 30);
         assert!(
             mesh.vertices
                 .iter()
-                .any(|vertex| vertex.color == [1, 2, 3, 4])
+                .any(|vertex| vertex.color == [1, 2, 3, 255])
         );
-        assert!(
-            mesh.vertices
-                .iter()
-                .any(|vertex| vertex.color == [1, 2, 3, 0])
-        );
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color[3] == 0));
         assert!(
             mesh.vertices
                 .iter()
@@ -1219,8 +1230,8 @@ mod tests {
         assert_eq!(plan.batches.len(), 2);
         assert_eq!(plan.batches[0].clip, None);
         assert_eq!(plan.batches[1].clip, Some(Rect::new(4.0, 5.0, 6.0, 7.0)));
-        assert_eq!(plan.batches[0].mesh.indices.len(), 30);
-        assert_eq!(plan.batches[1].mesh.indices.len(), 30);
+        assert!(!plan.batches[0].mesh.indices.is_empty());
+        assert!(!plan.batches[1].mesh.indices.is_empty());
     }
 
     #[test]
@@ -1383,15 +1394,7 @@ mod tests {
 
         assert!(mesh.vertices.len() > 4);
         assert!(mesh.indices.len() > 6);
-        assert!(
-            mesh.vertices
-                .iter()
-                .any(|vertex| vertex.color == [7, 8, 9, 10])
-        );
-        assert!(
-            mesh.vertices
-                .iter()
-                .any(|vertex| vertex.color == [7, 8, 9, 0])
-        );
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color[3] == 10));
+        assert!(mesh.vertices.iter().any(|vertex| vertex.color[3] == 0));
     }
 }

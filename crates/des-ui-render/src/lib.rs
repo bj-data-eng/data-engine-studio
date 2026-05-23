@@ -9,9 +9,6 @@ use des_ui_document::{
     Overflow, Point, Rect, ResolvedElement, ScrollAxis, ScrollChrome, Shadow, TextWrapMode,
 };
 
-const DEFAULT_ANTIALIASING_FRINGE: f32 = 1.0;
-const POLYGON_POINT_EPSILON: f32 = 0.01;
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DisplayList {
     pub commands: Vec<PaintCommand>,
@@ -175,37 +172,52 @@ pub enum PrimitiveCommand {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RenderPrimitive {
-    Triangles(TriangleMeshPrimitive),
+    Mesh(EpaintMeshPrimitive),
     Text(TextPaint),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TriangleMeshPrimitive {
+pub struct EpaintMeshPrimitive {
     pub element_id: ElementId,
-    pub vertices: Vec<PrimitiveVertex>,
-    pub indices: Vec<u32>,
+    pub mesh: epaint::Mesh,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PrimitiveVertex {
-    pub position: Point,
-    pub color: Color,
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrimitivePlanner {
+    pixels_per_point: f32,
+    options: epaint::TessellationOptions,
 }
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct PrimitivePlanner;
 
 impl PrimitivePlanner {
     pub fn new() -> Self {
-        Self
+        Self {
+            pixels_per_point: 1.0,
+            options: epaint::TessellationOptions::default(),
+        }
+    }
+
+    pub fn with_pixels_per_point(mut self, pixels_per_point: f32) -> Self {
+        self.pixels_per_point = pixels_per_point.max(0.000_001);
+        self
     }
 
     pub fn plan_display_list(&self, display_list: &DisplayList) -> PrimitiveList {
         let mut primitives = PrimitiveList::new();
         for command in &display_list.commands {
-            append_primitive_command(&mut primitives, command);
+            append_primitive_command(
+                &mut primitives,
+                command,
+                self.pixels_per_point,
+                &self.options,
+            );
         }
         primitives
+    }
+}
+
+impl Default for PrimitivePlanner {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -307,627 +319,179 @@ pub fn content_rect(frame: &ResolvedElement) -> Rect {
     })
 }
 
-fn append_primitive_command(primitives: &mut PrimitiveList, command: &PaintCommand) {
+fn append_primitive_command(
+    primitives: &mut PrimitiveList,
+    command: &PaintCommand,
+    pixels_per_point: f32,
+    options: &epaint::TessellationOptions,
+) {
     match command {
         PaintCommand::PushClip(rect) => primitives.push(PrimitiveCommand::PushClip(*rect)),
         PaintCommand::PopClip => primitives.push(PrimitiveCommand::PopClip),
-        PaintCommand::FillRect(command) => {
-            if let Some(mesh) = fill_rect_mesh(command) {
-                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
-            }
-        }
-        PaintCommand::StrokeRect(command) => {
-            for mesh in stroke_rect_meshes(command) {
-                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
-            }
-        }
-        PaintCommand::StrokeLine(command) => {
-            if let Some(mesh) = stroke_line_mesh(
-                command.element_id.clone(),
-                command.from,
-                command.to,
-                command.width,
-                command.color,
-                command.cap,
-            ) {
-                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
-            }
-        }
-        PaintCommand::StrokePath(command) => {
-            for mesh in stroke_path_meshes(command) {
-                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
-            }
-        }
-        PaintCommand::FillCircle(command) => {
-            if let Some(mesh) = fill_circle_mesh(command) {
-                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
-            }
-        }
-        PaintCommand::FillPolygon(command) => {
-            if let Some(mesh) = fill_polygon_mesh(
-                command.element_id.clone(),
-                command.points.clone(),
-                command.color,
-            ) {
-                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)));
-            }
-        }
         PaintCommand::Text(command) => {
             primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Text(
                 command.clone(),
             )));
         }
+        command => {
+            for primitive in tessellate_command(command, pixels_per_point, options) {
+                primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Mesh(primitive)));
+            }
+        }
     }
 }
 
-fn fill_rect_mesh(command: &FillRectPaint) -> Option<TriangleMeshPrimitive> {
-    if command.rect.size.width <= 0.0 || command.rect.size.height <= 0.0 || command.color.a == 0 {
-        return None;
-    }
-    if command.radius == CornerRadii::ZERO {
-        return fill_polygon_mesh(
-            command.element_id.clone(),
-            rect_points(command.rect),
-            command.color,
-        );
-    }
-    fill_polygon_mesh(
-        command.element_id.clone(),
-        rounded_rect_points(command.rect, command.radius),
-        command.color,
-    )
-}
-
-fn stroke_rect_meshes(command: &StrokeRectPaint) -> Vec<TriangleMeshPrimitive> {
-    if command.width <= 0.0 || command.rect.size.width <= 0.0 || command.rect.size.height <= 0.0 {
+fn tessellate_command(
+    command: &PaintCommand,
+    pixels_per_point: f32,
+    options: &epaint::TessellationOptions,
+) -> Vec<EpaintMeshPrimitive> {
+    let Some((element_id, shape)) = epaint_shape(command) else {
         return Vec::new();
-    }
-    let points = if command.radius == CornerRadii::ZERO {
-        rect_points(command.rect)
-    } else {
-        rounded_rect_points(command.rect, command.radius)
     };
-    joined_stroke_polyline_mesh(
-        command.element_id.clone(),
-        &points,
-        command.width,
-        command.color,
-        true,
-        StrokeCap::Butt,
-        StrokeJoin::Miter,
-    )
-    .into_iter()
-    .collect()
-}
-
-fn stroke_path_meshes(command: &StrokePathPaint) -> Vec<TriangleMeshPrimitive> {
-    if command.width <= 0.0 || command.points.len() < 2 {
-        return Vec::new();
-    }
-    joined_stroke_polyline_mesh(
-        command.element_id.clone(),
-        &command.points,
-        command.width,
-        command.color,
-        command.closed,
-        command.cap,
-        command.join,
-    )
-    .into_iter()
-    .chain(round_join_meshes(
-        command.element_id.clone(),
-        &command.points,
-        command.width,
-        command.color,
-        command.closed,
-        command.join,
-    ))
-    .collect()
-}
-
-fn round_join_meshes(
-    element_id: ElementId,
-    points: &[Point],
-    width: f32,
-    color: Color,
-    closed: bool,
-    join: StrokeJoin,
-) -> Vec<TriangleMeshPrimitive> {
-    if join != StrokeJoin::Round || width <= 0.0 || color.a == 0 || points.len() < 3 {
-        return Vec::new();
-    }
-    let range: Box<dyn Iterator<Item = usize>> = if closed {
-        Box::new(0..points.len())
-    } else {
-        Box::new(1..points.len() - 1)
+    let clipped = epaint::ClippedShape {
+        clip_rect: epaint::Rect::EVERYTHING,
+        shape,
     };
-    range
-        .filter_map(|index| {
-            fill_circle_mesh(&FillCirclePaint {
+    let mut tessellator =
+        epaint::Tessellator::new(pixels_per_point, options.clone(), [1, 1], Vec::new());
+    tessellator
+        .tessellate_shapes(vec![clipped])
+        .into_iter()
+        .filter_map(|primitive| match primitive.primitive {
+            epaint::Primitive::Mesh(mesh) if !mesh.is_empty() => Some(EpaintMeshPrimitive {
                 element_id: element_id.clone(),
-                center: points[index],
-                radius: width * 0.5,
-                color,
-            })
+                mesh,
+            }),
+            _ => None,
         })
         .collect()
 }
 
-fn joined_stroke_polyline_mesh(
-    element_id: ElementId,
-    points: &[Point],
-    width: f32,
-    color: Color,
-    closed: bool,
-    cap: StrokeCap,
-    join: StrokeJoin,
-) -> Option<TriangleMeshPrimitive> {
-    if width <= 0.0 || color.a == 0 || points.len() < 2 {
-        return None;
-    }
-    let half_width = width * 0.5;
-    let mut left = Vec::with_capacity(points.len());
-    let mut right = Vec::with_capacity(points.len());
-
-    for index in 0..points.len() {
-        let previous_index = if index == 0 {
-            if closed { points.len() - 1 } else { 0 }
-        } else {
-            index - 1
-        };
-        let next_index = if index + 1 == points.len() {
-            if closed { 0 } else { points.len() - 1 }
-        } else {
-            index + 1
-        };
-        let incoming = normalized_or(
-            Point::ZERO,
-            sub_points(points[index], points[previous_index]),
-        );
-        let outgoing = normalized_or(Point::ZERO, sub_points(points[next_index], points[index]));
-        let tangent = if point_length(incoming) <= f32::EPSILON {
-            outgoing
-        } else if point_length(outgoing) <= f32::EPSILON {
-            incoming
-        } else if join == StrokeJoin::Bevel {
-            outgoing
-        } else {
-            normalized_or(incoming, add_points(incoming, outgoing))
-        };
-        if point_length(tangent) <= f32::EPSILON {
-            return None;
+fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
+    match command {
+        PaintCommand::FillRect(command) => {
+            if command.rect.size.width <= 0.0
+                || command.rect.size.height <= 0.0
+                || command.color.a == 0
+            {
+                return None;
+            }
+            Some((
+                command.element_id.clone(),
+                epaint::Shape::Rect(epaint::RectShape::filled(
+                    to_epaint_rect(command.rect),
+                    to_epaint_radius(command.radius),
+                    to_epaint_color(command.color),
+                )),
+            ))
         }
-        let normal = Point::new(-tangent.y, tangent.x);
-        let reference_direction = if point_length(outgoing) > f32::EPSILON {
-            outgoing
-        } else {
-            incoming
-        };
-        let reference_normal = Point::new(-reference_direction.y, reference_direction.x);
-        let dot = dot_points(normal, reference_normal).abs().max(0.25);
-        let miter = (half_width / dot).min(width * 2.0);
-        left.push(add_points(points[index], scale_point(normal, miter)));
-        right.push(sub_points(points[index], scale_point(normal, miter)));
+        PaintCommand::StrokeRect(command) => {
+            if command.width <= 0.0
+                || command.color.a == 0
+                || command.rect.size.width <= 0.0
+                || command.rect.size.height <= 0.0
+            {
+                return None;
+            }
+            Some((
+                command.element_id.clone(),
+                epaint::Shape::Rect(epaint::RectShape::stroke(
+                    to_epaint_rect(command.rect),
+                    to_epaint_radius(command.radius),
+                    epaint::Stroke::new(command.width, to_epaint_color(command.color)),
+                    epaint::StrokeKind::Middle,
+                )),
+            ))
+        }
+        PaintCommand::StrokeLine(command) => {
+            if command.width <= 0.0 || command.color.a == 0 {
+                return None;
+            }
+            Some((
+                command.element_id.clone(),
+                epaint::Shape::line_segment(
+                    [to_epaint_pos(command.from), to_epaint_pos(command.to)],
+                    epaint::Stroke::new(command.width, to_epaint_color(command.color)),
+                ),
+            ))
+        }
+        PaintCommand::StrokePath(command) => {
+            if command.width <= 0.0 || command.color.a == 0 || command.points.len() < 2 {
+                return None;
+            }
+            let stroke =
+                epaint::PathStroke::new(command.width, to_epaint_color(command.color)).middle();
+            let points = command
+                .points
+                .iter()
+                .copied()
+                .map(to_epaint_pos)
+                .collect::<Vec<_>>();
+            let path = if command.closed {
+                epaint::PathShape::closed_line(points, stroke)
+            } else {
+                epaint::PathShape::line(points, stroke)
+            };
+            Some((command.element_id.clone(), epaint::Shape::Path(path)))
+        }
+        PaintCommand::FillCircle(command) => {
+            if command.radius <= 0.0 || command.color.a == 0 {
+                return None;
+            }
+            Some((
+                command.element_id.clone(),
+                epaint::Shape::circle_filled(
+                    to_epaint_pos(command.center),
+                    command.radius,
+                    to_epaint_color(command.color),
+                ),
+            ))
+        }
+        PaintCommand::FillPolygon(command) => {
+            if command.points.len() < 3 || command.color.a == 0 {
+                return None;
+            }
+            Some((
+                command.element_id.clone(),
+                epaint::Shape::convex_polygon(
+                    command
+                        .points
+                        .iter()
+                        .copied()
+                        .map(to_epaint_pos)
+                        .collect::<Vec<_>>(),
+                    to_epaint_color(command.color),
+                    epaint::Stroke::NONE,
+                ),
+            ))
+        }
+        PaintCommand::PushClip(_) | PaintCommand::PopClip | PaintCommand::Text(_) => None,
     }
-
-    if !closed && cap == StrokeCap::Square {
-        apply_square_caps(points, half_width, &mut left, &mut right);
-    }
-
-    let mut outline = Vec::with_capacity(points.len() * 2 + stroke_cap_segments(width) * 2);
-    outline.extend(left);
-    if !closed {
-        append_end_cap_points(&mut outline, points, half_width, cap);
-    }
-    outline.extend(right.iter().rev().copied());
-    if !closed {
-        append_start_cap_points(&mut outline, points, half_width, cap);
-    }
-    fill_polygon_mesh(element_id, outline, color)
 }
 
-fn stroke_line_mesh(
-    element_id: ElementId,
-    from: Point,
-    to: Point,
-    width: f32,
-    color: Color,
-    cap: StrokeCap,
-) -> Option<TriangleMeshPrimitive> {
-    joined_stroke_polyline_mesh(
-        element_id,
-        &[from, to],
-        width,
-        color,
-        false,
-        cap,
-        StrokeJoin::Miter,
+fn to_epaint_pos(point: Point) -> epaint::Pos2 {
+    epaint::pos2(point.x, point.y)
+}
+
+fn to_epaint_rect(rect: Rect) -> epaint::Rect {
+    epaint::Rect::from_min_size(
+        to_epaint_pos(rect.origin),
+        epaint::vec2(rect.size.width, rect.size.height),
     )
 }
 
-fn append_end_cap_points(
-    outline: &mut Vec<Point>,
-    points: &[Point],
-    half_width: f32,
-    cap: StrokeCap,
-) {
-    let Some(direction) = terminal_direction(points, false) else {
-        return;
-    };
-    let center = *points.last().expect("checked line point count");
-    match cap {
-        StrokeCap::Butt => {}
-        StrokeCap::Square => {}
-        StrokeCap::Round => {
-            let normal = Point::new(-direction.y, direction.x);
-            append_cap_arc(outline, center, direction, normal, half_width);
-        }
+fn to_epaint_radius(radius: CornerRadii) -> epaint::CornerRadius {
+    epaint::CornerRadius {
+        nw: radius.top_left.round().clamp(0.0, u8::MAX as f32) as u8,
+        ne: radius.top_right.round().clamp(0.0, u8::MAX as f32) as u8,
+        sw: radius.bottom_left.round().clamp(0.0, u8::MAX as f32) as u8,
+        se: radius.bottom_right.round().clamp(0.0, u8::MAX as f32) as u8,
     }
 }
 
-fn append_start_cap_points(
-    outline: &mut Vec<Point>,
-    points: &[Point],
-    half_width: f32,
-    cap: StrokeCap,
-) {
-    let Some(direction) = terminal_direction(points, true) else {
-        return;
-    };
-    let center = points[0];
-    match cap {
-        StrokeCap::Butt => {}
-        StrokeCap::Square => {}
-        StrokeCap::Round => {
-            let normal = Point::new(direction.y, -direction.x);
-            append_cap_arc(outline, center, direction, normal, half_width);
-        }
-    }
-}
-
-fn apply_square_caps(points: &[Point], half_width: f32, left: &mut [Point], right: &mut [Point]) {
-    let Some(start_direction) = terminal_direction(points, true) else {
-        return;
-    };
-    let Some(end_direction) = terminal_direction(points, false) else {
-        return;
-    };
-    let start_offset = scale_point(start_direction, half_width);
-    let end_offset = scale_point(end_direction, half_width);
-    left[0] = add_points(left[0], start_offset);
-    right[0] = add_points(right[0], start_offset);
-    let last = points.len() - 1;
-    left[last] = add_points(left[last], end_offset);
-    right[last] = add_points(right[last], end_offset);
-}
-
-fn append_cap_arc(
-    outline: &mut Vec<Point>,
-    center: Point,
-    direction: Point,
-    start_normal: Point,
-    radius: f32,
-) {
-    let segments = stroke_cap_segments(radius * 2.0);
-    for index in 1..segments {
-        let angle = std::f32::consts::PI * index as f32 / segments as f32;
-        let normal_part = scale_point(start_normal, angle.cos() * radius);
-        let direction_part = scale_point(direction, angle.sin() * radius);
-        outline.push(add_points(center, add_points(normal_part, direction_part)));
-    }
-}
-
-fn terminal_direction(points: &[Point], start: bool) -> Option<Point> {
-    let vector = if start {
-        sub_points(points[0], points[1])
-    } else {
-        sub_points(
-            *points.last().expect("checked line point count"),
-            points[points.len() - 2],
-        )
-    };
-    let length = point_length(vector);
-    if length <= f32::EPSILON {
-        None
-    } else {
-        Some(scale_point(vector, 1.0 / length))
-    }
-}
-
-fn stroke_cap_segments(width: f32) -> usize {
-    let segments = ((width * 1.25).ceil() as usize).clamp(6, 24);
-    if segments % 2 == 0 {
-        segments
-    } else {
-        (segments + 1).min(24)
-    }
-}
-
-fn fill_circle_mesh(command: &FillCirclePaint) -> Option<TriangleMeshPrimitive> {
-    if command.radius <= 0.0 || command.color.a == 0 {
-        return None;
-    }
-    let segments = circle_segments(command.radius);
-    let mut points = Vec::with_capacity(segments);
-    for index in 0..segments {
-        let angle = std::f32::consts::TAU * index as f32 / segments as f32;
-        points.push(Point::new(
-            command.center.x + angle.cos() * command.radius,
-            command.center.y + angle.sin() * command.radius,
-        ));
-    }
-    fill_polygon_mesh(command.element_id.clone(), points, command.color)
-}
-
-fn fill_polygon_mesh(
-    element_id: ElementId,
-    points: Vec<Point>,
-    color: Color,
-) -> Option<TriangleMeshPrimitive> {
-    if points.len() < 3 || color.a == 0 {
-        return None;
-    }
-    let points = clean_polygon_points(&points);
-    if points.len() < 3 {
-        return None;
-    }
-    fill_antialiased_convex_polygon_mesh(element_id, &points, color, DEFAULT_ANTIALIASING_FRINGE)
-}
-
-fn clean_polygon_points(points: &[Point]) -> Vec<Point> {
-    let mut cleaned = Vec::with_capacity(points.len());
-    for point in points {
-        if cleaned
-            .last()
-            .is_none_or(|previous| !points_are_near(*previous, *point))
-        {
-            cleaned.push(*point);
-        }
-    }
-    if cleaned.len() > 1
-        && points_are_near(
-            *cleaned.first().expect("checked polygon point count"),
-            *cleaned.last().expect("checked polygon point count"),
-        )
-    {
-        cleaned.pop();
-    }
-    cleaned
-}
-
-fn points_are_near(a: Point, b: Point) -> bool {
-    let delta = sub_points(a, b);
-    delta.x * delta.x + delta.y * delta.y <= POLYGON_POINT_EPSILON * POLYGON_POINT_EPSILON
-}
-
-fn fill_antialiased_convex_polygon_mesh(
-    element_id: ElementId,
-    points: &[Point],
-    color: Color,
-    fringe_width: f32,
-) -> Option<TriangleMeshPrimitive> {
-    if points.len() < 3 || color.a == 0 {
-        return None;
-    }
-    if fringe_width <= f32::EPSILON {
-        return fill_solid_polygon_mesh(element_id, points, color);
-    }
-    let normals = polygon_outward_join_normals(points)?;
-    let mut vertices = Vec::with_capacity(points.len() * 2);
-    let fringe = fringe_width * 0.5;
-    for (point, normal) in points.iter().zip(normals.iter()) {
-        vertices.push(PrimitiveVertex {
-            position: sub_points(*point, scale_point(*normal, fringe)),
-            color,
-        });
-        vertices.push(PrimitiveVertex {
-            position: add_points(*point, scale_point(*normal, fringe)),
-            color: Color { a: 0, ..color },
-        });
-    }
-
-    let count = points.len();
-    let mut indices = Vec::with_capacity((count - 2) * 3 + count * 6);
-    for index in 2..count {
-        indices.extend([(2 * (index - 1)) as u32, 0, (2 * index) as u32]);
-    }
-    let mut previous = count - 1;
-    for index in 0..count {
-        let inner = (2 * index) as u32;
-        let outer = inner + 1;
-        let previous_inner = (2 * previous) as u32;
-        let previous_outer = previous_inner + 1;
-        indices.extend([inner, previous_inner, previous_outer]);
-        indices.extend([previous_outer, outer, inner]);
-        previous = index;
-    }
-    Some(TriangleMeshPrimitive {
-        element_id,
-        vertices,
-        indices,
-    })
-}
-
-fn fill_solid_polygon_mesh(
-    element_id: ElementId,
-    points: &[Point],
-    color: Color,
-) -> Option<TriangleMeshPrimitive> {
-    if points.len() < 3 || color.a == 0 {
-        return None;
-    }
-    let vertices = points
-        .iter()
-        .copied()
-        .map(|position| PrimitiveVertex { position, color })
-        .collect();
-    let mut indices = Vec::with_capacity((points.len() - 2) * 3);
-    for index in 1..points.len() - 1 {
-        indices.extend([0, index as u32, index as u32 + 1]);
-    }
-    Some(TriangleMeshPrimitive {
-        element_id,
-        vertices,
-        indices,
-    })
-}
-
-fn polygon_outward_join_normals(points: &[Point]) -> Option<Vec<Point>> {
-    let area = signed_polygon_area(points);
-    if area.abs() <= f32::EPSILON {
-        return None;
-    }
-    let clockwise = area > 0.0;
-    let mut edge_normals = Vec::with_capacity(points.len());
-    for index in 0..points.len() {
-        let next = (index + 1) % points.len();
-        let edge = sub_points(points[next], points[index]);
-        let length = point_length(edge);
-        if length <= f32::EPSILON {
-            return None;
-        }
-        let normal = if clockwise {
-            Point::new(edge.y / length, -edge.x / length)
-        } else {
-            Point::new(-edge.y / length, edge.x / length)
-        };
-        edge_normals.push(normal);
-    }
-    Some(
-        edge_normals
-            .iter()
-            .enumerate()
-            .map(|(index, next)| {
-                let previous = edge_normals[(index + edge_normals.len() - 1) % edge_normals.len()];
-                let normal = scale_point(add_points(previous, *next), 0.5);
-                let length_sq = normal.x * normal.x + normal.y * normal.y;
-                if length_sq <= f32::EPSILON {
-                    *next
-                } else {
-                    let miter = scale_point(normal, 1.0 / length_sq);
-                    let miter_length = point_length(miter);
-                    if miter_length > 4.0 {
-                        scale_point(miter, 4.0 / miter_length)
-                    } else {
-                        miter
-                    }
-                }
-            })
-            .collect(),
-    )
-}
-
-fn signed_polygon_area(points: &[Point]) -> f32 {
-    let mut area = 0.0;
-    for index in 0..points.len() {
-        let next = (index + 1) % points.len();
-        area += points[index].x * points[next].y - points[next].x * points[index].y;
-    }
-    area * 0.5
-}
-
-fn normalized_or(fallback: Point, point: Point) -> Point {
-    let length = point_length(point);
-    if length <= f32::EPSILON {
-        fallback
-    } else {
-        scale_point(point, 1.0 / length)
-    }
-}
-
-fn rect_points(rect: Rect) -> Vec<Point> {
-    vec![
-        rect.origin,
-        Point::new(rect.right(), rect.origin.y),
-        Point::new(rect.right(), rect.bottom()),
-        Point::new(rect.origin.x, rect.bottom()),
-    ]
-}
-
-fn rounded_rect_points(rect: Rect, radius: CornerRadii) -> Vec<Point> {
-    let max_x = rect.size.width * 0.5;
-    let max_y = rect.size.height * 0.5;
-    let top_left = radius.top_left.min(max_x).min(max_y).max(0.0);
-    let top_right = radius.top_right.min(max_x).min(max_y).max(0.0);
-    let bottom_right = radius.bottom_right.min(max_x).min(max_y).max(0.0);
-    let bottom_left = radius.bottom_left.min(max_x).min(max_y).max(0.0);
-    let mut points = Vec::new();
-    let epsilon = f32::EPSILON * rect.size.width.max(rect.size.height);
-    append_corner_arc(
-        &mut points,
-        Point::new(rect.right() - bottom_right, rect.bottom() - bottom_right),
-        bottom_right,
-        0.0,
-        std::f32::consts::FRAC_PI_2,
-    );
-    pop_duplicate_side_endpoint(
-        &mut points,
-        rect.size.width <= bottom_right + bottom_left + epsilon,
-    );
-    append_corner_arc(
-        &mut points,
-        Point::new(rect.origin.x + bottom_left, rect.bottom() - bottom_left),
-        bottom_left,
-        std::f32::consts::FRAC_PI_2,
-        std::f32::consts::PI,
-    );
-    pop_duplicate_side_endpoint(
-        &mut points,
-        rect.size.height <= bottom_left + top_left + epsilon,
-    );
-    append_corner_arc(
-        &mut points,
-        Point::new(rect.origin.x + top_left, rect.origin.y + top_left),
-        top_left,
-        std::f32::consts::PI,
-        std::f32::consts::PI * 1.5,
-    );
-    pop_duplicate_side_endpoint(
-        &mut points,
-        rect.size.width <= top_left + top_right + epsilon,
-    );
-    append_corner_arc(
-        &mut points,
-        Point::new(rect.right() - top_right, rect.origin.y + top_right),
-        top_right,
-        std::f32::consts::PI * 1.5,
-        std::f32::consts::TAU,
-    );
-    pop_duplicate_side_endpoint(
-        &mut points,
-        rect.size.height <= top_right + bottom_right + epsilon,
-    );
-    points
-}
-
-fn append_corner_arc(points: &mut Vec<Point>, center: Point, radius: f32, start: f32, end: f32) {
-    if radius <= f32::EPSILON {
-        points.push(center);
-        return;
-    }
-    let segments = corner_segments(radius);
-    for index in 0..=segments {
-        let t = index as f32 / segments as f32;
-        let angle = start + (end - start) * t;
-        points.push(Point::new(
-            center.x + angle.cos() * radius,
-            center.y + angle.sin() * radius,
-        ));
-    }
-}
-
-fn pop_duplicate_side_endpoint(points: &mut Vec<Point>, side_is_all_rounding: bool) {
-    if side_is_all_rounding {
-        points.pop();
-    }
-}
-
-fn corner_segments(radius: f32) -> usize {
-    ((radius / 3.0).ceil() as usize).clamp(3, 10)
-}
-
-fn circle_segments(radius: f32) -> usize {
-    ((radius * 1.5).ceil() as usize).clamp(12, 48)
+fn to_epaint_color(color: Color) -> epaint::Color32 {
+    epaint::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
 }
 
 fn append_surface_commands(list: &mut DisplayList, frame: &ResolvedElement) {
@@ -1819,10 +1383,6 @@ fn scale_point(point: Point, scale: f32) -> Point {
     Point::new(point.x * scale, point.y * scale)
 }
 
-fn dot_points(lhs: Point, rhs: Point) -> f32 {
-    lhs.x * rhs.x + lhs.y * rhs.y
-}
-
 fn point_length(point: Point) -> f32 {
     (point.x * point.x + point.y * point.y).sqrt()
 }
@@ -2007,7 +1567,7 @@ mod tests {
         ));
         assert!(matches!(
             primitives.commands[1],
-            PrimitiveCommand::Draw(RenderPrimitive::Triangles(_))
+            PrimitiveCommand::Draw(RenderPrimitive::Mesh(_))
         ));
         assert!(matches!(
             primitives.commands[2],
@@ -2027,13 +1587,10 @@ mod tests {
         }));
 
         let primitives = plan_primitives(&list);
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected rounded rect mesh");
-        };
+        let mesh = first_mesh(&primitives);
 
-        assert!(mesh.vertices.len() > 4);
-        assert!(mesh.indices.len() > 6);
+        assert!(mesh.mesh.vertices.len() > 4);
+        assert!(mesh.mesh.indices.len() > 6);
         assert_eq!(mesh.element_id.as_str(), "rounded");
     }
 
@@ -2048,29 +1605,34 @@ mod tests {
         }));
 
         let primitives = plan_primitives(&list);
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected antialiased rect mesh");
-        };
+        let mesh = first_mesh(&primitives);
 
         assert!(
-            mesh.vertices.iter().any(|vertex| vertex.color.a == 0),
+            mesh.mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 0),
             "antialiasing requires transparent fringe vertices"
         );
         assert!(
-            mesh.vertices.iter().any(|vertex| vertex.color.a == 220),
+            mesh.mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 220),
             "filled shape must retain opaque interior vertices"
         );
         assert!(
-            mesh.vertices
+            mesh.mesh
+                .vertices
                 .iter()
-                .any(|vertex| vertex.position.x < 10.0 || vertex.position.y < 20.0),
+                .any(|vertex| vertex.pos.x < 10.0 || vertex.pos.y < 20.0),
             "fringe should expand outside the shape on leading edges"
         );
         assert!(
-            mesh.vertices
+            mesh.mesh
+                .vertices
                 .iter()
-                .any(|vertex| vertex.position.x > 40.0 || vertex.position.y > 60.0),
+                .any(|vertex| vertex.pos.x > 40.0 || vertex.pos.y > 60.0),
             "fringe should expand outside the shape on trailing edges"
         );
     }
@@ -2099,118 +1661,20 @@ mod tests {
             1,
             "a joined stroke path should not emit one mesh per segment"
         );
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected joined stroke mesh");
-        };
+        let mesh = first_mesh(&primitives);
         assert_eq!(mesh.element_id.as_str(), "joined");
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 230));
-    }
-
-    #[test]
-    fn round_line_cap_extends_stroke_with_semicircle_geometry() {
-        let mut list = DisplayList::new();
-        list.push(PaintCommand::StrokeLine(StrokeLinePaint {
-            element_id: ElementId::new("round-cap"),
-            from: Point::new(10.0, 20.0),
-            to: Point::new(50.0, 20.0),
-            width: 10.0,
-            color: Color::rgb(90, 80, 70),
-            cap: StrokeCap::Round,
-        }));
-
-        let primitives = plan_primitives(&list);
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected capped line mesh");
-        };
-
         assert!(
-            mesh.vertices.iter().any(|vertex| vertex.position.x <= 5.0),
-            "round cap should extend by half stroke width before the start point"
-        );
-        assert!(
-            mesh.vertices.iter().any(|vertex| vertex.position.x >= 55.0),
-            "round cap should extend by half stroke width after the end point"
-        );
-        assert!(
-            mesh.vertices.len() > 16,
-            "round caps should add semicircle samples beyond the stroke body"
-        );
-    }
-
-    #[test]
-    fn square_line_cap_extends_both_stroke_sides() {
-        let mut list = DisplayList::new();
-        list.push(PaintCommand::StrokeLine(StrokeLinePaint {
-            element_id: ElementId::new("square-cap"),
-            from: Point::new(10.0, 20.0),
-            to: Point::new(50.0, 20.0),
-            width: 10.0,
-            color: Color::rgb(90, 80, 70),
-            cap: StrokeCap::Square,
-        }));
-
-        let primitives = plan_primitives(&list);
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected capped line mesh");
-        };
-
-        assert!(
-            mesh.vertices
+            mesh.mesh
+                .vertices
                 .iter()
-                .any(|vertex| vertex.position.x <= 5.0 && vertex.position.y <= 15.0)
+                .any(|vertex| vertex.color.a() == 0)
         );
         assert!(
-            mesh.vertices
+            mesh.mesh
+                .vertices
                 .iter()
-                .any(|vertex| vertex.position.x <= 5.0 && vertex.position.y >= 25.0)
+                .any(|vertex| vertex.color.a() == 230)
         );
-        assert!(
-            mesh.vertices
-                .iter()
-                .any(|vertex| vertex.position.x >= 55.0 && vertex.position.y <= 15.0)
-        );
-        assert!(
-            mesh.vertices
-                .iter()
-                .any(|vertex| vertex.position.x >= 55.0 && vertex.position.y >= 25.0)
-        );
-    }
-
-    #[test]
-    fn round_stroke_join_adds_antialiased_joint_coverage() {
-        let mut list = DisplayList::new();
-        list.push(PaintCommand::StrokePath(StrokePathPaint {
-            element_id: ElementId::new("round-join"),
-            points: vec![
-                Point::new(0.0, 0.0),
-                Point::new(20.0, 0.0),
-                Point::new(20.0, 20.0),
-            ],
-            width: 10.0,
-            color: Color::rgb(10, 20, 30),
-            closed: false,
-            cap: StrokeCap::Butt,
-            join: StrokeJoin::Round,
-        }));
-
-        let primitives = plan_primitives(&list);
-
-        assert_eq!(
-            primitives.commands.len(),
-            2,
-            "round joins should add explicit joint coverage over the stroke strip"
-        );
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(joint)) = &primitives.commands[1]
-        else {
-            panic!("expected round join mesh");
-        };
-        assert_eq!(joint.element_id.as_str(), "round-join");
-        assert!(joint.vertices.iter().any(|vertex| vertex.color.a == 0));
-        assert!(joint.vertices.iter().any(|vertex| vertex.color.a == 255));
     }
 
     #[test]
@@ -2231,13 +1695,20 @@ mod tests {
             1,
             "a rectangular border should be one joined closed stroke mesh"
         );
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected joined border mesh");
-        };
+        let mesh = first_mesh(&primitives);
         assert_eq!(mesh.element_id.as_str(), "border");
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 255));
+        assert!(
+            mesh.mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 0)
+        );
+        assert!(
+            mesh.mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 255)
+        );
     }
 
     #[test]
@@ -2251,19 +1722,24 @@ mod tests {
         }));
 
         let primitives = plan_primitives(&list);
-        let PrimitiveCommand::Draw(RenderPrimitive::Triangles(mesh)) = &primitives.commands[0]
-        else {
-            panic!("expected antialiased rounded rect mesh");
-        };
+        let mesh = first_mesh(&primitives);
 
         assert!(
-            mesh.vertices.len()
-                >= 2 * rounded_rect_points(Rect::new(0.0, 0.0, 40.0, 24.0), CornerRadii::all(6.0))
-                    .len(),
+            mesh.mesh.vertices.len() > 8,
             "rounded rect should keep its curve samples and add an antialiasing fringe"
         );
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 0));
-        assert!(mesh.vertices.iter().any(|vertex| vertex.color.a == 255));
+        assert!(
+            mesh.mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 0)
+        );
+        assert!(
+            mesh.mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.color.a() == 255)
+        );
     }
 
     #[test]
@@ -2286,20 +1762,32 @@ mod tests {
     }
 
     #[test]
-    fn rounded_rect_points_avoid_left_side_degenerate_start_seam() {
-        let rect = Rect::new(0.0, 0.0, 120.0, 32.0);
-        let points = rounded_rect_points(rect, CornerRadii::all(999.0));
+    fn epaint_rect_fill_uses_boundary_anchored_fan_not_center_fan() {
+        let mut list = DisplayList::new();
+        list.push(PaintCommand::FillRect(FillRectPaint {
+            element_id: ElementId::new("epaint-fill"),
+            rect: Rect::new(10.0, 20.0, 30.0, 40.0),
+            radius: CornerRadii::ZERO,
+            color: Color::rgb(10, 20, 30),
+        }));
+
+        let primitives = plan_primitives(&list);
+        let mesh = first_mesh(&primitives);
 
         assert!(
-            points[0].x > rect.origin.x + rect.size.width * 0.5,
-            "rounded rect paths should start away from the collapsed left-side arc seam"
+            !mesh
+                .mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.pos == epaint::pos2(25.0, 40.0)),
+            "epaint fill tessellation should not add the center-fan vertex that caused wedge artifacts"
         );
-        for index in 0..points.len() {
-            let next = (index + 1) % points.len();
-            assert!(
-                !points_are_near(points[index], points[next]),
-                "rounded rect path should not contain adjacent duplicate points at index {index}"
-            );
-        }
+    }
+
+    fn first_mesh(primitives: &PrimitiveList) -> &EpaintMeshPrimitive {
+        let PrimitiveCommand::Draw(RenderPrimitive::Mesh(mesh)) = &primitives.commands[0] else {
+            panic!("expected epaint mesh primitive");
+        };
+        mesh
     }
 }
