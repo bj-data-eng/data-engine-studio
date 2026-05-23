@@ -43,8 +43,20 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main_gamma_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
     return input.color;
+}
+
+fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
+    let cutoff = srgb < vec3<f32>(0.04045);
+    let lower = srgb / vec3<f32>(12.92);
+    let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
+    return select(higher, lower, cutoff);
+}
+
+@fragment
+fn fs_main_linear_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
+    return vec4<f32>(linear_from_gamma_rgb(input.color.rgb), input.color.a);
 }
 "#;
 
@@ -86,8 +98,21 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main_gamma_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
     return textureSample(text_texture, text_sampler, input.uv) * input.color;
+}
+
+fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
+    let cutoff = srgb < vec3<f32>(0.04045);
+    let lower = srgb / vec3<f32>(12.92);
+    let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
+    return select(higher, lower, cutoff);
+}
+
+@fragment
+fn fs_main_linear_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
+    let color = textureSample(text_texture, text_sampler, input.uv) * input.color;
+    return vec4<f32>(linear_from_gamma_rgb(color.rgb), color.a);
 }
 "#;
 
@@ -1106,7 +1131,7 @@ fn create_pipeline(
         multisample: wgpu::MultisampleState::default(),
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some("fs_main"),
+            entry_point: Some(fragment_entry_point(format)),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,
@@ -1162,7 +1187,7 @@ fn create_text_pipeline(
         multisample: wgpu::MultisampleState::default(),
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some("fs_main"),
+            entry_point: Some(fragment_entry_point(format)),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,
@@ -1173,6 +1198,14 @@ fn create_text_pipeline(
         multiview_mask: None,
         cache: None,
     })
+}
+
+fn fragment_entry_point(format: wgpu::TextureFormat) -> &'static str {
+    if format.is_srgb() {
+        "fs_main_linear_framebuffer"
+    } else {
+        "fs_main_gamma_framebuffer"
+    }
 }
 
 pub fn clip_rect_to_scissor(clip: Option<Rect>, size: PhysicalRenderSize) -> Option<ScissorRect> {
@@ -1304,6 +1337,18 @@ mod tests {
         assert_eq!(blend.color.dst_factor, wgpu::BlendFactor::OneMinusSrcAlpha);
         assert_eq!(blend.alpha.src_factor, wgpu::BlendFactor::OneMinusDstAlpha);
         assert_eq!(blend.alpha.dst_factor, wgpu::BlendFactor::One);
+    }
+
+    #[test]
+    fn fragment_entry_point_matches_epaint_framebuffer_color_contract() {
+        assert_eq!(
+            crate::fragment_entry_point(wgpu::TextureFormat::Bgra8UnormSrgb),
+            "fs_main_linear_framebuffer"
+        );
+        assert_eq!(
+            crate::fragment_entry_point(wgpu::TextureFormat::Bgra8Unorm),
+            "fs_main_gamma_framebuffer"
+        );
     }
 
     #[test]
