@@ -768,6 +768,13 @@ enum DrawTexture {
     TextAtlas,
 }
 
+fn draw_texture_for_mesh(mesh: &Mesh) -> Option<DrawTexture> {
+    match mesh.texture_id {
+        None | Some(epaint::TextureId::Managed(0)) => Some(DrawTexture::Solid),
+        Some(epaint::TextureId::Managed(_)) | Some(epaint::TextureId::User(_)) => None,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BufferUpload {
     Skip,
@@ -1083,14 +1090,18 @@ impl<'window> GpuRenderer<'window> {
         let mut text_meshes = frame.batches.iter();
         for item in &plan.items {
             match item {
-                RenderItem::Mesh(batch) => draws.push(append_mesh_draw(
-                    &mut vertices,
-                    &mut indices,
-                    batch.clip,
-                    DrawTexture::Solid,
-                    &batch.mesh.vertices,
-                    &batch.mesh.indices,
-                )),
+                RenderItem::Mesh(batch) => {
+                    if let Some(texture) = draw_texture_for_mesh(&batch.mesh) {
+                        draws.push(append_mesh_draw(
+                            &mut vertices,
+                            &mut indices,
+                            batch.clip,
+                            texture,
+                            &batch.mesh.vertices,
+                            &batch.mesh.indices,
+                        ));
+                    }
+                }
                 RenderItem::Text(batch) => {
                     if let Some(mesh) = text_meshes.next() {
                         draws.push(append_mesh_draw(
@@ -1733,6 +1744,30 @@ mod tests {
             plan.batches[1].mesh.texture_id,
             Some(epaint::TextureId::Managed(1))
         );
+    }
+
+    #[test]
+    fn draw_texture_for_mesh_supports_only_known_native_textures() {
+        let mut solid = crate::Mesh::default();
+        assert_eq!(
+            crate::draw_texture_for_mesh(&solid),
+            Some(crate::DrawTexture::Solid)
+        );
+
+        solid.texture_id = Some(epaint::TextureId::Managed(0));
+        assert_eq!(
+            crate::draw_texture_for_mesh(&solid),
+            Some(crate::DrawTexture::Solid)
+        );
+
+        let mut unsupported = crate::Mesh {
+            texture_id: Some(epaint::TextureId::Managed(1)),
+            ..crate::Mesh::default()
+        };
+        assert_eq!(crate::draw_texture_for_mesh(&unsupported), None);
+
+        unsupported.texture_id = Some(epaint::TextureId::User(7));
+        assert_eq!(crate::draw_texture_for_mesh(&unsupported), None);
     }
 
     #[test]
