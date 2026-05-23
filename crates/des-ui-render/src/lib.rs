@@ -295,8 +295,10 @@ impl PrimitivePlanner {
     pub fn plan_display_list(&self, display_list: &DisplayList) -> PrimitiveList {
         let mut primitives = PrimitiveList::new();
         let options = epaint::TessellationOptions::from(self.options);
+        let mut tessellator =
+            epaint::Tessellator::new(self.pixels_per_point, options, [1, 1], Vec::new());
         for command in &display_list.commands {
-            append_primitive_command(&mut primitives, command, self.pixels_per_point, &options);
+            append_primitive_command(&mut primitives, command, &mut tessellator);
         }
         primitives
     }
@@ -409,8 +411,7 @@ pub fn content_rect(frame: &ResolvedElement) -> Rect {
 fn append_primitive_command(
     primitives: &mut PrimitiveList,
     command: &PaintCommand,
-    pixels_per_point: f32,
-    options: &epaint::TessellationOptions,
+    tessellator: &mut epaint::Tessellator,
 ) {
     match command {
         PaintCommand::PushClip(rect) => primitives.push(PrimitiveCommand::PushClip(*rect)),
@@ -421,7 +422,7 @@ fn append_primitive_command(
             )));
         }
         command => {
-            for primitive in tessellate_command(command, pixels_per_point, options) {
+            if let Some(primitive) = tessellate_command(command, tessellator) {
                 primitives.push(PrimitiveCommand::Draw(RenderPrimitive::Mesh(primitive)));
             }
         }
@@ -430,29 +431,17 @@ fn append_primitive_command(
 
 fn tessellate_command(
     command: &PaintCommand,
-    pixels_per_point: f32,
-    options: &epaint::TessellationOptions,
-) -> Vec<EpaintMeshPrimitive> {
+    tessellator: &mut epaint::Tessellator,
+) -> Option<EpaintMeshPrimitive> {
     let Some((element_id, shape)) = epaint_shape(command) else {
-        return Vec::new();
+        return None;
     };
-    let clipped = epaint::ClippedShape {
-        clip_rect: epaint::Rect::EVERYTHING,
-        shape,
-    };
-    let mut tessellator =
-        epaint::Tessellator::new(pixels_per_point, options.clone(), [1, 1], Vec::new());
-    tessellator
-        .tessellate_shapes(vec![clipped])
-        .into_iter()
-        .filter_map(|primitive| match primitive.primitive {
-            epaint::Primitive::Mesh(mesh) if !mesh.is_empty() => Some(EpaintMeshPrimitive {
-                element_id: element_id.clone(),
-                mesh,
-            }),
-            _ => None,
-        })
-        .collect()
+    let mut mesh = epaint::Mesh::default();
+    tessellator.tessellate_shape(shape, &mut mesh);
+    if mesh.is_empty() {
+        return None;
+    }
+    Some(EpaintMeshPrimitive { element_id, mesh })
 }
 
 fn epaint_shape(command: &PaintCommand) -> Option<(ElementId, epaint::Shape)> {
