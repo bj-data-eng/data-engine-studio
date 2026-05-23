@@ -19,86 +19,7 @@ use std::{
     ops::Range,
 };
 
-const SHADER: &str = r#"
-struct Viewport {
-    size: vec2<f32>,
-    dithering: u32,
-    _pad: u32,
-};
-
-@group(0) @binding(0)
-var<uniform> viewport: Viewport;
-
-struct VertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) uv: vec2<f32>,
-    @location(2) color: u32,
-};
-
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) color: vec4<f32>,
-};
-
-@vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
-    let ndc = vec2<f32>(
-        (input.position.x / viewport.size.x) * 2.0 - 1.0,
-        1.0 - (input.position.y / viewport.size.y) * 2.0,
-    );
-    var output: VertexOutput;
-    output.position = vec4<f32>(ndc, 0.0, 1.0);
-    output.color = unpack_color(input.color);
-    return output;
-}
-
-@fragment
-fn fs_main_gamma_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = input.color;
-    if viewport.dithering == 1u {
-        color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
-    }
-    return color;
-}
-
-fn linear_from_gamma_rgb(srgb: vec3<f32>) -> vec3<f32> {
-    let cutoff = srgb < vec3<f32>(0.04045);
-    let lower = srgb / vec3<f32>(12.92);
-    let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
-    return select(higher, lower, cutoff);
-}
-
-fn interleaved_gradient_noise(n: vec2<f32>) -> f32 {
-    let f = 0.06711056 * n.x + 0.00583715 * n.y;
-    return fract(52.9829189 * fract(f));
-}
-
-fn dither_interleaved(rgb: vec3<f32>, levels: f32, frag_coord: vec4<f32>) -> vec3<f32> {
-    var noise = interleaved_gradient_noise(frag_coord.xy);
-    noise = (noise - 0.5) * 0.95;
-    return rgb + noise / (levels - 1.0);
-}
-
-fn unpack_color(color: u32) -> vec4<f32> {
-    return vec4<f32>(
-        f32(color & 255u),
-        f32((color >> 8u) & 255u),
-        f32((color >> 16u) & 255u),
-        f32((color >> 24u) & 255u),
-    ) / 255.0;
-}
-
-@fragment
-fn fs_main_linear_framebuffer(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = input.color;
-    if viewport.dithering == 1u {
-        color = vec4<f32>(dither_interleaved(color.rgb, 256.0, input.position), color.a);
-    }
-    return vec4<f32>(linear_from_gamma_rgb(color.rgb), color.a);
-}
-"#;
-
-const TEXT_SHADER: &str = r#"
+const TEXTURED_SHADER: &str = r#"
 struct Viewport {
     size: vec2<f32>,
     dithering: u32,
@@ -740,11 +661,10 @@ pub struct GpuRenderer<'window> {
     config: wgpu::SurfaceConfiguration,
     options: RenderOptions,
     pipeline: wgpu::RenderPipeline,
-    text_pipeline: wgpu::RenderPipeline,
-    text_bind_group_layout: wgpu::BindGroupLayout,
-    text_sampler: wgpu::Sampler,
+    texture_bind_group_layout: wgpu::BindGroupLayout,
+    texture_sampler: wgpu::Sampler,
     viewport_buffer: wgpu::Buffer,
-    viewport_bind_group: wgpu::BindGroup,
+    solid_texture: GpuTexture,
     text_rasterizer: RefCell<TextRasterizer>,
     text_atlas: Option<GpuTextAtlas>,
     mesh_buffers: GpuFrameBuffers,
@@ -755,8 +675,19 @@ pub struct GpuRenderer<'window> {
 struct GpuTextAtlas {
     size: TextAtlasSize,
     fingerprint: u64,
+    gpu: GpuTexture,
+}
+
+#[derive(Clone)]
+struct GpuTexture {
     texture: wgpu::Texture,
     bind_group: wgpu::BindGroup,
+}
+
+struct TextureUpload<'a> {
+    width: u32,
+    height: u32,
+    pixels: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -952,31 +883,9 @@ impl<'window> GpuRenderer<'window> {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let viewport_bind_group_layout =
+        let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("des-ui viewport bind group layout"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
-        let viewport_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("des-ui viewport bind group"),
-            layout: &viewport_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: viewport_buffer.as_entire_binding(),
-            }],
-        });
-        let text_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("des-ui text bind group layout"),
+                label: Some("des-ui texture bind group layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -1006,8 +915,8 @@ impl<'window> GpuRenderer<'window> {
                     },
                 ],
             });
-        let text_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("des-ui text sampler"),
+        let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("des-ui texture sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -1016,8 +925,20 @@ impl<'window> GpuRenderer<'window> {
             mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
-        let pipeline = create_pipeline(&device, config.format, &viewport_bind_group_layout);
-        let text_pipeline = create_text_pipeline(&device, config.format, &text_bind_group_layout);
+        let pipeline = create_pipeline(&device, config.format, &texture_bind_group_layout);
+        let solid_texture = create_rgba_texture(
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+            &texture_sampler,
+            &viewport_buffer,
+            "des-ui solid white texture",
+            TextureUpload {
+                width: 1,
+                height: 1,
+                pixels: &[255, 255, 255, 255],
+            },
+        );
         let renderer = Self {
             surface,
             device,
@@ -1025,11 +946,10 @@ impl<'window> GpuRenderer<'window> {
             config,
             options,
             pipeline,
-            text_pipeline,
-            text_bind_group_layout,
-            text_sampler,
+            texture_bind_group_layout,
+            texture_sampler,
             viewport_buffer,
-            viewport_bind_group,
+            solid_texture,
             text_rasterizer: RefCell::new(TextRasterizer::new()),
             text_atlas: None,
             mesh_buffers: GpuFrameBuffers::default(),
@@ -1112,21 +1032,17 @@ impl<'window> GpuRenderer<'window> {
                 multiview_mask: None,
             });
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &self.viewport_bind_group, &[]);
             let mut mesh_index = 0;
             let mut text_index = 0;
             for item in &plan.items {
                 match item {
                     RenderItem::Mesh(_) => {
-                        pass.set_pipeline(&self.pipeline);
-                        pass.set_bind_group(0, &self.viewport_bind_group, &[]);
                         if let Some(draw) = mesh_frame.draws.get(mesh_index) {
-                            self.draw_mesh_batch(&mut pass, draw);
+                            self.draw_mesh_batch(&mut pass, draw, &self.solid_texture.bind_group);
                         }
                         mesh_index += 1;
                     }
                     RenderItem::Text(_) => {
-                        pass.set_pipeline(&self.text_pipeline);
                         let draw = uploaded_text_frame.draws.get(text_index);
                         if let (Some(draw), Some(bind_group)) = (draw, text_bind_group.as_ref()) {
                             self.draw_text_batch(&mut pass, draw, bind_group);
@@ -1263,6 +1179,7 @@ impl<'window> GpuRenderer<'window> {
         &'pass self,
         pass: &mut wgpu::RenderPass<'pass>,
         draw: &'pass UploadedDraw,
+        bind_group: &'pass wgpu::BindGroup,
     ) {
         if draw.index_count == 0 {
             return;
@@ -1277,6 +1194,7 @@ impl<'window> GpuRenderer<'window> {
             return;
         };
         pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
+        pass.set_bind_group(0, bind_group, &[]);
         pass.set_vertex_buffer(0, vertex_buffer.buffer.slice(draw.vertex_range.clone()));
         pass.set_index_buffer(
             index_buffer.buffer.slice(draw.index_range.clone()),
@@ -1305,7 +1223,7 @@ impl<'window> GpuRenderer<'window> {
             let atlas = self.text_atlas.as_ref()?;
             self.queue.write_texture(
                 wgpu::TexelCopyTextureInfo {
-                    texture: &atlas.texture,
+                    texture: &atlas.gpu.texture,
                     mip_level: 0,
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
@@ -1326,48 +1244,27 @@ impl<'window> GpuRenderer<'window> {
                 atlas.fingerprint = fingerprint;
             }
         }
-        Some(self.text_atlas.as_ref()?.bind_group.clone())
+        Some(self.text_atlas.as_ref()?.gpu.bind_group.clone())
     }
 
     fn create_text_atlas(&self, size: TextAtlasSize, fingerprint: u64) -> GpuTextAtlas {
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("des-ui text atlas texture"),
-            size: wgpu::Extent3d {
+        let gpu = create_rgba_texture(
+            &self.device,
+            &self.queue,
+            &self.texture_bind_group_layout,
+            &self.texture_sampler,
+            &self.viewport_buffer,
+            "des-ui text atlas texture",
+            TextureUpload {
                 width: size.width,
                 height: size.height,
-                depth_or_array_layers: 1,
+                pixels: &[],
             },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("des-ui text atlas bind group"),
-            layout: &self.text_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.viewport_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.text_sampler),
-                },
-            ],
-        });
+        );
         GpuTextAtlas {
             size,
             fingerprint,
-            texture,
-            bind_group,
+            gpu,
         }
     }
 
@@ -1417,22 +1314,91 @@ fn viewport_uniform(size: PhysicalRenderSize, options: RenderOptions) -> Viewpor
     }
 }
 
+fn create_rgba_texture(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    viewport_buffer: &wgpu::Buffer,
+    label: &'static str,
+    upload: TextureUpload<'_>,
+) -> GpuTexture {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size: wgpu::Extent3d {
+            width: upload.width,
+            height: upload.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    if !upload.pixels.is_empty() {
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            upload.pixels,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(upload.width * 4),
+                rows_per_image: Some(upload.height),
+            },
+            wgpu::Extent3d {
+                width: upload.width,
+                height: upload.height,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: viewport_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    });
+    GpuTexture {
+        texture,
+        bind_group,
+    }
+}
+
 fn create_pipeline(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
-    viewport_bind_group_layout: &wgpu::BindGroupLayout,
+    texture_bind_group_layout: &wgpu::BindGroupLayout,
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("des-ui mesh shader"),
-        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+        label: Some("des-ui textured mesh shader"),
+        source: wgpu::ShaderSource::Wgsl(TEXTURED_SHADER.into()),
     });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("des-ui mesh pipeline layout"),
-        bind_group_layouts: &[Some(viewport_bind_group_layout)],
+        label: Some("des-ui textured mesh pipeline layout"),
+        bind_group_layouts: &[Some(texture_bind_group_layout)],
         immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("des-ui mesh pipeline"),
+        label: Some("des-ui textured mesh pipeline"),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader,
@@ -1471,47 +1437,6 @@ fn premultiplied_alpha_blend() -> wgpu::BlendState {
             operation: wgpu::BlendOperation::Add,
         },
     }
-}
-
-fn create_text_pipeline(
-    device: &wgpu::Device,
-    format: wgpu::TextureFormat,
-    text_bind_group_layout: &wgpu::BindGroupLayout,
-) -> wgpu::RenderPipeline {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("des-ui text shader"),
-        source: wgpu::ShaderSource::Wgsl(TEXT_SHADER.into()),
-    });
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("des-ui text pipeline layout"),
-        bind_group_layouts: &[Some(text_bind_group_layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("des-ui text pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: Some("vs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Vertex::layout()],
-        },
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: Some(fragment_entry_point(format)),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: Some(premultiplied_alpha_blend()),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        multiview_mask: None,
-        cache: None,
-    })
 }
 
 fn fragment_entry_point(format: wgpu::TextureFormat) -> &'static str {
