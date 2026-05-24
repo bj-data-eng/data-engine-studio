@@ -188,6 +188,14 @@ pub enum WordBreak {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextAlign {
+    Start,
+    Center,
+    End,
+    Justify,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WhiteSpace {
     Normal,
     Nowrap,
@@ -203,6 +211,7 @@ pub struct TextLayoutStyle {
     pub text_wrap_mode: TextWrapMode,
     pub overflow_wrap: OverflowWrap,
     pub word_break: WordBreak,
+    pub text_align: TextAlign,
     pub tab_size: u16,
     pub max_lines: Option<usize>,
 }
@@ -215,6 +224,7 @@ impl TextLayoutStyle {
         text_wrap_mode: TextWrapMode::Wrap,
         overflow_wrap: OverflowWrap::Normal,
         word_break: WordBreak::Normal,
+        text_align: TextAlign::Start,
         tab_size: Self::DEFAULT_TAB_SIZE,
         max_lines: None,
     };
@@ -343,6 +353,7 @@ pub struct TextLayoutLine {
     pub layout_end: usize,
     pub semantic_start: usize,
     pub semantic_end: usize,
+    pub x_offset: f32,
     pub width: f32,
     pub height: f32,
 }
@@ -525,7 +536,13 @@ fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
     let visible_layout_lines = lines
         .iter()
         .take(visible_lines)
-        .map(|line| line.to_text_layout_line(request.text, line_height))
+        .map(|line| {
+            line.to_text_layout_line(
+                request.text,
+                line_height,
+                fallback_line_x_offset(request.layout_style.text_align, max_width, line.width),
+            )
+        })
         .collect();
     TextLayoutResult {
         size: Size::new(
@@ -682,7 +699,12 @@ impl From<Vec<FallbackLayoutChar>> for FallbackLayoutLine {
 }
 
 impl FallbackLayoutLine {
-    fn to_text_layout_line(&self, text: &NormalizedText, height: f32) -> TextLayoutLine {
+    fn to_text_layout_line(
+        &self,
+        text: &NormalizedText,
+        height: f32,
+        x_offset: f32,
+    ) -> TextLayoutLine {
         let layout_start = self.chars.first().map_or(0, |ch| ch.layout_index);
         let layout_end = self
             .chars
@@ -693,6 +715,7 @@ impl FallbackLayoutLine {
             layout_end,
             semantic_start: text.layout_to_semantic_index(layout_start),
             semantic_end: text.layout_to_semantic_index(layout_end),
+            x_offset,
             width: self.width,
             height,
         }
@@ -756,6 +779,7 @@ fn fallback_char_width(ch: char, font_size: f32) -> f32 {
 fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize {
     let line_height = fallback_line_height(&request);
     let target_line = (point.y / line_height).floor().max(0.0) as usize;
+    let max_width = fallback_wrap_width(&request);
     let lines = fallback_layout_lines(&request);
     let Some(line) = lines.get(target_line).or_else(|| lines.last()) else {
         return 0;
@@ -765,10 +789,12 @@ fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize
         return request.text.semantic_text().chars().count();
     }
 
+    let x_offset = fallback_line_x_offset(request.layout_style.text_align, max_width, line.width);
+    let hit_x = point.x - x_offset;
     let mut cursor_x = 0.0;
     for ch in &line.chars {
         let midpoint = cursor_x + (ch.width / 2.0);
-        if point.x <= midpoint {
+        if hit_x <= midpoint {
             return request.text.layout_to_semantic_index(ch.layout_index);
         }
         cursor_x += ch.width;
@@ -778,6 +804,17 @@ fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize
         .last()
         .map(|ch| request.text.layout_to_semantic_index(ch.layout_index + 1))
         .unwrap_or_else(|| request.text.semantic_text().chars().count())
+}
+
+fn fallback_line_x_offset(text_align: TextAlign, max_width: f32, line_width: f32) -> f32 {
+    if !max_width.is_finite() {
+        return 0.0;
+    }
+    match text_align {
+        TextAlign::Start | TextAlign::Justify => 0.0,
+        TextAlign::Center => ((max_width - line_width) / 2.0).max(0.0),
+        TextAlign::End => (max_width - line_width).max(0.0),
+    }
 }
 
 fn layout_slice_by_chars(value: &str, start: usize, end: usize) -> String {
@@ -806,6 +843,7 @@ mod tests {
                 text_wrap_mode: TextWrapMode::Wrap,
                 overflow_wrap: OverflowWrap::Normal,
                 word_break: WordBreak::Normal,
+                text_align: TextAlign::Start,
                 tab_size: TextLayoutStyle::DEFAULT_TAB_SIZE,
                 max_lines: None,
             }
@@ -961,6 +999,50 @@ mod tests {
         assert_eq!(measured.lines[0].layout_start, 0);
         assert_eq!(measured.lines[0].semantic_start, 0);
         assert!(measured.lines[0].layout_end <= normalized.layout_text().chars().count());
+    }
+
+    #[test]
+    fn fallback_measurement_reports_aligned_line_offsets() {
+        let content = TextContent::plain("abcd");
+        let mut style = TextLayoutStyle::default();
+        style.text_align = TextAlign::Center;
+        let normalized = NormalizedText::from_content(&content, style);
+        let mut measurer = FallbackTextMeasurer;
+
+        let measured = measurer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: 60.0,
+            layout_style: style,
+            line_height: None,
+        });
+
+        assert_eq!(measured.lines.len(), 1);
+        assert!(measured.lines[0].x_offset > 0.0);
+    }
+
+    #[test]
+    fn fallback_hit_testing_accounts_for_aligned_line_offsets() {
+        let content = TextContent::plain("abcd");
+        let mut style = TextLayoutStyle::default();
+        style.text_align = TextAlign::End;
+        let normalized = NormalizedText::from_content(&content, style);
+        let mut measurer = FallbackTextMeasurer;
+
+        let index = measurer.text_index_at(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 13.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 60.0,
+                layout_style: style,
+                line_height: None,
+            },
+            Point::new(31.0, 0.0),
+        );
+
+        assert_eq!(index, 0);
     }
 
     #[test]

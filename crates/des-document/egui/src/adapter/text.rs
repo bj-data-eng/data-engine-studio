@@ -1,5 +1,5 @@
 use des_document::{
-    Color, DocumentOutput, InlineTextStyle, Point, Size, TextDecoration, TextLayoutLine,
+    Color, DocumentOutput, InlineTextStyle, Point, Size, TextAlign, TextDecoration, TextLayoutLine,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
@@ -59,6 +59,7 @@ fn galley_lines(request: &TextLayoutRequest<'_>, galley: &egui::Galley) -> Vec<T
                 layout_end,
                 semantic_start: request.text.layout_to_semantic_index(layout_start),
                 semantic_end: request.text.layout_to_semantic_index(layout_end),
+                x_offset: row.pos.x,
                 width: row.size.x,
                 height: row.size.y,
             };
@@ -184,6 +185,8 @@ pub(crate) fn layout_job(
     };
     let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = wrap_width;
+    job.halign = egui_text_align(request.layout_style.text_align);
+    job.justify = request.layout_style.text_align == TextAlign::Justify;
     if let Some(max_lines) = request.layout_style.max_lines {
         job.wrap.max_rows = max_lines.max(1);
         if job.wrap.max_rows == 1 {
@@ -212,6 +215,14 @@ pub(crate) fn layout_job(
         );
     }
     job
+}
+
+fn egui_text_align(text_align: TextAlign) -> egui::Align {
+    match text_align {
+        TextAlign::Start | TextAlign::Justify => egui::Align::LEFT,
+        TextAlign::Center => egui::Align::Center,
+        TextAlign::End => egui::Align::RIGHT,
+    }
 }
 
 fn text_format(
@@ -273,8 +284,8 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 mod tests {
     use super::*;
     use des_document::{
-        FontWeight, InlineTextStyle, NormalizedText, TextContent, TextDecoration, TextLayoutStyle,
-        TextRun, WhiteSpace,
+        FontWeight, InlineTextStyle, NormalizedText, TextAlign, TextContent, TextDecoration,
+        TextLayoutStyle, TextRun, WhiteSpace,
     };
 
     #[test]
@@ -320,6 +331,50 @@ mod tests {
         assert_eq!(job.wrap.max_width, 1.0);
         assert_eq!(job.wrap.max_rows, 1);
         assert!(job.wrap.break_anywhere);
+    }
+
+    #[test]
+    fn layout_job_maps_text_alignment() {
+        let text = TextContent::plain("aligned");
+        let mut style = TextLayoutStyle::default();
+        style.text_align = TextAlign::End;
+        let normalized = NormalizedText::from_content(&text, style);
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 120.0,
+                layout_style: style,
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.halign, egui::Align::RIGHT);
+        assert!(!job.justify);
+    }
+
+    #[test]
+    fn layout_job_maps_justified_text_alignment() {
+        let text = TextContent::plain("justified text");
+        let mut style = TextLayoutStyle::default();
+        style.text_align = TextAlign::Justify;
+        let normalized = NormalizedText::from_content(&text, style);
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 120.0,
+                layout_style: style,
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.halign, egui::Align::LEFT);
+        assert!(job.justify);
     }
 
     #[test]
