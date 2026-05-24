@@ -84,6 +84,7 @@ pub struct TextGlyph {
     pub x_px: i32,
     pub y_px: i32,
     pub color: Color,
+    pub run_index: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -240,16 +241,20 @@ impl CosmicTextRenderer {
                 let mut backgrounds = Vec::new();
                 let mut decorations = Vec::new();
                 let run_backgrounds = run_backgrounds(request.text);
+                let baseline_shifts = run_baseline_shifts(request.text, request.font_size, scale);
                 for run in buffer.layout_runs() {
                     collect_run_backgrounds(
                         run.glyphs,
                         run.line_top,
                         run.line_height,
                         &run_backgrounds,
+                        &baseline_shifts,
                         &mut backgrounds,
                     );
                     for glyph in run.glyphs {
-                        let physical = glyph.physical((0.0, run.line_y), 1.0);
+                        let baseline_shift =
+                            baseline_shifts.get(glyph.metadata).copied().unwrap_or(0.0);
+                        let physical = glyph.physical((0.0, run.line_y - baseline_shift), 1.0);
                         let x = physical.x as f32 / scale;
                         let y = physical.y as f32 / scale;
                         let margin = glyph.font_size * 2.0;
@@ -268,6 +273,7 @@ impl CosmicTextRenderer {
                             color: glyph
                                 .color_opt
                                 .map_or(request.color, cosmic_to_document_color),
+                            run_index: glyph.metadata.saturating_sub(1),
                         });
                     }
                     let mut collector = DecorationCollector {
@@ -956,49 +962,99 @@ fn run_backgrounds(text: &des_document::NormalizedText) -> Vec<Option<Color>> {
     backgrounds
 }
 
+fn run_baseline_shifts(
+    text: &des_document::NormalizedText,
+    inherited_font_size: f32,
+    scale: f32,
+) -> Vec<f32> {
+    let mut shifts = Vec::with_capacity(text.runs().len() + 1);
+    shifts.push(0.0);
+    shifts.extend(text.runs().iter().map(|run| {
+        let font_size = run.style.font_size.unwrap_or(inherited_font_size).max(1.0) * scale;
+        match run
+            .style
+            .vertical_align
+            .unwrap_or(des_document::TextVerticalAlign::Baseline)
+        {
+            des_document::TextVerticalAlign::Super => font_size * 0.35,
+            des_document::TextVerticalAlign::Sub => -(font_size * 0.2),
+            des_document::TextVerticalAlign::Baseline
+            | des_document::TextVerticalAlign::Top
+            | des_document::TextVerticalAlign::Middle
+            | des_document::TextVerticalAlign::Bottom => 0.0,
+        }
+    }));
+    shifts
+}
+
 fn collect_run_backgrounds(
     glyphs: &[cosmic_text::LayoutGlyph],
     line_top: f32,
     line_height: f32,
     backgrounds: &[Option<Color>],
+    baseline_shifts: &[f32],
     output: &mut Vec<TextGlyphRect>,
 ) {
-    let mut active: Option<(usize, f32, f32, Color)> = None;
+    let mut active: Option<(usize, f32, f32, f32, Color)> = None;
     for glyph in glyphs {
         let color = backgrounds
             .get(glyph.metadata)
             .and_then(|background| *background);
+        let baseline_shift = baseline_shifts.get(glyph.metadata).copied().unwrap_or(0.0);
         match (active, color) {
-            (Some((metadata, min_x, max_x, active_color)), Some(color))
-                if metadata == glyph.metadata && active_color == color =>
+            (Some((metadata, min_x, max_x, active_shift, active_color)), Some(color))
+                if metadata == glyph.metadata
+                    && active_shift == baseline_shift
+                    && active_color == color =>
             {
                 active = Some((
                     metadata,
                     min_x.min(glyph.x),
                     max_x.max(glyph.x + glyph.w),
+                    active_shift,
                     color,
                 ));
             }
-            (Some((_, min_x, max_x, active_color)), next_color) => {
+            (Some((_, min_x, max_x, active_shift, active_color)), next_color) => {
                 push_text_rect(
                     output,
                     min_x,
-                    line_top,
+                    line_top - active_shift,
                     max_x - min_x,
                     line_height,
                     active_color,
                 );
-                active =
-                    next_color.map(|color| (glyph.metadata, glyph.x, glyph.x + glyph.w, color));
+                active = next_color.map(|color| {
+                    (
+                        glyph.metadata,
+                        glyph.x,
+                        glyph.x + glyph.w,
+                        baseline_shift,
+                        color,
+                    )
+                });
             }
             (None, Some(color)) => {
-                active = Some((glyph.metadata, glyph.x, glyph.x + glyph.w, color));
+                active = Some((
+                    glyph.metadata,
+                    glyph.x,
+                    glyph.x + glyph.w,
+                    baseline_shift,
+                    color,
+                ));
             }
             (None, None) => {}
         }
     }
-    if let Some((_, min_x, max_x, color)) = active {
-        push_text_rect(output, min_x, line_top, max_x - min_x, line_height, color);
+    if let Some((_, min_x, max_x, baseline_shift, color)) = active {
+        push_text_rect(
+            output,
+            min_x,
+            line_top - baseline_shift,
+            max_x - min_x,
+            line_height,
+            color,
+        );
     }
 }
 
@@ -1345,6 +1401,52 @@ mod tests {
                 .iter()
                 .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px > 0),
             "underline runs should become paintable decoration rectangles"
+        );
+    }
+
+    #[test]
+    fn positions_subscript_and_superscript_runs_around_the_baseline() {
+        let mut renderer = renderer();
+        let content = TextContent::new(vec![
+            TextRun::plain("H"),
+            TextRun::styled(
+                "2",
+                InlineTextStyle {
+                    vertical_align: Some(des_document::TextVerticalAlign::Super),
+                    font_size: Some(12.0),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::plain("O CO"),
+            TextRun::styled(
+                "2",
+                InlineTextStyle {
+                    vertical_align: Some(des_document::TextVerticalAlign::Sub),
+                    font_size: Some(12.0),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let glyph_run = renderer.glyphs(request(&normalized, 20.0, 400.0), 2.0, None);
+        let super_two = glyph_run
+            .glyphs
+            .iter()
+            .find(|glyph| glyph.run_index == 1)
+            .expect("superscript run should paint one glyph");
+        let sub_two = glyph_run
+            .glyphs
+            .iter()
+            .find(|glyph| glyph.run_index == 3)
+            .expect("subscript run should paint one glyph");
+
+        assert!(
+            super_two.y_px < sub_two.y_px,
+            "superscript glyph should paint above subscript glyph"
+        );
+        assert!(
+            sub_two.y_px - super_two.y_px >= 8,
+            "baseline shift should be visible in physical glyph placement"
         );
     }
 }
