@@ -305,7 +305,7 @@ impl CosmicTextRenderer {
         let scale = pixels_per_point.max(1.0);
         let buffer_key = TextBufferKey::new(&request, scale);
         let cache_rect = visible_rect.map(text_paint_cache_rect);
-        let paint_key = TextPaintGlyphRunKey::new(buffer_key.clone(), cache_rect);
+        let paint_key = TextPaintGlyphRunKey::new(buffer_key.clone(), &request, cache_rect);
         if let Some(run) = self.paint_runs.get(&paint_key).cloned() {
             self.paint_run_cache_hits += 1;
             return run;
@@ -476,13 +476,12 @@ impl ScaleTextLayoutResult for TextLayoutResult {
 struct TextBufferKey {
     text: TextContentFingerprint,
     font_size: u32,
-    color: [u8; 4],
     direction: DirectionKey,
     wrap_width: u32,
     layout_style: TextLayoutStyleKey,
     line_height: Option<u32>,
     scale: u32,
-    runs: Vec<InlineStyleKey>,
+    runs: Vec<InlineLayoutStyleKey>,
 }
 
 impl TextBufferKey {
@@ -490,7 +489,6 @@ impl TextBufferKey {
         Self {
             text: TextContentFingerprint::new(request),
             font_size: f32_key(request.font_size),
-            color: color_key(request.color),
             direction: DirectionKey::from(request.direction),
             wrap_width: f32_key(request.wrap_width),
             layout_style: TextLayoutStyleKey::from(request.layout_style),
@@ -500,7 +498,7 @@ impl TextBufferKey {
                 .text
                 .runs()
                 .iter()
-                .map(|run| InlineStyleKey::from(&run.style))
+                .map(|run| InlineLayoutStyleKey::from(&run.style))
                 .collect(),
         }
     }
@@ -542,14 +540,40 @@ impl TextContentFingerprint {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct TextPaintGlyphRunKey {
     buffer: TextBufferKey,
+    paint: TextPaintStyleKey,
     visible_rect: Option<RectKey>,
 }
 
 impl TextPaintGlyphRunKey {
-    fn new(buffer: TextBufferKey, visible_rect: Option<Rect>) -> Self {
+    fn new(
+        buffer: TextBufferKey,
+        request: &TextLayoutRequest<'_>,
+        visible_rect: Option<Rect>,
+    ) -> Self {
         Self {
             buffer,
+            paint: TextPaintStyleKey::new(request),
             visible_rect: visible_rect.map(RectKey::from),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct TextPaintStyleKey {
+    color: [u8; 4],
+    runs: Vec<InlinePaintStyleKey>,
+}
+
+impl TextPaintStyleKey {
+    fn new(request: &TextLayoutRequest<'_>) -> Self {
+        Self {
+            color: color_key(request.color),
+            runs: request
+                .text
+                .runs()
+                .iter()
+                .map(|run| InlinePaintStyleKey::from(&run.style))
+                .collect(),
         }
     }
 }
@@ -608,8 +632,7 @@ impl From<Direction> for DirectionKey {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct InlineStyleKey {
-    color: Option<[u8; 4]>,
+struct InlineLayoutStyleKey {
     font_size: Option<u32>,
     line_height: Option<u32>,
     letter_spacing: Option<u32>,
@@ -617,15 +640,12 @@ struct InlineStyleKey {
     font_weight: Option<u16>,
     font_stretch: Option<u32>,
     font_style: Option<FontStyleKey>,
-    text_decoration: Option<TextDecorationKey>,
     vertical_align: Option<TextVerticalAlignKey>,
-    background: Option<[u8; 4]>,
 }
 
-impl From<&InlineTextStyle> for InlineStyleKey {
+impl From<&InlineTextStyle> for InlineLayoutStyleKey {
     fn from(style: &InlineTextStyle) -> Self {
         Self {
-            color: style.color.map(color_key),
             font_size: style.font_size.map(f32_key),
             line_height: style.line_height.map(f32_key),
             letter_spacing: style.letter_spacing.map(f32_key),
@@ -633,8 +653,23 @@ impl From<&InlineTextStyle> for InlineStyleKey {
             font_weight: style.font_weight.map(|weight| weight.value()),
             font_stretch: style.font_stretch.map(|stretch| f32_key(stretch.value())),
             font_style: style.font_style.map(FontStyleKey::from),
-            text_decoration: style.text_decoration.map(TextDecorationKey::from),
             vertical_align: style.vertical_align.map(TextVerticalAlignKey::from),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct InlinePaintStyleKey {
+    color: Option<[u8; 4]>,
+    text_decoration: Option<TextDecorationKey>,
+    background: Option<[u8; 4]>,
+}
+
+impl From<&InlineTextStyle> for InlinePaintStyleKey {
+    fn from(style: &InlineTextStyle) -> Self {
+        Self {
+            color: style.color.map(color_key),
+            text_decoration: style.text_decoration.map(TextDecorationKey::from),
             background: style.background.map(color_key),
         }
     }
@@ -1332,6 +1367,17 @@ fn run_backgrounds(text: &des_document::NormalizedText) -> Vec<Option<Color>> {
     backgrounds
 }
 
+fn run_colors(text: &des_document::NormalizedText, inherited_color: Color) -> Vec<Color> {
+    let mut colors = Vec::with_capacity(text.runs().len() + 1);
+    colors.push(inherited_color);
+    colors.extend(
+        text.runs()
+            .iter()
+            .map(|run| run.style.color.unwrap_or(inherited_color)),
+    );
+    colors
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct TextDecorationPaint {
     underline: bool,
@@ -1406,6 +1452,7 @@ fn collect_text_paint_glyph_run(
     let mut glyphs = Vec::new();
     let mut backgrounds = Vec::new();
     let mut decorations = Vec::new();
+    let run_colors = run_colors(request.text, request.color);
     let run_backgrounds = run_backgrounds(request.text);
     let run_decorations = run_decorations(request.text, request.color, scale);
     let baseline_shifts = run_baseline_shifts(request.text, request.font_size, scale);
@@ -1444,9 +1491,10 @@ fn collect_text_paint_glyph_run(
                 cache_key: physical.cache_key,
                 x_px: physical.x,
                 y_px: physical.y,
-                color: glyph
-                    .color_opt
-                    .map_or(request.color, cosmic_to_document_color),
+                color: run_colors
+                    .get(glyph.metadata)
+                    .copied()
+                    .unwrap_or(request.color),
                 run_index: glyph.metadata.saturating_sub(1),
                 layout_start: line_byte_to_layout_index(
                     request.text.layout_text(),
@@ -1691,11 +1739,6 @@ fn push_text_rect(
 
 fn cosmic_color(color: Color) -> CosmicColor {
     CosmicColor::rgba(color.r, color.g, color.b, color.a)
-}
-
-fn cosmic_to_document_color(color: CosmicColor) -> Color {
-    let (r, g, b, a) = color.as_rgba_tuple();
-    Color::rgba(r, g, b, a)
 }
 
 struct RasterizedSurface {
@@ -2433,6 +2476,45 @@ mod tests {
         assert_eq!(nearby, cold);
         assert_eq!(stats.paint_run_cache_hits, 1);
         assert_eq!(stats.paint_run_cache_misses, 0);
+    }
+
+    #[test]
+    fn paint_color_changes_reuse_layout_buffer_but_repaint_glyph_colors() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Paint color changes should stay paint-only");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let first_color = Color::rgb(18, 24, 32);
+        let second_color = Color::rgb(184, 42, 60);
+        let mut first_request = request(&normalized, 24.0, 420.0);
+        first_request.color = first_color;
+        let mut second_request = request(&normalized, 24.0, 420.0);
+        second_request.color = second_color;
+
+        let first = renderer.paint_glyphs(first_request, 2.0, None);
+        assert!(!first.glyphs.is_empty());
+        assert!(first.glyphs.iter().all(|glyph| glyph.color == first_color));
+
+        renderer.begin_frame();
+        let second = renderer.paint_glyphs(second_request, 2.0, None);
+        let stats = renderer.buffer_stats();
+
+        assert_eq!(
+            stats.cache_hits, 1,
+            "paint-only color changes should reuse the retained cosmic layout buffer"
+        );
+        assert_eq!(stats.cache_misses, 0);
+        assert_eq!(
+            stats.paint_run_cache_misses, 1,
+            "paint-only color changes should still rebuild the document paint run"
+        );
+        assert_eq!(stats.paint_run_cache_hits, 0);
+        assert!(
+            second
+                .glyphs
+                .iter()
+                .all(|glyph| glyph.color == second_color)
+        );
+        assert_ne!(first.glyphs, second.glyphs);
     }
 
     #[test]
