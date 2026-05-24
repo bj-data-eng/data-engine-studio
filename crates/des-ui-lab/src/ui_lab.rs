@@ -150,6 +150,7 @@ pub(crate) struct UiLabState {
     text_paint_resources: CosmicTextPaintResources,
     pending_stage_scroll: Option<Point>,
     lab_document: Option<RetainedLabDocument<LabDocumentKey>>,
+    last_output: Option<RetainedLabOutput<LabDocumentKey>>,
     last_perf: UiLabPerf,
 }
 
@@ -158,6 +159,13 @@ struct RetainedLabDocument<Key> {
     debug_overlay: bool,
     key: Key,
     document: Document,
+}
+
+struct RetainedLabOutput<Key> {
+    viewport: Size,
+    debug_overlay: bool,
+    key: Key,
+    output: DocumentOutput,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -221,6 +229,7 @@ impl Default for UiLabState {
             text_paint_resources: CosmicTextPaintResources::new(des_egui::document_text_renderer()),
             pending_stage_scroll: None,
             lab_document: None,
+            last_output: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -248,10 +257,50 @@ impl UiLabState {
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
         let viewport_size = Size::new(viewport.x, viewport.y);
+        let key = self.lab_document_key();
+        self.text_paint_resources.begin_frame();
+
+        let input = document_input(ui, origin);
+        let pointer = input.pointer;
+        if self.can_reuse_last_output(viewport_size, debug_overlay, &key, input) {
+            let paint_start = Instant::now();
+            let output = &self
+                .last_output
+                .as_ref()
+                .expect("reuse check proves retained output exists")
+                .output;
+            copy_selected_text_on_command(ui, output);
+            apply_cursor_icon(ui, output);
+            paint_frame_with_text_resources(
+                ui,
+                origin,
+                &output.layout,
+                output.text_selection.as_ref(),
+                &mut self.text_paint_resources,
+            );
+            if debug_overlay && self.view == LabView::Text {
+                paint_legacy_text_path_comparison(ui, origin, output);
+            }
+            paint_scroll_chrome(ui, origin, &output.scroll_chrome);
+            let paint_time = paint_start.elapsed();
+            let text_paint = self.text_paint_resources.stats();
+            self.last_perf = UiLabPerf {
+                stylesheet_time: Duration::ZERO,
+                document_time: Duration::ZERO,
+                engine_time: Duration::ZERO,
+                paint_time,
+                text_paint,
+                metrics: output.metrics,
+            };
+            if debug_overlay {
+                self.paint_debug_overlay_document(ui, origin, viewport);
+            }
+            return;
+        }
+
         let document_start = Instant::now();
         let mut retained = self.take_lab_document(viewport_size, debug_overlay);
         let document_time = document_start.elapsed();
-        self.text_paint_resources.begin_frame();
 
         let stylesheet_start = Instant::now();
         let dynamic_stylesheet = self.dynamic_stylesheet();
@@ -264,8 +313,6 @@ impl UiLabState {
             self.document_engine.scroll_element_to("stage", scroll);
         }
 
-        let input = document_input(ui, origin);
-        let pointer = input.pointer;
         let engine_start = Instant::now();
         let mut output = self.document_engine.update_with_input_and_text_measurer(
             &mut retained.document,
@@ -349,6 +396,60 @@ impl UiLabState {
         if debug_overlay {
             self.paint_debug_overlay_document(ui, origin, viewport);
         }
+        self.last_output = Some(RetainedLabOutput {
+            viewport: viewport_size,
+            debug_overlay,
+            key,
+            output,
+        });
+    }
+
+    fn can_reuse_last_output(
+        &self,
+        viewport: Size,
+        debug_overlay: bool,
+        key: &LabDocumentKey,
+        input: DocumentInput,
+    ) -> bool {
+        if !inert_pointer_move(input)
+            || self.pending_stage_scroll.is_some()
+            || self.active_drag.is_some()
+            || self.dropdown_open
+            || self.text_context_menu.is_some()
+        {
+            return false;
+        }
+        let Some(retained) = self.last_output.as_ref() else {
+            return false;
+        };
+        if retained.viewport != viewport
+            || retained.debug_overlay != debug_overlay
+            || &retained.key != key
+        {
+            return false;
+        }
+        let output = &retained.output;
+        if output.animating
+            || output.active_drag.is_some()
+            || output.completed_drag.is_some()
+            || !output.events.is_empty()
+            || output
+                .text_selection
+                .as_ref()
+                .is_some_and(|selection| selection.active)
+        {
+            return false;
+        }
+        let Some(pointer) = input.pointer else {
+            return false;
+        };
+        let Some(previous_hit) = output.hit_id.as_ref() else {
+            return false;
+        };
+        let Some(hit) = deepest_frame_at(&output.layout, pointer.position) else {
+            return false;
+        };
+        hit.id == *previous_hit && !hit.interactive && !hit.selectable_text
     }
 
     fn take_lab_document(
@@ -1449,6 +1550,32 @@ fn document_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
 
 fn egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_premultiplied(color.r, color.g, color.b, color.a)
+}
+
+fn inert_pointer_move(input: DocumentInput) -> bool {
+    input.scroll_delta == Point::ZERO
+        && input.pointer.is_some_and(|pointer| {
+            !pointer.primary_down
+                && !pointer.primary_pressed
+                && !pointer.primary_clicked
+                && pointer.primary_click_count == 0
+                && !pointer.secondary_clicked
+        })
+}
+
+fn deepest_frame_at(
+    frame: &des_document::ResolvedElement,
+    point: Point,
+) -> Option<&des_document::ResolvedElement> {
+    if !frame.rect.contains(point) {
+        return None;
+    }
+    frame
+        .children
+        .iter()
+        .rev()
+        .find_map(|child| deepest_frame_at(child, point))
+        .or(Some(frame))
 }
 
 #[derive(Clone, Copy, Debug, Default)]

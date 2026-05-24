@@ -2679,6 +2679,35 @@ fn text_view_nav_hover_release_measurement() {
     );
 }
 
+#[test]
+fn blank_topbar_pointer_moves_reuse_last_document_output() {
+    let mut harness = lab_harness("text");
+    render_harness(&mut harness);
+    let topbar = state_rect(harness.state(), "topbar");
+    let first = egui::pos2(
+        topbar.origin.x + 320.0,
+        topbar.origin.y + topbar.size.height - 7.0,
+    );
+    let second = egui::pos2(topbar.origin.x + 420.0, first.y);
+
+    harness.hover_at(first);
+    render_harness(&mut harness);
+    harness.hover_at(second);
+    let second_frame = render_harness(&mut harness);
+    let second_perf = harness.state().last_perf;
+
+    assert!(image_stats(&second_frame).non_transparent_pixels > 20_000);
+    assert_eq!(
+        second_perf.engine_time,
+        Duration::ZERO,
+        "same inert topbar hit should reuse retained document output"
+    );
+    assert!(
+        second_perf.paint_time > Duration::ZERO,
+        "reused document output should still be painted"
+    );
+}
+
 #[cfg(not(debug_assertions))]
 #[test]
 fn whole_lab_interaction_release_measurement() {
@@ -2702,6 +2731,17 @@ fn whole_lab_interaction_release_measurement() {
         }
     }
     hover_totals.report("whole text nav hover");
+
+    let topbar = state_rect(text.state(), "topbar");
+    let mut topbar_totals = ReleaseFrameTotals::default();
+    for index in 0..36 {
+        let x = topbar.origin.x + 320.0 + (index % 12) as f32 * 18.0;
+        let y = topbar.origin.y + topbar.size.height - 7.0;
+        text.hover_at(egui::pos2(x, y));
+        let frame = measure_release_frame(&mut text, &mut topbar_totals);
+        assert!(image_stats(&frame).non_transparent_pixels > 20_000);
+    }
+    topbar_totals.report("whole text blank topbar pointer move");
 
     let mut text_scroll = lab_harness("text");
     render_harness(&mut text_scroll);
