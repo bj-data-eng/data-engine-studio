@@ -952,11 +952,12 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
                 "debug-text-cache",
                 "text cache",
                 format!(
-                    "{} text / {} glyph / {} new / {} cached",
+                    "{} text / {} glyph / {} new / {} cached / {} pages",
                     perf.text_paint.glyphs_painted,
                     perf.text_paint.glyph_cache_hits,
                     perf.text_paint.rasterizations,
-                    perf.text_paint.cached_glyphs
+                    perf.text_paint.cached_glyphs,
+                    perf.text_paint.atlas_pages
                 ),
             );
             debug_metric_row(

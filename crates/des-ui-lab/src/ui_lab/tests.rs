@@ -2173,6 +2173,10 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         first_stats.cached_glyphs > 0,
         "text paint should populate the glyph atlas"
     );
+    assert!(
+        first_stats.atlas_pages > 0,
+        "text paint should create at least one glyph atlas page"
+    );
     assert_eq!(
         warm_stats.rasterizations, 0,
         "warm text paint should reuse the glyph atlas without rasterizing glyphs"
@@ -2222,6 +2226,10 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
     assert!(
         populated_stats.cached_glyphs > 0,
         "scrolled text paint should populate or reuse atlas glyphs"
+    );
+    assert!(
+        populated_stats.atlas_pages > 0,
+        "scrolled text paint should create at least one glyph atlas page"
     );
     assert!(
         populated_stats.layout_cache_entries > 0,

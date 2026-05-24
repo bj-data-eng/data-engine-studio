@@ -18,16 +18,21 @@ pub struct CosmicTextPaintResources {
 }
 
 struct TextGlyphAtlas {
-    texture: Option<egui::TextureHandle>,
+    pages: Vec<TextGlyphAtlasPage>,
     entries: HashMap<TextGlyphCacheKey, TextGlyphAtlasEntry>,
+    size: usize,
+}
+
+struct TextGlyphAtlasPage {
+    texture: egui::TextureHandle,
     cursor_x: usize,
     cursor_y: usize,
     row_height: usize,
-    size: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct TextGlyphAtlasEntry {
+    texture_id: egui::TextureId,
     uv: egui::Rect,
     size_px: [u32; 2],
     placement_px: [i32; 2],
@@ -40,6 +45,7 @@ pub struct TextPaintStats {
     pub glyph_cache_hits: usize,
     pub rasterizations: usize,
     pub cached_glyphs: usize,
+    pub atlas_pages: usize,
     pub uploaded_pixels: u64,
     pub layout_cache_hits: usize,
     pub layout_cache_misses: usize,
@@ -59,6 +65,7 @@ impl CosmicTextPaintResources {
         self.renderer.begin_frame();
         self.stats = TextPaintStats {
             cached_glyphs: self.atlas.entries.len(),
+            atlas_pages: self.atlas.pages.len(),
             layout_cache_entries: self.renderer.buffer_stats().cache_entries,
             ..TextPaintStats::default()
         };
@@ -68,6 +75,7 @@ impl CosmicTextPaintResources {
         let layout_stats = self.renderer.buffer_stats();
         TextPaintStats {
             cached_glyphs: self.atlas.entries.len(),
+            atlas_pages: self.atlas.pages.len(),
             layout_cache_hits: layout_stats.cache_hits,
             layout_cache_misses: layout_stats.cache_misses,
             layout_cache_entries: layout_stats.cache_entries,
@@ -77,29 +85,25 @@ impl CosmicTextPaintResources {
 }
 
 impl TextGlyphAtlas {
+    #[cfg(not(test))]
     const SIZE: usize = 2048;
+    #[cfg(test)]
+    const SIZE: usize = 256;
     const PADDING: usize = 1;
 
     fn new() -> Self {
         Self {
-            texture: None,
+            pages: Vec::new(),
             entries: HashMap::new(),
-            cursor_x: Self::PADDING,
-            cursor_y: Self::PADDING,
-            row_height: 0,
             size: Self::SIZE,
         }
     }
 
-    fn ensure_texture(&mut self, ctx: &egui::Context) {
-        if self.texture.is_none() {
-            let image = egui::ColorImage::new(
-                [self.size, self.size],
-                vec![egui::Color32::TRANSPARENT; self.size * self.size],
-            );
-            self.texture =
-                Some(ctx.load_texture("des-cosmic-glyph-atlas", image, texture_options()));
-        }
+    fn add_page(&mut self, ctx: &egui::Context) -> usize {
+        let page_index = self.pages.len();
+        self.pages
+            .push(TextGlyphAtlasPage::new(ctx, self.size, page_index));
+        page_index
     }
 
     fn entry(
@@ -126,34 +130,37 @@ impl TextGlyphAtlas {
         image: &TextGlyphImage,
         stats: &mut TextPaintStats,
     ) -> Option<TextGlyphAtlasEntry> {
+        let entry = self.insert_image(ctx, image, stats)?;
+        self.entries.insert(cache_key, entry);
+        Some(entry)
+    }
+
+    fn insert_image(
+        &mut self,
+        ctx: &egui::Context,
+        image: &TextGlyphImage,
+        stats: &mut TextPaintStats,
+    ) -> Option<TextGlyphAtlasEntry> {
         let width = image.width_px as usize;
         let height = image.height_px as usize;
         if width == 0 || height == 0 || width + Self::PADDING * 2 > self.size {
             return None;
         }
-        self.ensure_texture(ctx);
-        if self.cursor_x + width + Self::PADDING > self.size {
-            self.cursor_x = Self::PADDING;
-            self.cursor_y += self.row_height + Self::PADDING;
-            self.row_height = 0;
-        }
-        if self.cursor_y + height + Self::PADDING > self.size {
-            return None;
+
+        if self.pages.is_empty() {
+            self.add_page(ctx);
         }
 
-        let x = self.cursor_x;
-        let y = self.cursor_y;
-        self.cursor_x += width + Self::PADDING;
-        self.row_height = self.row_height.max(height);
-
-        let color_image = egui::ColorImage::from_rgba_unmultiplied([width, height], &image.rgba);
-        let texture = self
-            .texture
-            .as_mut()
-            .expect("glyph atlas texture exists before glyph upload");
-        texture.set_partial([x, y], color_image, texture_options());
-        stats.rasterizations += 1;
-        stats.uploaded_pixels += image.width_px as u64 * image.height_px as u64;
+        let mut page_index = self.pages.len() - 1;
+        let allocation =
+            if let Some(allocation) = self.pages[page_index].allocate(width, height, self.size) {
+                allocation
+            } else {
+                page_index = self.add_page(ctx);
+                self.pages[page_index].allocate(width, height, self.size)?
+            };
+        let (x, y) = allocation;
+        self.pages[page_index].upload([x, y], [width, height], &image.rgba);
 
         let uv = egui::Rect::from_min_max(
             egui::pos2(x as f32 / self.size as f32, y as f32 / self.size as f32),
@@ -163,13 +170,56 @@ impl TextGlyphAtlas {
             ),
         );
         let entry = TextGlyphAtlasEntry {
+            texture_id: self.pages[page_index].texture.id(),
             uv,
             size_px: [image.width_px, image.height_px],
             placement_px: [image.left_px, image.top_px],
             color_content: image.content == TextGlyphImageContent::Color,
         };
-        self.entries.insert(cache_key, entry);
+        stats.rasterizations += 1;
+        stats.uploaded_pixels += image.width_px as u64 * image.height_px as u64;
         Some(entry)
+    }
+}
+
+impl TextGlyphAtlasPage {
+    fn new(ctx: &egui::Context, size: usize, page_index: usize) -> Self {
+        let image =
+            egui::ColorImage::new([size, size], vec![egui::Color32::TRANSPARENT; size * size]);
+        let texture = ctx.load_texture(
+            format!("des-cosmic-glyph-atlas-{page_index}"),
+            image,
+            texture_options(),
+        );
+        Self {
+            texture,
+            cursor_x: TextGlyphAtlas::PADDING,
+            cursor_y: TextGlyphAtlas::PADDING,
+            row_height: 0,
+        }
+    }
+
+    fn allocate(&mut self, width: usize, height: usize, size: usize) -> Option<(usize, usize)> {
+        if self.cursor_x + width + TextGlyphAtlas::PADDING > size {
+            self.cursor_x = TextGlyphAtlas::PADDING;
+            self.cursor_y += self.row_height + TextGlyphAtlas::PADDING;
+            self.row_height = 0;
+        }
+        if self.cursor_y + height + TextGlyphAtlas::PADDING > size {
+            return None;
+        }
+
+        let x = self.cursor_x;
+        let y = self.cursor_y;
+        self.cursor_x += width + TextGlyphAtlas::PADDING;
+        self.row_height = self.row_height.max(height);
+        Some((x, y))
+    }
+
+    fn upload(&mut self, origin: [usize; 2], size: [usize; 2], rgba: &[u8]) {
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(size, rgba);
+        self.texture
+            .set_partial(origin, color_image, texture_options());
     }
 }
 
@@ -379,20 +429,9 @@ fn paint_atlas_text(
 ) {
     let glyph_run = renderer.glyphs(request.clone(), pixels_per_point, Some(visible_rect));
     let scale = pixels_per_point.max(1.0);
-    let texture_id = match atlas.texture.as_ref().map(|texture| texture.id()) {
-        Some(texture_id) => texture_id,
-        None => {
-            if glyph_run.glyphs.is_empty() {
-                return;
-            }
-            atlas.ensure_texture(painter.ctx());
-            atlas
-                .texture
-                .as_ref()
-                .expect("glyph atlas texture exists")
-                .id()
-        }
-    };
+    if glyph_run.glyphs.is_empty() {
+        return;
+    }
     for background in &glyph_run.backgrounds {
         paint_text_rect(painter, position, *background, scale);
     }
@@ -422,7 +461,7 @@ fn paint_atlas_text(
         } else {
             glyph
         };
-        paint_glyph_atlas_entry(painter, position, texture_id, glyph, entry, scale);
+        paint_glyph_atlas_entry(painter, position, glyph, entry, scale);
     }
     for decoration in &glyph_run.decorations {
         paint_text_rect(painter, position, *decoration, scale);
@@ -444,7 +483,6 @@ fn visible_local_rect(clip_rect: egui::Rect, text_rect: egui::Rect) -> Option<Re
 fn paint_glyph_atlas_entry(
     painter: &egui::Painter,
     text_position: egui::Pos2,
-    texture_id: egui::TextureId,
     glyph: TextGlyph,
     entry: TextGlyphAtlasEntry,
     scale: f32,
@@ -463,7 +501,7 @@ fn paint_glyph_atlas_entry(
         to_egui_color(glyph.color)
     };
     painter.image(
-        texture_id,
+        entry.texture_id,
         egui::Rect::from_min_size(min, size),
         entry.uv,
         tint,
@@ -1374,6 +1412,34 @@ mod tests {
                 leading_gap: 3.0,
             }
         );
+    }
+
+    #[test]
+    fn glyph_atlas_adds_pages_instead_of_dropping_when_full() {
+        let ctx = egui::Context::default();
+        let mut atlas = TextGlyphAtlas::new();
+        let mut stats = TextPaintStats::default();
+        let image = TextGlyphImage {
+            width_px: 80,
+            height_px: 80,
+            left_px: 0,
+            top_px: 0,
+            content: TextGlyphImageContent::Mask,
+            rgba: vec![255; 80 * 80 * 4],
+        };
+
+        for _ in 0..16 {
+            assert!(
+                atlas.insert_image(&ctx, &image, &mut stats).is_some(),
+                "atlas should allocate another page instead of dropping a fitting glyph"
+            );
+        }
+
+        assert!(
+            atlas.pages.len() > 1,
+            "test-sized atlas should grow to multiple pages"
+        );
+        assert_eq!(stats.rasterizations, 16);
     }
 
     #[test]
