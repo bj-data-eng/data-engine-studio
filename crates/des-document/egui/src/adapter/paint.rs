@@ -51,6 +51,9 @@ pub struct TextPaintStats {
     pub paint_text_requests: usize,
     pub glyph_run_time: Duration,
     pub glyph_atlas_time: Duration,
+    pub glyph_image_time: Duration,
+    pub glyph_upload_time: Duration,
+    pub glyph_paint_time: Duration,
     pub glyphs_painted: usize,
     pub glyph_cache_hits: usize,
     pub rasterizations: usize,
@@ -135,7 +138,9 @@ impl TextGlyphAtlas {
             return Some(entry);
         }
 
+        let image_start = Instant::now();
         let image = renderer.glyph_image(cache_key)?;
+        stats.glyph_image_time += image_start.elapsed();
         let entry = self.insert(ctx, cache_key, &image, stats)?;
         Some(entry)
     }
@@ -177,7 +182,9 @@ impl TextGlyphAtlas {
                 self.pages[page_index].allocate(width, height, self.size)?
             };
         let (x, y) = allocation;
+        let upload_start = Instant::now();
         self.pages[page_index].upload([x, y], [width, height], &image.rgba);
+        stats.glyph_upload_time += upload_start.elapsed();
 
         let uv = egui::Rect::from_min_max(
             egui::pos2(x as f32 / self.size as f32, y as f32 / self.size as f32),
@@ -520,7 +527,9 @@ fn paint_atlas_text(
         } else {
             glyph
         };
+        let paint_start = Instant::now();
         paint_glyph_atlas_entry(painter, position, glyph, entry, scale);
+        stats.glyph_paint_time += paint_start.elapsed();
     }
     stats.glyph_atlas_time += atlas_start.elapsed();
     for decoration in &glyph_run.decorations {

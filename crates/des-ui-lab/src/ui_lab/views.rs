@@ -1020,6 +1020,24 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-glyph-image-time",
+                "text glyph image",
+                format_duration(perf.text_paint.glyph_image_time),
+            );
+            debug_metric_row(
+                ui,
+                "debug-text-upload-time",
+                "text upload",
+                format_duration(perf.text_paint.glyph_upload_time),
+            );
+            debug_metric_row(
+                ui,
+                "debug-text-glyph-paint-time",
+                "text glyph paint",
+                format_duration(perf.text_paint.glyph_paint_time),
+            );
+            debug_metric_row(
+                ui,
                 "debug-text-pixels",
                 "text upload px",
                 perf.text_paint.uploaded_pixels.to_string(),
