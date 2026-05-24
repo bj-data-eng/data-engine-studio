@@ -2267,21 +2267,41 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     assert_eq!(spacing_runs[1].style.letter_spacing, Some(0.0));
     assert_eq!(spacing_runs[2].style.letter_spacing, Some(2.0));
     assert_eq!(
+        decoration_runs[0].style.text_decoration,
+        Some(
+            TextDecoration::UNDERLINE
+                .color(Color::rgb(103, 80, 164))
+                .thickness(1.0)
+        )
+    );
+    assert!(decoration_runs[1].style.text_decoration.is_none());
+    assert_eq!(
         decoration_runs[2].style.text_decoration,
+        Some(
+            TextDecoration::LINE_THROUGH
+                .color(Color::rgb(122, 71, 0))
+                .thickness(1.0)
+        )
+    );
+    assert!(decoration_runs[3].style.text_decoration.is_none());
+    assert_eq!(
+        decoration_runs[4].style.text_decoration,
         Some(
             TextDecoration::OVERLINE
                 .color(Color::rgb(0, 95, 102))
                 .thickness(1.0)
         )
     );
+    assert!(decoration_runs[5].style.text_decoration.is_none());
     assert_eq!(
-        decoration_runs[3].style.text_decoration,
+        decoration_runs[6].style.text_decoration,
         Some(
             TextDecoration::lines(true, true, true)
                 .color(Color::rgb(86, 69, 0))
                 .thickness(1.0)
         )
     );
+    assert!(decoration_runs[7].style.text_decoration.is_none());
     assert_eq!(
         family_runs[0].style.font_family.as_deref(),
         Some("Aptos, Inter, sans-serif")

@@ -3325,7 +3325,7 @@ fn rich_spacing_specimen() -> TextContent {
 fn rich_decoration_specimen() -> TextContent {
     TextContent::new(vec![
         TextRun::styled(
-            "underline ",
+            "underline",
             InlineTextStyle {
                 text_decoration: Some(
                     TextDecoration::UNDERLINE
@@ -3335,8 +3335,9 @@ fn rich_decoration_specimen() -> TextContent {
                 ..InlineTextStyle::default()
             },
         ),
+        TextRun::plain(" "),
         TextRun::styled(
-            "strike ",
+            "strike",
             InlineTextStyle {
                 text_decoration: Some(
                     TextDecoration::LINE_THROUGH
@@ -3346,8 +3347,9 @@ fn rich_decoration_specimen() -> TextContent {
                 ..InlineTextStyle::default()
             },
         ),
+        TextRun::plain(" "),
         TextRun::styled(
-            "overline ",
+            "overline",
             InlineTextStyle {
                 text_decoration: Some(
                     TextDecoration::OVERLINE
@@ -3357,8 +3359,9 @@ fn rich_decoration_specimen() -> TextContent {
                 ..InlineTextStyle::default()
             },
         ),
+        TextRun::plain(" "),
         TextRun::styled(
-            "combo ",
+            "combo",
             InlineTextStyle {
                 text_decoration: Some(
                     TextDecoration::lines(true, true, true)
@@ -3368,6 +3371,7 @@ fn rich_decoration_specimen() -> TextContent {
                 ..InlineTextStyle::default()
             },
         ),
+        TextRun::plain(" "),
         TextRun::styled(
             "highlight",
             InlineTextStyle {
