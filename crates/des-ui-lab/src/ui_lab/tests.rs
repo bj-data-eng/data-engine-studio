@@ -10,6 +10,8 @@ use des_document::{
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
+#[cfg(not(debug_assertions))]
+use std::time::Duration;
 
 const INTERACTION_LOOP_SCROLL_Y: f32 = 300.0;
 
@@ -2467,6 +2469,157 @@ fn text_view_reuses_text_paint_runs_during_nearby_scroll() {
         nearby_stats.paint_run_cache_hits > 0,
         "nearby scroll should reuse retained expanded cosmic text paint runs"
     );
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn text_view_warm_repaint_release_measurement() {
+    const WARMUP_FRAMES: usize = 4;
+    const MEASURED_FRAMES: usize = 24;
+
+    let mut harness = lab_harness("text");
+    let baseline = render_harness(&mut harness);
+    for _ in 0..WARMUP_FRAMES {
+        render_harness(&mut harness);
+    }
+
+    let mut paint_total = Duration::ZERO;
+    let mut glyph_run_total = Duration::ZERO;
+    let mut glyph_paint_total = Duration::ZERO;
+    let mut max_paint = Duration::ZERO;
+    let mut mesh_hits = 0usize;
+    let mut mesh_misses = 0usize;
+    let mut rasterizations = 0usize;
+    let mut uploaded_pixels = 0u64;
+
+    for _ in 0..MEASURED_FRAMES {
+        let frame = render_harness(&mut harness);
+        assert_exact_image_match(&baseline, &frame);
+        let perf = harness.state().last_perf;
+        paint_total += perf.paint_time;
+        glyph_run_total += perf.text_paint.glyph_run_time;
+        glyph_paint_total += perf.text_paint.glyph_paint_time;
+        max_paint = max_paint.max(perf.paint_time);
+        mesh_hits += perf.text_paint.glyph_mesh_cache_hits;
+        mesh_misses += perf.text_paint.glyph_mesh_cache_misses;
+        rasterizations += perf.text_paint.rasterizations;
+        uploaded_pixels += perf.text_paint.uploaded_pixels;
+    }
+
+    let frame_count = MEASURED_FRAMES as u32;
+    eprintln!(
+        "text warm repaint release measurement: frames={MEASURED_FRAMES} avg_paint={} max_paint={} avg_glyph_run={} avg_glyph_paint={} mesh_hits={mesh_hits} mesh_misses={mesh_misses} rasterizations={rasterizations} uploaded_pixels={uploaded_pixels}",
+        format_duration_for_test(paint_total / frame_count),
+        format_duration_for_test(max_paint),
+        format_duration_for_test(glyph_run_total / frame_count),
+        format_duration_for_test(glyph_paint_total / frame_count),
+    );
+
+    assert!(
+        mesh_hits > 0,
+        "warm release renders should hit retained text meshes"
+    );
+    assert_eq!(
+        mesh_misses, 0,
+        "warm release renders should not rebuild retained text meshes"
+    );
+    assert_eq!(
+        rasterizations, 0,
+        "warm release renders should not rasterize glyphs"
+    );
+    assert_eq!(
+        uploaded_pixels, 0,
+        "warm release renders should not upload glyph pixels"
+    );
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn text_view_nav_hover_release_measurement() {
+    const WARMUP_ROUNDS: usize = 2;
+    const MEASURED_ROUNDS: usize = 8;
+
+    let mut harness = lab_harness("text");
+    render_harness(&mut harness);
+    let hover_points = [
+        center(state_rect(harness.state(), "view-layout")),
+        center(state_rect(harness.state(), "view-text")),
+        center(state_rect(harness.state(), "view-graph")),
+    ];
+
+    for _ in 0..WARMUP_ROUNDS {
+        for point in hover_points {
+            harness.hover_at(point);
+            render_harness(&mut harness);
+        }
+    }
+
+    let mut paint_total = Duration::ZERO;
+    let mut glyph_run_total = Duration::ZERO;
+    let mut glyph_paint_total = Duration::ZERO;
+    let mut max_paint = Duration::ZERO;
+    let mut mesh_hits = 0usize;
+    let mut mesh_misses = 0usize;
+    let mut rasterizations = 0usize;
+    let mut uploaded_pixels = 0u64;
+    let mut frames = 0usize;
+
+    for _ in 0..MEASURED_ROUNDS {
+        for point in hover_points {
+            harness.hover_at(point);
+            let frame = render_harness(&mut harness);
+            assert!(
+                image_stats(&frame).non_transparent_pixels > 20_000,
+                "hover repaint should keep rendering visible lab output"
+            );
+            let perf = harness.state().last_perf;
+            paint_total += perf.paint_time;
+            glyph_run_total += perf.text_paint.glyph_run_time;
+            glyph_paint_total += perf.text_paint.glyph_paint_time;
+            max_paint = max_paint.max(perf.paint_time);
+            mesh_hits += perf.text_paint.glyph_mesh_cache_hits;
+            mesh_misses += perf.text_paint.glyph_mesh_cache_misses;
+            rasterizations += perf.text_paint.rasterizations;
+            uploaded_pixels += perf.text_paint.uploaded_pixels;
+            frames += 1;
+        }
+    }
+
+    let frame_count = frames as u32;
+    eprintln!(
+        "text nav hover release measurement: frames={frames} avg_paint={} max_paint={} avg_glyph_run={} avg_glyph_paint={} mesh_hits={mesh_hits} mesh_misses={mesh_misses} rasterizations={rasterizations} uploaded_pixels={uploaded_pixels}",
+        format_duration_for_test(paint_total / frame_count),
+        format_duration_for_test(max_paint),
+        format_duration_for_test(glyph_run_total / frame_count),
+        format_duration_for_test(glyph_paint_total / frame_count),
+    );
+
+    assert!(
+        mesh_hits > 0,
+        "hover release renders should hit retained text meshes"
+    );
+    assert_eq!(
+        mesh_misses, 0,
+        "warmed hover release renders should not rebuild retained text meshes"
+    );
+    assert_eq!(
+        rasterizations, 0,
+        "hover release renders should not rasterize glyphs"
+    );
+    assert_eq!(
+        uploaded_pixels, 0,
+        "hover release renders should not upload glyph pixels"
+    );
+}
+
+#[cfg(not(debug_assertions))]
+fn format_duration_for_test(duration: Duration) -> String {
+    let micros = duration.as_micros();
+    if micros >= 1_000 {
+        format!("{:.2}ms", micros as f64 / 1_000.0)
+    } else {
+        format!("{micros}us")
+    }
 }
 
 #[test]
