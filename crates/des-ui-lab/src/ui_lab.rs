@@ -248,15 +248,19 @@ impl UiLabState {
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
         let viewport_size = Size::new(viewport.x, viewport.y);
-        let stylesheet = self.active_stylesheet();
         let document_start = Instant::now();
         let mut retained = self.take_lab_document(viewport_size, debug_overlay);
         let document_time = document_start.elapsed();
         self.text_paint_resources.begin_frame();
 
+        let stylesheet_start = Instant::now();
+        let dynamic_stylesheet = self.dynamic_stylesheet();
+        let stylesheet = dynamic_stylesheet.as_ref().unwrap_or(&self.stylesheet);
+        let stylesheet_time = stylesheet_start.elapsed();
+
         if let Some(scroll) = self.pending_stage_scroll.take() {
             self.document_engine
-                .update(&mut retained.document, &stylesheet);
+                .update(&mut retained.document, stylesheet);
             self.document_engine.scroll_element_to("stage", scroll);
         }
 
@@ -265,18 +269,19 @@ impl UiLabState {
         let engine_start = Instant::now();
         let mut output = self.document_engine.update_with_input_and_text_measurer(
             &mut retained.document,
-            &stylesheet,
+            stylesheet,
             input,
             &mut self.text_paint_resources,
         );
         self.lab_document = Some(retained);
 
         if self.sync_drag_state(ui, &output) {
-            let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
+            let dynamic_stylesheet = self.dynamic_stylesheet();
+            let stylesheet = dynamic_stylesheet.as_ref().unwrap_or(&self.stylesheet);
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
-                &stylesheet,
+                stylesheet,
                 input,
                 &mut self.text_paint_resources,
             );
@@ -284,11 +289,12 @@ impl UiLabState {
             self.sync_drag_state(ui, &output);
         }
         if self.sync_drag_press_state(&output, pointer) {
-            let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
+            let dynamic_stylesheet = self.dynamic_stylesheet();
+            let stylesheet = dynamic_stylesheet.as_ref().unwrap_or(&self.stylesheet);
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
-                &stylesheet,
+                stylesheet,
                 input,
                 &mut self.text_paint_resources,
             );
@@ -296,11 +302,12 @@ impl UiLabState {
             self.sync_drag_state(ui, &output);
         }
         if self.apply_clicked_document_actions(ui, &output) {
-            let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
+            let dynamic_stylesheet = self.dynamic_stylesheet();
+            let stylesheet = dynamic_stylesheet.as_ref().unwrap_or(&self.stylesheet);
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
-                &stylesheet,
+                stylesheet,
                 repaint_input_after_action(input),
                 &mut self.text_paint_resources,
             );
@@ -328,6 +335,7 @@ impl UiLabState {
         let paint_time = paint_start.elapsed();
         let text_paint = self.text_paint_resources.stats();
         self.last_perf = UiLabPerf {
+            stylesheet_time,
             document_time,
             engine_time,
             paint_time,
@@ -773,6 +781,18 @@ impl UiLabState {
     }
 
     fn active_stylesheet(&self) -> StyleSheet {
+        self.dynamic_stylesheet()
+            .unwrap_or_else(|| self.stylesheet.clone())
+    }
+
+    fn dynamic_stylesheet(&self) -> Option<StyleSheet> {
+        if self.active_drag.is_none()
+            && self.view != LabView::Styling
+            && self.text_context_menu.is_none()
+        {
+            return None;
+        }
+
         let mut stylesheet = self.stylesheet.clone();
         if let Some(drag) = &self.active_drag {
             let offset = self.drag_parent_offset.unwrap_or(drag.pointer_offset);
@@ -803,7 +823,7 @@ impl UiLabState {
             let menu = text_context_menu_widget(menu);
             menu.push_styles(&mut stylesheet);
         }
-        stylesheet
+        Some(stylesheet)
     }
 
     fn shadow_tune_mut(&mut self, target: ShadowTuneTarget) -> &mut ShadowTuneState {
@@ -1433,6 +1453,7 @@ fn egui_color(color: Color) -> egui::Color32 {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct UiLabPerf {
+    stylesheet_time: Duration,
     document_time: Duration,
     engine_time: Duration,
     paint_time: Duration,

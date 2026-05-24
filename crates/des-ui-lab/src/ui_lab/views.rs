@@ -919,6 +919,12 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-stylesheet-time",
+                "stylesheet",
+                format_duration(perf.stylesheet_time),
+            );
+            debug_metric_row(
+                ui,
                 "debug-document-time",
                 "document",
                 format_duration(perf.document_time),

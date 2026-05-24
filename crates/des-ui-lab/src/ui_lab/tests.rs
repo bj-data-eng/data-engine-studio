@@ -11,7 +11,7 @@ use des_document::{
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
 #[cfg(not(debug_assertions))]
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const INTERACTION_LOOP_SCROLL_Y: f32 = 300.0;
 
@@ -162,6 +162,17 @@ fn click_at_stays_hovered(harness: &mut Harness<'_, UiLabState>, pos: egui::Pos2
         modifiers: egui::Modifiers::NONE,
     });
     harness.run();
+}
+
+#[cfg(not(debug_assertions))]
+fn wheel_at(harness: &mut Harness<'_, UiLabState>, pos: egui::Pos2, delta: egui::Vec2) {
+    harness.event(egui::Event::PointerMoved(pos));
+    harness.event(egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta,
+        phase: egui::TouchPhase::Move,
+        modifiers: egui::Modifiers::default(),
+    });
 }
 
 fn count_visible_text_selection_pixels_in_rect(
@@ -2666,6 +2677,194 @@ fn text_view_nav_hover_release_measurement() {
         uploaded_pixels, 0,
         "hover release renders should not upload glyph pixels"
     );
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn whole_lab_interaction_release_measurement() {
+    let mut text = lab_harness("text");
+    render_harness(&mut text);
+    for _ in 0..4 {
+        render_harness(&mut text);
+    }
+
+    let hover_points = [
+        center(state_rect(text.state(), "view-layout")),
+        center(state_rect(text.state(), "view-text")),
+        center(state_rect(text.state(), "view-graph")),
+    ];
+    let mut hover_totals = ReleaseFrameTotals::default();
+    for _ in 0..8 {
+        for point in hover_points {
+            text.hover_at(point);
+            let frame = measure_release_frame(&mut text, &mut hover_totals);
+            assert!(image_stats(&frame).non_transparent_pixels > 20_000);
+        }
+    }
+    hover_totals.report("whole text nav hover");
+
+    let mut text_scroll = lab_harness("text");
+    render_harness(&mut text_scroll);
+    let text_stage = center(state_rect(text_scroll.state(), "stage"));
+    let mut text_scroll_totals = ReleaseFrameTotals::default();
+    for delta_y in [-96.0, -96.0, -96.0, 96.0, 96.0, 96.0]
+        .into_iter()
+        .cycle()
+        .take(24)
+    {
+        wheel_at(&mut text_scroll, text_stage, egui::vec2(0.0, delta_y));
+        let frame = measure_release_frame(&mut text_scroll, &mut text_scroll_totals);
+        assert!(image_stats(&frame).non_transparent_pixels > 20_000);
+    }
+    text_scroll_totals.report("whole text stage scroll");
+
+    let mut scrolling = lab_harness("scrolling");
+    render_harness(&mut scrolling);
+    let scrolling_stage = center(state_rect(scrolling.state(), "stage"));
+    let mut nested_scroll_totals = ReleaseFrameTotals::default();
+    for delta_y in [-120.0, -120.0, -120.0, 120.0, 120.0, 120.0]
+        .into_iter()
+        .cycle()
+        .take(24)
+    {
+        wheel_at(&mut scrolling, scrolling_stage, egui::vec2(0.0, delta_y));
+        let frame = measure_release_frame(&mut scrolling, &mut nested_scroll_totals);
+        assert!(image_stats(&frame).non_transparent_pixels > 20_000);
+    }
+    nested_scroll_totals.report("whole scrolling stage scroll");
+
+    let mut selection = lab_harness("text");
+    render_harness(&mut selection);
+    let rect = state_rect(selection.state(), "text-wrap-body");
+    let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
+    let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
+    let mut selection_totals = ReleaseFrameTotals::default();
+    for _ in 0..12 {
+        selection.hover_at(start);
+        selection.drag_at(start);
+        measure_release_frame(&mut selection, &mut selection_totals);
+        selection.hover_at(end);
+        let frame = measure_release_frame(&mut selection, &mut selection_totals);
+        assert!(image_stats(&frame).non_transparent_pixels > 20_000);
+        selection.drop_at(end);
+        measure_release_frame(&mut selection, &mut selection_totals);
+    }
+    selection_totals.report("whole text selection drag");
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Default)]
+struct ReleaseFrameTotals {
+    frames: usize,
+    egui_steps: u64,
+    total_frame: Duration,
+    egui_run: Duration,
+    pixel_render: Duration,
+    max_frame: Duration,
+    shape_count: usize,
+    stylesheet: Duration,
+    document: Duration,
+    engine: Duration,
+    paint: Duration,
+    text_glyph_run: Duration,
+    text_glyph_paint: Duration,
+    mesh_hits: usize,
+    mesh_misses: usize,
+    rasterizations: usize,
+    uploaded_pixels: u64,
+    input_changed_frames: usize,
+    relayout_frames: usize,
+    animation_frames: usize,
+}
+
+#[cfg(not(debug_assertions))]
+impl ReleaseFrameTotals {
+    fn record(
+        &mut self,
+        egui_steps: u64,
+        egui_run_time: Duration,
+        pixel_render_time: Duration,
+        shape_count: usize,
+        perf: UiLabPerf,
+    ) {
+        self.frames += 1;
+        self.egui_steps += egui_steps;
+        let frame_time = egui_run_time + pixel_render_time;
+        self.total_frame += frame_time;
+        self.egui_run += egui_run_time;
+        self.pixel_render += pixel_render_time;
+        self.max_frame = self.max_frame.max(frame_time);
+        self.shape_count += shape_count;
+        self.stylesheet += perf.stylesheet_time;
+        self.document += perf.document_time;
+        self.engine += perf.engine_time;
+        self.paint += perf.paint_time;
+        self.text_glyph_run += perf.text_paint.glyph_run_time;
+        self.text_glyph_paint += perf.text_paint.glyph_paint_time;
+        self.mesh_hits += perf.text_paint.glyph_mesh_cache_hits;
+        self.mesh_misses += perf.text_paint.glyph_mesh_cache_misses;
+        self.rasterizations += perf.text_paint.rasterizations;
+        self.uploaded_pixels += perf.text_paint.uploaded_pixels;
+        self.input_changed_frames += usize::from(perf.metrics.input_changed_state);
+        self.relayout_frames += usize::from(!perf.metrics.reused_input_layout);
+        self.animation_frames += usize::from(perf.metrics.animation_changed_paint);
+    }
+
+    fn report(&self, label: &str) {
+        let frames = self.frames as u32;
+        let known = self.document + self.engine + self.paint;
+        let other = self.total_frame.saturating_sub(known);
+        eprintln!(
+            "{label}: frames={} egui_steps={} avg_steps_per_frame={:.1} avg_total={} max_total={} avg_egui_run={} avg_egui_step={} avg_pixel_render={} avg_shapes={} avg_stylesheet={} avg_document={} avg_engine={} avg_doc_paint={} avg_outer_other={} avg_text_glyph_run={} avg_text_glyph_paint={} mesh_hits={} mesh_misses={} rasterizations={} uploaded_pixels={} input_changed_frames={} relayout_frames={} animation_frames={}",
+            self.frames,
+            self.egui_steps,
+            self.egui_steps as f64 / self.frames as f64,
+            format_duration_for_test(self.total_frame / frames),
+            format_duration_for_test(self.max_frame),
+            format_duration_for_test(self.egui_run / frames),
+            format_duration_for_test(self.egui_run / self.egui_steps.max(1) as u32),
+            format_duration_for_test(self.pixel_render / frames),
+            self.shape_count / self.frames,
+            format_duration_for_test(self.stylesheet / frames),
+            format_duration_for_test(self.document / frames),
+            format_duration_for_test(self.engine / frames),
+            format_duration_for_test(self.paint / frames),
+            format_duration_for_test(other / frames),
+            format_duration_for_test(self.text_glyph_run / frames),
+            format_duration_for_test(self.text_glyph_paint / frames),
+            self.mesh_hits,
+            self.mesh_misses,
+            self.rasterizations,
+            self.uploaded_pixels,
+            self.input_changed_frames,
+            self.relayout_frames,
+            self.animation_frames,
+        );
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn measure_release_frame(
+    harness: &mut Harness<'_, UiLabState>,
+    totals: &mut ReleaseFrameTotals,
+) -> image::RgbaImage {
+    let run_start = Instant::now();
+    let egui_steps = harness.run();
+    let egui_run_time = run_start.elapsed();
+    let shape_count = harness.output().shapes.len();
+    let render_start = Instant::now();
+    let frame = harness
+        .render()
+        .expect("render egui output through kittest");
+    let pixel_render_time = render_start.elapsed();
+    totals.record(
+        egui_steps,
+        egui_run_time,
+        pixel_render_time,
+        shape_count,
+        harness.state().last_perf,
+    );
+    frame
 }
 
 #[cfg(not(debug_assertions))]
