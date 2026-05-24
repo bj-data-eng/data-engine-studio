@@ -994,6 +994,7 @@ fn text_index_at_point(
             text: &normalized,
             font_size: frame.style.font_size,
             color: frame.style.text_color,
+            direction: frame.style.direction,
             wrap_width,
             layout_style: frame.style.text_layout,
             line_height: frame.style.line_height,

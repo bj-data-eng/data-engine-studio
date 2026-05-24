@@ -58,6 +58,7 @@ fn paint_frame_clipped(
                 text: &normalized,
                 font_size: frame.style.font_size,
                 color: frame.style.text_color,
+                direction: frame.style.direction,
                 wrap_width: match frame.style.text_layout.text_wrap_mode {
                     TextWrapMode::NoWrap => f32::INFINITY,
                     TextWrapMode::Wrap => text_rect.width(),

@@ -1552,6 +1552,7 @@ fn measure_text_with_wrap_width(
         text: &normalized,
         font_size: style.font_size,
         color: style.text_color,
+        direction: style.direction,
         wrap_width,
         layout_style: style.text_layout,
         line_height: style.line_height,
@@ -1562,6 +1563,7 @@ impl Document {
     fn layout_style_from_computed(&mut self, style: &ComputedStyle) -> LayoutStyle {
         LayoutStyle {
             display: style.display,
+            direction: style.direction,
             overflow: layout_overflow(style.overflow_x, style.overflow_y),
             scrollbar_width: style.scrollbar_width,
             position: layout_position(style.position),

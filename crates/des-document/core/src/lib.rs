@@ -38,7 +38,7 @@ pub use state::{
 };
 pub use style::{
     Anchor, AnchorPlacement, BorderStyle, CompoundSelector, ComputedStyle, ContainerQuery,
-    CornerStyle, Display, Easing, EdgeStyle, FloatingArrow, FloatingArrowData,
+    CornerStyle, Direction, Display, Easing, EdgeStyle, FloatingArrow, FloatingArrowData,
     FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary, FloatingFallbackAxisSideDirection,
     FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHide, FloatingHideData,
     FloatingHideStrategy, FloatingInline, FloatingOffset, FloatingOptions, FloatingPlacement,

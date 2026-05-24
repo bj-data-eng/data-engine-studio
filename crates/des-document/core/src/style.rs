@@ -12,6 +12,7 @@ pub use des_layout::prelude::{
     Display, GridAutoFlow, MaxTrackSizingFunction, MinTrackSizingFunction, RepetitionCount,
     TrackSizingFunction,
 };
+pub use des_layout::style::Direction;
 
 pub use des_layout::floating::{
     FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
@@ -559,6 +560,7 @@ fn legacy_cross_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Style {
     pub display: Option<Display>,
+    pub direction: Option<Direction>,
     pub flex_direction: Option<FlexDirection>,
     pub flex_wrap: Option<FlexWrap>,
     pub flex_basis: Option<Length>,
@@ -1050,6 +1052,11 @@ impl Style {
         self
     }
 
+    pub fn direction(mut self, direction: Direction) -> Self {
+        self.direction = Some(direction);
+        self
+    }
+
     pub fn text_layout(mut self, layout: TextLayoutStyle) -> Self {
         self.text_layout = Some(layout);
         self
@@ -1484,6 +1491,7 @@ impl Style {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComputedStyle {
     pub display: Display,
+    pub direction: Direction,
     pub flex_direction: FlexDirection,
     pub flex_wrap: FlexWrap,
     pub flex_basis: Length,
@@ -1558,6 +1566,7 @@ impl Default for ComputedStyle {
     fn default() -> Self {
         Self {
             display: Display::Flex,
+            direction: Direction::Ltr,
             flex_direction: FlexDirection::Column,
             flex_wrap: FlexWrap::NoWrap,
             flex_basis: Length::Auto,
@@ -1634,6 +1643,9 @@ impl ComputedStyle {
     pub(crate) fn apply(&mut self, style: &Style) {
         if let Some(value) = style.display {
             self.display = value;
+        }
+        if let Some(value) = style.direction {
+            self.direction = value;
         }
         if let Some(value) = style.flex_direction {
             self.flex_direction = value;
@@ -2128,6 +2140,7 @@ fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle)
         || previous.grid_template_row_names != next.grid_template_row_names
         || previous.grid_row != next.grid_row
         || previous.grid_column != next.grid_column
+        || previous.direction != next.direction
         || previous.margin != next.margin
         || previous.padding != next.padding
         || previous.width != next.width

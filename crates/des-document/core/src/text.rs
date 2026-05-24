@@ -1,5 +1,6 @@
 use crate::element::Color;
 use crate::geometry::{Point, Size};
+use des_layout::style::Direction;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextContent {
@@ -402,6 +403,7 @@ pub struct TextLayoutRequest<'a> {
     pub text: &'a NormalizedText,
     pub font_size: f32,
     pub color: Color,
+    pub direction: Direction,
     pub wrap_width: f32,
     pub layout_style: TextLayoutStyle,
     pub line_height: Option<f32>,
@@ -674,7 +676,12 @@ fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
                 request.text,
                 line_height,
                 fallback_baseline_for_line(line, line_height),
-                fallback_line_x_offset(request.layout_style.text_align, max_width, line.width),
+                fallback_line_x_offset(
+                    request.layout_style.text_align,
+                    request.direction,
+                    max_width,
+                    line.width,
+                ),
             )
         })
         .collect();
@@ -975,7 +982,12 @@ fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize
         return request.text.semantic_text().chars().count();
     }
 
-    let x_offset = fallback_line_x_offset(request.layout_style.text_align, max_width, line.width);
+    let x_offset = fallback_line_x_offset(
+        request.layout_style.text_align,
+        request.direction,
+        max_width,
+        line.width,
+    );
     let hit_x = point.x - x_offset;
     let mut cursor_x = 0.0;
     for ch in &line.chars {
@@ -992,13 +1004,22 @@ fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize
         .unwrap_or_else(|| request.text.semantic_text().chars().count())
 }
 
-fn fallback_line_x_offset(text_align: TextAlign, max_width: f32, line_width: f32) -> f32 {
+fn fallback_line_x_offset(
+    text_align: TextAlign,
+    direction: Direction,
+    max_width: f32,
+    line_width: f32,
+) -> f32 {
     if !max_width.is_finite() {
         return 0.0;
     }
     match text_align {
+        TextAlign::Start | TextAlign::Justify if direction == Direction::Rtl => {
+            (max_width - line_width).max(0.0)
+        }
         TextAlign::Start | TextAlign::Justify => 0.0,
         TextAlign::Center => ((max_width - line_width) / 2.0).max(0.0),
+        TextAlign::End if direction == Direction::Rtl => 0.0,
         TextAlign::End => (max_width - line_width).max(0.0),
     }
 }
@@ -1280,6 +1301,7 @@ mod tests {
             text: &normalized,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: 20.0,
             layout_style: style,
             line_height: None,
@@ -1298,6 +1320,7 @@ mod tests {
             text: &normalized,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: 40.0,
             layout_style: TextLayoutStyle::default(),
             line_height: None,
@@ -1323,6 +1346,7 @@ mod tests {
             text: &normalized,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: 25.0,
             layout_style: style,
             line_height: None,
@@ -1349,6 +1373,7 @@ mod tests {
                 text: &normalized,
                 font_size: 13.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 25.0,
                 layout_style: style,
                 line_height: None,
@@ -1371,6 +1396,7 @@ mod tests {
             text: &normalized,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: 60.0,
             layout_style: style,
             line_height: None,
@@ -1378,6 +1404,48 @@ mod tests {
 
         assert_eq!(measured.lines.len(), 1);
         assert!(measured.lines[0].x_offset > 0.0);
+    }
+
+    #[test]
+    fn fallback_measurement_resolves_start_and_end_against_direction() {
+        let content = TextContent::plain("abcd");
+        let mut style = TextLayoutStyle::white_space(WhiteSpace::Pre);
+        style.text_align = TextAlign::Start;
+        let normalized = NormalizedText::from_content(&content, style);
+        let mut measurer = FallbackTextMeasurer;
+
+        let rtl_start = measurer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            direction: Direction::Rtl,
+            wrap_width: 60.0,
+            layout_style: style,
+            line_height: None,
+        });
+
+        style.text_align = TextAlign::End;
+        let ltr_end = measurer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
+            wrap_width: 60.0,
+            layout_style: style,
+            line_height: None,
+        });
+        let rtl_end = measurer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            direction: Direction::Rtl,
+            wrap_width: 60.0,
+            layout_style: style,
+            line_height: None,
+        });
+
+        assert_eq!(rtl_start.lines[0].x_offset, ltr_end.lines[0].x_offset);
+        assert_eq!(rtl_end.lines[0].x_offset, 0.0);
     }
 
     #[test]
@@ -1398,6 +1466,7 @@ mod tests {
             text: &normalized_plain,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1406,6 +1475,7 @@ mod tests {
             text: &normalized_rich,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1443,6 +1513,7 @@ mod tests {
             text: &normalized_normal,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1451,6 +1522,7 @@ mod tests {
             text: &normalized_shifted,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1473,6 +1545,7 @@ mod tests {
                 text: &normalized,
                 font_size: 13.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 60.0,
                 layout_style: style,
                 line_height: None,
@@ -1504,6 +1577,7 @@ mod tests {
             text: &normalized_small,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1512,6 +1586,7 @@ mod tests {
             text: &normalized_rich,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1539,6 +1614,7 @@ mod tests {
             text: &normalized_normal,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1547,6 +1623,7 @@ mod tests {
             text: &normalized_spaced,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1583,6 +1660,7 @@ mod tests {
             text: &normalized_normal,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1591,6 +1669,7 @@ mod tests {
             text: &normalized_condensed,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1599,6 +1678,7 @@ mod tests {
             text: &normalized_expanded,
             font_size: 13.0,
             color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
             wrap_width: f32::INFINITY,
             layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
             line_height: None,
@@ -1628,6 +1708,7 @@ mod tests {
                 text: &normalized,
                 font_size: 13.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: f32::INFINITY,
                 layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
                 line_height: None,
@@ -1655,6 +1736,7 @@ mod tests {
                 text: &normalized,
                 font_size: 13.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: f32::INFINITY,
                 layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
                 line_height: None,
@@ -1676,6 +1758,7 @@ mod tests {
                 text: &normalized,
                 font_size: 13.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: f32::INFINITY,
                 layout_style: TextLayoutStyle::default(),
                 line_height: None,

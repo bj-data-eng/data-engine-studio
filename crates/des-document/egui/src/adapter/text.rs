@@ -1,7 +1,7 @@
 use des_document::{
-    Color, DocumentOutput, FontStyle, InlineTextStyle, Point, Size, TextAlign, TextDecoration,
-    TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextVerticalAlign, TextWrapMode,
+    Color, Direction, DocumentOutput, FontStyle, InlineTextStyle, Point, Size, TextAlign,
+    TextDecoration, TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextMeasurer,
+    TextMeasurerKey, TextOverflow, TextVerticalAlign, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -200,7 +200,7 @@ pub(crate) fn layout_job(
         TextOverflow::Clip => None,
         TextOverflow::Ellipsis => Some('…'),
     };
-    job.halign = egui_text_align(request.layout_style.text_align);
+    job.halign = egui_text_align(request.layout_style.text_align, request.direction);
     job.justify = request.layout_style.text_align == TextAlign::Justify;
     if let Some(max_lines) = request.layout_style.max_lines {
         job.wrap.max_rows = max_lines.max(1);
@@ -232,10 +232,12 @@ pub(crate) fn layout_job(
     job
 }
 
-fn egui_text_align(text_align: TextAlign) -> egui::Align {
+fn egui_text_align(text_align: TextAlign, direction: Direction) -> egui::Align {
     match text_align {
+        TextAlign::Start | TextAlign::Justify if direction == Direction::Rtl => egui::Align::RIGHT,
         TextAlign::Start | TextAlign::Justify => egui::Align::LEFT,
         TextAlign::Center => egui::Align::Center,
+        TextAlign::End if direction == Direction::Rtl => egui::Align::LEFT,
         TextAlign::End => egui::Align::RIGHT,
     }
 }
@@ -337,6 +339,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 10.0,
                 layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
                 line_height: Some(18.0),
@@ -360,6 +363,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 0.0,
                 layout_style: style,
                 line_height: None,
@@ -385,6 +389,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 60.0,
                 layout_style: style,
                 line_height: None,
@@ -406,6 +411,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 120.0,
                 layout_style: style,
                 line_height: None,
@@ -415,6 +421,43 @@ mod tests {
 
         assert_eq!(job.halign, egui::Align::RIGHT);
         assert!(!job.justify);
+    }
+
+    #[test]
+    fn layout_job_maps_start_and_end_alignment_through_direction() {
+        let text = TextContent::plain("aligned");
+        let normalized = NormalizedText::from_content(&text, TextLayoutStyle::default());
+
+        let rtl_start = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                direction: Direction::Rtl,
+                wrap_width: 120.0,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        let mut style = TextLayoutStyle::default();
+        style.text_align = TextAlign::End;
+        let rtl_end = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                direction: Direction::Rtl,
+                wrap_width: 120.0,
+                layout_style: style,
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(rtl_start.halign, egui::Align::RIGHT);
+        assert_eq!(rtl_end.halign, egui::Align::LEFT);
     }
 
     #[test]
@@ -428,6 +471,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 120.0,
                 layout_style: style,
                 line_height: None,
@@ -470,6 +514,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 240.0,
                 layout_style: TextLayoutStyle::default(),
                 line_height: None,
@@ -517,6 +562,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 240.0,
                 layout_style: TextLayoutStyle::default(),
                 line_height: None,
@@ -546,6 +592,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 240.0,
                 layout_style: TextLayoutStyle::default(),
                 line_height: None,
@@ -575,6 +622,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 240.0,
                 layout_style: TextLayoutStyle::default(),
                 line_height: None,
@@ -601,6 +649,7 @@ mod tests {
                 text: &normalized,
                 font_size: 14.0,
                 color: Color::rgb(255, 255, 255),
+                direction: Direction::Ltr,
                 wrap_width: 240.0,
                 layout_style: TextLayoutStyle::default(),
                 line_height: None,

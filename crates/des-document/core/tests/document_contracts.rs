@@ -1,11 +1,11 @@
 use des_document::{
-    AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentEventKind,
-    DocumentInput, Element, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
-    JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    VisualCloneOptions, WhiteSpace,
+    AlignItems, Color, CornerRadii, Direction, Document, DocumentEngine, DocumentEvent,
+    DocumentEventKind, DocumentInput, Element, ElementId, ElementSpec, ElementStateSelector,
+    FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow,
+    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
+    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1425,6 +1425,27 @@ fn text_layout_uses_document_wrap_and_truncation_styles() {
     );
     assert_eq!(truncated.text_layout.as_ref().unwrap().line_count, 1);
     assert!(truncated.text_layout.as_ref().unwrap().elided);
+}
+
+#[test]
+fn declared_direction_resolves_start_aligned_text_against_rtl_edge() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(100.0))
+            .direction(Direction::Rtl),
+    );
+    let mut document = Document::build(Size::new(160.0, 80.0), |ui| {
+        ui.text_element("label", ElementSpec::new(Element::Text), "abcd");
+    });
+
+    let output = engine.update(&mut document, &stylesheet);
+    let label = output.layout.find("label").unwrap();
+    let line = label.text_layout.as_ref().unwrap().lines.first().unwrap();
+
+    assert_eq!(label.style.direction, Direction::Rtl);
+    assert!(line.x_offset > 50.0);
 }
 
 #[test]
