@@ -28,15 +28,11 @@ use des_widgets::{
 use eframe::egui;
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
 const PANEL: Color = Color::rgb(255, 251, 254);
-const PANEL_ALT: Color = Color::rgb(250, 244, 252);
-const CARD: Color = Color::rgb(255, 251, 254);
-const CARD_HOVER: Color = Color::rgb(243, 237, 247);
-const CARD_PRESSED: Color = Color::rgb(224, 210, 245);
+#[cfg(test)]
 const STROKE: Color = Color::rgb(202, 196, 208);
-const STROKE_SELECTED: Color = Color::rgb(103, 80, 164);
 const TEXT: Color = Color::rgb(29, 27, 32);
-const TEXT_MUTED: Color = Color::rgb(98, 91, 113);
 #[cfg(test)]
 const PURPLE: Color = Color::rgb(103, 80, 164);
 #[cfg(test)]

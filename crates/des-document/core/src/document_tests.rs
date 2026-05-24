@@ -517,6 +517,9 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
             scrollbar-pressed-handle-border-color: rgba(255, 251, 254, 0.71);
             scrollbar-pressed-handle-border-width: 1px;
             scrollbar-radius: 6px;
+            animate-size: false;
+            animate-paint: false;
+            animate-shadows: false;
             padding: 4px 8px;
         }
 
@@ -597,6 +600,9 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
     );
     assert_eq!(title.style.scrollbar_pressed_handle_border_width, Some(1.0));
     assert_eq!(title.style.scrollbar_radius, 6.0);
+    assert!(!title.style.animate_size);
+    assert!(!title.style.animate_paint);
+    assert!(!title.style.animate_shadows);
     assert_eq!(title.style.background, Some(Color::rgb(238, 229, 255)));
     assert_eq!(title.style.border, Some(Color::rgb(103, 80, 164)));
     assert_eq!(title.style.border_width.top, 1.0);

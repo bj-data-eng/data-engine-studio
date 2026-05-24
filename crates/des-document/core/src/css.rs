@@ -489,6 +489,9 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         }
         "scrollbar-radius" => style.scrollbar_radius = Some(parse_px(value)?.max(0.0)),
         "scrollbar-visible" => style.scrollbar_visible = Some(parse_bool(value)?),
+        "animate-size" => style.animate_size = Some(parse_bool(value)?),
+        "animate-paint" => style.animate_paint = Some(parse_bool(value)?),
+        "animate-shadows" => style.animate_shadows = Some(parse_bool(value)?),
         "position" => style.position = Some(parse_position(value)?),
         "top" => style.inset.top = Some(parse_length(value)?),
         "right" => style.inset.right = Some(parse_length(value)?),

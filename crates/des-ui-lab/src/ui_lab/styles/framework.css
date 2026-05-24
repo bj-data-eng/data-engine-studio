@@ -1,0 +1,176 @@
+.drag-item {
+  flex-direction: row;
+  width: 100%;
+  height: 34px;
+  padding: 6px 9px;
+  align-items: center;
+  justify-content: space-between;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+  box-shadow: 0px 0px 3.85px -3.85px #00000050;
+  transition: all 0.14s ease-out;
+}
+
+.drag-origin-space {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+  box-shadow: none;
+  animate-paint: false;
+  animate-shadows: false;
+}
+
+.drag-origin-collapsed {
+  height: 0px;
+  padding: 0px;
+  border-width: 0px;
+  margin: 0px 0px -5px 0px;
+}
+
+.drag-handle {
+  width: 24px;
+  height: 22px;
+  padding: 4px 2px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 3px;
+  transition: all 0.1s ease-out;
+}
+
+.drag-handle:hover {
+  background: rgba(103, 80, 164, 0.078);
+}
+
+.drag-handle-glyph {
+  font-size: 12px;
+  color: #625b71;
+}
+
+.drag-origin-content {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+}
+
+.drag-item:hover,
+.drag-item:active,
+.drag-handle-pressed {
+  background: #fffbfe;
+  box-shadow: 0px 2.75px 11px -8.25px #00000050;
+}
+
+.drag-origin-space:hover,
+.drag-origin-space:active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.drag-overlay {
+  z-index: 1000;
+  box-shadow: 0px 2.75px 11px -8.25px #00000050;
+  animate-size: false;
+  transition: all 0.18s ease-out;
+}
+
+.drag-overlay-idle {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  z-index: -1;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.drag-gap-before {
+  margin: 39px 0px 0px 0px;
+}
+
+.drag-gap-after {
+  margin: 0px 0px 39px 0px;
+}
+
+.drag-scroll-list-card {
+  width: 0px;
+  flex-basis: 0px;
+  flex-grow: 1;
+  padding: 10px;
+  gap: 8px;
+  background: #faf4fc;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.drag-scroll-list {
+  width: 100%;
+  height: 126px;
+  padding: 6px;
+  gap: 5px;
+  overflow-y: scroll;
+  scrollbar-visible: true;
+  scrollbar-width: 2px;
+  scrollbar-expanded-width: 10px;
+  scrollbar-radius: 5px;
+  scrollbar-handle-color: rgba(103, 80, 164, 0.463);
+  scrollbar-track-color: rgba(103, 80, 164, 0.11);
+  scrollbar-hover-handle-color: rgba(103, 80, 164, 0.463);
+  scrollbar-hover-track-color: rgba(103, 80, 164, 0.11);
+  scrollbar-pressed-handle-color: rgba(103, 80, 164, 0.69);
+  scrollbar-pressed-handle-border-color: #6750a4;
+  scrollbar-pressed-handle-border-width: 1px;
+  transition: all 0.12s ease-out;
+}
+
+.context-menu {
+  width: 142px;
+  height: auto;
+  padding: 6px 5px;
+  gap: 4px;
+  z-index: 2000;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+  box-shadow: 0px 2px 7px -1px #0000006e, 0px 14px 28px -5px #0000004e;
+}
+
+.context-menu-item {
+  flex-direction: row;
+  width: 100%;
+  height: 30px;
+  padding: 8px 6px;
+  align-items: center;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 4px;
+}
+
+.context-menu-item:hover {
+  background: #f3edf7;
+}
+
+.context-menu-item:active {
+  background: #e0d2f5;
+}
+
+.context-menu-item:disabled {
+  color: #625b71;
+}
+
+.context-menu-label {
+  font-size: 12.5px;
+  color: #1d1b20;
+}
+
+.context-menu-label:disabled {
+  color: #625b71;
+}
+
+.context-menu-separator {
+  width: 100%;
+  height: 1px;
+  background: #cac4d0;
+}
