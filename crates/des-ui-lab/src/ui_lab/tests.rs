@@ -2708,6 +2708,16 @@ fn blank_topbar_pointer_moves_reuse_last_document_output() {
     );
 }
 
+#[test]
+fn native_pointer_move_filter_skips_physical_points_inside_inert_rect() {
+    let mut filter = NativePointerMoveFilter::default();
+    filter.pixels_per_point = 2.0;
+    filter.inert_rect = Some(des_document::Rect::new(20.0, 10.0, 80.0, 30.0));
+
+    assert!(filter.should_skip_cursor_moved(80.0, 40.0));
+    assert!(!filter.should_skip_cursor_moved(220.0, 40.0));
+}
+
 #[cfg(not(debug_assertions))]
 #[test]
 fn whole_lab_interaction_release_measurement() {

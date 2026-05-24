@@ -18,6 +18,7 @@ des-text.workspace = true
 des-widgets.workspace = true
 eframe.workspace = true
 egui.workspace = true
+winit.workspace = true
 iconflow = { workspace = true, features = ["pack-lucide"] }
 
 [dev-dependencies]
