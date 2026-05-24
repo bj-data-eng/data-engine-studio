@@ -123,6 +123,10 @@ pub(crate) fn app_subtitle_font() -> FontId {
 }
 
 pub fn document_text_renderer() -> des_text::CosmicTextRenderer {
+    document_text_renderer_with_system_font_loading(des_text::SystemFontLoading::BundledOnly)
+}
+
+pub fn document_text_renderer_with_system_fallbacks() -> des_text::CosmicTextRenderer {
     document_text_renderer_with_system_font_loading(des_text::SystemFontLoading::IncludeSystemFonts)
 }
 
@@ -173,10 +177,18 @@ mod tests {
     };
 
     #[test]
-    fn document_text_renderer_keeps_bundled_default_font_metrics_without_system_fallbacks() {
-        let mut renderer = document_text_renderer_with_system_font_loading(
-            des_text::SystemFontLoading::BundledOnly,
-        );
+    fn document_text_renderer_uses_bundled_fonts_by_default() {
+        let mut renderer = document_text_renderer();
+        assert_text_renderer_measures_default_sample(&mut renderer);
+    }
+
+    #[test]
+    fn document_text_renderer_can_include_system_fallbacks_when_requested() {
+        let mut renderer = document_text_renderer_with_system_fallbacks();
+        assert_text_renderer_measures_default_sample(&mut renderer);
+    }
+
+    fn assert_text_renderer_measures_default_sample(renderer: &mut dyn TextMeasurer) {
         let content = TextContent::plain("Ag 100px");
         let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
         let measured = renderer.measure_text(TextLayoutRequest {

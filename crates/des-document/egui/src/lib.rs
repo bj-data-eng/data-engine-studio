@@ -3,3 +3,4 @@ mod host_config;
 
 pub use host_config::apply_host_configuration as apply_default_host_configuration;
 pub use host_config::document_text_renderer;
+pub use host_config::document_text_renderer_with_system_fallbacks;
