@@ -1139,7 +1139,8 @@ fn cosmic_attrs<'a>(
     font_families: &FontFamilyResolver,
 ) -> Attrs<'a> {
     let color = style.color.unwrap_or(inherited_color);
-    let font_size = style.font_size.unwrap_or(inherited_font_size).max(1.0) * scale;
+    let logical_font_size = style.font_size.unwrap_or(inherited_font_size).max(1.0);
+    let font_size = logical_font_size * scale;
     let line_height = style
         .line_height
         .or(inherited_line_height)
@@ -1164,7 +1165,7 @@ fn cosmic_attrs<'a>(
         Some(FontStyle::Normal) | None => {}
     }
     if let Some(letter_spacing) = style.letter_spacing {
-        attrs = attrs.letter_spacing((letter_spacing / font_size).max(0.0));
+        attrs = attrs.letter_spacing((letter_spacing / logical_font_size).max(0.0));
     }
     if let Some(decoration) = style.text_decoration {
         let decoration_color = cosmic_color(decoration.stroke_color(color));
@@ -2330,6 +2331,40 @@ mod tests {
         let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
 
         assert_eq!(attrs.stretch, Stretch::Expanded);
+    }
+
+    #[test]
+    fn maps_css_letter_spacing_as_logical_length_to_cosmic_em_tracking() {
+        let style = InlineTextStyle {
+            letter_spacing: Some(2.0),
+            ..InlineTextStyle::default()
+        };
+        let resolver = FontFamilyResolver::from_names([INTER_FAMILY, JETBRAINS_MONO_FAMILY]);
+        let attrs_at_1x = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
+        let attrs_at_2x = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 2.0, 0, &resolver);
+
+        assert_eq!(
+            attrs_at_1x.letter_spacing_opt,
+            attrs_at_2x.letter_spacing_opt
+        );
+    }
+
+    #[test]
+    fn letter_spacing_layout_is_stable_across_device_scale() {
+        let mut renderer = renderer();
+        let content = TextContent::new(vec![TextRun::styled(
+            "Tracking",
+            InlineTextStyle {
+                letter_spacing: Some(2.0),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let at_1x = renderer.layout(request(&normalized, 16.0, 400.0), 1.0);
+        let at_2x = renderer.layout(request(&normalized, 16.0, 400.0), 2.0);
+
+        assert!((at_1x.size.width - at_2x.size.width).abs() < 0.05);
+        assert!((at_1x.size.height - at_2x.size.height).abs() < 0.05);
     }
 
     #[test]
