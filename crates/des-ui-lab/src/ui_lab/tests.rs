@@ -2146,6 +2146,33 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
 }
 
 #[test]
+fn text_view_uses_glyph_atlas_on_warm_paint() {
+    let mut harness = lab_harness("text");
+    let first = render_harness(&mut harness);
+    let first_stats = harness.state().last_perf.text_paint;
+    let warm = render_harness(&mut harness);
+    let warm_stats = harness.state().last_perf.text_paint;
+
+    assert!(
+        image_stats(&first).non_transparent_pixels > 20_000,
+        "text view should render visible specimen output"
+    );
+    assert_exact_image_match(&first, &warm);
+    assert!(
+        first_stats.cached_glyphs > 0,
+        "text paint should populate the glyph atlas"
+    );
+    assert_eq!(
+        warm_stats.rasterizations, 0,
+        "warm text paint should reuse the glyph atlas without rasterizing glyphs"
+    );
+    assert!(
+        warm_stats.glyph_cache_hits > 0,
+        "warm text paint should hit cached atlas glyphs"
+    );
+}
+
+#[test]
 fn text_view_allows_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
     let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");

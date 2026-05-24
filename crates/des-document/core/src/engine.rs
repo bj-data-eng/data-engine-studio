@@ -256,7 +256,7 @@ impl DocumentEngine {
                 element_count,
                 scroll_chrome_count,
                 style_nodes_visited,
-                reused_cached_layout: false,
+                reused_cached_layout: reused_document_cache,
                 reused_input_layout,
                 input_changed_state: input_update.changed || clamp_changed,
                 animation_changed_style: animation_update.changed()

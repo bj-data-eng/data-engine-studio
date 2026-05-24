@@ -4,28 +4,167 @@ use des_document::{
     Insets, NormalizedText, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest,
     TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
-use des_text::CosmicTextRenderer;
+use des_text::{
+    CosmicTextRenderer, TextGlyph, TextGlyphCacheKey, TextGlyphImage, TextGlyphImageContent,
+};
 use eframe::egui;
-use std::collections::{HashMap, hash_map::DefaultHasher};
-use std::hash::{Hash, Hasher};
+use std::collections::HashMap;
 
 pub struct CosmicTextPaintResources {
     renderer: CosmicTextRenderer,
-    textures: HashMap<u64, CachedTextTexture>,
+    atlas: TextGlyphAtlas,
+    stats: TextPaintStats,
 }
 
-struct CachedTextTexture {
-    texture: egui::TextureHandle,
-    size: egui::Vec2,
+struct TextGlyphAtlas {
+    texture: Option<egui::TextureHandle>,
+    entries: HashMap<TextGlyphCacheKey, TextGlyphAtlasEntry>,
+    cursor_x: usize,
+    cursor_y: usize,
+    row_height: usize,
+    size: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextGlyphAtlasEntry {
+    uv: egui::Rect,
+    size_px: [u32; 2],
+    placement_px: [i32; 2],
+    color_content: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TextPaintStats {
+    pub cache_hits: usize,
+    pub glyph_cache_hits: usize,
+    pub rasterizations: usize,
+    pub cached_glyphs: usize,
+    pub uploaded_pixels: u64,
 }
 
 impl CosmicTextPaintResources {
     pub fn new(renderer: CosmicTextRenderer) -> Self {
         Self {
             renderer,
-            textures: HashMap::new(),
+            atlas: TextGlyphAtlas::new(),
+            stats: TextPaintStats::default(),
         }
     }
+
+    pub fn begin_frame(&mut self) {
+        self.stats = TextPaintStats {
+            cached_glyphs: self.atlas.entries.len(),
+            ..TextPaintStats::default()
+        };
+    }
+
+    pub fn stats(&self) -> TextPaintStats {
+        TextPaintStats {
+            cached_glyphs: self.atlas.entries.len(),
+            ..self.stats
+        }
+    }
+}
+
+impl TextGlyphAtlas {
+    const SIZE: usize = 2048;
+    const PADDING: usize = 1;
+
+    fn new() -> Self {
+        Self {
+            texture: None,
+            entries: HashMap::new(),
+            cursor_x: Self::PADDING,
+            cursor_y: Self::PADDING,
+            row_height: 0,
+            size: Self::SIZE,
+        }
+    }
+
+    fn ensure_texture(&mut self, ctx: &egui::Context) {
+        if self.texture.is_none() {
+            let image = egui::ColorImage::new(
+                [self.size, self.size],
+                vec![egui::Color32::TRANSPARENT; self.size * self.size],
+            );
+            self.texture =
+                Some(ctx.load_texture("des-cosmic-glyph-atlas", image, texture_options()));
+        }
+    }
+
+    fn entry(
+        &mut self,
+        ctx: &egui::Context,
+        renderer: &mut CosmicTextRenderer,
+        cache_key: TextGlyphCacheKey,
+        stats: &mut TextPaintStats,
+    ) -> Option<TextGlyphAtlasEntry> {
+        if let Some(entry) = self.entries.get(&cache_key).copied() {
+            stats.glyph_cache_hits += 1;
+            return Some(entry);
+        }
+
+        let image = renderer.glyph_image(cache_key)?;
+        let entry = self.insert(ctx, cache_key, &image, stats)?;
+        Some(entry)
+    }
+
+    fn insert(
+        &mut self,
+        ctx: &egui::Context,
+        cache_key: TextGlyphCacheKey,
+        image: &TextGlyphImage,
+        stats: &mut TextPaintStats,
+    ) -> Option<TextGlyphAtlasEntry> {
+        let width = image.width_px as usize;
+        let height = image.height_px as usize;
+        if width == 0 || height == 0 || width + Self::PADDING * 2 > self.size {
+            return None;
+        }
+        self.ensure_texture(ctx);
+        if self.cursor_x + width + Self::PADDING > self.size {
+            self.cursor_x = Self::PADDING;
+            self.cursor_y += self.row_height + Self::PADDING;
+            self.row_height = 0;
+        }
+        if self.cursor_y + height + Self::PADDING > self.size {
+            return None;
+        }
+
+        let x = self.cursor_x;
+        let y = self.cursor_y;
+        self.cursor_x += width + Self::PADDING;
+        self.row_height = self.row_height.max(height);
+
+        let color_image = egui::ColorImage::from_rgba_unmultiplied([width, height], &image.rgba);
+        let texture = self
+            .texture
+            .as_mut()
+            .expect("glyph atlas texture exists before glyph upload");
+        texture.set_partial([x, y], color_image, texture_options());
+        stats.rasterizations += 1;
+        stats.uploaded_pixels += image.width_px as u64 * image.height_px as u64;
+
+        let uv = egui::Rect::from_min_max(
+            egui::pos2(x as f32 / self.size as f32, y as f32 / self.size as f32),
+            egui::pos2(
+                (x + width) as f32 / self.size as f32,
+                (y + height) as f32 / self.size as f32,
+            ),
+        );
+        let entry = TextGlyphAtlasEntry {
+            uv,
+            size_px: [image.width_px, image.height_px],
+            placement_px: [image.left_px, image.top_px],
+            color_content: image.content == TextGlyphImageContent::Color,
+        };
+        self.entries.insert(cache_key, entry);
+        Some(entry)
+    }
+}
+
+fn texture_options() -> egui::TextureOptions {
+    egui::TextureOptions::LINEAR
 }
 
 impl TextMeasurer for CosmicTextPaintResources {
@@ -98,33 +237,36 @@ fn paint_frame_clipped(
     let painter = ui.painter().with_clip_rect(clip_rect);
     if frame.id.as_str() != "root" {
         let rect = frame_rect(origin, frame);
+        let self_visible = clip_rect.intersects(rect);
 
-        if let Some(arrow) = floating_arrow(frame, rect) {
-            paint_floating_surface(&painter, rect, frame, arrow);
-        } else {
-            paint_shadows(&painter, rect, frame.style.radius, &frame.style.shadows);
+        if self_visible {
+            if let Some(arrow) = floating_arrow(frame, rect) {
+                paint_floating_surface(&painter, rect, frame, arrow);
+            } else {
+                paint_shadows(&painter, rect, frame.style.radius, &frame.style.shadows);
 
-            if let Some(color) = frame.style.background {
-                painter.rect_filled(
-                    rect,
-                    to_egui_radius(frame.style.radius),
-                    to_egui_color(color),
-                );
-            }
+                if let Some(color) = frame.style.background {
+                    painter.rect_filled(
+                        rect,
+                        to_egui_radius(frame.style.radius),
+                        to_egui_color(color),
+                    );
+                }
 
-            if let Some(color) = frame.style.border {
-                paint_border(
-                    &painter,
-                    rect,
-                    frame.style.radius,
-                    frame.style.border_width,
-                    frame.style.border_style,
-                    color,
-                );
+                if let Some(color) = frame.style.border {
+                    paint_border(
+                        &painter,
+                        rect,
+                        frame.style.radius,
+                        frame.style.border_width,
+                        frame.style.border_style,
+                        color,
+                    );
+                }
             }
         }
 
-        if let Some(text) = &frame.text {
+        if self_visible && let Some(text) = &frame.text {
             let text_rect = frame_content_rect(rect, frame);
             let normalized = NormalizedText::from_content(text, frame.style.text_layout);
             let request = TextLayoutRequest {
@@ -140,15 +282,18 @@ fn paint_frame_clipped(
                 line_height: frame.style.line_height,
             };
             if let Some(resources) = text_resources.as_deref_mut() {
-                paint_rasterized_text(
-                    &painter,
-                    text_rect.min,
-                    frame,
-                    request,
-                    ui.ctx().pixels_per_point(),
-                    &mut resources.renderer,
-                    &mut resources.textures,
-                );
+                if let Some(visible_rect) = visible_local_rect(clip_rect, text_rect) {
+                    paint_atlas_text(
+                        &painter,
+                        text_rect.min,
+                        visible_rect,
+                        request,
+                        ui.ctx().pixels_per_point(),
+                        &mut resources.renderer,
+                        &mut resources.atlas,
+                        &mut resources.stats,
+                    );
+                }
             } else {
                 let color = to_egui_color(frame.style.text_color);
                 let mut galley = painter.layout_job(layout_job(request, color));
@@ -173,7 +318,7 @@ fn paint_frame_clipped(
             }
         }
 
-        if let Some(glyph) = frame.glyph {
+        if self_visible && let Some(glyph) = frame.glyph {
             paint_glyph(
                 &painter,
                 rect,
@@ -198,82 +343,80 @@ fn paint_frame_clipped(
     }
 }
 
-fn paint_rasterized_text(
+fn paint_atlas_text(
     painter: &egui::Painter,
     position: egui::Pos2,
-    frame: &ResolvedElement,
+    visible_rect: Rect,
     request: TextLayoutRequest<'_>,
     pixels_per_point: f32,
     renderer: &mut CosmicTextRenderer,
-    textures: &mut HashMap<u64, CachedTextTexture>,
+    atlas: &mut TextGlyphAtlas,
+    stats: &mut TextPaintStats,
 ) {
-    let texture_key = text_texture_hash(frame, &request, pixels_per_point);
-    if let Some(cached) = textures.get(&texture_key) {
-        paint_text_texture(painter, position, cached.texture.id(), cached.size);
-        return;
+    let glyph_run = renderer.glyphs(request, pixels_per_point, Some(visible_rect));
+    let scale = pixels_per_point.max(1.0);
+    let texture_id = match atlas.texture.as_ref().map(|texture| texture.id()) {
+        Some(texture_id) => texture_id,
+        None => {
+            if glyph_run.glyphs.is_empty() {
+                return;
+            }
+            atlas.ensure_texture(painter.ctx());
+            atlas
+                .texture
+                .as_ref()
+                .expect("glyph atlas texture exists")
+                .id()
+        }
+    };
+    for glyph in glyph_run.glyphs {
+        let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
+            continue;
+        };
+        stats.cache_hits += 1;
+        paint_glyph_atlas_entry(painter, position, texture_id, glyph, entry, scale);
     }
+}
 
-    let rasterized = renderer.rasterize(request, pixels_per_point);
-    if rasterized.surface.is_empty() {
-        return;
-    }
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(
-        [
-            rasterized.surface.width_px as usize,
-            rasterized.surface.height_px as usize,
-        ],
-        &rasterized.surface.rgba,
-    );
-    let texture = painter.ctx().load_texture(
-        format!("des-cosmic-text-{}-{texture_key}", frame.id.as_str()),
-        color_image,
-        egui::TextureOptions::LINEAR,
+fn visible_local_rect(clip_rect: egui::Rect, text_rect: egui::Rect) -> Option<Rect> {
+    let visible = clip_rect.intersect(text_rect);
+    (visible.width() > 0.0 && visible.height() > 0.0).then(|| {
+        Rect::new(
+            visible.left() - text_rect.left(),
+            visible.top() - text_rect.top(),
+            visible.width(),
+            visible.height(),
+        )
+    })
+}
+
+fn paint_glyph_atlas_entry(
+    painter: &egui::Painter,
+    text_position: egui::Pos2,
+    texture_id: egui::TextureId,
+    glyph: TextGlyph,
+    entry: TextGlyphAtlasEntry,
+    scale: f32,
+) {
+    let min = egui::pos2(
+        text_position.x + (glyph.x_px + entry.placement_px[0]) as f32 / scale,
+        text_position.y + (glyph.y_px - entry.placement_px[1]) as f32 / scale,
     );
     let size = egui::vec2(
-        rasterized.surface.size.width,
-        rasterized.surface.size.height,
+        entry.size_px[0] as f32 / scale,
+        entry.size_px[1] as f32 / scale,
     );
-    paint_text_texture(painter, position, texture.id(), size);
-    textures.insert(texture_key, CachedTextTexture { texture, size });
-}
-
-fn paint_text_texture(
-    painter: &egui::Painter,
-    position: egui::Pos2,
-    texture: egui::TextureId,
-    size: egui::Vec2,
-) {
-    let rect = egui::Rect::from_min_size(position, size);
+    let tint = if entry.color_content {
+        egui::Color32::WHITE
+    } else {
+        to_egui_color(glyph.color)
+    };
     painter.image(
-        texture,
-        rect,
-        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
-        egui::Color32::WHITE,
+        texture_id,
+        egui::Rect::from_min_size(min, size),
+        entry.uv,
+        tint,
     );
-}
-
-fn text_texture_hash(
-    frame: &ResolvedElement,
-    request: &TextLayoutRequest<'_>,
-    pixels_per_point: f32,
-) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    frame.id.as_str().hash(&mut hasher);
-    if let Some(text) = &frame.text {
-        text.semantic_text().hash(&mut hasher);
-        format!("{:?}", text.runs()).hash(&mut hasher);
-    }
-    frame.style.font_size.to_bits().hash(&mut hasher);
-    frame.style.line_height.map(f32::to_bits).hash(&mut hasher);
-    frame.style.text_color.r.hash(&mut hasher);
-    frame.style.text_color.g.hash(&mut hasher);
-    frame.style.text_color.b.hash(&mut hasher);
-    frame.style.text_color.a.hash(&mut hasher);
-    request.wrap_width.to_bits().hash(&mut hasher);
-    format!("{:?}", request.direction).hash(&mut hasher);
-    format!("{:?}", request.layout_style).hash(&mut hasher);
-    pixels_per_point.to_bits().hash(&mut hasher);
-    hasher.finish()
 }
 
 fn apply_document_clip(

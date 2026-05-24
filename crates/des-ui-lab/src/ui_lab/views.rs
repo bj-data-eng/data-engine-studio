@@ -949,6 +949,24 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-cache",
+                "text cache",
+                format!(
+                    "{} text / {} glyph / {} new / {} cached",
+                    perf.text_paint.cache_hits,
+                    perf.text_paint.glyph_cache_hits,
+                    perf.text_paint.rasterizations,
+                    perf.text_paint.cached_glyphs
+                ),
+            );
+            debug_metric_row(
+                ui,
+                "debug-text-pixels",
+                "text upload px",
+                perf.text_paint.uploaded_pixels.to_string(),
+            );
+            debug_metric_row(
+                ui,
                 "debug-input-cache",
                 "input cache hit",
                 perf.metrics.reused_cached_layout.to_string(),

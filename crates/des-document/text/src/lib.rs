@@ -1,15 +1,16 @@
 use cosmic_text::{
-    Align, Attrs, Buffer, Color as CosmicColor, Ellipsize, EllipsizeHeightLimit, Family,
-    FontSystem, Metrics, Shaping, Style, SwashCache, Weight, Wrap,
+    Align, Attrs, Buffer, CacheKey, Color as CosmicColor, Ellipsize, EllipsizeHeightLimit, Family,
+    FontSystem, Metrics, Shaping, Style, SwashCache, SwashContent, Weight, Wrap,
 };
 use des_document::{
-    Color, Direction, FontStyle, InlineTextStyle, Point, Size, TextAlign, TextLayoutLine,
+    Color, Direction, FontStyle, InlineTextStyle, Point, Rect, Size, TextAlign, TextLayoutLine,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
 };
 use std::sync::Arc;
 
 pub const INTER_FAMILY: &str = "Inter";
 pub const JETBRAINS_MONO_FAMILY: &str = "JetBrains Mono";
+pub type TextGlyphCacheKey = CacheKey;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SystemFontLoading {
@@ -32,6 +33,7 @@ impl FontAsset {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextSurface {
     pub size: Size,
+    pub offset: Point,
     pub pixels_per_point: f32,
     pub width_px: u32,
     pub height_px: u32,
@@ -49,6 +51,36 @@ pub struct RasterizedText {
     pub surface: TextSurface,
     pub layout: TextLayoutResult,
     pub diagnostics: TextDiagnostics,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextGlyphRun {
+    pub layout: TextLayoutResult,
+    pub glyphs: Vec<TextGlyph>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextGlyphImageContent {
+    Mask,
+    Color,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextGlyphImage {
+    pub width_px: u32,
+    pub height_px: u32,
+    pub left_px: i32,
+    pub top_px: i32,
+    pub content: TextGlyphImageContent,
+    pub rgba: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextGlyph {
+    pub cache_key: TextGlyphCacheKey,
+    pub x_px: i32,
+    pub y_px: i32,
+    pub color: Color,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -98,52 +130,46 @@ impl CosmicTextRenderer {
         request: TextLayoutRequest<'_>,
         pixels_per_point: f32,
     ) -> RasterizedText {
+        self.rasterize_visible(request, pixels_per_point, None)
+    }
+
+    pub fn rasterize_visible(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        pixels_per_point: f32,
+        visible_rect: Option<Rect>,
+    ) -> RasterizedText {
         let scale = pixels_per_point.max(1.0);
-        let (layout, rgba, glyph_rects, width_px, height_px) =
-            self.with_buffer(request.clone(), scale, |buffer, swash_cache| {
-                let layout = layout_result(&request, buffer);
-                let width_px = surface_width_px(
-                    &layout,
-                    request.wrap_width,
-                    request.layout_style.text_wrap_mode,
-                    scale,
-                );
-                let height_px = finite_surface_extent(layout.size.height).ceil() as u32;
-                let mut rgba =
-                    vec![0; width_px.saturating_mul(height_px).saturating_mul(4) as usize];
-                let mut glyph_rects = 0usize;
-                buffer.draw(
-                    swash_cache,
-                    cosmic_color(request.color),
-                    |x, y, w, h, color| {
-                        glyph_rects += 1;
-                        blend_rect(&mut rgba, width_px, height_px, x, y, w, h, color);
-                    },
-                );
-                (layout, rgba, glyph_rects, width_px, height_px)
-            });
+        let (layout, surface) = self.with_buffer(request.clone(), scale, |buffer, swash_cache| {
+            let layout = layout_result(&request, buffer);
+            let surface = rasterize_surface(
+                buffer,
+                swash_cache,
+                request.color,
+                scale,
+                &layout,
+                visible_rect,
+            );
+            (layout, surface)
+        });
+
+        let diagnostics = TextDiagnostics {
+            backend: "cosmic-text",
+            proportional_family: INTER_FAMILY,
+            monospace_family: JETBRAINS_MONO_FAMILY,
+            pixels_per_point: scale,
+            width_px: surface.surface.width_px,
+            height_px: surface.surface.height_px,
+            glyph_rects: surface.glyph_rects,
+        };
 
         RasterizedText {
-            surface: TextSurface {
-                size: Size::new(width_px as f32 / scale, height_px as f32 / scale),
-                pixels_per_point: scale,
-                width_px,
-                height_px,
-                rgba,
-            },
+            surface: surface.surface,
             layout: TextLayoutResult {
                 size: Size::new(layout.size.width / scale, layout.size.height / scale),
                 ..layout.scale_lines(1.0 / scale)
             },
-            diagnostics: TextDiagnostics {
-                backend: "cosmic-text",
-                proportional_family: INTER_FAMILY,
-                monospace_family: JETBRAINS_MONO_FAMILY,
-                pixels_per_point: scale,
-                width_px,
-                height_px,
-                glyph_rects,
-            },
+            diagnostics,
         }
     }
 
@@ -160,6 +186,78 @@ impl CosmicTextRenderer {
             size: Size::new(layout.size.width / scale, layout.size.height / scale),
             ..layout.scale_lines(1.0 / scale)
         }
+    }
+
+    pub fn glyphs(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        pixels_per_point: f32,
+        visible_rect: Option<Rect>,
+    ) -> TextGlyphRun {
+        let scale = pixels_per_point.max(1.0);
+        let (layout, glyphs) = self.with_buffer(request.clone(), scale, |buffer, _| {
+            let layout = layout_result(&request, buffer);
+            let mut glyphs = Vec::new();
+            for run in buffer.layout_runs() {
+                for glyph in run.glyphs {
+                    let physical = glyph.physical((0.0, run.line_y), 1.0);
+                    let x = physical.x as f32 / scale;
+                    let y = physical.y as f32 / scale;
+                    let margin = glyph.font_size * 2.0;
+                    if let Some(visible) = visible_rect
+                        && (x > visible.right() + margin
+                            || y > visible.bottom() + margin
+                            || x < visible.origin.x - margin
+                            || y < visible.origin.y - margin)
+                    {
+                        continue;
+                    }
+                    glyphs.push(TextGlyph {
+                        cache_key: physical.cache_key,
+                        x_px: physical.x,
+                        y_px: physical.y,
+                        color: glyph
+                            .color_opt
+                            .map_or(request.color, cosmic_to_document_color),
+                    });
+                }
+            }
+            (layout, glyphs)
+        });
+        TextGlyphRun {
+            layout: TextLayoutResult {
+                size: Size::new(layout.size.width / scale, layout.size.height / scale),
+                ..layout.scale_lines(1.0 / scale)
+            },
+            glyphs,
+        }
+    }
+
+    pub fn glyph_image(&mut self, cache_key: TextGlyphCacheKey) -> Option<TextGlyphImage> {
+        let image = self
+            .swash_cache
+            .get_image(&mut self.font_system, cache_key)
+            .as_ref()?;
+        let content = match image.content {
+            SwashContent::Mask | SwashContent::SubpixelMask => TextGlyphImageContent::Mask,
+            SwashContent::Color => TextGlyphImageContent::Color,
+        };
+        let rgba = match image.content {
+            SwashContent::Mask => image
+                .data
+                .iter()
+                .flat_map(|alpha| [255, 255, 255, *alpha])
+                .collect(),
+            SwashContent::SubpixelMask | SwashContent::Color => image.data.clone(),
+        };
+        Some(TextGlyphImage {
+            width_px: image.placement.width,
+            height_px: image.placement.height,
+            left_px: image.placement.left,
+            top_px: image.placement.top,
+            content,
+            rgba,
+        })
     }
 
     fn hit_index(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
@@ -235,7 +333,7 @@ impl CosmicTextRenderer {
         buffer.set_rich_text(
             spans,
             &default_attrs,
-            Shaping::Advanced,
+            shaping_for(&request),
             Some(cosmic_align(
                 request.layout_style.text_align,
                 request.direction,
@@ -345,30 +443,6 @@ fn line_byte_to_layout_index(text: &str, line_index: usize, line_byte_index: usi
     text.chars().count()
 }
 
-fn surface_width_px(
-    layout: &TextLayoutResult,
-    wrap_width: f32,
-    wrap_mode: TextWrapMode,
-    scale: f32,
-) -> u32 {
-    let width = match wrap_mode {
-        TextWrapMode::NoWrap => layout.size.width.max(1.0),
-        TextWrapMode::Wrap if wrap_width.is_finite() && wrap_width > 1.0 => {
-            (wrap_width * scale).max(layout.size.width).max(1.0)
-        }
-        TextWrapMode::Wrap => layout.size.width.max(1.0),
-    };
-    finite_surface_extent(width).ceil() as u32
-}
-
-fn finite_surface_extent(value: f32) -> f32 {
-    if value.is_finite() {
-        value.clamp(1.0, 16_384.0)
-    } else {
-        16_384.0
-    }
-}
-
 fn cosmic_wrap(request: &TextLayoutRequest<'_>) -> Wrap {
     match request.layout_style.text_wrap_mode {
         TextWrapMode::NoWrap => Wrap::None,
@@ -396,6 +470,20 @@ fn cosmic_align(text_align: TextAlign, direction: Direction) -> Align {
         TextAlign::End if direction == Direction::Rtl => Align::Left,
         TextAlign::End => Align::Right,
         TextAlign::Justify => Align::Justified,
+    }
+}
+
+fn shaping_for(request: &TextLayoutRequest<'_>) -> Shaping {
+    if request.direction == Direction::Ltr
+        && request
+            .text
+            .layout_text()
+            .chars()
+            .all(|character| character.is_ascii())
+    {
+        Shaping::Basic
+    } else {
+        Shaping::Advanced
     }
 }
 
@@ -444,6 +532,98 @@ fn cosmic_color(color: Color) -> CosmicColor {
     CosmicColor::rgba(color.r, color.g, color.b, color.a)
 }
 
+fn cosmic_to_document_color(color: CosmicColor) -> Color {
+    let (r, g, b, a) = color.as_rgba_tuple();
+    Color::rgba(r, g, b, a)
+}
+
+struct RasterizedSurface {
+    surface: TextSurface,
+    glyph_rects: usize,
+}
+
+fn rasterize_surface(
+    buffer: &mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>,
+    swash_cache: &mut SwashCache,
+    color: Color,
+    scale: f32,
+    layout: &TextLayoutResult,
+    visible_rect: Option<Rect>,
+) -> RasterizedSurface {
+    let layout_min_x = layout
+        .lines
+        .iter()
+        .map(|line| line.x_offset)
+        .fold(f32::INFINITY, f32::min)
+        .min(0.0)
+        .floor() as i32;
+    let layout_max_x = layout
+        .lines
+        .iter()
+        .map(|line| line.x_offset + line.width)
+        .fold(0.0_f32, f32::max)
+        .ceil() as i32;
+    let layout_min_y = 0_i32;
+    let layout_max_y = layout.size.height.ceil() as i32;
+    let (clip_min_x, clip_min_y, clip_max_x, clip_max_y) = visible_rect
+        .map(|rect| {
+            (
+                (rect.origin.x * scale).floor() as i32,
+                (rect.origin.y * scale).floor() as i32,
+                ((rect.origin.x + rect.size.width) * scale).ceil() as i32,
+                ((rect.origin.y + rect.size.height) * scale).ceil() as i32,
+            )
+        })
+        .unwrap_or((layout_min_x, layout_min_y, layout_max_x, layout_max_y));
+    let min_x = layout_min_x.max(clip_min_x);
+    let min_y = layout_min_y.max(clip_min_y);
+    let max_x = layout_max_x.min(clip_max_x);
+    let max_y = layout_max_y.min(clip_max_y);
+    let width_px = (max_x - min_x).clamp(1, 16_384) as u32;
+    let height_px = (max_y - min_y).clamp(1, 16_384) as u32;
+    if layout.lines.is_empty() || min_x >= max_x || min_y >= max_y {
+        return RasterizedSurface {
+            surface: TextSurface {
+                size: Size::default(),
+                offset: Point::ZERO,
+                pixels_per_point: scale,
+                width_px: 0,
+                height_px: 0,
+                rgba: Vec::new(),
+            },
+            glyph_rects: 0,
+        };
+    }
+
+    let mut rgba = vec![0; width_px.saturating_mul(height_px).saturating_mul(4) as usize];
+    let mut glyph_rects = 0usize;
+    buffer.draw(swash_cache, cosmic_color(color), |x, y, w, h, color| {
+        glyph_rects += 1;
+        blend_rect(
+            &mut rgba,
+            width_px,
+            height_px,
+            x - min_x,
+            y - min_y,
+            w,
+            h,
+            color,
+        );
+    });
+
+    RasterizedSurface {
+        surface: TextSurface {
+            size: Size::new(width_px as f32 / scale, height_px as f32 / scale),
+            offset: Point::new(min_x as f32 / scale, min_y as f32 / scale),
+            pixels_per_point: scale,
+            width_px,
+            height_px,
+            rgba,
+        },
+        glyph_rects,
+    }
+}
+
 fn blend_rect(
     rgba: &mut [u8],
     width_px: u32,
@@ -468,6 +648,13 @@ fn blend_rect(
 }
 
 fn alpha_blend(dst: &mut [u8], src: [u8; 4]) {
+    if src[3] == 0 {
+        return;
+    }
+    if dst[3] == 0 || src[3] == 255 {
+        dst.copy_from_slice(&src);
+        return;
+    }
     let src_a = src[3] as f32 / 255.0;
     let dst_a = dst[3] as f32 / 255.0;
     let out_a = src_a + dst_a * (1.0 - src_a);

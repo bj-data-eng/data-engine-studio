@@ -4,8 +4,9 @@ mod tests;
 mod views;
 
 use des_egui::adapter::{
-    CosmicTextPaintResources, configure_text_selection_input, copy_selected_text_on_command,
-    document_input, paint_frame_with_text_resources, paint_scroll_chrome,
+    CosmicTextPaintResources, TextPaintStats, configure_text_selection_input,
+    copy_selected_text_on_command, document_input, paint_frame_with_text_resources,
+    paint_scroll_chrome,
 };
 use styles::stylesheet;
 use views::{
@@ -312,6 +313,7 @@ impl UiLabState {
         apply_cursor_icon(ui, &output);
 
         let paint_start = Instant::now();
+        self.text_paint_resources.begin_frame();
         paint_frame_with_text_resources(
             ui,
             origin,
@@ -324,10 +326,12 @@ impl UiLabState {
         }
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
         let paint_time = paint_start.elapsed();
+        let text_paint = self.text_paint_resources.stats();
         self.last_perf = UiLabPerf {
             document_time,
             engine_time,
             paint_time,
+            text_paint,
             metrics: output.metrics,
         };
         self.apply_document_events(ui, &output, pointer);
@@ -1432,5 +1436,6 @@ struct UiLabPerf {
     document_time: Duration,
     engine_time: Duration,
     paint_time: Duration,
+    text_paint: TextPaintStats,
     metrics: DocumentMetrics,
 }
