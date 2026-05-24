@@ -41,7 +41,7 @@ verify that the rendered result still matches the contract.
 
 ```sh
 just ui-test
-cargo test -p des-ui-document
+cargo test -p des-document
 cargo test -p des-ui-lab
 just ui-shot-mac
 just ui-shot-windows

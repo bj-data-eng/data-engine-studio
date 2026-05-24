@@ -4,7 +4,35 @@ use des_template::{
 };
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+struct TempTemplatePath {
+    path: PathBuf,
+}
+
+impl TempTemplatePath {
+    fn new(name: &str) -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "{name}-{}.xml",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock should be after epoch")
+                .as_nanos()
+        ));
+        Self { path }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempTemplatePath {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
 
 #[test]
 fn compiled_template_renders_markup_interpolation_and_loops() {
@@ -89,13 +117,8 @@ fn compiled_template_renders_conditionals() {
 
 #[test]
 fn template_file_hot_reloads_when_source_changes() {
-    let path = std::env::temp_dir().join(format!(
-        "des-template-hot-reload-{}.xml",
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock should be after epoch")
-            .as_nanos()
-    ));
+    let fixture = TempTemplatePath::new("des-template-hot-reload");
+    let path = fixture.path();
 
     fs::write(&path, "<text>{title}</text>").expect("template fixture should be writable");
     let mut file = TemplateFile::load(&path).expect("template file should load");
@@ -130,8 +153,50 @@ fn template_file_hot_reloads_when_source_changes() {
             .classes,
         ["changed"]
     );
+}
 
-    let _ = fs::remove_file(path);
+#[test]
+fn compiled_template_locks_attribute_class_and_text_normalization() {
+    let template = CompiledTemplate::compile(
+        r#"
+        <panel class="primary  elevated" data-mode="old" data-mode="{mode}">
+          <text>  {label}  </text>
+        </panel>
+        "#,
+    )
+    .expect("template should compile");
+    let mut context = BTreeMap::new();
+    context.insert("mode".to_owned(), Value::string("active"));
+    context.insert("label".to_owned(), Value::string("Ready"));
+
+    let rendered = template.render(&context).expect("template should render");
+
+    assert_eq!(rendered[0].classes, ["primary", "elevated"]);
+    assert_eq!(
+        rendered[0].attributes.get("data-mode").map(String::as_str),
+        Some("active"),
+        "later duplicate attributes intentionally replace earlier values"
+    );
+    assert_eq!(rendered[0].children[0].text.as_deref(), Some("Ready"));
+}
+
+#[test]
+fn compiled_template_renders_markup_like_interpolation_as_text() {
+    let template =
+        CompiledTemplate::compile(r#"<text>{message}</text>"#).expect("template should compile");
+    let mut context = BTreeMap::new();
+    context.insert(
+        "message".to_owned(),
+        Value::string("<strong>not markup</strong>"),
+    );
+
+    let rendered = template.render(&context).expect("template should render");
+
+    assert_eq!(
+        rendered[0].text.as_deref(),
+        Some("<strong>not markup</strong>")
+    );
+    assert!(rendered[0].children.is_empty());
 }
 
 #[test]

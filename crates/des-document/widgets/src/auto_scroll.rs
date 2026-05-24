@@ -239,8 +239,7 @@ mod tests {
         Document, Element, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
     };
 
-    #[test]
-    fn auto_scroller_scrolls_nearest_scrollable_container_near_bottom_edge() {
+    fn vertical_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
         let mut engine = DocumentEngine::default();
         let stylesheet = StyleSheet::new()
             .rule(
@@ -265,6 +264,34 @@ mod tests {
             });
         });
         let output = engine.update(&mut document, &stylesheet);
+        (engine, document, stylesheet, output)
+    }
+
+    fn horizontal_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
+        let mut engine = DocumentEngine::default();
+        let stylesheet = StyleSheet::new()
+            .rule(
+                StyleSelector::id("scroll-parent"),
+                Style::default()
+                    .size(120.0, 80.0)
+                    .overflow_x(Overflow::Scroll),
+            )
+            .rule(
+                StyleSelector::id("wide-row"),
+                Style::default().size(240.0, 60.0),
+            );
+        let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
+            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
+                ui.element("wide-row", ElementSpec::new(Element::Div), |_| {});
+            });
+        });
+        let output = engine.update(&mut document, &stylesheet);
+        (engine, document, stylesheet, output)
+    }
+
+    #[test]
+    fn auto_scroller_scrolls_nearest_scrollable_container_near_bottom_edge() {
+        let (mut engine, _, _, output) = vertical_scroll_fixture();
         let pointer = Point::new(40.0, 76.0);
 
         let action = AutoScroller::new(AutoScrollOptions::default())
@@ -278,36 +305,70 @@ mod tests {
 
     #[test]
     fn auto_scroller_does_not_scroll_when_axis_threshold_is_disabled() {
-        let mut engine = DocumentEngine::default();
-        let stylesheet = StyleSheet::new()
-            .rule(
-                StyleSelector::id("scroll-parent"),
-                Style::default()
-                    .size(120.0, 80.0)
-                    .overflow_y(Overflow::Scroll),
-            )
-            .rule(
-                StyleSelector::class("row"),
-                Style::default().size(100.0, 32.0),
-            );
-        let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
-            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
-                for index in 0..8 {
-                    ui.element(
-                        format!("row-{index}"),
-                        ElementSpec::new(Element::Div).class("row"),
-                        |_| {},
-                    );
-                }
-            });
-        });
-        let output = engine.update(&mut document, &stylesheet);
+        let (mut engine, _, _, output) = vertical_scroll_fixture();
 
         let action = AutoScroller::new(AutoScrollOptions {
             threshold_y: 0.0,
             ..AutoScrollOptions::default()
         })
         .scroll_drag(&mut engine, &output, Point::new(40.0, 76.0));
+
+        assert!(action.is_none());
+        assert_eq!(engine.element_state("scroll-parent").unwrap().scroll_y, 0.0);
+    }
+
+    #[test]
+    fn auto_scroller_scrolls_back_toward_top_edge() {
+        let (mut engine, mut document, stylesheet, _) = vertical_scroll_fixture();
+        assert!(engine.scroll_element_by("scroll-parent", Point::new(0.0, 48.0)));
+        let output = engine.update(&mut document, &stylesheet);
+
+        let action = AutoScroller::new(AutoScrollOptions::default())
+            .scroll_drag(&mut engine, &output, Point::new(40.0, 4.0))
+            .expect("pointer near the top should scroll upward when already scrolled");
+
+        assert_eq!(action.element_id, ElementId::new("scroll-parent"));
+        assert!(action.delta.y < 0.0);
+        assert!(engine.element_state("scroll-parent").unwrap().scroll_y < 48.0);
+    }
+
+    #[test]
+    fn auto_scroller_scrolls_horizontally_near_right_edge() {
+        let (mut engine, _, _, output) = horizontal_scroll_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions::default())
+            .scroll_drag(&mut engine, &output, Point::new(116.0, 40.0))
+            .expect("pointer near the right edge should scroll horizontally");
+
+        assert_eq!(action.element_id, ElementId::new("scroll-parent"));
+        assert!(action.delta.x > 0.0);
+        assert!(engine.element_state("scroll-parent").unwrap().scroll_x > 0.0);
+    }
+
+    #[test]
+    fn auto_scroller_respects_cross_axis_tolerance() {
+        let (mut engine, _, _, output) = vertical_scroll_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions {
+            tolerance: 2.0,
+            ..AutoScrollOptions::default()
+        })
+        .scroll_drag(&mut engine, &output, Point::new(140.0, 76.0));
+
+        assert!(action.is_none());
+        assert_eq!(engine.element_state("scroll-parent").unwrap().scroll_y, 0.0);
+    }
+
+    #[test]
+    fn auto_scroller_filter_can_reject_scroll_container() {
+        let (mut engine, _, _, output) = vertical_scroll_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions::default()).scroll_drag_with_filter(
+            &mut engine,
+            &output,
+            Point::new(40.0, 76.0),
+            |_| false,
+        );
 
         assert!(action.is_none());
         assert_eq!(engine.element_state("scroll-parent").unwrap().scroll_y, 0.0);

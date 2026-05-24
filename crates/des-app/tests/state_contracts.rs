@@ -91,3 +91,76 @@ fn dispatch_move_graph_node_updates_selected_flow_node_position() {
         .unwrap();
     assert_eq!(join.position, CanvasPoint::new(410.0, 180.0));
 }
+
+#[test]
+fn dispatch_unknown_selection_commands_leave_snapshot_unchanged() {
+    let commands = [
+        AppCommand::SelectWorkspaceRoot {
+            root_id: "missing-root".to_string(),
+        },
+        AppCommand::SelectWorkspace {
+            workspace_id: "missing-workspace".to_string(),
+        },
+        AppCommand::SelectProject {
+            project_id: "missing-project".to_string(),
+        },
+        AppCommand::SelectFlowGroup {
+            group_id: "missing-group".to_string(),
+        },
+        AppCommand::SelectFlow {
+            flow_id: "missing-flow".to_string(),
+        },
+    ];
+
+    for command in commands {
+        let mut state = StudioAppState::new();
+        let before = state.snapshot();
+
+        state.dispatch(command);
+
+        assert_eq!(state.snapshot(), before);
+    }
+}
+
+#[test]
+fn dispatch_move_graph_node_by_offsets_selected_flow_node_position() {
+    let mut state = StudioAppState::new();
+
+    state.dispatch(AppCommand::MoveGraphNodeBy {
+        node_id: "join".to_string(),
+        dx: -10.0,
+        dy: 25.0,
+    });
+
+    let join = state
+        .snapshot()
+        .catalog
+        .flows
+        .into_iter()
+        .find(|flow| flow.id == "customer-analytics")
+        .unwrap()
+        .graph
+        .nodes
+        .into_iter()
+        .find(|node| node.id == "join")
+        .unwrap();
+    assert_eq!(join.position, CanvasPoint::new(1070.0, 280.0));
+}
+
+#[test]
+fn dispatch_move_unknown_graph_node_leaves_snapshot_unchanged() {
+    let mut state = StudioAppState::new();
+    let before = state.snapshot();
+
+    state.dispatch(AppCommand::MoveGraphNode {
+        node_id: "missing-node".to_string(),
+        position: CanvasPoint::new(1.0, 2.0),
+    });
+    state.dispatch(AppCommand::MoveGraphNodeBy {
+        node_id: "missing-node".to_string(),
+        dx: 3.0,
+        dy: 4.0,
+    });
+
+    assert_eq!(state.snapshot(), before);
+}

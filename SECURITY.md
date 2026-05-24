@@ -66,7 +66,15 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Python packaging changes should also smoke-test the native extension build path described in `AGENTS.md`.
+Python packaging changes should also run:
+
+```sh
+just python-test
+just python-smoke
+```
+
+Use `just verify-all` before security-sensitive merges when the local environment
+can build the native Python extension.
 
 ## When To Re-Audit
 

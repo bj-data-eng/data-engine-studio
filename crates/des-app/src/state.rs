@@ -97,6 +97,14 @@ impl StudioAppState {
     }
 
     fn select_workspace_root(&mut self, root_id: String) {
+        if !self
+            .catalog
+            .workspace_roots
+            .iter()
+            .any(|root| root.id == root_id)
+        {
+            return;
+        }
         self.selected_root_id = Some(root_id.clone());
         let workspace_id = self
             .catalog
@@ -109,58 +117,62 @@ impl StudioAppState {
     }
 
     fn select_workspace(&mut self, workspace_id: String) {
-        self.selected_workspace_id = Some(workspace_id.clone());
-        if let Some(workspace) = self
+        let Some(workspace) = self
             .catalog
             .workspaces
             .iter()
             .find(|workspace| workspace.id == workspace_id)
-        {
-            self.selected_root_id = Some(workspace.root_id.clone());
-        }
+        else {
+            return;
+        };
+        self.selected_workspace_id = Some(workspace_id.clone());
+        self.selected_root_id = Some(workspace.root_id.clone());
         self.select_first_project_in_workspace(Some(&workspace_id));
     }
 
     fn select_project(&mut self, project_id: String) {
-        self.selected_project_id = Some(project_id.clone());
-        if let Some(project) = self
+        let Some(project) = self
             .catalog
             .projects
             .iter()
             .find(|project| project.id == project_id)
+        else {
+            return;
+        };
+        self.selected_project_id = Some(project_id.clone());
+        self.selected_workspace_id = Some(project.workspace_id.clone());
+        if let Some(workspace) = self
+            .catalog
+            .workspaces
+            .iter()
+            .find(|workspace| workspace.id == project.workspace_id)
         {
-            self.selected_workspace_id = Some(project.workspace_id.clone());
-            if let Some(workspace) = self
-                .catalog
-                .workspaces
-                .iter()
-                .find(|workspace| workspace.id == project.workspace_id)
-            {
-                self.selected_root_id = Some(workspace.root_id.clone());
-            }
+            self.selected_root_id = Some(workspace.root_id.clone());
         }
         self.select_first_group_in_project(Some(&project_id));
     }
 
     fn select_flow_group(&mut self, group_id: String) {
-        self.selected_group_id = Some(group_id.clone());
-        if let Some(group) = self
+        let Some(group) = self
             .catalog
             .flow_groups
             .iter()
             .find(|group| group.id == group_id)
-        {
-            self.select_project_without_cascade(group.project_id.clone());
-        }
+        else {
+            return;
+        };
+        self.selected_group_id = Some(group_id.clone());
+        self.select_project_without_cascade(group.project_id.clone());
         self.select_first_flow_in_group(Some(&group_id));
     }
 
     fn select_flow(&mut self, flow_id: String) {
+        let Some(flow) = self.catalog.flows.iter().find(|flow| flow.id == flow_id) else {
+            return;
+        };
         self.selected_flow_id = Some(flow_id.clone());
-        if let Some(flow) = self.catalog.flows.iter().find(|flow| flow.id == flow_id) {
-            self.selected_group_id = Some(flow.group_id.clone());
-            self.select_project_without_cascade(flow.project_id.clone());
-        }
+        self.selected_group_id = Some(flow.group_id.clone());
+        self.select_project_without_cascade(flow.project_id.clone());
     }
 
     fn select_first_project_in_workspace(&mut self, workspace_id: Option<&str>) {

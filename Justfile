@@ -39,6 +39,15 @@ ui-debug-windows out='target/ui-shots/studio-debug.png':
 ui-test:
     cargo test -p des-ui-lab ui_lab::tests
 
+python-test:
+    PYTHONPATH=python python3 -m unittest discover -s python/tests -p 'test_*.py'
+
+python-smoke:
+    python3 -m venv .venv
+    .venv/bin/python -m pip install --upgrade pip maturin==1.13.3
+    .venv/bin/python -m maturin develop --manifest-path crates/des-python/Cargo.toml
+    .venv/bin/python -c "from data_engine_studio.native import hello, runtime_info; info = runtime_info(); print(hello()); print(info.name, info.version)"
+
 audit:
     cargo audit
 
@@ -53,3 +62,9 @@ verify:
     cargo fmt --check
     cargo check --workspace
     cargo nextest run --workspace
+
+verify-all:
+    just verify
+    just security
+    just python-test
+    just python-smoke
