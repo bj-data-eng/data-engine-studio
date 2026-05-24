@@ -1,9 +1,10 @@
 use crate::{
-    AlignContent, AlignItems, Color, ContainerQuery, Direction, Display, Easing, Element,
-    ElementStateSelector, FlexDirection, FlexWrap, FloatingAxisOffset, FloatingPlacement,
-    FloatingShift, Insets, JustifyContent, Length, Overflow, OverflowWrap, Point, Position, Shadow,
-    Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform,
-    TextWrapMode, Transition, ViewportQuery, WhiteSpace,
+    AlignContent, AlignItems, Color, ComplexSelector, ComplexSelectorPart, ContainerQuery,
+    Direction, Display, Easing, Element, ElementStateSelector, FlexDirection, FlexWrap,
+    FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
+    OverflowWrap, Point, Position, SelectorCombinator, Shadow, Style, StyleCondition,
+    StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform, TextWrapMode, Transition,
+    ViewportQuery, WhiteSpace,
 };
 use std::error::Error;
 use std::fmt;
@@ -286,11 +287,16 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
     if input.is_empty() {
         return Err(CssParseError::new("CSS selector is empty"));
     }
-    if input.contains('>') || input.contains('+') || input.contains('~') {
+    if input.contains('+') || input.contains('~') {
         return Err(CssParseError::new(
-            "child and sibling combinators are not supported by this CSS slice yet",
+            "sibling combinators are not supported by this CSS slice yet",
         ));
     }
+    if input.contains('>') {
+        let parts = parse_complex_selector(input)?;
+        return Ok(StyleSelector::Complex(ComplexSelector::new(parts)));
+    }
+
     let parts = input.split_whitespace().collect::<Vec<_>>();
     if parts.len() > 1 {
         let selectors = parts
@@ -301,6 +307,96 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
     }
 
     Ok(parse_compound_selector(input)?.selector())
+}
+
+fn parse_complex_selector(input: &str) -> Result<Vec<ComplexSelectorPart>, CssParseError> {
+    let mut parts = Vec::new();
+    let mut cursor = 0;
+    let mut pending_combinator = None;
+
+    while cursor < input.len() {
+        let before_whitespace = cursor;
+        cursor = skip_selector_whitespace(input, cursor);
+        if cursor > before_whitespace && !parts.is_empty() && pending_combinator.is_none() {
+            pending_combinator = Some(SelectorCombinator::Descendant);
+        }
+        if cursor >= input.len() {
+            break;
+        }
+
+        let rest = &input[cursor..];
+        if rest.starts_with('>') {
+            if parts.is_empty() || pending_combinator == Some(SelectorCombinator::Child) {
+                return Err(CssParseError::new(
+                    "CSS child selector is missing a subject",
+                ));
+            }
+            pending_combinator = Some(SelectorCombinator::Child);
+            cursor += 1;
+            continue;
+        }
+
+        let start = cursor;
+        while cursor < input.len() {
+            let ch = input[cursor..]
+                .chars()
+                .next()
+                .expect("cursor is inside selector");
+            if ch.is_whitespace() || ch == '>' {
+                break;
+            }
+            cursor += ch.len_utf8();
+        }
+        if start == cursor {
+            return Err(CssParseError::new(
+                "CSS complex selector is missing a compound selector",
+            ));
+        }
+        let selector = parse_compound_selector(&input[start..cursor])?;
+        let part = if parts.is_empty() {
+            if pending_combinator.is_some() {
+                return Err(CssParseError::new(
+                    "CSS selector cannot start with a combinator",
+                ));
+            }
+            ComplexSelectorPart::root(selector)
+        } else {
+            ComplexSelectorPart::related(
+                pending_combinator
+                    .take()
+                    .unwrap_or(SelectorCombinator::Descendant),
+                selector,
+            )
+        };
+        parts.push(part);
+    }
+
+    if pending_combinator.is_some() {
+        return Err(CssParseError::new(
+            "CSS selector cannot end with a combinator",
+        ));
+    }
+    if parts.len() < 2 {
+        return Err(CssParseError::new(
+            "CSS complex selector must contain at least two compounds",
+        ));
+    }
+
+    Ok(parts)
+}
+
+fn skip_selector_whitespace(input: &str, mut cursor: usize) -> usize {
+    while cursor < input.len() {
+        let ch = input[cursor..]
+            .chars()
+            .next()
+            .expect("cursor is inside selector");
+        if !ch.is_whitespace() {
+            break;
+        }
+        cursor += ch.len_utf8();
+    }
+    cursor
 }
 
 fn parse_compound_selector(input: &str) -> Result<crate::CompoundSelector, CssParseError> {

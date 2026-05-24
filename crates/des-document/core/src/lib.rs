@@ -39,16 +39,17 @@ pub use state::{
     ResolvedFloating, ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
-    Anchor, AnchorPlacement, BorderStyle, CompoundSelector, ComputedStyle, ContainerQuery,
-    CornerStyle, Direction, Display, Easing, EdgeStyle, FloatingArrow, FloatingArrowData,
-    FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary, FloatingFallbackAxisSideDirection,
-    FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHide, FloatingHideData,
-    FloatingHideStrategy, FloatingInline, FloatingOffset, FloatingOptions, FloatingPlacement,
-    FloatingShift, FloatingShiftLimiter, FloatingSize, FloatingVisibility, GridAutoFlow,
-    GridPlacement, GridPlacementLine, GridTemplateArea, GridTemplateComponent,
-    GridTemplateRepetition, GridTrack, MaxTrackSizingFunction, MinTrackSizingFunction,
-    NthChildFormula, RepetitionCount, Shadow, Style, StyleCondition, StyleRule, StyleSelector,
-    StyleSheet, TrackSizingFunction, Transition, ViewportQuery,
+    Anchor, AnchorPlacement, BorderStyle, ComplexSelector, ComplexSelectorPart, CompoundSelector,
+    ComputedStyle, ContainerQuery, CornerStyle, Direction, Display, Easing, EdgeStyle,
+    FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
+    FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
+    FloatingFlipCrossAxis, FloatingHide, FloatingHideData, FloatingHideStrategy, FloatingInline,
+    FloatingOffset, FloatingOptions, FloatingPlacement, FloatingShift, FloatingShiftLimiter,
+    FloatingSize, FloatingVisibility, GridAutoFlow, GridPlacement, GridPlacementLine,
+    GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack,
+    MaxTrackSizingFunction, MinTrackSizingFunction, NthChildFormula, RepetitionCount,
+    SelectorCombinator, Shadow, Style, StyleCondition, StyleRule, StyleSelector, StyleSheet,
+    TrackSizingFunction, Transition, ViewportQuery,
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{

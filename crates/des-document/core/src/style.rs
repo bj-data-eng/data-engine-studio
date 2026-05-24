@@ -45,6 +45,7 @@ pub enum StyleSelector {
     IdState(ElementId, ElementStateSelector),
     Compound(CompoundSelector),
     Descendant(Vec<CompoundSelector>),
+    Complex(ComplexSelector),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -286,6 +287,23 @@ pub struct CompoundSelector {
     pub(crate) child_position: Option<ChildPositionSelector>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectorCombinator {
+    Descendant,
+    Child,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComplexSelector {
+    pub(crate) parts: Vec<ComplexSelectorPart>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComplexSelectorPart {
+    pub(crate) combinator: Option<SelectorCombinator>,
+    pub(crate) selector: CompoundSelector,
+}
+
 impl StyleSelector {
     pub fn element(element: Element) -> Self {
         Self::Element(element)
@@ -333,6 +351,28 @@ impl StyleSelector {
 
     pub fn compound() -> CompoundSelector {
         CompoundSelector::default()
+    }
+}
+
+impl ComplexSelector {
+    pub(crate) fn new(parts: Vec<ComplexSelectorPart>) -> Self {
+        Self { parts }
+    }
+}
+
+impl ComplexSelectorPart {
+    pub(crate) fn root(selector: CompoundSelector) -> Self {
+        Self {
+            combinator: None,
+            selector,
+        }
+    }
+
+    pub(crate) fn related(combinator: SelectorCombinator, selector: CompoundSelector) -> Self {
+        Self {
+            combinator: Some(combinator),
+            selector,
+        }
     }
 }
 
@@ -2205,6 +2245,11 @@ fn primary_selector_key(selector: &StyleSelector) -> SelectorIndexKey {
             .last()
             .map(primary_compound_selector_key)
             .unwrap_or(SelectorIndexKey::Universal),
+        StyleSelector::Complex(selector) => selector
+            .parts
+            .last()
+            .map(|part| primary_compound_selector_key(&part.selector))
+            .unwrap_or(SelectorIndexKey::Universal),
         StyleSelector::State(_)
         | StyleSelector::FirstChild
         | StyleSelector::LastChild
@@ -2368,6 +2413,9 @@ fn selector_matches(
         StyleSelector::Descendant(selectors) => {
             descendant_selector_matches(selectors, element, state, position, ancestors)
         }
+        StyleSelector::Complex(selector) => {
+            complex_selector_matches(selector, element, state, position, ancestors)
+        }
     }
 }
 
@@ -2459,6 +2507,60 @@ fn descendant_selector_matches(
     }
 
     next_ancestor == 0
+}
+
+fn complex_selector_matches(
+    selector: &ComplexSelector,
+    element: &DocumentNode,
+    state: Option<&ElementState>,
+    position: Option<ChildPosition>,
+    ancestors: &[StyleMatchContext<'_>],
+) -> bool {
+    let Some(target) = selector.parts.last() else {
+        return false;
+    };
+    if !compound_selector_matches(&target.selector, element, state, position) {
+        return false;
+    }
+
+    let mut ancestor_end = ancestors.len();
+    for index in (1..selector.parts.len()).rev() {
+        let previous = &selector.parts[index - 1].selector;
+        match selector.parts[index].combinator {
+            Some(SelectorCombinator::Child) => {
+                let Some(parent_index) = ancestor_end.checked_sub(1) else {
+                    return false;
+                };
+                let parent = &ancestors[parent_index];
+                if !compound_selector_matches(
+                    previous,
+                    parent.element,
+                    parent.state,
+                    parent.position,
+                ) {
+                    return false;
+                }
+                ancestor_end = parent_index;
+            }
+            Some(SelectorCombinator::Descendant) => {
+                let Some(found_index) = (0..ancestor_end).rev().find(|index| {
+                    let ancestor = &ancestors[*index];
+                    compound_selector_matches(
+                        previous,
+                        ancestor.element,
+                        ancestor.state,
+                        ancestor.position,
+                    )
+                }) else {
+                    return false;
+                };
+                ancestor_end = found_index;
+            }
+            None => return false,
+        }
+    }
+
+    true
 }
 
 fn child_position_selector_matches(

@@ -687,6 +687,71 @@ fn css_stylesheet_parser_resolves_descendant_selectors() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_child_combinators() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+    document
+        .append_text(
+            "panel",
+            "direct-title",
+            ElementSpec::new(Element::Text).class("title"),
+            "Direct title",
+        )
+        .unwrap();
+    document
+        .append_element(
+            "panel",
+            "nested-wrap",
+            ElementSpec::new(Element::Div).class("wrap"),
+        )
+        .unwrap();
+    document
+        .append_text(
+            "nested-wrap",
+            "nested-title",
+            ElementSpec::new(Element::Text).class("title"),
+            "Nested title",
+        )
+        .unwrap();
+
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        .panel > text.title {
+            width: 220px;
+        }
+
+        .panel > .wrap text.title {
+            height: 32px;
+        }
+        "#,
+    )
+    .unwrap();
+
+    document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+
+    assert_eq!(
+        document.layout_style("direct-title").unwrap().size.width,
+        length::<_, Dimension>(220.0)
+    );
+    assert_eq!(
+        document.layout_style("nested-title").unwrap().size.width,
+        Dimension::auto()
+    );
+    assert_eq!(
+        document.layout_style("nested-title").unwrap().size.height,
+        length::<_, Dimension>(32.0)
+    );
+}
+
+#[test]
 fn css_stylesheet_parser_accepts_box_shadow_none() {
     let stylesheet = StyleSheet::parse_css(".panel { box-shadow: none; }").unwrap();
     let mut document = Document::new(Size::new(800.0, 600.0));
