@@ -349,6 +349,7 @@ pub struct TextLayoutResult {
     pub size: Size,
     pub line_count: usize,
     pub elided: bool,
+    pub first_baseline: Option<f32>,
     pub lines: Vec<TextLayoutLine>,
 }
 
@@ -358,6 +359,7 @@ impl TextLayoutResult {
             size,
             line_count,
             elided,
+            first_baseline: None,
             lines: Vec::new(),
         }
     }
@@ -372,6 +374,7 @@ pub struct TextLayoutLine {
     pub x_offset: f32,
     pub width: f32,
     pub height: f32,
+    pub baseline: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -549,17 +552,19 @@ fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
         .fold(0.0, f32::max);
     let elided = lines.len() > visible_lines;
 
-    let visible_layout_lines = lines
+    let visible_layout_lines: Vec<_> = lines
         .iter()
         .take(visible_lines)
         .map(|line| {
             line.to_text_layout_line(
                 request.text,
                 line_height,
+                fallback_baseline_for_line(line, line_height),
                 fallback_line_x_offset(request.layout_style.text_align, max_width, line.width),
             )
         })
         .collect();
+    let first_baseline = visible_layout_lines.first().map(|line| line.baseline);
     TextLayoutResult {
         size: Size::new(
             max_line_width.min(max_width),
@@ -567,6 +572,7 @@ fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
         ),
         line_count: visible_lines,
         elided,
+        first_baseline,
         lines: visible_layout_lines,
     }
 }
@@ -720,6 +726,7 @@ impl FallbackLayoutLine {
         &self,
         text: &NormalizedText,
         height: f32,
+        baseline: f32,
         x_offset: f32,
     ) -> TextLayoutLine {
         let layout_start = self.chars.first().map_or(0, |ch| ch.layout_index);
@@ -735,8 +742,15 @@ impl FallbackLayoutLine {
             x_offset,
             width: self.width,
             height,
+            baseline,
         }
     }
+}
+
+fn fallback_baseline_for_line(line: &FallbackLayoutLine, line_height: f32) -> f32 {
+    let max_font_size = line.chars.iter().map(|ch| ch.font_size).fold(0.0, f32::max);
+    let font_baseline = max_font_size * 0.8;
+    font_baseline.clamp(0.0, line_height)
 }
 
 fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayoutChar>> {
@@ -1059,6 +1073,9 @@ mod tests {
         assert_eq!(measured.lines[0].layout_start, 0);
         assert_eq!(measured.lines[0].semantic_start, 0);
         assert!(measured.lines[0].layout_end <= normalized.layout_text().chars().count());
+        assert_eq!(measured.first_baseline, Some(measured.lines[0].baseline));
+        assert!(measured.lines[0].baseline > 0.0);
+        assert!(measured.lines[0].baseline <= measured.lines[0].height);
     }
 
     #[test]
@@ -1127,6 +1144,41 @@ mod tests {
 
         assert_eq!(measured.lines.len(), 1);
         assert!(measured.lines[0].x_offset > 0.0);
+    }
+
+    #[test]
+    fn fallback_line_baseline_tracks_largest_inline_font_on_line() {
+        let plain = TextContent::plain("AA");
+        let rich = TextContent::new(vec![TextRun::styled(
+            "AA",
+            InlineTextStyle {
+                font_size: Some(26.0),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized_plain = NormalizedText::from_content(&plain, TextLayoutStyle::default());
+        let normalized_rich = NormalizedText::from_content(&rich, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let plain = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_plain,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+        let rich = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_rich,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+
+        assert!(rich.lines[0].baseline > plain.lines[0].baseline);
+        assert_eq!(rich.first_baseline, Some(rich.lines[0].baseline));
     }
 
     #[test]

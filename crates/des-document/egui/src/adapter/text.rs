@@ -33,6 +33,7 @@ impl TextMeasurer for EguiTextMeasurer {
             size: Size::new(size.x, size.y),
             line_count: galley.rows.len(),
             elided: galley.elided,
+            first_baseline: lines.first().map(|line| line.baseline),
             lines,
         }
     }
@@ -63,11 +64,20 @@ fn galley_lines(request: &TextLayoutRequest<'_>, galley: &egui::Galley) -> Vec<T
                 x_offset: row.pos.x,
                 width: row.size.x,
                 height: row.size.y,
+                baseline: row_baseline(row),
             };
             layout_start = layout_end;
             line
         })
         .collect()
+}
+
+fn row_baseline(row: &egui::epaint::text::PlacedRow) -> f32 {
+    row.glyphs
+        .iter()
+        .map(|glyph| glyph.pos.y)
+        .fold(0.0, f32::max)
+        .clamp(0.0, row.size.y)
 }
 pub fn configure_text_selection_input(context: &egui::Context) {
     context.options_mut(|options| {
