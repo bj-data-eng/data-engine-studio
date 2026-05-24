@@ -3,7 +3,7 @@ mod styles;
 mod tests;
 mod views;
 
-use des_ui_egui::adapter::{
+use des_egui::adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
     document_input, paint_frame, paint_scroll_chrome,
 };
@@ -18,7 +18,7 @@ use des_document::{
     Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
     TableColumnSpec, TableSpec, TableTrackSize, VisualCloneOptions, VisualElementClone,
 };
-use des_ui_widgets::{
+use des_widgets::{
     AutoScrollOptions, AutoScroller, ContextMenu, DropZoneId, SortableDocumentConfig,
     SortableDropPreview, SortableItemId, SortableModel,
 };

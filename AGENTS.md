@@ -29,8 +29,8 @@ Craft standard:
 - `crates/des-core`: tiny shared primitives, identity, diagnostics, errors.
 - `crates/des-app`: app state, commands, snapshots, orchestration.
 - `crates/des-document`: egui-free document tree, style model, layout, input, retained state.
-- `crates/des-ui-widgets`: egui-free reusable widget behavior over document contracts.
-- `crates/des-ui-egui`: egui adapter for document input, painting, text measurement, and host defaults.
+- `crates/des-widgets`: egui-free reusable widget behavior over document contracts.
+- `crates/des-egui`: egui adapter for document input, painting, text measurement, and host defaults.
 - `crates/des-ui-lab`: UI lab app, dev/screenshot binaries, lab styles, and lab regression tests.
 - `crates/des-graph-egui`: vendored graph interaction crate while graph UX is explored.
 - `crates/des-python` and `python/data_engine_studio`: thin Python launcher/native wrapper.
@@ -42,9 +42,9 @@ Add crates only for real API boundaries, not architecture theater.
 
 - Export intentional front-door APIs from `lib.rs`; keep internals private by default.
 - Prefer typed commands, events, snapshots, reports, and change sets over shared mutable state.
-- Domain/project/runtime/query/validation logic must not depend on `des-ui-egui` or Python.
-- `des-document` and `des-ui-widgets` must not depend on `egui` or Python.
-- `des-ui-egui` should translate egui input/output, measure text, and paint document snapshots. Keep business logic out.
+- Domain/project/runtime/query/validation logic must not depend on `des-egui` or Python.
+- `des-document` and `des-widgets` must not depend on `egui` or Python.
+- `des-egui` should translate egui input/output, measure text, and paint document snapshots. Keep business logic out.
 - `des-python` stays thin: launch/runtime diagnostics only.
 - If a small change touches many crates, revisit the boundary before continuing.
 
@@ -52,7 +52,7 @@ Dependency direction:
 
 ```text
 python -> des-python -> des-ui-lab -> des-app -> domain/service crates -> des-core
-                          \-> des-ui-egui -> des-ui-widgets -> des-document
+                          \-> des-egui -> des-widgets -> des-document
 ```
 
 ## UI Toolkit Rules
@@ -60,8 +60,8 @@ python -> des-python -> des-ui-lab -> des-app -> domain/service crates -> des-co
 - The UI can drive discovery, but must not absorb architecture.
 - Add product behavior through `des-app` commands/snapshots first or alongside UI work.
 - Add low-level layout, z-order, hover, press, focus, scroll, clipping, routing, and retained state to `des-document` when reusable.
-- Add reusable widget behavior to `des-ui-widgets`.
-- Keep `des-ui-egui` adapter-focused; put exploratory app surfaces and proving-ground views in `des-ui-lab` until promoted into app crates.
+- Add reusable widget behavior to `des-widgets`.
+- Keep `des-egui` adapter-focused; put exploratory app surfaces and proving-ground views in `des-ui-lab` until promoted into app crates.
 - The UI lab is the proving ground for layout, styling, input, graph/canvas, table, editor, markdown, and widgets before app promotion.
 - Avoid throwaway GUI framework spikes in the main tree. Remove short-lived spikes once a direction is chosen.
 

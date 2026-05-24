@@ -1,6 +1,6 @@
 //! Reusable document-backed widgets and interaction policies.
 //!
-//! `des-ui-widgets` builds higher-level UI behavior on top of
+//! `des-widgets` builds higher-level UI behavior on top of
 //! `des-document` without depending on a rendering host such as egui.
 
 mod auto_scroll;

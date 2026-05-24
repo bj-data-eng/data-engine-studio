@@ -8,7 +8,7 @@ use des_document::{
     PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
     TextWrapMode,
 };
-use des_ui_egui::adapter::EguiTextMeasurer;
+use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
 
 const INTERACTION_LOOP_SCROLL_Y: f32 = 300.0;
@@ -1659,7 +1659,7 @@ fn draggable_scroll_list_preview_margin_updates_scrollbar_range() {
     state.scroll_list_drop_preview = Some(SortableDropPreview {
         zone: DropZoneId(0),
         nearest_item: Some(SortableItemId(3)),
-        edge: des_ui_widgets::DropEdge::After,
+        edge: des_widgets::DropEdge::After,
     });
     let preview_output = state_output(&state);
     let preview_scroll = preview_output

@@ -3,7 +3,7 @@ use des_document::{
     AlignItems, Color, ElementStateSelector, Insets, JustifyContent, Length, Overflow, Point,
     Shadow, Style, StyleSelector, StyleSheet, Transition,
 };
-use des_ui_widgets::{
+use des_widgets::{
     CONTEXT_MENU_CLASS, CONTEXT_MENU_ITEM_CLASS, CONTEXT_MENU_LABEL_CLASS,
     CONTEXT_MENU_SEPARATOR_CLASS, context_menu_surface_style,
 };

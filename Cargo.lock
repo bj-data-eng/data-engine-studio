@@ -727,6 +727,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-egui"
+version = "0.1.0"
+dependencies = [
+ "des-core",
+ "des-document",
+ "eframe",
+ "egui",
+ "iconflow",
+]
+
+[[package]]
 name = "des-graph-egui"
 version = "0.1.0"
 dependencies = [
@@ -764,26 +775,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "des-ui-egui"
-version = "0.1.0"
-dependencies = [
- "des-core",
- "des-document",
- "eframe",
- "egui",
- "iconflow",
-]
-
-[[package]]
 name = "des-ui-lab"
 version = "0.1.0"
 dependencies = [
  "des-app",
  "des-core",
  "des-document",
+ "des-egui",
  "des-graph-egui",
- "des-ui-egui",
- "des-ui-widgets",
+ "des-widgets",
  "eframe",
  "egui",
  "egui_kittest",
@@ -792,7 +792,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "des-ui-widgets"
+name = "des-widgets"
 version = "0.1.0"
 dependencies = [
  "des-document",

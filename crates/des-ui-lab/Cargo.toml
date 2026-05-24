@@ -6,15 +6,15 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-ui-screenshot = ["des-ui-egui/ui-screenshot", "eframe/__screenshot", "eframe/glow"]
+ui-screenshot = ["des-egui/ui-screenshot", "eframe/__screenshot", "eframe/glow"]
 
 [dependencies]
 des-app.workspace = true
 des-core.workspace = true
 des-graph-egui.workspace = true
 des-document.workspace = true
-des-ui-egui.workspace = true
-des-ui-widgets.workspace = true
+des-egui.workspace = true
+des-widgets.workspace = true
 eframe.workspace = true
 egui.workspace = true
 iconflow = { workspace = true, features = ["pack-lucide"] }

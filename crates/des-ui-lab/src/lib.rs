@@ -48,7 +48,7 @@ pub fn run_native(options: NativeLaunchOptions) -> StudioResult<()> {
         &native_options.title,
         native_options.options,
         Box::new(|creation_context| {
-            des_ui_egui::apply_default_host_configuration(&creation_context.egui_ctx);
+            des_egui::apply_default_host_configuration(&creation_context.egui_ctx);
             Ok(Box::new(app::StudioLabApp::new(app_options)))
         }),
     )

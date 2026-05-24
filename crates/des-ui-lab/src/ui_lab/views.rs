@@ -102,11 +102,11 @@ pub(super) fn render_stage(
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
     pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_ui_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_drag_item: Option<des_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
     drag_pointer: Option<des_document::Point>,
-    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
 ) {
@@ -666,11 +666,11 @@ fn render_draggable_view(
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
     pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_ui_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_drag_item: Option<des_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
     drag_pointer: Option<des_document::Point>,
-    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
 ) {
     ui.child("draggable-heading", Element::Text)
         .class("heading")
@@ -796,11 +796,11 @@ fn render_drag_drop_lab(
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
     pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_ui_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
+    active_drag_item: Option<des_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
     _drag_pointer: Option<des_document::Point>,
-    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
 ) {
     ui.child("drag-title", Element::Text)
         .class("section-title")
@@ -835,7 +835,7 @@ fn render_drag_drop_lab(
                                 .collect();
                             cell_items.sort_by_key(|item| drag_item_order[*item]);
                             for item in cell_items {
-                                if active_drag_item == Some(des_ui_widgets::SortableItemId(item)) {
+                                if active_drag_item == Some(des_widgets::SortableItemId(item)) {
                                     drag_item(
                                         ui,
                                         item,
@@ -863,8 +863,8 @@ fn render_elevated_scrollable_drag_list(
     ui: &mut des_document::DocumentBuilder,
     title: &'static str,
     scroll_list_item_order: [usize; 14],
-    active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
+    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
     pressed_drag_source: Option<&str>,
 ) {
     ui.div("drag-scroll-list-card")
@@ -884,7 +884,7 @@ fn render_elevated_scrollable_drag_list(
                             item,
                             scroll_list_drop_preview,
                             active_scroll_list_drag_item
-                                == Some(des_ui_widgets::SortableItemId(item)),
+                                == Some(des_widgets::SortableItemId(item)),
                             pressed_drag_source,
                         );
                     }
@@ -1022,7 +1022,7 @@ fn format_duration(duration: std::time::Duration) -> String {
 fn drag_scroll_item(
     ui: &mut des_document::DocumentBuilder,
     item: usize,
-    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
     origin_space: bool,
     pressed_drag_source: Option<&str>,
 ) {
@@ -1042,11 +1042,11 @@ fn drag_scroll_item(
         }
     }
     if let Some(preview) = drag_drop_preview
-        && preview.nearest_item == Some(des_ui_widgets::SortableItemId(item))
+        && preview.nearest_item == Some(des_widgets::SortableItemId(item))
     {
         item_builder = item_builder.class(match preview.edge {
-            des_ui_widgets::DropEdge::Before => "drag-gap-before",
-            des_ui_widgets::DropEdge::After => "drag-gap-after",
+            des_widgets::DropEdge::Before => "drag-gap-before",
+            des_widgets::DropEdge::After => "drag-gap-after",
         });
     }
     item_builder.children(|ui| {
@@ -1085,7 +1085,7 @@ fn drag_scroll_handle(ui: &mut des_document::DocumentBuilder, item: usize, origi
 fn drag_item(
     ui: &mut des_document::DocumentBuilder,
     item: usize,
-    drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
+    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
     origin_space: bool,
     pressed_drag_source: Option<&str>,
 ) {
@@ -1104,11 +1104,11 @@ fn drag_item(
         }
     }
     if let Some(preview) = drag_drop_preview
-        && preview.nearest_item == Some(des_ui_widgets::SortableItemId(item))
+        && preview.nearest_item == Some(des_widgets::SortableItemId(item))
     {
         item_builder = item_builder.class(match preview.edge {
-            des_ui_widgets::DropEdge::Before => "drag-gap-before",
-            des_ui_widgets::DropEdge::After => "drag-gap-after",
+            des_widgets::DropEdge::Before => "drag-gap-before",
+            des_widgets::DropEdge::After => "drag-gap-after",
         });
     }
     item_builder.children(|ui| {
