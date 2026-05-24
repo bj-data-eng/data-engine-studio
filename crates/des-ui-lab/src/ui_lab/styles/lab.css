@@ -1817,3 +1817,141 @@ text {
 #floating-edge-flip-reference {
   margin: 132px 0px 0px 118px;
 }
+
+.nest-outer {
+  width: 650px;
+  height: 430px;
+  padding: 28px;
+  gap: 16px;
+  background: #f3edf7;
+  border: 1px solid #cac4d0;
+  border-radius: 8px;
+}
+
+.nest-middle {
+  width: 500px;
+  height: 270px;
+  padding: 24px;
+  gap: 14px;
+  background: #eaddff;
+  border: 1px solid #6750a4;
+  border-radius: 7px;
+}
+
+.nest-inner {
+  width: 360px;
+  height: 130px;
+  padding: 18px;
+  gap: 6px;
+  background: #e8def8;
+  border: 1px solid #6750a4;
+  border-radius: 7px;
+}
+
+.nest-inner:hover {
+  background: #e8def8;
+  border-color: #6750a4;
+}
+
+.canvas-placeholder {
+  width: 720px;
+  height: 360px;
+  padding: 18px;
+  gap: 8px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 7px;
+}
+
+.debug-overlay-root {
+  width: 1320px;
+  height: 780px;
+  background: transparent;
+}
+
+.debug-overlay {
+  position: fixed;
+  left: 1042px;
+  top: 12px;
+  width: 264px;
+  height: auto;
+  padding: 10px 12px;
+  gap: 5px;
+  background: #fffbfee8;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+  box-shadow: 0px 4px 10px 0px #0000003a;
+  z-index: 2000;
+}
+
+.debug-overlay-title {
+  height: 18px;
+  font-size: 14px;
+  color: #1d1b20;
+}
+
+.debug-row {
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+}
+
+.debug-label {
+  height: 16px;
+  font-size: 12px;
+  color: #625b71;
+}
+
+.debug-value {
+  height: 16px;
+  font-size: 12px;
+  color: #1d1b20;
+}
+
+.title {
+  font-size: 21px;
+  color: #1d1b20;
+}
+
+.heading {
+  font-size: 24px;
+  color: #1d1b20;
+}
+
+.section-title {
+  width: 100%;
+  height: auto;
+  font-size: 13px;
+  color: #6750a4;
+  text-wrap: wrap;
+}
+
+.card-title {
+  width: 100%;
+  height: auto;
+  font-size: 16px;
+  line-height: 18px;
+  color: #1d1b20;
+  text-wrap: wrap;
+}
+
+.muted {
+  font-size: 12.5px;
+  color: #625b71;
+}
+
+#interaction-card-two:hover {
+  border-color: #006a50;
+  transition: all 0.24s ease-out;
+}
+
+#interaction-card-three {
+  transition: all 0.06s ease-out;
+}
+
+#interaction-card-three:pressed {
+  background: #e8def8;
+  border-color: #6750a4;
+}

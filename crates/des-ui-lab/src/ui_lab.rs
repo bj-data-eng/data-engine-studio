@@ -37,11 +37,13 @@ const STROKE: Color = Color::rgb(202, 196, 208);
 const STROKE_SELECTED: Color = Color::rgb(103, 80, 164);
 const TEXT: Color = Color::rgb(29, 27, 32);
 const TEXT_MUTED: Color = Color::rgb(98, 91, 113);
-const TEXT_ACCENT: Color = Color::rgb(103, 80, 164);
-const GREEN: Color = Color::rgb(0, 106, 80);
+#[cfg(test)]
 const PURPLE: Color = Color::rgb(103, 80, 164);
+#[cfg(test)]
 const SURFACE_CONTAINER: Color = Color::rgb(243, 237, 247);
+#[cfg(test)]
 const PRIMARY_CONTAINER: Color = Color::rgb(234, 221, 255);
+#[cfg(test)]
 const SECONDARY_CONTAINER: Color = Color::rgb(232, 222, 248);
 #[cfg(test)]
 const SUCCESS_CONTAINER: Color = Color::rgb(205, 239, 221);

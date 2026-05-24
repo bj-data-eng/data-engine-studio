@@ -1,13 +1,9 @@
 mod framework;
 
-use super::{
-    GREEN, PANEL, PRIMARY_CONTAINER, PURPLE, SECONDARY_CONTAINER, SHADOW_COLOR, STROKE,
-    STROKE_SELECTED, SURFACE_CONTAINER, TEXT, TEXT_ACCENT, TEXT_MUTED,
-};
+use super::{PANEL, STROKE_SELECTED};
 use des_document::{
-    Color, ElementStateSelector, FlexDirection, FloatingAxisOffset, FloatingPlacement,
-    FloatingShift, Insets, JustifyContent, Length, Point, Shadow, Style, StyleSelector, StyleSheet,
-    TextWrapMode, Transition, ViewportQuery,
+    Color, FlexDirection, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, Length,
+    Style, StyleSelector, StyleSheet, Transition, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -184,151 +180,6 @@ fn lab_stylesheet() -> StyleSheet {
             .floating_boundary_to("floating-edge-flip-panel")
             .floating_flip(true),
     );
-    stylesheet.push_rule(
-        StyleSelector::class("nest-outer"),
-        Style::default()
-            .size(650.0, 430.0)
-            .padding(Insets::all(28.0))
-            .gap(16.0)
-            .background(SURFACE_CONTAINER)
-            .border(STROKE)
-            .radius(8.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("nest-middle"),
-        Style::default()
-            .size(500.0, 270.0)
-            .padding(Insets::all(24.0))
-            .gap(14.0)
-            .background(PRIMARY_CONTAINER)
-            .border(STROKE_SELECTED)
-            .radius(7.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("nest-inner"),
-        Style::default()
-            .size(360.0, 130.0)
-            .padding(Insets::all(18.0))
-            .gap(6.0)
-            .background(SECONDARY_CONTAINER)
-            .border(PURPLE)
-            .radius(7.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("nest-inner", ElementStateSelector::Hovered),
-        Style::default()
-            .background(SECONDARY_CONTAINER)
-            .border(TEXT_ACCENT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("canvas-placeholder"),
-        Style::default()
-            .size(720.0, 360.0)
-            .padding(Insets::all(18.0))
-            .gap(8.0)
-            .background(PANEL)
-            .border(STROKE)
-            .radius(7.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("debug-overlay-root"),
-        Style::default()
-            .size(1320.0, 780.0)
-            .background(Color::rgba(0, 0, 0, 0)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("debug-overlay"),
-        Style::default()
-            .absolute_viewport()
-            .left(Length::Px(1042.0))
-            .top(Length::Px(12.0))
-            .width(Length::Px(264.0))
-            .height(Length::Auto)
-            .padding(Insets::symmetric(12.0, 10.0))
-            .gap(5.0)
-            .background(Color::rgba(255, 251, 254, 232))
-            .border(STROKE)
-            .radius(6.0)
-            .z_index(2000)
-            .shadows(web_elevation(1, SHADOW_COLOR)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("debug-overlay-title"),
-        Style::default()
-            .font_size(14.0)
-            .text_color(TEXT)
-            .height(Length::Px(18.0)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("debug-row"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .justify_content(JustifyContent::SpaceBetween)
-            .width_fill()
-            .height(Length::Px(18.0))
-            .background(Color::rgba(0, 0, 0, 0)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("debug-label"),
-        Style::default()
-            .font_size(12.0)
-            .text_color(TEXT_MUTED)
-            .height(Length::Px(16.0)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("debug-value"),
-        Style::default()
-            .font_size(12.0)
-            .text_color(TEXT)
-            .height(Length::Px(16.0)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("title"),
-        Style::default().font_size(21.0).text_color(TEXT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("heading"),
-        Style::default().font_size(24.0).text_color(TEXT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("section-title"),
-        Style::default()
-            .width_fill()
-            .height(Length::Auto)
-            .font_size(13.0)
-            .text_wrap_mode(TextWrapMode::Wrap)
-            .text_color(TEXT_ACCENT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("card-title"),
-        Style::default()
-            .width_fill()
-            .height(Length::Auto)
-            .font_size(16.0)
-            .line_height(18.0)
-            .text_wrap_mode(TextWrapMode::Wrap)
-            .text_color(TEXT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("muted"),
-        Style::default().font_size(12.5).text_color(TEXT_MUTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::id_state("interaction-card-two", ElementStateSelector::Hovered),
-        Style::default()
-            .border(GREEN)
-            .transition(Transition::ease_out(0.24)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::id("interaction-card-three"),
-        Style::default().transition(Transition::ease_out(0.06)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::id_state("interaction-card-three", ElementStateSelector::Pressed),
-        Style::default()
-            .background(SECONDARY_CONTAINER)
-            .border(PURPLE),
-    );
     stylesheet
 }
 
@@ -373,28 +224,4 @@ fn styled_scrollbar_style() -> Style {
         .scrollbar_pressed_handle_border_width(1.0)
         .scrollbar_radius(6.0)
         .transition(Transition::ease_out(0.14))
-}
-
-fn web_elevation(level: u8, color: Color) -> Vec<Shadow> {
-    match level.min(5) {
-        0 => Vec::new(),
-        1 => single_shadow(color, 0.0, 4.0, 10.0, 0.0, 58),
-        2 => single_shadow(color, 0.0, 8.0, 18.0, 0.0, 66),
-        3 => single_shadow(color, 0.0, 12.0, 28.0, 0.0, 74),
-        4 => single_shadow(color, 0.0, 16.0, 36.0, 0.0, 82),
-        _ => single_shadow(color, 0.0, 20.0, 44.0, 0.0, 90),
-    }
-}
-
-fn single_shadow(color: Color, x: f32, y: f32, blur: f32, spread: f32, alpha: u8) -> Vec<Shadow> {
-    vec![Shadow {
-        offset: Point::new(x, y),
-        blur,
-        spread,
-        color: with_alpha(color, alpha),
-    }]
-}
-
-fn with_alpha(color: Color, alpha: u8) -> Color {
-    Color { a: alpha, ..color }
 }
