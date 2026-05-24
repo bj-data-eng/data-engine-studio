@@ -9,7 +9,7 @@ use crate::geometry::{
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
 use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
-    ChildPosition, ComputedStyle, StyleSheet, classify_computed_style_change,
+    ChildPosition, ComputedStyle, StyleMatchContext, StyleSheet, classify_computed_style_change,
     resolve_style_with_position,
 };
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
@@ -462,19 +462,32 @@ impl Document {
         resolve_container_queries: bool,
     ) -> DocumentResult<StyleResolutionReport> {
         let mut positions = Vec::new();
-        self.collect_positions(self.root.clone(), None, &mut positions)?;
+        self.collect_positions(self.root.clone(), None, &mut Vec::new(), &mut positions)?;
         let mut report = StyleResolutionReport {
             visited: positions.len(),
             ..Default::default()
         };
 
-        for (id, position) in positions {
+        for (id, position, ancestor_ids) in positions {
             let element = self.snapshot_element(&id)?;
+            let ancestors = ancestor_ids
+                .iter()
+                .map(|(id, position)| self.snapshot_element(id).map(|node| (node, *position)))
+                .collect::<DocumentResult<Vec<_>>>()?;
+            let ancestor_contexts = ancestors
+                .iter()
+                .map(|(element, position)| StyleMatchContext {
+                    element,
+                    state: states.get(&element.id),
+                    position: *position,
+                })
+                .collect::<Vec<_>>();
             let computed = resolve_style_with_position(
                 &element,
                 stylesheet,
                 states.get(&id),
                 position,
+                &ancestor_contexts,
                 self.viewport,
                 if resolve_container_queries {
                     self.parent_container_size(&id)?
@@ -932,19 +945,31 @@ impl Document {
         &self,
         id: ElementId,
         position: Option<ChildPosition>,
-        positions: &mut Vec<(ElementId, Option<ChildPosition>)>,
+        ancestors: &mut Vec<(ElementId, Option<ChildPosition>)>,
+        positions: &mut Vec<(
+            ElementId,
+            Option<ChildPosition>,
+            Vec<(ElementId, Option<ChildPosition>)>,
+        )>,
     ) -> DocumentResult<()> {
-        positions.push((id.clone(), position));
+        positions.push((id.clone(), position, ancestors.clone()));
 
         let children = self.children(id)?;
         let sibling_count = children.len();
+        let current = positions
+            .last()
+            .map(|(id, position, _)| (id.clone(), *position))
+            .expect("current style position was just recorded");
+        ancestors.push(current);
         for (index, child) in children.into_iter().enumerate() {
             self.collect_positions(
                 child,
                 Some(ChildPosition::new(index, sibling_count)),
+                ancestors,
                 positions,
             )?;
         }
+        ancestors.pop();
 
         Ok(())
     }

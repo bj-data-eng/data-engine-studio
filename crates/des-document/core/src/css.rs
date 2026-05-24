@@ -216,6 +216,24 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
     if input.is_empty() {
         return Err(CssParseError::new("CSS selector is empty"));
     }
+    if input.contains('>') || input.contains('+') || input.contains('~') {
+        return Err(CssParseError::new(
+            "child and sibling combinators are not supported by this CSS slice yet",
+        ));
+    }
+    let parts = input.split_whitespace().collect::<Vec<_>>();
+    if parts.len() > 1 {
+        let selectors = parts
+            .into_iter()
+            .map(parse_compound_selector)
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(StyleSelector::Descendant(selectors));
+    }
+
+    Ok(parse_compound_selector(input)?.selector())
+}
+
+fn parse_compound_selector(input: &str) -> Result<crate::CompoundSelector, CssParseError> {
     let mut selector = StyleSelector::compound();
     let mut cursor = 0;
     let chars: Vec<char> = input.chars().collect();
@@ -284,9 +302,7 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
                 }
             }
             ch if ch.is_whitespace() => {
-                return Err(CssParseError::new(
-                    "descendant selectors are not supported by this CSS slice yet",
-                ));
+                return Err(CssParseError::new("compound CSS selector has whitespace"));
             }
             _ => {
                 return Err(CssParseError::new(format!(
@@ -297,7 +313,7 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
         }
     }
 
-    Ok(selector.selector())
+    Ok(selector)
 }
 
 enum ParsedPseudo {

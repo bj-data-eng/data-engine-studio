@@ -44,6 +44,7 @@ pub enum StyleSelector {
     ClassState(ClassName, ElementStateSelector),
     IdState(ElementId, ElementStateSelector),
     Compound(CompoundSelector),
+    Descendant(Vec<CompoundSelector>),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -391,6 +392,13 @@ impl CompoundSelector {
     pub fn selector(self) -> StyleSelector {
         StyleSelector::Compound(self)
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StyleMatchContext<'a> {
+    pub element: &'a DocumentNode,
+    pub state: Option<&'a ElementState>,
+    pub position: Option<ChildPosition>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2192,17 +2200,11 @@ fn primary_selector_key(selector: &StyleSelector) -> SelectorIndexKey {
         StyleSelector::Id(id) => SelectorIndexKey::Id(id.clone()),
         StyleSelector::ClassState(class, _) => SelectorIndexKey::Class(class.clone()),
         StyleSelector::IdState(id, _) => SelectorIndexKey::Id(id.clone()),
-        StyleSelector::Compound(selector) => {
-            if let Some(id) = &selector.id {
-                SelectorIndexKey::Id(id.clone())
-            } else if let Some(class) = selector.classes.last() {
-                SelectorIndexKey::Class(class.clone())
-            } else if let Some(element) = selector.element {
-                SelectorIndexKey::Element(element)
-            } else {
-                SelectorIndexKey::Universal
-            }
-        }
+        StyleSelector::Compound(selector) => primary_compound_selector_key(selector),
+        StyleSelector::Descendant(selectors) => selectors
+            .last()
+            .map(primary_compound_selector_key)
+            .unwrap_or(SelectorIndexKey::Universal),
         StyleSelector::State(_)
         | StyleSelector::FirstChild
         | StyleSelector::LastChild
@@ -2211,11 +2213,24 @@ fn primary_selector_key(selector: &StyleSelector) -> SelectorIndexKey {
     }
 }
 
+fn primary_compound_selector_key(selector: &CompoundSelector) -> SelectorIndexKey {
+    if let Some(id) = &selector.id {
+        SelectorIndexKey::Id(id.clone())
+    } else if let Some(class) = selector.classes.last() {
+        SelectorIndexKey::Class(class.clone())
+    } else if let Some(element) = selector.element {
+        SelectorIndexKey::Element(element)
+    } else {
+        SelectorIndexKey::Universal
+    }
+}
+
 pub(crate) fn resolve_style_with_position(
     element: &DocumentNode,
     stylesheet: &StyleSheet,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
+    ancestors: &[StyleMatchContext<'_>],
     viewport: Size,
     container: Option<Size>,
 ) -> ComputedStyle {
@@ -2223,7 +2238,9 @@ pub(crate) fn resolve_style_with_position(
 
     for index in stylesheet.index.candidates_for(element) {
         let rule = &stylesheet.rules[index];
-        if rule_matches(rule, element, state, position, viewport, container) {
+        if rule_matches(
+            rule, element, state, position, ancestors, viewport, container,
+        ) {
             style.apply(&rule.style);
         }
     }
@@ -2317,6 +2334,7 @@ fn selector_matches(
     element: &DocumentNode,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
+    ancestors: &[StyleMatchContext<'_>],
 ) -> bool {
     match selector {
         StyleSelector::Element(target) => element.spec.element == *target,
@@ -2347,6 +2365,9 @@ fn selector_matches(
         StyleSelector::Compound(selector) => {
             compound_selector_matches(selector, element, state, position)
         }
+        StyleSelector::Descendant(selectors) => {
+            descendant_selector_matches(selectors, element, state, position, ancestors)
+        }
     }
 }
 
@@ -2355,12 +2376,13 @@ fn rule_matches(
     element: &DocumentNode,
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
+    ancestors: &[StyleMatchContext<'_>],
     viewport: Size,
     container: Option<Size>,
 ) -> bool {
     rule.condition
         .is_none_or(|condition| condition.matches(viewport, container))
-        && selector_matches(&rule.selector, element, state, position)
+        && selector_matches(&rule.selector, element, state, position, ancestors)
 }
 
 fn compound_selector_matches(
@@ -2404,6 +2426,39 @@ fn compound_selector_matches(
     }
 
     true
+}
+
+fn descendant_selector_matches(
+    selectors: &[CompoundSelector],
+    element: &DocumentNode,
+    state: Option<&ElementState>,
+    position: Option<ChildPosition>,
+    ancestors: &[StyleMatchContext<'_>],
+) -> bool {
+    let Some((target, ancestor_selectors)) = selectors.split_last() else {
+        return false;
+    };
+    if !compound_selector_matches(target, element, state, position) {
+        return false;
+    }
+
+    let mut next_ancestor = ancestor_selectors.len();
+    for ancestor in ancestors.iter().rev() {
+        if next_ancestor == 0 {
+            break;
+        }
+        let selector = &ancestor_selectors[next_ancestor - 1];
+        if compound_selector_matches(
+            selector,
+            ancestor.element,
+            ancestor.state,
+            ancestor.position,
+        ) {
+            next_ancestor -= 1;
+        }
+    }
+
+    next_ancestor == 0
 }
 
 fn child_position_selector_matches(

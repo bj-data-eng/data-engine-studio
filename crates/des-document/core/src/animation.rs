@@ -2,8 +2,8 @@ use crate::element::{Color, DocumentNode, ElementId};
 use crate::geometry::{CornerRadii, Insets, Length, Point, Size};
 use crate::state::ElementState;
 use crate::style::{
-    ChildPosition, ComputedStyle, Shadow, StyleInvalidation, StyleSheet, Transition,
-    classify_computed_style_change, resolve_style_with_position,
+    ChildPosition, ComputedStyle, Shadow, StyleInvalidation, StyleMatchContext, StyleSheet,
+    Transition, classify_computed_style_change, resolve_style_with_position,
 };
 use std::collections::HashMap;
 
@@ -34,28 +34,41 @@ pub(crate) fn update_element_style_animation(
         states,
         snap_epsilon,
         None,
+        &mut Vec::new(),
         viewport,
         container_size,
     )
 }
 
-fn update_element_style_animation_at(
-    element: &DocumentNode,
+fn update_element_style_animation_at<'a>(
+    element: &'a DocumentNode,
     stylesheet: &StyleSheet,
     states: &mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
     position: Option<ChildPosition>,
+    ancestors: &mut Vec<(&'a DocumentNode, Option<ChildPosition>)>,
     viewport: Size,
     container_size: &dyn Fn(&ElementId) -> Option<Size>,
 ) -> AnimationUpdate {
-    let target_style = resolve_style_with_position(
-        element,
-        stylesheet,
-        states.get(&element.id),
-        position,
-        viewport,
-        container_size(&element.id),
-    );
+    let target_style = {
+        let ancestor_contexts = ancestors
+            .iter()
+            .map(|(element, position)| StyleMatchContext {
+                element,
+                state: states.get(&element.id),
+                position: *position,
+            })
+            .collect::<Vec<_>>();
+        resolve_style_with_position(
+            element,
+            stylesheet,
+            states.get(&element.id),
+            position,
+            &ancestor_contexts,
+            viewport,
+            container_size(&element.id),
+        )
+    };
     let mut update = AnimationUpdate::default();
 
     if let Some(state) = states.get_mut(&element.id) {
@@ -75,6 +88,7 @@ fn update_element_style_animation_at(
         update += classify_computed_style_change(previous.as_ref(), state.rendered_style.as_ref());
     }
 
+    ancestors.push((element, position));
     for (index, child) in element.children.iter().enumerate() {
         update += update_element_style_animation_at(
             child,
@@ -82,10 +96,12 @@ fn update_element_style_animation_at(
             states,
             snap_epsilon,
             Some(ChildPosition::new(index, element.children.len())),
+            ancestors,
             viewport,
             container_size,
         );
     }
+    ancestors.pop();
 
     update
 }

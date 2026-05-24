@@ -608,6 +608,79 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_descendant_selectors() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "section",
+            ElementSpec::new(Element::Section).class("section"),
+        )
+        .unwrap();
+    document
+        .append_element(
+            "section",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+    document
+        .append_text(
+            "panel",
+            "nested-title",
+            ElementSpec::new(Element::Text).class("title"),
+            "Nested title",
+        )
+        .unwrap();
+    document
+        .append_text(
+            "root",
+            "loose-title",
+            ElementSpec::new(Element::Text).class("title"),
+            "Loose title",
+        )
+        .unwrap();
+
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        .section .panel text.title {
+            width: 240px;
+        }
+
+        .section:hover text.title {
+            color: #6750a4;
+        }
+        "#,
+    )
+    .unwrap();
+    let mut states = HashMap::new();
+    let mut section_state = ElementState::default();
+    section_state.hovered = true;
+    states.insert(ElementId::new("section"), section_state);
+
+    document.apply_stylesheet(&stylesheet, &states).unwrap();
+
+    assert_eq!(
+        document.layout_style("nested-title").unwrap().size.width,
+        length::<_, Dimension>(240.0)
+    );
+    assert_eq!(
+        document
+            .resolved_layout()
+            .unwrap()
+            .find("nested-title")
+            .unwrap()
+            .style
+            .text_color,
+        Color::rgb(103, 80, 164)
+    );
+    assert_eq!(
+        document.layout_style("loose-title").unwrap().size.width,
+        Dimension::auto()
+    );
+}
+
+#[test]
 fn css_stylesheet_parser_accepts_box_shadow_none() {
     let stylesheet = StyleSheet::parse_css(".panel { box-shadow: none; }").unwrap();
     let mut document = Document::new(Size::new(800.0, 600.0));
