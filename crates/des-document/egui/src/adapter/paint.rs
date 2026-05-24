@@ -6,7 +6,7 @@ use des_document::{
 };
 use des_text::{
     CosmicTextRenderer, TextGlyph, TextGlyphCacheKey, TextGlyphImage, TextGlyphImageContent,
-    TextGlyphRect,
+    TextGlyphRect, TextPaintRunId,
 };
 use eframe::egui;
 use std::{
@@ -17,6 +17,7 @@ use std::{
 pub struct CosmicTextPaintResources {
     renderer: CosmicTextRenderer,
     atlas: TextGlyphAtlas,
+    mesh_cache: TextGlyphMeshCache,
     stats: TextPaintStats,
 }
 
@@ -31,6 +32,18 @@ struct TextGlyphAtlasPage {
     cursor_x: usize,
     cursor_y: usize,
     row_height: usize,
+}
+
+struct TextGlyphMeshCache {
+    entries: HashMap<TextGlyphMeshCacheKey, Vec<egui::epaint::Mesh>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct TextGlyphMeshCacheKey {
+    run_id: TextPaintRunId,
+    selection_start: Option<usize>,
+    selection_end: Option<usize>,
+    selection_color: [u8; 4],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,6 +69,9 @@ pub struct TextPaintStats {
     pub glyph_paint_time: Duration,
     pub glyphs_painted: usize,
     pub glyph_meshes: usize,
+    pub glyph_mesh_cache_hits: usize,
+    pub glyph_mesh_cache_misses: usize,
+    pub glyph_mesh_cache_entries: usize,
     pub glyph_cache_hits: usize,
     pub rasterizations: usize,
     pub cached_glyphs: usize,
@@ -74,6 +90,7 @@ impl CosmicTextPaintResources {
         Self {
             renderer,
             atlas: TextGlyphAtlas::new(),
+            mesh_cache: TextGlyphMeshCache::new(),
             stats: TextPaintStats::default(),
         }
     }
@@ -83,6 +100,7 @@ impl CosmicTextPaintResources {
         self.stats = TextPaintStats {
             cached_glyphs: self.atlas.entries.len(),
             atlas_pages: self.atlas.pages.len(),
+            glyph_mesh_cache_entries: self.mesh_cache.entries.len(),
             layout_cache_entries: self.renderer.buffer_stats().cache_entries,
             paint_run_cache_entries: self.renderer.buffer_stats().paint_run_cache_entries,
             ..TextPaintStats::default()
@@ -94,6 +112,7 @@ impl CosmicTextPaintResources {
         TextPaintStats {
             cached_glyphs: self.atlas.entries.len(),
             atlas_pages: self.atlas.pages.len(),
+            glyph_mesh_cache_entries: self.mesh_cache.entries.len(),
             layout_cache_hits: layout_stats.cache_hits,
             layout_cache_misses: layout_stats.cache_misses,
             layout_cache_entries: layout_stats.cache_entries,
@@ -248,6 +267,42 @@ impl TextGlyphAtlasPage {
     }
 }
 
+impl TextGlyphMeshCache {
+    const MAX_ENTRIES: usize = 1024;
+
+    fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    fn get(&self, key: &TextGlyphMeshCacheKey) -> Option<&[egui::epaint::Mesh]> {
+        self.entries.get(key).map(Vec::as_slice)
+    }
+
+    fn insert(&mut self, key: TextGlyphMeshCacheKey, meshes: Vec<egui::epaint::Mesh>) {
+        if self.entries.len() > Self::MAX_ENTRIES {
+            self.entries.clear();
+        }
+        self.entries.insert(key, meshes);
+    }
+}
+
+impl TextGlyphMeshCacheKey {
+    fn new(
+        run_id: TextPaintRunId,
+        selection: Option<&std::ops::Range<usize>>,
+        selection_color: Color,
+    ) -> Self {
+        Self {
+            run_id,
+            selection_start: selection.map(|selection| selection.start),
+            selection_end: selection.map(|selection| selection.end),
+            selection_color: selection.map_or([0; 4], |_| color_key(selection_color)),
+        }
+    }
+}
+
 fn texture_options() -> egui::TextureOptions {
     egui::TextureOptions::LINEAR
 }
@@ -394,6 +449,7 @@ fn paint_frame_clipped(
                         ui.ctx().pixels_per_point(),
                         &mut resources.renderer,
                         &mut resources.atlas,
+                        &mut resources.mesh_cache,
                         &mut resources.stats,
                     );
                 }
@@ -507,6 +563,7 @@ fn paint_atlas_text(
     pixels_per_point: f32,
     renderer: &mut CosmicTextRenderer,
     atlas: &mut TextGlyphAtlas,
+    mesh_cache: &mut TextGlyphMeshCache,
     stats: &mut TextPaintStats,
 ) {
     stats.paint_text_requests += 1;
@@ -520,6 +577,7 @@ fn paint_atlas_text(
     for background in &glyph_run.backgrounds {
         paint_text_rect(painter, position, *background, scale);
     }
+    let selection = selection.filter(|selection| selection.start < selection.end);
     if let Some(selection) = selection.clone() {
         for rect in renderer.selection_rects(
             request.clone(),
@@ -532,8 +590,52 @@ fn paint_atlas_text(
     }
     let atlas_start = Instant::now();
     let paint_start = Instant::now();
+    paint_text_glyph_meshes(
+        painter,
+        position,
+        glyph_run.id,
+        &glyph_run.glyphs,
+        selection.as_ref(),
+        selection_color,
+        scale,
+        renderer,
+        atlas,
+        mesh_cache,
+        stats,
+    );
+    stats.glyph_paint_time += paint_start.elapsed();
+    stats.glyph_atlas_time += atlas_start.elapsed();
+    for decoration in &glyph_run.decorations {
+        paint_text_rect(painter, position, *decoration, scale);
+    }
+}
+
+fn paint_text_glyph_meshes(
+    painter: &egui::Painter,
+    position: egui::Pos2,
+    run_id: TextPaintRunId,
+    glyphs: &[TextGlyph],
+    selection: Option<&std::ops::Range<usize>>,
+    selection_color: Color,
+    scale: f32,
+    renderer: &mut CosmicTextRenderer,
+    atlas: &mut TextGlyphAtlas,
+    mesh_cache: &mut TextGlyphMeshCache,
+    stats: &mut TextPaintStats,
+) {
+    let cache_key = TextGlyphMeshCacheKey::new(run_id, selection, selection_color);
+    if let Some(meshes) = mesh_cache.get(&cache_key) {
+        stats.glyph_mesh_cache_hits += 1;
+        stats.glyphs_painted += glyphs.len();
+        stats.glyph_meshes += meshes.len();
+        paint_cached_text_meshes(painter, position, meshes);
+        return;
+    }
+
+    stats.glyph_mesh_cache_misses += 1;
+    let mut meshes = Vec::new();
     let mut batch = TextGlyphBatch::default();
-    for glyph in glyph_run.glyphs {
+    for glyph in glyphs.iter().copied() {
         let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
             continue;
         };
@@ -549,13 +651,26 @@ fn paint_atlas_text(
         } else {
             glyph
         };
-        stats.glyph_meshes += batch.push(painter, position, glyph, entry, scale);
+        batch.push(glyph, entry, scale, &mut meshes);
     }
-    stats.glyph_meshes += batch.flush(painter);
-    stats.glyph_paint_time += paint_start.elapsed();
-    stats.glyph_atlas_time += atlas_start.elapsed();
-    for decoration in &glyph_run.decorations {
-        paint_text_rect(painter, position, *decoration, scale);
+    batch.flush(&mut meshes);
+    stats.glyph_meshes += meshes.len();
+    paint_cached_text_meshes(painter, position, &meshes);
+    mesh_cache.insert(cache_key, meshes);
+}
+
+fn paint_cached_text_meshes(
+    painter: &egui::Painter,
+    position: egui::Pos2,
+    meshes: &[egui::epaint::Mesh],
+) {
+    for mesh in meshes {
+        let mut mesh = mesh.clone();
+        for vertex in &mut mesh.vertices {
+            vertex.pos.x += position.x;
+            vertex.pos.y += position.y;
+        }
+        painter.add(mesh);
     }
 }
 
@@ -579,28 +694,25 @@ struct TextGlyphBatch {
 impl TextGlyphBatch {
     fn push(
         &mut self,
-        painter: &egui::Painter,
-        text_position: egui::Pos2,
         glyph: TextGlyph,
         entry: TextGlyphAtlasEntry,
         scale: f32,
-    ) -> usize {
+        meshes: &mut Vec<egui::epaint::Mesh>,
+    ) {
         let texture_id = entry.texture_id;
-        let flushed = if self
+        if self
             .mesh
             .as_ref()
             .is_some_and(|mesh| mesh.texture_id != texture_id)
         {
-            self.flush(painter)
-        } else {
-            0
-        };
+            self.flush(meshes);
+        }
         let mesh = self
             .mesh
             .get_or_insert_with(|| egui::epaint::Mesh::with_texture(texture_id));
         let min = egui::pos2(
-            text_position.x + (glyph.x_px + entry.placement_px[0]) as f32 / scale,
-            text_position.y + (glyph.y_px - entry.placement_px[1]) as f32 / scale,
+            (glyph.x_px + entry.placement_px[0]) as f32 / scale,
+            (glyph.y_px - entry.placement_px[1]) as f32 / scale,
         );
         let size = egui::vec2(
             entry.size_px[0] as f32 / scale,
@@ -612,15 +724,13 @@ impl TextGlyphBatch {
             to_egui_color(glyph.color)
         };
         mesh.add_rect_with_uv(egui::Rect::from_min_size(min, size), entry.uv, tint);
-        flushed
     }
 
-    fn flush(&mut self, painter: &egui::Painter) -> usize {
+    fn flush(&mut self, meshes: &mut Vec<egui::epaint::Mesh>) {
         let Some(mesh) = self.mesh.take().filter(|mesh| !mesh.is_empty()) else {
-            return 0;
+            return;
         };
-        painter.add(mesh);
-        1
+        meshes.push(mesh);
     }
 }
 
@@ -1629,6 +1739,10 @@ fn document_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
 
 fn to_egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, color.a)
+}
+
+fn color_key(color: Color) -> [u8; 4] {
+    [color.r, color.g, color.b, color.a]
 }
 
 fn to_egui_radius(radius: CornerRadii) -> egui::CornerRadius {

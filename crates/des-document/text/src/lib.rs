@@ -18,6 +18,15 @@ pub const INTER_FAMILY: &str = "Inter";
 pub const JETBRAINS_MONO_FAMILY: &str = "JetBrains Mono";
 pub type TextGlyphCacheKey = CacheKey;
 
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct TextPaintRunId(u64);
+
+impl TextPaintRunId {
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SystemFontLoading {
     BundledOnly,
@@ -78,6 +87,7 @@ pub struct TextGlyphRun {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextPaintGlyphRun {
+    pub id: TextPaintRunId,
     pub glyphs: Vec<TextGlyph>,
     pub backgrounds: Vec<TextGlyphRect>,
     pub decorations: Vec<TextGlyphRect>,
@@ -306,6 +316,7 @@ impl CosmicTextRenderer {
         let buffer_key = TextBufferKey::new(&request, scale);
         let cache_rect = visible_rect.map(text_paint_cache_rect);
         let paint_key = TextPaintGlyphRunKey::new(buffer_key.clone(), &request, cache_rect);
+        let paint_id = paint_key.id();
         if let Some(run) = self.paint_runs.get(&paint_key).cloned() {
             self.paint_run_cache_hits += 1;
             return run;
@@ -317,6 +328,10 @@ impl CosmicTextRenderer {
         let run = self.with_buffer_key(buffer_key, request.clone(), scale, |buffer, _| {
             collect_text_paint_glyph_run(&request, buffer, scale, cache_rect)
         });
+        let run = TextPaintGlyphRun {
+            id: paint_id,
+            ..run
+        };
         self.paint_runs.insert(paint_key, run.clone());
         run
     }
@@ -555,6 +570,12 @@ impl TextPaintGlyphRunKey {
             paint: TextPaintStyleKey::new(request),
             visible_rect: visible_rect.map(RectKey::from),
         }
+    }
+
+    fn id(&self) -> TextPaintRunId {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        TextPaintRunId(hasher.finish())
     }
 }
 
@@ -1510,6 +1531,7 @@ fn collect_text_paint_glyph_run(
         }
     }
     TextPaintGlyphRun {
+        id: TextPaintRunId::default(),
         glyphs,
         backgrounds,
         decorations,

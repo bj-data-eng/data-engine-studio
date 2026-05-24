@@ -2327,8 +2327,20 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         "warm text paint should retain cosmic text buffers even when paint runs avoid touching them"
     );
     assert!(
-        warm_stats.glyph_cache_hits > 0,
-        "warm text paint should hit cached atlas glyphs"
+        first_stats.glyph_mesh_cache_entries > 0,
+        "cold text paint should populate retained glyph meshes"
+    );
+    assert!(
+        warm_stats.glyph_mesh_cache_hits > 0,
+        "warm text paint should hit retained glyph meshes"
+    );
+    assert_eq!(
+        warm_stats.glyph_mesh_cache_misses, 0,
+        "warm text paint should not rebuild retained glyph meshes"
+    );
+    assert_eq!(
+        warm_stats.glyph_cache_hits, 0,
+        "warm text paint should skip per-glyph atlas lookups when retained meshes are available"
     );
     assert!(
         warm_stats.glyph_meshes > 0 && warm_stats.glyph_meshes < warm_stats.glyphs_painted,
@@ -2405,8 +2417,20 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
         "warm scrolled text paint should retain cosmic text buffers even when paint runs avoid touching them"
     );
     assert!(
-        warm_stats.glyph_cache_hits > 0,
-        "warm scrolled text paint should hit cached atlas glyphs"
+        populated_stats.glyph_mesh_cache_entries > 0,
+        "scrolled text paint should populate retained glyph meshes"
+    );
+    assert!(
+        warm_stats.glyph_mesh_cache_hits > 0,
+        "warm scrolled text paint should hit retained glyph meshes"
+    );
+    assert_eq!(
+        warm_stats.glyph_mesh_cache_misses, 0,
+        "warm scrolled text paint should not rebuild retained glyph meshes"
+    );
+    assert_eq!(
+        warm_stats.glyph_cache_hits, 0,
+        "warm scrolled text paint should skip per-glyph atlas lookups when retained meshes are available"
     );
     assert!(
         warm_stats.glyph_meshes > 0 && warm_stats.glyph_meshes < warm_stats.glyphs_painted,
@@ -2456,6 +2480,9 @@ fn debug_overlay_reports_split_text_paint_timings() {
                     glyph_upload_time: std::time::Duration::from_micros(2_500),
                     glyph_paint_time: std::time::Duration::from_micros(3_750),
                     glyph_meshes: 9,
+                    glyph_mesh_cache_hits: 7,
+                    glyph_mesh_cache_misses: 2,
+                    glyph_mesh_cache_entries: 5,
                     ..TextPaintStats::default()
                 },
                 ..UiLabPerf::default()
@@ -2495,6 +2522,14 @@ fn debug_overlay_reports_split_text_paint_timings() {
     assert_eq!(
         frame_text(&output, "debug-text-glyph-meshes-value"),
         Some("9")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-mesh-cache-label"),
+        Some("text mesh cache")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-mesh-cache-value"),
+        Some("7 hit / 2 miss / 5 cached")
     );
 }
 

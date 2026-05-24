@@ -984,6 +984,17 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-mesh-cache",
+                "text mesh cache",
+                format!(
+                    "{} hit / {} miss / {} cached",
+                    perf.text_paint.glyph_mesh_cache_hits,
+                    perf.text_paint.glyph_mesh_cache_misses,
+                    perf.text_paint.glyph_mesh_cache_entries
+                ),
+            );
+            debug_metric_row(
+                ui,
                 "debug-text-measure",
                 "text measure",
                 format!(
