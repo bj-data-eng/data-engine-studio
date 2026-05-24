@@ -252,10 +252,7 @@ fn text_format(
         .as_ref()
         .map(|family| egui::FontFamily::Name(family.clone().into()))
         .unwrap_or(egui::FontFamily::Proportional);
-    let coords = style
-        .font_weight
-        .map(|weight| egui::epaint::text::VariationCoords::new([(b"wght", weight.value() as f32)]))
-        .unwrap_or_default();
+    let coords = variation_coords(style);
     egui::TextFormat {
         font_id: egui::FontId::new(style.font_size.unwrap_or(inherited_font_size), family),
         extra_letter_spacing: style.letter_spacing.unwrap_or(0.0).max(0.0),
@@ -295,6 +292,17 @@ fn text_format(
     }
 }
 
+fn variation_coords(style: &InlineTextStyle) -> egui::epaint::text::VariationCoords {
+    let mut coords = egui::epaint::text::VariationCoords::default();
+    if let Some(weight) = style.font_weight {
+        coords.push(b"wght", weight.value() as f32);
+    }
+    if let Some(stretch) = style.font_stretch {
+        coords.push(b"wdth", stretch.value());
+    }
+    coords
+}
+
 fn to_egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_premultiplied(color.r, color.g, color.b, color.a)
 }
@@ -303,8 +311,8 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 mod tests {
     use super::*;
     use des_document::{
-        FontStyle, FontWeight, InlineTextStyle, NormalizedText, TextAlign, TextContent,
-        TextDecoration, TextLayoutStyle, TextOverflow, TextRun, WhiteSpace,
+        FontStretch, FontStyle, FontWeight, InlineTextStyle, NormalizedText, TextAlign,
+        TextContent, TextDecoration, TextLayoutStyle, TextOverflow, TextRun, WhiteSpace,
     };
 
     #[test]
@@ -430,6 +438,7 @@ mod tests {
                     font_size: Some(18.0),
                     letter_spacing: Some(1.5),
                     font_weight: Some(FontWeight::BOLD),
+                    font_stretch: Some(FontStretch::CONDENSED),
                     font_style: Some(FontStyle::Italic),
                     text_decoration: Some(TextDecoration::lines(true, false, true)),
                     background: Some(Color::rgb(0, 0, 255)),
@@ -462,7 +471,10 @@ mod tests {
         assert_eq!(format.background, egui::Color32::from_rgb(0, 0, 255));
         assert_eq!(
             format.coords.as_ref(),
-            &[(egui::epaint::text::Tag::new(b"wght"), 700.0)]
+            &[
+                (egui::epaint::text::Tag::new(b"wght"), 700.0),
+                (egui::epaint::text::Tag::new(b"wdth"), 75.0)
+            ]
         );
     }
 
@@ -492,6 +504,35 @@ mod tests {
         assert_eq!(
             job.sections[0].format.coords.as_ref(),
             &[(egui::epaint::text::Tag::new(b"wght"), 525.0)]
+        );
+    }
+
+    #[test]
+    fn layout_job_maps_font_stretch_to_variation_axis() {
+        let text = TextContent::new(vec![TextRun::styled(
+            "stretched",
+            InlineTextStyle {
+                font_stretch: Some(FontStretch::percent(137.5)),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized = NormalizedText::from_content(&text, TextLayoutStyle::default());
+
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 240.0,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(
+            job.sections[0].format.coords.as_ref(),
+            &[(egui::epaint::text::Tag::new(b"wdth"), 137.5)]
         );
     }
 

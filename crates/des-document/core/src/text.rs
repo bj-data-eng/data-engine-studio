@@ -92,6 +92,7 @@ pub struct InlineTextStyle {
     pub letter_spacing: Option<f32>,
     pub font_family: Option<String>,
     pub font_weight: Option<FontWeight>,
+    pub font_stretch: Option<FontStretch>,
     pub font_style: Option<FontStyle>,
     pub text_transform: Option<TextTransform>,
     pub text_decoration: Option<TextDecoration>,
@@ -119,6 +120,35 @@ impl FontWeight {
 
     pub const fn value(self) -> u16 {
         self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontStretch(f32);
+
+impl FontStretch {
+    pub const MIN_PERCENT: f32 = 50.0;
+    pub const MAX_PERCENT: f32 = 200.0;
+    pub const NORMAL: Self = Self(100.0);
+    pub const ULTRA_CONDENSED: Self = Self(50.0);
+    pub const EXTRA_CONDENSED: Self = Self(62.5);
+    pub const CONDENSED: Self = Self(75.0);
+    pub const SEMI_CONDENSED: Self = Self(87.5);
+    pub const SEMI_EXPANDED: Self = Self(112.5);
+    pub const EXPANDED: Self = Self(125.0);
+    pub const EXTRA_EXPANDED: Self = Self(150.0);
+    pub const ULTRA_EXPANDED: Self = Self(200.0);
+
+    pub fn percent(value: f32) -> Self {
+        Self(value.clamp(Self::MIN_PERCENT, Self::MAX_PERCENT))
+    }
+
+    pub const fn value(self) -> f32 {
+        self.0
+    }
+
+    pub const fn width_factor(self) -> f32 {
+        self.0 / 100.0
     }
 }
 
@@ -821,6 +851,11 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
     for run in request.text.runs() {
         let font_size = run.style.font_size.unwrap_or(request.font_size).max(1.0);
         let letter_spacing = run.style.letter_spacing.unwrap_or(0.0).max(0.0);
+        let font_stretch = run
+            .style
+            .font_stretch
+            .unwrap_or(FontStretch::NORMAL)
+            .width_factor();
         for ch in run.text.chars() {
             if ch == '\n' {
                 paragraphs.push(Vec::new());
@@ -831,7 +866,7 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
                     .expect("paragraph list always has a current paragraph")
                     .push(FallbackLayoutChar {
                         value: ch,
-                        width: fallback_char_width(ch, font_size, letter_spacing),
+                        width: fallback_char_width(ch, font_size, letter_spacing, font_stretch),
                         font_size,
                         layout_index,
                     });
@@ -862,11 +897,12 @@ fn fallback_default_line_height(font_size: f32) -> f32 {
     (font_size * 1.25).max(18.0)
 }
 
-fn fallback_char_width(ch: char, font_size: f32, letter_spacing: f32) -> f32 {
+fn fallback_char_width(ch: char, font_size: f32, letter_spacing: f32, font_stretch: f32) -> f32 {
     if ch == '\n' {
         0.0
     } else {
-        (font_size.max(1.0) * (7.5 / 13.0) + letter_spacing.max(0.0)).max(0.0)
+        ((font_size.max(1.0) * (7.5 / 13.0) * font_stretch.max(0.0)) + letter_spacing.max(0.0))
+            .max(0.0)
     }
 }
 
@@ -1028,6 +1064,19 @@ mod tests {
         assert_eq!(FontWeight::new(50).value(), 50);
         assert_eq!(FontWeight::new(0).value(), FontWeight::MIN);
         assert_eq!(FontWeight::new(1200).value(), FontWeight::MAX);
+    }
+
+    #[test]
+    fn font_stretch_represents_css_percentage_widths() {
+        assert_eq!(FontStretch::NORMAL.value(), 100.0);
+        assert_eq!(FontStretch::CONDENSED.value(), 75.0);
+        assert_eq!(FontStretch::EXPANDED.value(), 125.0);
+        assert_eq!(FontStretch::percent(20.0).value(), FontStretch::MIN_PERCENT);
+        assert_eq!(
+            FontStretch::percent(240.0).value(),
+            FontStretch::MAX_PERCENT
+        );
+        assert_eq!(FontStretch::percent(112.5).width_factor(), 1.125);
     }
 
     #[test]
@@ -1384,6 +1433,59 @@ mod tests {
         });
 
         assert!(spaced.size.width > normal.size.width);
+    }
+
+    #[test]
+    fn fallback_measurement_uses_inline_font_stretch() {
+        let normal = TextContent::plain("MMMM");
+        let condensed = TextContent::new(vec![TextRun::styled(
+            "MMMM",
+            InlineTextStyle {
+                font_stretch: Some(FontStretch::CONDENSED),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let expanded = TextContent::new(vec![TextRun::styled(
+            "MMMM",
+            InlineTextStyle {
+                font_stretch: Some(FontStretch::EXPANDED),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized_normal = NormalizedText::from_content(&normal, TextLayoutStyle::default());
+        let normalized_condensed =
+            NormalizedText::from_content(&condensed, TextLayoutStyle::default());
+        let normalized_expanded =
+            NormalizedText::from_content(&expanded, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let normal = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_normal,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+        let condensed = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_condensed,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+        let expanded = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_expanded,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+
+        assert!(condensed.size.width < normal.size.width);
+        assert!(expanded.size.width > normal.size.width);
     }
 
     #[test]
