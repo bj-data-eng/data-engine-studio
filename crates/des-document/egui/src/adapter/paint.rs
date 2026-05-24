@@ -293,11 +293,22 @@ fn paint_frame_clipped(
             };
             if let Some(resources) = text_resources.as_deref_mut() {
                 if let Some(visible_rect) = visible_local_rect(clip_rect, text_rect) {
+                    let selection = text_selection.and_then(|selection| {
+                        (frame.selectable_text && selection.target == frame.id).then(|| {
+                            let anchor =
+                                normalized.semantic_to_layout_index(selection.anchor_index);
+                            let focus = normalized.semantic_to_layout_index(selection.focus_index);
+                            anchor.min(focus)..anchor.max(focus)
+                        })
+                    });
                     paint_atlas_text(
                         &painter,
                         text_rect.min,
                         visible_rect,
                         request,
+                        selection,
+                        frame.style.text_selection_background,
+                        frame.style.text_selection_color,
                         ui.ctx().pixels_per_point(),
                         &mut resources.renderer,
                         &mut resources.atlas,
@@ -358,12 +369,15 @@ fn paint_atlas_text(
     position: egui::Pos2,
     visible_rect: Rect,
     request: TextLayoutRequest<'_>,
+    selection: Option<std::ops::Range<usize>>,
+    selection_background: Color,
+    selection_color: Color,
     pixels_per_point: f32,
     renderer: &mut CosmicTextRenderer,
     atlas: &mut TextGlyphAtlas,
     stats: &mut TextPaintStats,
 ) {
-    let glyph_run = renderer.glyphs(request, pixels_per_point, Some(visible_rect));
+    let glyph_run = renderer.glyphs(request.clone(), pixels_per_point, Some(visible_rect));
     let scale = pixels_per_point.max(1.0);
     let texture_id = match atlas.texture.as_ref().map(|texture| texture.id()) {
         Some(texture_id) => texture_id,
@@ -382,11 +396,32 @@ fn paint_atlas_text(
     for background in &glyph_run.backgrounds {
         paint_text_rect(painter, position, *background, scale);
     }
+    if let Some(selection) = selection.clone() {
+        for rect in renderer.selection_rects(
+            request.clone(),
+            pixels_per_point,
+            selection,
+            selection_background,
+        ) {
+            paint_text_rect(painter, position, rect, scale);
+        }
+    }
     for glyph in glyph_run.glyphs {
         let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
             continue;
         };
         stats.glyphs_painted += 1;
+        let selected = selection.as_ref().is_some_and(|selection| {
+            glyph.layout_start < selection.end && glyph.layout_end > selection.start
+        });
+        let glyph = if selected {
+            TextGlyph {
+                color: selection_color,
+                ..glyph
+            }
+        } else {
+            glyph
+        };
         paint_glyph_atlas_entry(painter, position, texture_id, glyph, entry, scale);
     }
     for decoration in &glyph_run.decorations {

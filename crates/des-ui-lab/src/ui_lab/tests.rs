@@ -162,17 +162,28 @@ fn click_at_stays_hovered(harness: &mut Harness<'_, UiLabState>, pos: egui::Pos2
     harness.run();
 }
 
-fn count_visible_text_selection_pixels(image: &image::RgbaImage) -> usize {
-    image
-        .pixels()
-        .filter(|pixel| {
-            let [red, green, blue, alpha] = pixel.0;
-            alpha > 220
+fn count_visible_text_selection_pixels_in_rect(
+    image: &image::RgbaImage,
+    rect: des_document::Rect,
+) -> usize {
+    let min_x = rect.origin.x.floor().max(0.0) as u32;
+    let min_y = rect.origin.y.floor().max(0.0) as u32;
+    let max_x = rect.right().ceil().clamp(0.0, image.width() as f32) as u32;
+    let max_y = rect.bottom().ceil().clamp(0.0, image.height() as f32) as u32;
+    let mut count = 0usize;
+    for y in min_y..max_y {
+        for x in min_x..max_x {
+            let [red, green, blue, alpha] = image.get_pixel(x, y).0;
+            if alpha > 220
                 && (90..=150).contains(&red)
                 && (70..=125).contains(&green)
                 && (145..=205).contains(&blue)
-        })
-        .count()
+            {
+                count += 1;
+            }
+        }
+    }
+    count
 }
 
 fn scroll_harness_stage(harness: &mut Harness<'_, UiLabState>, scroll_y: f32) {
@@ -2273,7 +2284,7 @@ fn text_view_paints_pointer_selection_on_selectable_text() {
     let after = render_harness(&mut harness);
 
     let comparison = compare_images(&before, &after);
-    let selection_pixels = count_visible_text_selection_pixels(&after);
+    let selection_pixels = count_visible_text_selection_pixels_in_rect(&after, rect);
     assert!(
         comparison.differing_pixels > 0,
         "dragging selectable text should visibly paint a document text selection"

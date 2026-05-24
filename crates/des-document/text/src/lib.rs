@@ -7,7 +7,7 @@ use des_document::{
     Color, Direction, FontStyle, InlineTextStyle, Point, Rect, Size, TextAlign, TextLayoutLine,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
 };
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{collections::HashMap, hash::Hash, ops::Range, sync::Arc};
 
 pub const INTER_FAMILY: &str = "Inter";
 pub const JETBRAINS_MONO_FAMILY: &str = "JetBrains Mono";
@@ -85,6 +85,8 @@ pub struct TextGlyph {
     pub y_px: i32,
     pub color: Color,
     pub run_index: usize,
+    pub layout_start: usize,
+    pub layout_end: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -274,6 +276,16 @@ impl CosmicTextRenderer {
                                 .color_opt
                                 .map_or(request.color, cosmic_to_document_color),
                             run_index: glyph.metadata.saturating_sub(1),
+                            layout_start: line_byte_to_layout_index(
+                                request.text.layout_text(),
+                                run.line_i,
+                                glyph.start,
+                            ),
+                            layout_end: line_byte_to_layout_index(
+                                request.text.layout_text(),
+                                run.line_i,
+                                glyph.end,
+                            ),
                         });
                     }
                     let mut collector = DecorationCollector {
@@ -292,6 +304,45 @@ impl CosmicTextRenderer {
             backgrounds,
             decorations,
         }
+    }
+
+    pub fn selection_rects(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        pixels_per_point: f32,
+        selected_layout: Range<usize>,
+        color: Color,
+    ) -> Vec<TextGlyphRect> {
+        if selected_layout.start >= selected_layout.end {
+            return Vec::new();
+        }
+        let scale = pixels_per_point.max(1.0);
+        self.with_buffer(request.clone(), scale, |buffer, _| {
+            let mut rects = Vec::new();
+            for run in buffer.layout_runs() {
+                let line_start =
+                    line_byte_to_layout_index(request.text.layout_text(), run.line_i, 0);
+                let line_end = line_start + run.text.chars().count();
+                let start = selected_layout.start.max(line_start);
+                let end = selected_layout.end.min(line_end);
+                if start >= end {
+                    continue;
+                }
+                let left = x_for_layout_index(request.text.layout_text(), &run, start);
+                let right = x_for_layout_index(request.text.layout_text(), &run, end);
+                let min_x = left.min(right);
+                let max_x = left.max(right);
+                push_text_rect(
+                    &mut rects,
+                    min_x,
+                    run.line_top,
+                    max_x - min_x,
+                    run.line_height,
+                    color,
+                );
+            }
+            rects
+        })
     }
 
     pub fn glyph_image(&mut self, cache_key: TextGlyphCacheKey) -> Option<TextGlyphImage> {
@@ -840,6 +891,39 @@ fn layout_elided(request: &TextLayoutRequest<'_>, lines: &[TextLayoutLine]) -> b
 
 fn first_glyph_x(glyphs: &[cosmic_text::LayoutGlyph]) -> f32 {
     glyphs.first().map(|glyph| glyph.x).unwrap_or(0.0)
+}
+
+fn x_for_layout_index(text: &str, run: &cosmic_text::LayoutRun<'_>, layout_index: usize) -> f32 {
+    if run.glyphs.is_empty() {
+        return 0.0;
+    }
+    let line_start = line_byte_to_layout_index(text, run.line_i, 0);
+    let local_index = layout_index.saturating_sub(line_start);
+    let min_x = run
+        .glyphs
+        .iter()
+        .map(|glyph| glyph.x.min(glyph.x + glyph.w))
+        .fold(f32::INFINITY, f32::min);
+    let max_x = run
+        .glyphs
+        .iter()
+        .map(|glyph| glyph.x.max(glyph.x + glyph.w))
+        .fold(0.0_f32, f32::max);
+
+    for glyph in run.glyphs {
+        let glyph_start = line_byte_to_layout_index(text, run.line_i, glyph.start) - line_start;
+        let glyph_end = line_byte_to_layout_index(text, run.line_i, glyph.end) - line_start;
+        if local_index <= glyph_start {
+            return glyph.x;
+        }
+        if local_index < glyph_end {
+            let span = glyph_end.saturating_sub(glyph_start).max(1) as f32;
+            let progress = (local_index - glyph_start) as f32 / span;
+            return glyph.x + glyph.w * progress.clamp(0.0, 1.0);
+        }
+    }
+
+    if run.rtl { min_x } else { max_x }
 }
 
 fn line_byte_to_layout_index(text: &str, line_index: usize, line_byte_index: usize) -> usize {
@@ -1431,6 +1515,24 @@ mod tests {
                 .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px > 0),
             "underline runs should become paintable decoration rectangles"
         );
+    }
+
+    #[test]
+    fn exposes_selection_rectangles_for_layout_ranges() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("select me");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let rects = renderer.selection_rects(
+            request(&normalized, 20.0, 400.0),
+            2.0,
+            0..6,
+            Color::rgba(234, 221, 255, 190),
+        );
+
+        assert_eq!(rects.len(), 1);
+        assert_eq!(rects[0].color, Color::rgba(234, 221, 255, 190));
+        assert!(rects[0].width_px > 0);
+        assert!(rects[0].height_px > 0);
     }
 
     #[test]
