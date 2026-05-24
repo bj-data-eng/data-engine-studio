@@ -4,9 +4,8 @@ mod tests;
 mod views;
 
 use des_egui::adapter::{
-    CosmicTextPaintResources, EguiTextMeasurer, configure_text_selection_input,
-    copy_selected_text_on_command, document_input, paint_frame, paint_frame_with_text_resources,
-    paint_scroll_chrome,
+    CosmicTextPaintResources, configure_text_selection_input, copy_selected_text_on_command,
+    document_input, paint_frame_with_text_resources, paint_scroll_chrome,
 };
 use styles::stylesheet;
 use views::{
@@ -147,7 +146,6 @@ pub(crate) struct UiLabState {
     drag_drop_preview: Option<SortableDropPreview>,
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
-    text_renderer: des_text::CosmicTextRenderer,
     text_paint_resources: CosmicTextPaintResources,
     pending_stage_scroll: Option<Point>,
     lab_document: Option<RetainedLabDocument<LabDocumentKey>>,
@@ -219,7 +217,6 @@ impl Default for UiLabState {
             drag_drop_preview: None,
             scroll_list_drop_preview: None,
             text_context_menu: None,
-            text_renderer: des_egui::document_text_renderer(),
             text_paint_resources: CosmicTextPaintResources::new(des_egui::document_text_renderer()),
             pending_stage_scroll: None,
             lab_document: None,
@@ -268,7 +265,7 @@ impl UiLabState {
             &mut retained.document,
             &stylesheet,
             input,
-            &mut self.text_renderer,
+            &mut self.text_paint_resources,
         );
         self.lab_document = Some(retained);
 
@@ -279,7 +276,7 @@ impl UiLabState {
                 &mut retained.document,
                 &stylesheet,
                 input,
-                &mut self.text_renderer,
+                &mut self.text_paint_resources,
             );
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
@@ -291,7 +288,7 @@ impl UiLabState {
                 &mut retained.document,
                 &stylesheet,
                 input,
-                &mut self.text_renderer,
+                &mut self.text_paint_resources,
             );
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
@@ -303,7 +300,7 @@ impl UiLabState {
                 &mut retained.document,
                 &stylesheet,
                 repaint_input_after_action(input),
-                &mut self.text_renderer,
+                &mut self.text_paint_resources,
             );
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
@@ -813,7 +810,7 @@ impl UiLabState {
     }
 
     fn paint_debug_overlay_document(
-        &self,
+        &mut self,
         ui: &mut egui::Ui,
         origin: egui::Pos2,
         viewport: egui::Vec2,
@@ -828,14 +825,20 @@ impl UiLabState {
             );
         });
         let mut engine = DocumentEngine::default();
-        let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
+        let stylesheet = self.active_stylesheet();
         let output = engine.update_with_input_and_text_measurer(
             &mut document,
-            &self.active_stylesheet(),
+            &stylesheet,
             DocumentInput::default(),
-            &mut text_measurer,
+            &mut self.text_paint_resources,
         );
-        paint_frame(ui, origin, &output.layout, None);
+        paint_frame_with_text_resources(
+            ui,
+            origin,
+            &output.layout,
+            None,
+            &mut self.text_paint_resources,
+        );
     }
 
     fn apply_interaction_document_state(&self, document: &mut Document) {
@@ -950,7 +953,7 @@ impl UiLabState {
             &mut retained.document,
             &stylesheet,
             DocumentInput::default(),
-            &mut self.text_renderer,
+            &mut self.text_paint_resources,
         );
         self.lab_document = Some(retained);
         output
@@ -968,7 +971,7 @@ impl UiLabState {
             &mut retained.document,
             &stylesheet,
             DocumentInput::default(),
-            &mut self.text_renderer,
+            &mut self.text_paint_resources,
         );
         self.document_engine
             .scroll_element_to("stage", Point::new(0.0, scroll_y));
@@ -976,7 +979,7 @@ impl UiLabState {
             &mut retained.document,
             &stylesheet,
             DocumentInput::default(),
-            &mut self.text_renderer,
+            &mut self.text_paint_resources,
         );
         self.lab_document = Some(retained);
         output
@@ -1012,7 +1015,7 @@ impl UiLabState {
             &mut retained.document,
             &stylesheet,
             input,
-            &mut self.text_renderer,
+            &mut self.text_paint_resources,
         );
         self.lab_document = Some(retained);
         output

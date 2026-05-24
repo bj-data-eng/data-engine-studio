@@ -11,6 +11,12 @@ use std::sync::Arc;
 pub const INTER_FAMILY: &str = "Inter";
 pub const JETBRAINS_MONO_FAMILY: &str = "JetBrains Mono";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SystemFontLoading {
+    BundledOnly,
+    IncludeSystemFonts,
+}
+
 #[derive(Clone, Debug)]
 pub struct FontAsset {
     pub family: &'static str,
@@ -63,8 +69,17 @@ pub struct CosmicTextRenderer {
 
 impl CosmicTextRenderer {
     pub fn new(fonts: impl IntoIterator<Item = FontAsset>) -> Self {
+        Self::with_system_font_loading(fonts, SystemFontLoading::BundledOnly)
+    }
+
+    pub fn with_system_font_loading(
+        fonts: impl IntoIterator<Item = FontAsset>,
+        system_font_loading: SystemFontLoading,
+    ) -> Self {
         let mut db = fontdb::Database::new();
-        db.load_system_fonts();
+        if system_font_loading == SystemFontLoading::IncludeSystemFonts {
+            db.load_system_fonts();
+        }
         for font in fonts {
             db.load_font_source(fontdb::Source::Binary(Arc::new(font.bytes.to_vec())));
         }
@@ -84,6 +99,87 @@ impl CosmicTextRenderer {
         pixels_per_point: f32,
     ) -> RasterizedText {
         let scale = pixels_per_point.max(1.0);
+        let (layout, rgba, glyph_rects, width_px, height_px) =
+            self.with_buffer(request.clone(), scale, |buffer, swash_cache| {
+                let layout = layout_result(&request, buffer);
+                let width_px = surface_width_px(
+                    &layout,
+                    request.wrap_width,
+                    request.layout_style.text_wrap_mode,
+                    scale,
+                );
+                let height_px = finite_surface_extent(layout.size.height).ceil() as u32;
+                let mut rgba =
+                    vec![0; width_px.saturating_mul(height_px).saturating_mul(4) as usize];
+                let mut glyph_rects = 0usize;
+                buffer.draw(
+                    swash_cache,
+                    cosmic_color(request.color),
+                    |x, y, w, h, color| {
+                        glyph_rects += 1;
+                        blend_rect(&mut rgba, width_px, height_px, x, y, w, h, color);
+                    },
+                );
+                (layout, rgba, glyph_rects, width_px, height_px)
+            });
+
+        RasterizedText {
+            surface: TextSurface {
+                size: Size::new(width_px as f32 / scale, height_px as f32 / scale),
+                pixels_per_point: scale,
+                width_px,
+                height_px,
+                rgba,
+            },
+            layout: TextLayoutResult {
+                size: Size::new(layout.size.width / scale, layout.size.height / scale),
+                ..layout.scale_lines(1.0 / scale)
+            },
+            diagnostics: TextDiagnostics {
+                backend: "cosmic-text",
+                proportional_family: INTER_FAMILY,
+                monospace_family: JETBRAINS_MONO_FAMILY,
+                pixels_per_point: scale,
+                width_px,
+                height_px,
+                glyph_rects,
+            },
+        }
+    }
+
+    pub fn layout(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        pixels_per_point: f32,
+    ) -> TextLayoutResult {
+        let scale = pixels_per_point.max(1.0);
+        let layout = self.with_buffer(request.clone(), scale, |buffer, _| {
+            layout_result(&request, buffer)
+        });
+        TextLayoutResult {
+            size: Size::new(layout.size.width / scale, layout.size.height / scale),
+            ..layout.scale_lines(1.0 / scale)
+        }
+    }
+
+    fn hit_index(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
+        let scale = 1.0;
+        let cursor = self
+            .with_buffer(request.clone(), scale, |buffer, _| {
+                buffer.hit(point.x * scale, point.y * scale)
+            })
+            .unwrap_or_default();
+        let layout_index =
+            line_byte_to_layout_index(request.text.layout_text(), cursor.line, cursor.index);
+        request.text.layout_to_semantic_index(layout_index)
+    }
+
+    fn with_buffer<R>(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        scale: f32,
+        f: impl FnOnce(&mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>, &mut SwashCache) -> R,
+    ) -> R {
         let metrics = Metrics::new(
             request.font_size.max(1.0) * scale,
             request
@@ -146,47 +242,7 @@ impl CosmicTextRenderer {
             )),
         );
 
-        let layout = layout_result(&request, &mut buffer);
-        let width_px = surface_width_px(
-            &layout,
-            request.wrap_width,
-            request.layout_style.text_wrap_mode,
-            scale,
-        );
-        let height_px = finite_surface_extent(layout.size.height).ceil() as u32;
-        let mut rgba = vec![0; width_px.saturating_mul(height_px).saturating_mul(4) as usize];
-        let mut glyph_rects = 0usize;
-        buffer.draw(
-            &mut self.swash_cache,
-            cosmic_color(request.color),
-            |x, y, w, h, color| {
-                glyph_rects += 1;
-                blend_rect(&mut rgba, width_px, height_px, x, y, w, h, color);
-            },
-        );
-
-        RasterizedText {
-            surface: TextSurface {
-                size: Size::new(width_px as f32 / scale, height_px as f32 / scale),
-                pixels_per_point: scale,
-                width_px,
-                height_px,
-                rgba,
-            },
-            layout: TextLayoutResult {
-                size: Size::new(layout.size.width / scale, layout.size.height / scale),
-                ..layout.scale_lines(1.0 / scale)
-            },
-            diagnostics: TextDiagnostics {
-                backend: "cosmic-text",
-                proportional_family: INTER_FAMILY,
-                monospace_family: JETBRAINS_MONO_FAMILY,
-                pixels_per_point: scale,
-                width_px,
-                height_px,
-                glyph_rects,
-            },
-        }
+        f(&mut buffer, &mut self.swash_cache)
     }
 }
 
@@ -196,23 +252,11 @@ impl TextMeasurer for CosmicTextRenderer {
     }
 
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
-        self.rasterize(request, 1.0).layout
+        self.layout(request, 1.0)
     }
 
     fn text_index_at(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
-        let measured = self.rasterize(request.clone(), 1.0).layout;
-        measured
-            .lines
-            .iter()
-            .find(|line| point.y >= line.baseline - line.height && point.y <= line.baseline)
-            .map(|line| {
-                if point.x >= line.x_offset + line.width {
-                    line.semantic_end
-                } else {
-                    line.semantic_start
-                }
-            })
-            .unwrap_or(0)
+        self.hit_index(request, point)
     }
 }
 
@@ -287,6 +331,18 @@ fn layout_elided(request: &TextLayoutRequest<'_>, lines: &[TextLayoutLine]) -> b
 
 fn first_glyph_x(glyphs: &[cosmic_text::LayoutGlyph]) -> f32 {
     glyphs.first().map(|glyph| glyph.x).unwrap_or(0.0)
+}
+
+fn line_byte_to_layout_index(text: &str, line_index: usize, line_byte_index: usize) -> usize {
+    let mut byte_start = 0usize;
+    for (index, line) in text.split_inclusive('\n').enumerate() {
+        if index == line_index {
+            let local_byte = line_byte_index.min(line.len());
+            return text[..byte_start + local_byte].chars().count();
+        }
+        byte_start += line.len();
+    }
+    text.chars().count()
 }
 
 fn surface_width_px(
@@ -440,31 +496,72 @@ mod tests {
     const JETBRAINS_MONO_ITALIC: &[u8] =
         include_bytes!("../../egui/assets/fonts/jetbrains-mono/JetBrainsMono-Italic[wght].ttf");
 
-    #[test]
-    fn rasterizes_basic_text_surface() {
-        let mut renderer = CosmicTextRenderer::new([
+    fn renderer() -> CosmicTextRenderer {
+        CosmicTextRenderer::new([
             FontAsset::new(INTER_FAMILY, INTER),
             FontAsset::new(JETBRAINS_MONO_FAMILY, JETBRAINS_MONO),
             FontAsset::new(JETBRAINS_MONO_FAMILY, JETBRAINS_MONO_ITALIC),
-        ]);
+        ])
+    }
+
+    fn request<'a>(
+        normalized: &'a NormalizedText,
+        font_size: f32,
+        wrap_width: f32,
+    ) -> TextLayoutRequest<'a> {
+        TextLayoutRequest {
+            text: normalized,
+            font_size,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width,
+            layout_style: TextLayoutStyle::default(),
+            line_height: Some(font_size * 1.25),
+        }
+    }
+
+    #[test]
+    fn rasterizes_basic_text_surface() {
+        let mut renderer = renderer();
         let content = TextContent::plain("Ag 100px");
         let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
-        let rasterized = renderer.rasterize(
-            TextLayoutRequest {
-                text: &normalized,
-                font_size: 32.0,
-                color: Color::rgb(24, 24, 30),
-                direction: Direction::Ltr,
-                wrap_width: 300.0,
-                layout_style: TextLayoutStyle::default(),
-                line_height: Some(40.0),
-            },
-            2.0,
-        );
+        let rasterized = renderer.rasterize(request(&normalized, 32.0, 300.0), 2.0);
 
         assert!(rasterized.surface.width_px > 0);
         assert!(rasterized.surface.height_px > 0);
         assert!(rasterized.diagnostics.glyph_rects > 0);
         assert!(rasterized.surface.rgba.iter().any(|channel| *channel != 0));
+    }
+
+    #[test]
+    fn measures_layout_without_rasterizing_surface() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Alpha beta gamma delta");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let measured = renderer.measure_text(request(&normalized, 16.0, 90.0));
+
+        assert!(measured.size.width > 0.0);
+        assert!(measured.line_count >= 1);
+    }
+
+    #[test]
+    fn hit_testing_returns_interior_text_indices() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Alpha beta");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let text_request = request(&normalized, 24.0, 400.0);
+        let measured = renderer.measure_text(text_request.clone());
+        let baseline = measured.first_baseline.unwrap_or(20.0);
+
+        let start = renderer.text_index_at(text_request.clone(), Point::new(1.0, baseline));
+        let middle = renderer.text_index_at(text_request.clone(), Point::new(72.0, baseline));
+        let end = renderer.text_index_at(text_request, Point::new(220.0, baseline));
+
+        assert_eq!(start, 0);
+        assert!(
+            middle > start && middle < content.semantic_text().chars().count(),
+            "expected hit testing to produce an interior semantic index, got {middle}"
+        );
+        assert_eq!(end, content.semantic_text().chars().count());
     }
 }

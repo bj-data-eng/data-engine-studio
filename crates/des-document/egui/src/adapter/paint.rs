@@ -2,16 +2,21 @@ use super::text::{layout_job, paint_document_text_selection};
 use des_document::{
     BorderStyle, ClipRect, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph,
     Insets, NormalizedText, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest,
-    TextWrapMode,
+    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
-use des_text::{CosmicTextRenderer, RasterizedText};
+use des_text::CosmicTextRenderer;
 use eframe::egui;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 
 pub struct CosmicTextPaintResources {
     renderer: CosmicTextRenderer,
-    textures: HashMap<u64, egui::TextureHandle>,
+    textures: HashMap<u64, CachedTextTexture>,
+}
+
+struct CachedTextTexture {
+    texture: egui::TextureHandle,
+    size: egui::Vec2,
 }
 
 impl CosmicTextPaintResources {
@@ -20,6 +25,24 @@ impl CosmicTextPaintResources {
             renderer,
             textures: HashMap::new(),
         }
+    }
+}
+
+impl TextMeasurer for CosmicTextPaintResources {
+    fn cache_key(&self) -> TextMeasurerKey {
+        self.renderer.cache_key()
+    }
+
+    fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
+        self.renderer.measure_text(request)
+    }
+
+    fn text_index_at(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        point: des_document::Point,
+    ) -> usize {
+        self.renderer.text_index_at(request, point)
     }
 }
 pub fn paint_frame(
@@ -117,14 +140,13 @@ fn paint_frame_clipped(
                 line_height: frame.style.line_height,
             };
             if let Some(resources) = text_resources.as_deref_mut() {
-                let rasterized = resources
-                    .renderer
-                    .rasterize(request, ui.ctx().pixels_per_point());
                 paint_rasterized_text(
                     &painter,
                     text_rect.min,
                     frame,
-                    &rasterized,
+                    request,
+                    ui.ctx().pixels_per_point(),
+                    &mut resources.renderer,
                     &mut resources.textures,
                 );
             } else {
@@ -180,9 +202,18 @@ fn paint_rasterized_text(
     painter: &egui::Painter,
     position: egui::Pos2,
     frame: &ResolvedElement,
-    rasterized: &RasterizedText,
-    textures: &mut HashMap<u64, egui::TextureHandle>,
+    request: TextLayoutRequest<'_>,
+    pixels_per_point: f32,
+    renderer: &mut CosmicTextRenderer,
+    textures: &mut HashMap<u64, CachedTextTexture>,
 ) {
+    let texture_key = text_texture_hash(frame, &request, pixels_per_point);
+    if let Some(cached) = textures.get(&texture_key) {
+        paint_text_texture(painter, position, cached.texture.id(), cached.size);
+        return;
+    }
+
+    let rasterized = renderer.rasterize(request, pixels_per_point);
     if rasterized.surface.is_empty() {
         return;
     }
@@ -193,35 +224,44 @@ fn paint_rasterized_text(
         ],
         &rasterized.surface.rgba,
     );
-    let texture_key = text_texture_hash(frame, rasterized);
-    let texture = textures.entry(texture_key).or_insert_with(|| {
-        painter.ctx().load_texture(
-            format!("des-cosmic-text-{}-{texture_key}", frame.id.as_str()),
-            color_image.clone(),
-            egui::TextureOptions::LINEAR,
-        )
-    });
-    texture.set(color_image, egui::TextureOptions::LINEAR);
-    let rect = egui::Rect::from_min_size(
-        position,
-        egui::vec2(
-            rasterized.surface.size.width,
-            rasterized.surface.size.height,
-        ),
+    let texture = painter.ctx().load_texture(
+        format!("des-cosmic-text-{}-{texture_key}", frame.id.as_str()),
+        color_image,
+        egui::TextureOptions::LINEAR,
     );
+    let size = egui::vec2(
+        rasterized.surface.size.width,
+        rasterized.surface.size.height,
+    );
+    paint_text_texture(painter, position, texture.id(), size);
+    textures.insert(texture_key, CachedTextTexture { texture, size });
+}
+
+fn paint_text_texture(
+    painter: &egui::Painter,
+    position: egui::Pos2,
+    texture: egui::TextureId,
+    size: egui::Vec2,
+) {
+    let rect = egui::Rect::from_min_size(position, size);
     painter.image(
-        texture.id(),
+        texture,
         rect,
         egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
         egui::Color32::WHITE,
     );
 }
 
-fn text_texture_hash(frame: &ResolvedElement, rasterized: &RasterizedText) -> u64 {
+fn text_texture_hash(
+    frame: &ResolvedElement,
+    request: &TextLayoutRequest<'_>,
+    pixels_per_point: f32,
+) -> u64 {
     let mut hasher = DefaultHasher::new();
     frame.id.as_str().hash(&mut hasher);
     if let Some(text) = &frame.text {
         text.semantic_text().hash(&mut hasher);
+        format!("{:?}", text.runs()).hash(&mut hasher);
     }
     frame.style.font_size.to_bits().hash(&mut hasher);
     frame.style.line_height.map(f32::to_bits).hash(&mut hasher);
@@ -229,13 +269,10 @@ fn text_texture_hash(frame: &ResolvedElement, rasterized: &RasterizedText) -> u6
     frame.style.text_color.g.hash(&mut hasher);
     frame.style.text_color.b.hash(&mut hasher);
     frame.style.text_color.a.hash(&mut hasher);
-    rasterized.surface.width_px.hash(&mut hasher);
-    rasterized.surface.height_px.hash(&mut hasher);
-    rasterized
-        .surface
-        .pixels_per_point
-        .to_bits()
-        .hash(&mut hasher);
+    request.wrap_width.to_bits().hash(&mut hasher);
+    format!("{:?}", request.direction).hash(&mut hasher);
+    format!("{:?}", request.layout_style).hash(&mut hasher);
+    pixels_per_point.to_bits().hash(&mut hasher);
     hasher.finish()
 }
 
