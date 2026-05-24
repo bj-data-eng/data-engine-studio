@@ -1446,15 +1446,15 @@ fn run_baseline_shifts(
 ) -> Vec<f32> {
     let mut shifts = Vec::with_capacity(text.runs().len() + 1);
     shifts.push(0.0);
+    let parent_font_size = inherited_font_size.max(1.0) * scale;
     shifts.extend(text.runs().iter().map(|run| {
-        let font_size = run.style.font_size.unwrap_or(inherited_font_size).max(1.0) * scale;
         match run
             .style
             .vertical_align
             .unwrap_or(des_document::TextVerticalAlign::Baseline)
         {
-            des_document::TextVerticalAlign::Super => font_size * 0.35,
-            des_document::TextVerticalAlign::Sub => -(font_size * 0.2),
+            des_document::TextVerticalAlign::Super => parent_font_size * 0.4,
+            des_document::TextVerticalAlign::Sub => -(parent_font_size * 0.2),
             des_document::TextVerticalAlign::Baseline
             | des_document::TextVerticalAlign::Top
             | des_document::TextVerticalAlign::Middle
@@ -2910,6 +2910,16 @@ mod tests {
             .iter()
             .find(|glyph| glyph.run_index == 1)
             .expect("superscript run should paint one glyph");
+        let baseline_o = glyph_run
+            .glyphs
+            .iter()
+            .find(|glyph| glyph.run_index == 2 && glyph.layout_start == 2)
+            .expect("baseline O should paint one glyph after superscript");
+        let baseline_c = glyph_run
+            .glyphs
+            .iter()
+            .find(|glyph| glyph.run_index == 2 && glyph.layout_start == 4)
+            .expect("baseline C should paint one glyph before subscript");
         let sub_two = glyph_run
             .glyphs
             .iter()
@@ -2917,12 +2927,24 @@ mod tests {
             .expect("subscript run should paint one glyph");
 
         assert!(
+            super_two.y_px < baseline_o.y_px,
+            "superscript glyph should paint above the surrounding baseline text"
+        );
+        assert!(
+            sub_two.y_px > baseline_c.y_px,
+            "subscript glyph should paint below the surrounding baseline text"
+        );
+        assert!(
             super_two.y_px < sub_two.y_px,
             "superscript glyph should paint above subscript glyph"
         );
         assert!(
-            sub_two.y_px - super_two.y_px >= 8,
-            "baseline shift should be visible in physical glyph placement"
+            baseline_o.y_px - super_two.y_px >= 8,
+            "superscript shift should be visible relative to parent-size text"
+        );
+        assert!(
+            sub_two.y_px - baseline_c.y_px >= 4,
+            "subscript shift should be visible relative to parent-size text"
         );
     }
 }
