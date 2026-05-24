@@ -806,11 +806,33 @@ fn parse_length(input: &str) -> Result<Length, CssParseError> {
     match input {
         "auto" => Ok(Length::Auto),
         "fill" | "100%" => Ok(Length::Fill),
-        value if value.ends_with('%') => {
-            let percent = parse_f32(value.trim_end_matches('%'))? / 100.0;
-            Ok(Length::Percent(percent))
-        }
+        value if value.starts_with("calc(") => parse_calc_length(value),
+        value if value.ends_with('%') => Ok(Length::Percent(parse_percent_factor(value)?)),
         value => Ok(Length::Px(parse_px(value)?)),
+    }
+}
+
+fn parse_calc_length(input: &str) -> Result<Length, CssParseError> {
+    let Some(body) = input
+        .strip_prefix("calc(")
+        .and_then(|value| value.strip_suffix(')'))
+    else {
+        return Err(CssParseError::new(format!("invalid calc length `{input}`")));
+    };
+    let parts = body.split_whitespace().collect::<Vec<_>>();
+    let [percent, operator, px] = parts.as_slice() else {
+        return Err(CssParseError::new(
+            "calc length expects `<percent> +/- <px>`",
+        ));
+    };
+    let percent = parse_percent_factor(percent)?;
+    let px = parse_px(px)?;
+    match *operator {
+        "+" => Ok(Length::calc(percent, px)),
+        "-" => Ok(Length::calc(percent, -px)),
+        _ => Err(CssParseError::new(
+            "calc length operator must be `+` or `-`",
+        )),
     }
 }
 
@@ -823,6 +845,16 @@ fn parse_f32(input: &str) -> Result<f32, CssParseError> {
     input
         .parse::<f32>()
         .map_err(|_| CssParseError::new(format!("expected number, got `{input}`")))
+}
+
+fn parse_percent_factor(input: &str) -> Result<f32, CssParseError> {
+    let percent = input
+        .strip_suffix('%')
+        .ok_or_else(|| CssParseError::new("expected percentage"))?;
+    percent
+        .parse::<f64>()
+        .map(|value| (value / 100.0) as f32)
+        .map_err(|_| CssParseError::new(format!("expected percentage, got `{input}`")))
 }
 
 fn parse_usize(input: &str) -> Result<usize, CssParseError> {

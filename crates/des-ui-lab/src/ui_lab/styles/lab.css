@@ -1649,3 +1649,171 @@ text {
   color: #625b71;
   text-wrap: wrap;
 }
+
+.floating-playground {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  padding: 10px;
+  gap: 10px;
+  background: #faf4fc;
+}
+
+.floating-specimen-box {
+  width: calc(33.333334% - 6.666667px);
+  height: 160px;
+  flex-basis: calc(33.333334% - 6.666667px);
+  flex-shrink: 0;
+  padding: 8px 12px 10px 12px;
+  gap: 6px;
+  background: #f3edf7;
+  border: 1px solid #cac4d0;
+  border-radius: 8px;
+}
+
+.floating-main-axis-specimen {
+  height: 210px;
+}
+
+.floating-centered-axis-specimen {
+  height: 160px;
+}
+
+.floating-offset-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 112px;
+  gap: 24px;
+}
+
+.floating-main-axis-stack {
+  width: 100%;
+  height: auto;
+  padding: 10px 0px 0px 0px;
+  gap: 36px;
+}
+
+.floating-main-axis-row {
+  flex-direction: row;
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  gap: 22px;
+}
+
+.floating-centered-axis-row {
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.floating-scroll-shift-panel,
+.floating-vertical-overlap-panel,
+.floating-vertical-flip-panel,
+.floating-edge-flip-panel {
+  width: 100%;
+  height: 148px;
+  border: 1px solid #cac4d0;
+  border-radius: 8px;
+  scrollbar-visible: true;
+}
+
+.floating-scroll-shift-panel {
+  overflow-x: scroll;
+  overflow-y: visible;
+}
+
+.floating-vertical-overlap-panel,
+.floating-vertical-flip-panel {
+  overflow-x: visible;
+  overflow-y: scroll;
+}
+
+.floating-edge-flip-panel {
+  overflow: scroll;
+}
+
+.floating-scroll-shift-track {
+  width: 620px;
+  height: 108px;
+  flex-shrink: 0;
+}
+
+.floating-vertical-overlap-track,
+.floating-vertical-flip-track {
+  width: 100%;
+  height: 420px;
+  flex-shrink: 0;
+}
+
+.floating-edge-flip-track {
+  width: 560px;
+  height: 340px;
+  flex-shrink: 0;
+}
+
+.floating-offset-reference {
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: transparent;
+  border: 2px dashed #1e1f26;
+  border-radius: 0px;
+}
+
+.floating-alignment-axis-reference {
+  gap: 3px;
+}
+
+.floating-offset-reference-label {
+  font-size: 9px;
+  color: #1e1f26;
+}
+
+.floating-alignment-axis-placement-label {
+  font-size: 8px;
+  color: #1e1f26;
+}
+
+.floating-alignment-axis-axis-label {
+  font-size: 7px;
+  color: #1e1f26;
+}
+
+.floating-offset-popover {
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 22px;
+  background: #f43457;
+  border: 1px solid #f43457;
+  border-radius: 0px;
+  z-index: 2300;
+}
+
+.floating-offset-popover-label {
+  font-size: 9px;
+  color: #ffffff;
+}
+
+#floating-scroll-shift-reference {
+  margin: 50px 0px 0px 520px;
+}
+
+#floating-scroll-attach-reference {
+  margin: 50px 0px 0px 280px;
+}
+
+#floating-vertical-overlap-reference {
+  margin: 92px 0px 0px 118px;
+}
+
+#floating-vertical-flip-reference,
+#floating-edge-flip-reference {
+  margin: 132px 0px 0px 118px;
+}
