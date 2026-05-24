@@ -2216,13 +2216,18 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         rich_sample.text.as_ref().unwrap().semantic_text(),
         "Ag 100px"
     );
+    assert_eq!(
+        frame_text(&output, "text-rich-shape"),
+        Some("normal italic oblique")
+    );
     let shape_runs = rich_shape
         .normalized_text
         .as_ref()
         .expect("rich shape specimen should retain normalized text")
         .runs();
-    assert_eq!(shape_runs[3].style.font_style, Some(FontStyle::Italic));
-    assert_eq!(shape_runs[4].style.font_style, Some(FontStyle::Oblique));
+    assert_eq!(shape_runs[0].style.font_style, None);
+    assert_eq!(shape_runs[1].style.font_style, Some(FontStyle::Italic));
+    assert_eq!(shape_runs[2].style.font_style, Some(FontStyle::Oblique));
     let family_runs = rich_family
         .normalized_text
         .as_ref()

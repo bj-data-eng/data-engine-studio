@@ -3278,27 +3278,7 @@ fn rich_weight_specimen() -> TextContent {
 
 fn rich_shape_specimen() -> TextContent {
     TextContent::new(vec![
-        TextRun::styled(
-            "condensed ",
-            InlineTextStyle {
-                font_stretch: Some(FontStretch::CONDENSED),
-                ..InlineTextStyle::default()
-            },
-        ),
-        TextRun::styled(
-            "normal ",
-            InlineTextStyle {
-                font_stretch: Some(FontStretch::NORMAL),
-                ..InlineTextStyle::default()
-            },
-        ),
-        TextRun::styled(
-            "expanded ",
-            InlineTextStyle {
-                font_stretch: Some(FontStretch::EXPANDED),
-                ..InlineTextStyle::default()
-            },
-        ),
+        TextRun::plain("normal "),
         TextRun::styled(
             "italic ",
             InlineTextStyle {

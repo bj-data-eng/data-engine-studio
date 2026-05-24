@@ -16,9 +16,9 @@ use views::{
 use des_document::{
     Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
     DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector,
-    FontStretch, FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput, Rect, Shadow,
-    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextContent, TextDecoration, TextRun, TextVerticalAlign, VisualCloneOptions,
+    FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput, Rect, Shadow, Size, Style,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextContent, TextDecoration, TextRun, TextVerticalAlign, VisualCloneOptions,
     VisualElementClone,
 };
 use des_widgets::{
