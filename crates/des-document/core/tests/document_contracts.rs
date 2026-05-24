@@ -4,7 +4,7 @@ use des_document::{
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
     TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextSelectionGranularity, TextWrapMode, Transition, ViewportQuery,
+    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
     VisualCloneOptions, WhiteSpace,
 };
 
@@ -1626,6 +1626,54 @@ fn selectable_text_exposes_selected_text_for_copy() {
     assert_eq!(output.selected_text().as_deref(), Some("Customer"));
     assert!(output.snapshot().find("label").unwrap().selectable_text());
     assert!(output.snapshot().find("label").unwrap().copyable_text());
+}
+
+#[test]
+fn declared_text_transform_changes_layout_text_but_copy_uses_semantic_text() {
+    struct RecordingLayoutTextMeasurer {
+        layout_text: String,
+    }
+
+    impl TextMeasurer for RecordingLayoutTextMeasurer {
+        fn cache_key(&self) -> TextMeasurerKey {
+            TextMeasurerKey::new("recording-layout-text")
+        }
+
+        fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
+            self.layout_text = request.text.layout_text().to_owned();
+            TextLayoutResult::new(Size::new(160.0, 18.0), 1, false)
+        }
+    }
+
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(320.0))
+            .white_space(WhiteSpace::Pre)
+            .text_transform(TextTransform::Uppercase),
+    );
+    let mut document = Document::build(Size::new(360.0, 120.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(Element::Text).selectable_text(),
+            "Straße analytics",
+        );
+    });
+    let mut text_measurer = RecordingLayoutTextMeasurer {
+        layout_text: String::new(),
+    };
+
+    let output = engine.update_with_input_and_text_measurer(
+        &mut document,
+        &stylesheet,
+        DocumentInput::default(),
+        &mut text_measurer,
+    );
+    let label = output.snapshot().find("label").unwrap();
+
+    assert_eq!(text_measurer.layout_text, "STRASSE ANALYTICS");
+    assert_eq!(label.text().as_deref(), Some("Straße analytics"));
 }
 
 #[test]

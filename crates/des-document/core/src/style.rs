@@ -5,8 +5,8 @@ use crate::geometry::{
 };
 use crate::state::ElementState;
 use crate::text::{
-    OverflowWrap, TextAlign, TextLayoutStyle, TextOverflow, TextWrapMode, WhiteSpace,
-    WhiteSpaceCollapse, WordBreak,
+    OverflowWrap, TextAlign, TextLayoutStyle, TextOverflow, TextTransform, TextWrapMode,
+    WhiteSpace, WhiteSpaceCollapse, WordBreak,
 };
 pub use des_layout::prelude::{
     Display, GridAutoFlow, MaxTrackSizingFunction, MinTrackSizingFunction, RepetitionCount,
@@ -1101,6 +1101,13 @@ impl Style {
     pub fn text_overflow(mut self, text_overflow: TextOverflow) -> Self {
         let mut layout = self.text_layout.unwrap_or_default();
         layout.text_overflow = text_overflow;
+        self.text_layout = Some(layout);
+        self
+    }
+
+    pub fn text_transform(mut self, text_transform: TextTransform) -> Self {
+        let mut layout = self.text_layout.unwrap_or_default();
+        layout.text_transform = text_transform;
         self.text_layout = Some(layout);
         self
     }

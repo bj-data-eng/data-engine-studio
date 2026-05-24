@@ -93,6 +93,7 @@ pub struct InlineTextStyle {
     pub font_family: Option<String>,
     pub font_weight: Option<FontWeight>,
     pub font_style: Option<FontStyle>,
+    pub text_transform: Option<TextTransform>,
     pub text_decoration: Option<TextDecoration>,
     pub background: Option<Color>,
 }
@@ -210,6 +211,14 @@ pub enum TextOverflow {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextTransform {
+    None,
+    Uppercase,
+    Lowercase,
+    Capitalize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WhiteSpace {
     Normal,
     Nowrap,
@@ -227,6 +236,7 @@ pub struct TextLayoutStyle {
     pub word_break: WordBreak,
     pub text_align: TextAlign,
     pub text_overflow: TextOverflow,
+    pub text_transform: TextTransform,
     pub tab_size: u16,
     pub max_lines: Option<usize>,
 }
@@ -241,6 +251,7 @@ impl TextLayoutStyle {
         word_break: WordBreak::Normal,
         text_align: TextAlign::Start,
         text_overflow: TextOverflow::Clip,
+        text_transform: TextTransform::None,
         tab_size: Self::DEFAULT_TAB_SIZE,
         max_lines: None,
     };
@@ -420,6 +431,7 @@ struct TextNormalizer {
     runs: Vec<TextLayoutRun>,
     pending_collapsed_space: Option<usize>,
     last_emitted_space: bool,
+    capitalize_next: bool,
 }
 
 impl TextNormalizer {
@@ -433,6 +445,7 @@ impl TextNormalizer {
             runs: Vec::new(),
             pending_collapsed_space: None,
             last_emitted_space: false,
+            capitalize_next: true,
         }
     }
 
@@ -442,35 +455,44 @@ impl TextNormalizer {
             for ch in run.text.chars() {
                 let semantic_index = self.semantic_text.chars().count();
                 self.semantic_text.push(ch);
+                let text_transform = run
+                    .style
+                    .text_transform
+                    .unwrap_or(self.style.text_transform);
                 match self.style.white_space_collapse {
                     WhiteSpaceCollapse::Collapse => {
                         if is_css_space(ch) {
+                            self.capitalize_next = true;
                             self.pending_collapsed_space.get_or_insert(semantic_index);
                             self.semantic_to_layout
                                 .push(self.layout_text.chars().count());
                         } else {
                             self.flush_collapsed_space(run_index, &run.style);
-                            self.emit_char(ch, semantic_index);
+                            self.emit_transformed_char(ch, semantic_index, text_transform);
                         }
                     }
-                    WhiteSpaceCollapse::Preserve => self.emit_preserved_char(ch, semantic_index),
+                    WhiteSpaceCollapse::Preserve => {
+                        self.emit_preserved_char(ch, semantic_index, text_transform)
+                    }
                     WhiteSpaceCollapse::PreserveBreaks => {
                         if ch == '\n' {
                             self.emit_char(ch, semantic_index);
+                            self.capitalize_next = true;
                         } else if is_css_space(ch) {
+                            self.capitalize_next = true;
                             self.pending_collapsed_space.get_or_insert(semantic_index);
                             self.semantic_to_layout
                                 .push(self.layout_text.chars().count());
                         } else {
                             self.flush_collapsed_space(run_index, &run.style);
-                            self.emit_char(ch, semantic_index);
+                            self.emit_transformed_char(ch, semantic_index, text_transform);
                         }
                     }
                     WhiteSpaceCollapse::BreakSpaces => {
                         if ch == '\t' {
                             self.emit_tab(semantic_index);
                         } else {
-                            self.emit_char(ch, semantic_index);
+                            self.emit_transformed_char(ch, semantic_index, text_transform);
                         }
                     }
                 }
@@ -519,11 +541,50 @@ impl TextNormalizer {
         self.last_emitted_space = ch == ' ' || ch == '\n';
     }
 
-    fn emit_preserved_char(&mut self, ch: char, semantic_index: usize) {
+    fn emit_transformed_char(
+        &mut self,
+        ch: char,
+        semantic_index: usize,
+        text_transform: TextTransform,
+    ) {
+        match text_transform {
+            TextTransform::None => self.emit_char(ch, semantic_index),
+            TextTransform::Uppercase => {
+                for transformed in ch.to_uppercase() {
+                    self.emit_char(transformed, semantic_index);
+                }
+            }
+            TextTransform::Lowercase => {
+                for transformed in ch.to_lowercase() {
+                    self.emit_char(transformed, semantic_index);
+                }
+            }
+            TextTransform::Capitalize => {
+                if ch.is_alphabetic() && self.capitalize_next {
+                    for transformed in ch.to_uppercase() {
+                        self.emit_char(transformed, semantic_index);
+                    }
+                } else {
+                    self.emit_char(ch, semantic_index);
+                }
+                self.capitalize_next = !ch.is_alphanumeric();
+            }
+        }
+        if text_transform != TextTransform::Capitalize {
+            self.capitalize_next = !ch.is_alphanumeric();
+        }
+    }
+
+    fn emit_preserved_char(
+        &mut self,
+        ch: char,
+        semantic_index: usize,
+        text_transform: TextTransform,
+    ) {
         if ch == '\t' {
             self.emit_tab(semantic_index);
         } else {
-            self.emit_char(ch, semantic_index);
+            self.emit_transformed_char(ch, semantic_index, text_transform);
         }
     }
 
@@ -532,6 +593,7 @@ impl TextNormalizer {
         for _ in 0..width {
             self.emit_char(' ', semantic_index);
         }
+        self.capitalize_next = true;
     }
 }
 
@@ -877,6 +939,7 @@ mod tests {
                 word_break: WordBreak::Normal,
                 text_align: TextAlign::Start,
                 text_overflow: TextOverflow::Clip,
+                text_transform: TextTransform::None,
                 tab_size: TextLayoutStyle::DEFAULT_TAB_SIZE,
                 max_lines: None,
             }
@@ -1022,6 +1085,53 @@ mod tests {
         assert!(TextDecoration::UNDERLINE.underline);
         assert!(TextDecoration::OVERLINE.overline);
         assert!(TextDecoration::LINE_THROUGH.line_through);
+    }
+
+    #[test]
+    fn text_transform_changes_layout_text_without_changing_semantic_text() {
+        let content = TextContent::plain("Straße title");
+        let mut style = TextLayoutStyle::default();
+        style.text_transform = TextTransform::Uppercase;
+        let normalized = NormalizedText::from_content(&content, style);
+
+        assert_eq!(normalized.semantic_text(), "Straße title");
+        assert_eq!(normalized.layout_text(), "STRASSE TITLE");
+        assert_eq!(normalized.layout_to_semantic_index(4), 4);
+        assert_eq!(normalized.layout_to_semantic_index(5), 4);
+        assert_eq!(normalized.semantic_to_layout_index(4), 4);
+        assert_eq!(normalized.semantic_to_layout_index(5), 6);
+    }
+
+    #[test]
+    fn inline_text_transform_overrides_element_transform_per_run() {
+        let content = TextContent::new(vec![
+            TextRun::plain("hello "),
+            TextRun::styled(
+                "LOUD",
+                InlineTextStyle {
+                    text_transform: Some(TextTransform::Lowercase),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let mut style = TextLayoutStyle::default();
+        style.text_transform = TextTransform::Capitalize;
+        let normalized = NormalizedText::from_content(&content, style);
+
+        assert_eq!(normalized.semantic_text(), "hello LOUD");
+        assert_eq!(normalized.layout_text(), "Hello loud");
+        assert_eq!(normalized.runs().len(), 2);
+    }
+
+    #[test]
+    fn text_transform_capitalize_tracks_word_boundaries_across_runs() {
+        let content =
+            TextContent::new(vec![TextRun::plain("alpha-"), TextRun::plain("beta gamma")]);
+        let mut style = TextLayoutStyle::white_space(WhiteSpace::PreWrap);
+        style.text_transform = TextTransform::Capitalize;
+        let normalized = NormalizedText::from_content(&content, style);
+
+        assert_eq!(normalized.layout_text(), "Alpha-Beta Gamma");
     }
 
     #[test]
