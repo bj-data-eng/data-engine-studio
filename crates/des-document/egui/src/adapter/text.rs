@@ -202,9 +202,19 @@ fn text_format(
         .as_ref()
         .map(|family| egui::FontFamily::Name(family.clone().into()))
         .unwrap_or(egui::FontFamily::Proportional);
+    let coords = match style.font_weight {
+        Some(des_document::FontWeight::Bold) => {
+            egui::epaint::text::VariationCoords::new([(b"wght", 700.0)])
+        }
+        Some(des_document::FontWeight::Normal) => {
+            egui::epaint::text::VariationCoords::new([(b"wght", 400.0)])
+        }
+        None => egui::epaint::text::VariationCoords::default(),
+    };
     egui::TextFormat {
         font_id: egui::FontId::new(style.font_size.unwrap_or(inherited_font_size), family),
         color: to_egui_color(color),
+        coords,
         italics: style.italic.unwrap_or(false),
         strikethrough: if style.strikethrough.unwrap_or(false) {
             egui::Stroke::new(1.0, to_egui_color(color))
@@ -235,7 +245,10 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_document::{NormalizedText, TextContent, TextLayoutStyle, WhiteSpace};
+    use des_document::{
+        FontWeight, InlineTextStyle, NormalizedText, TextContent, TextLayoutStyle, TextRun,
+        WhiteSpace,
+    };
 
     #[test]
     fn layout_job_extends_without_wrapping() {
@@ -280,6 +293,52 @@ mod tests {
         assert_eq!(job.wrap.max_width, 1.0);
         assert_eq!(job.wrap.max_rows, 1);
         assert!(job.wrap.break_anywhere);
+    }
+
+    #[test]
+    fn layout_job_preserves_inline_run_visual_style() {
+        let text = TextContent::new(vec![
+            TextRun::plain("plain "),
+            TextRun::styled(
+                "bold",
+                InlineTextStyle {
+                    color: Some(Color::rgb(255, 0, 0)),
+                    font_size: Some(18.0),
+                    font_weight: Some(FontWeight::Bold),
+                    italic: Some(true),
+                    underline: Some(true),
+                    strikethrough: Some(true),
+                    background: Some(Color::rgb(0, 0, 255)),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized = NormalizedText::from_content(&text, TextLayoutStyle::default());
+
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 240.0,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.sections.len(), 2);
+        let format = &job.sections[1].format;
+        assert_eq!(format.color, egui::Color32::from_rgb(255, 0, 0));
+        assert_eq!(format.font_id.size, 18.0);
+        assert!(format.italics);
+        assert_ne!(format.underline, egui::Stroke::NONE);
+        assert_ne!(format.strikethrough, egui::Stroke::NONE);
+        assert_eq!(format.background, egui::Color32::from_rgb(0, 0, 255));
+        assert_eq!(
+            format.coords.as_ref(),
+            &[(egui::epaint::text::Tag::new(b"wght"), 700.0)]
+        );
     }
 
     #[test]
