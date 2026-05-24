@@ -66,6 +66,26 @@ impl TextMeasurer for CountingTextMeasurer {
     }
 }
 
+#[derive(Default)]
+struct SlotTextMeasurer {
+    hit_requests: usize,
+}
+
+impl TextMeasurer for SlotTextMeasurer {
+    fn cache_key(&self) -> TextMeasurerKey {
+        TextMeasurerKey::new("slot")
+    }
+
+    fn measure_text(&mut self, _request: TextLayoutRequest<'_>) -> TextLayoutResult {
+        TextLayoutResult::new(Size::new(120.0, 18.0), 1, false)
+    }
+
+    fn text_index_at(&mut self, _request: TextLayoutRequest<'_>, point: Point) -> usize {
+        self.hit_requests += 1;
+        (point.x / 20.0).floor().max(0.0) as usize
+    }
+}
+
 fn hover_input(position: Point) -> DocumentInput {
     DocumentInput {
         pointer: Some(PointerInput {
@@ -75,6 +95,22 @@ fn hover_input(position: Point) -> DocumentInput {
             primary_pressed: false,
             primary_clicked: false,
             primary_click_count: 0,
+            secondary_clicked: false,
+            time_seconds: 0.0,
+        }),
+        scroll_delta: Point::ZERO,
+    }
+}
+
+fn drag_text_input(position: Point, primary_pressed: bool) -> DocumentInput {
+    DocumentInput {
+        pointer: Some(PointerInput {
+            position,
+            primary_delta: Point::ZERO,
+            primary_down: true,
+            primary_pressed,
+            primary_clicked: primary_pressed,
+            primary_click_count: u8::from(primary_pressed),
             secondary_clicked: false,
             time_seconds: 0.0,
         }),
@@ -925,6 +961,65 @@ fn document_engine_update_with_input_clicks_interactive_element() {
             .any(|event| event.target == ElementId::new("button")
                 && event.kind == DocumentEventKind::Clicked)
     );
+}
+
+#[test]
+fn document_engine_active_text_selection_ignores_pointer_moves_inside_same_index() {
+    let mut document = Document::new(Size::new(240.0, 120.0));
+    document
+        .append_text(
+            "root",
+            "label",
+            ElementSpec::new(Element::Text).selectable_text(),
+            "Selectable text",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default().size(160.0, 40.0),
+    );
+    let mut engine = DocumentEngine::default();
+    let mut text_measurer = SlotTextMeasurer::default();
+
+    let start = engine.update_with_input_and_text_measurer(
+        &mut document,
+        &stylesheet,
+        drag_text_input(Point::new(4.0, 8.0), true),
+        &mut text_measurer,
+    );
+    assert!(start.metrics.input_changed_state);
+
+    let changed = engine.update_with_input_and_text_measurer(
+        &mut document,
+        &stylesheet,
+        drag_text_input(Point::new(45.0, 8.0), false),
+        &mut text_measurer,
+    );
+    let changed_selection = changed
+        .text_selection
+        .clone()
+        .expect("dragging selectable text should update selection");
+    assert!(changed.metrics.input_changed_state);
+    assert_eq!(changed_selection.focus_index, 2);
+
+    let same_index = engine.update_with_input_and_text_measurer(
+        &mut document,
+        &stylesheet,
+        drag_text_input(Point::new(48.0, 8.0), false),
+        &mut text_measurer,
+    );
+    let same_selection = same_index
+        .text_selection
+        .expect("selection should remain active while dragging");
+
+    assert!(
+        !same_index.metrics.input_changed_state,
+        "moving inside the same text index should not mark input changed"
+    );
+    assert_eq!(same_selection.anchor_index, changed_selection.anchor_index);
+    assert_eq!(same_selection.focus_index, changed_selection.focus_index);
+    assert_eq!(same_selection.focus, changed_selection.focus);
+    assert!(text_measurer.hit_requests >= 3);
 }
 
 #[test]

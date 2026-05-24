@@ -729,7 +729,7 @@ impl DocumentEngine {
         };
         if pointer.primary_down {
             let mut changed = false;
-            let focus_index = layout
+            let indices = layout
                 .find(selection.target.as_str())
                 .map(|frame| {
                     let text_index = text_index_at_point(frame, pointer.position, text_measurer);
@@ -738,19 +738,20 @@ impl DocumentEngine {
                         .as_ref()
                         .map(|text| text.semantic_text())
                         .unwrap_or_default();
-                    let (anchor_index, focus_index) = selection_indices_for_granularity(
+                    selection_indices_for_granularity(
                         text,
                         selection.anchor_range_start,
                         selection.anchor_range_end,
                         text_index,
                         selection.granularity,
-                    );
-                    selection.anchor_index = anchor_index;
-                    focus_index
+                    )
                 })
-                .unwrap_or(selection.focus_index);
-            changed |= set_point(&mut selection.focus, pointer.position);
-            changed |= set_usize(&mut selection.focus_index, focus_index);
+                .unwrap_or((selection.anchor_index, selection.focus_index));
+            changed |= set_usize(&mut selection.anchor_index, indices.0);
+            changed |= set_usize(&mut selection.focus_index, indices.1);
+            if changed {
+                selection.focus = pointer.position;
+            }
             changed |= set_bool(&mut selection.active, true);
             changed
         } else {
@@ -955,12 +956,6 @@ fn set_bool(target: &mut bool, value: bool) -> bool {
 }
 
 fn set_usize(target: &mut usize, value: usize) -> bool {
-    let changed = *target != value;
-    *target = value;
-    changed
-}
-
-fn set_point(target: &mut Point, value: Point) -> bool {
     let changed = *target != value;
     *target = value;
     changed
