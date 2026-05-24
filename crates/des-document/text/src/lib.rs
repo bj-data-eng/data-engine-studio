@@ -1476,6 +1476,28 @@ mod tests {
     }
 
     #[test]
+    fn reports_single_line_ellipsis_as_elided() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("A compact field title should elide when too wide.");
+        let mut style = TextLayoutStyle::default();
+        style.max_lines = Some(1);
+        style.text_overflow = TextOverflow::Ellipsis;
+        let normalized = NormalizedText::from_content(&content, style);
+        let measured = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 90.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+
+        assert_eq!(measured.line_count, 1);
+        assert!(measured.elided);
+    }
+
+    #[test]
     fn preserves_blank_lines_in_preformatted_text() {
         let mut renderer = renderer();
         let content = TextContent::plain("a\n\nb");
