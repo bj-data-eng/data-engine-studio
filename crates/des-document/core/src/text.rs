@@ -92,7 +92,7 @@ pub struct InlineTextStyle {
     pub letter_spacing: Option<f32>,
     pub font_family: Option<String>,
     pub font_weight: Option<FontWeight>,
-    pub italic: Option<bool>,
+    pub font_style: Option<FontStyle>,
     pub text_decoration: Option<TextDecoration>,
     pub background: Option<Color>,
 }
@@ -119,6 +119,13 @@ impl FontWeight {
     pub const fn value(self) -> u16 {
         self.0
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FontStyle {
+    Normal,
+    Italic,
+    Oblique,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -944,6 +951,47 @@ mod tests {
         assert_eq!(FontWeight::new(50).value(), 50);
         assert_eq!(FontWeight::new(0).value(), FontWeight::MIN);
         assert_eq!(FontWeight::new(1200).value(), FontWeight::MAX);
+    }
+
+    #[test]
+    fn font_style_represents_css_font_style_keywords() {
+        let content = TextContent::new(vec![
+            TextRun::styled(
+                "normal",
+                InlineTextStyle {
+                    font_style: Some(FontStyle::Normal),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::styled(
+                " italic",
+                InlineTextStyle {
+                    font_style: Some(FontStyle::Italic),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::styled(
+                " oblique",
+                InlineTextStyle {
+                    font_style: Some(FontStyle::Oblique),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+
+        assert_eq!(
+            normalized.runs()[0].style.font_style,
+            Some(FontStyle::Normal)
+        );
+        assert_eq!(
+            normalized.runs()[1].style.font_style,
+            Some(FontStyle::Italic)
+        );
+        assert_eq!(
+            normalized.runs()[2].style.font_style,
+            Some(FontStyle::Oblique)
+        );
     }
 
     #[test]

@@ -1,6 +1,7 @@
 use des_document::{
-    Color, DocumentOutput, InlineTextStyle, Point, Size, TextAlign, TextDecoration, TextLayoutLine,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
+    Color, DocumentOutput, FontStyle, InlineTextStyle, Point, Size, TextAlign, TextDecoration,
+    TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    TextOverflow, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -250,7 +251,10 @@ fn text_format(
         extra_letter_spacing: style.letter_spacing.unwrap_or(0.0).max(0.0),
         color: to_egui_color(color),
         coords,
-        italics: style.italic.unwrap_or(false),
+        italics: matches!(
+            style.font_style,
+            Some(FontStyle::Italic | FontStyle::Oblique)
+        ),
         strikethrough: if style
             .text_decoration
             .unwrap_or(TextDecoration::NONE)
@@ -289,8 +293,8 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 mod tests {
     use super::*;
     use des_document::{
-        FontWeight, InlineTextStyle, NormalizedText, TextAlign, TextContent, TextDecoration,
-        TextLayoutStyle, TextOverflow, TextRun, WhiteSpace,
+        FontStyle, FontWeight, InlineTextStyle, NormalizedText, TextAlign, TextContent,
+        TextDecoration, TextLayoutStyle, TextOverflow, TextRun, WhiteSpace,
     };
 
     #[test]
@@ -416,7 +420,7 @@ mod tests {
                     font_size: Some(18.0),
                     letter_spacing: Some(1.5),
                     font_weight: Some(FontWeight::BOLD),
-                    italic: Some(true),
+                    font_style: Some(FontStyle::Italic),
                     text_decoration: Some(TextDecoration::lines(true, false, true)),
                     background: Some(Color::rgb(0, 0, 255)),
                     ..InlineTextStyle::default()
@@ -479,6 +483,32 @@ mod tests {
             job.sections[0].format.coords.as_ref(),
             &[(egui::epaint::text::Tag::new(b"wght"), 525.0)]
         );
+    }
+
+    #[test]
+    fn layout_job_maps_oblique_font_style_to_italics() {
+        let text = TextContent::new(vec![TextRun::styled(
+            "oblique",
+            InlineTextStyle {
+                font_style: Some(FontStyle::Oblique),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized = NormalizedText::from_content(&text, TextLayoutStyle::default());
+
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 240.0,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert!(job.sections[0].format.italics);
     }
 
     #[test]
