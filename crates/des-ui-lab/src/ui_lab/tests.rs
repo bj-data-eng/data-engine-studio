@@ -2199,6 +2199,10 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         "text paint should populate the glyph atlas"
     );
     assert!(
+        first_stats.paint_text_requests > 0,
+        "text view should report cosmic glyph-run paint requests"
+    );
+    assert!(
         first_stats.atlas_pages > 0,
         "text paint should create at least one glyph atlas page"
     );

@@ -973,6 +973,42 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-measure",
+                "text measure",
+                format!(
+                    "{} / {}",
+                    perf.text_paint.measure_requests,
+                    format_duration(perf.text_paint.measure_time)
+                ),
+            );
+            debug_metric_row(
+                ui,
+                "debug-text-glyph-run",
+                "text glyph run",
+                format!(
+                    "{} / {}",
+                    perf.text_paint.paint_text_requests,
+                    format_duration(perf.text_paint.glyph_run_time)
+                ),
+            );
+            debug_metric_row(
+                ui,
+                "debug-text-hit-test",
+                "text hit test",
+                format!(
+                    "{} / {}",
+                    perf.text_paint.hit_test_requests,
+                    format_duration(perf.text_paint.hit_test_time)
+                ),
+            );
+            debug_metric_row(
+                ui,
+                "debug-text-atlas-time",
+                "text atlas",
+                format_duration(perf.text_paint.glyph_atlas_time),
+            );
+            debug_metric_row(
+                ui,
                 "debug-text-pixels",
                 "text upload px",
                 perf.text_paint.uploaded_pixels.to_string(),

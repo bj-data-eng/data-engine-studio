@@ -9,7 +9,10 @@ use des_text::{
     TextGlyphRect,
 };
 use eframe::egui;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 pub struct CosmicTextPaintResources {
     renderer: CosmicTextRenderer,
@@ -41,6 +44,13 @@ struct TextGlyphAtlasEntry {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TextPaintStats {
+    pub measure_requests: usize,
+    pub measure_time: Duration,
+    pub hit_test_requests: usize,
+    pub hit_test_time: Duration,
+    pub paint_text_requests: usize,
+    pub glyph_run_time: Duration,
+    pub glyph_atlas_time: Duration,
     pub glyphs_painted: usize,
     pub glyph_cache_hits: usize,
     pub rasterizations: usize,
@@ -233,7 +243,11 @@ impl TextMeasurer for CosmicTextPaintResources {
     }
 
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
-        self.renderer.measure_text(request)
+        self.stats.measure_requests += 1;
+        let start = Instant::now();
+        let result = self.renderer.measure_text(request);
+        self.stats.measure_time += start.elapsed();
+        result
     }
 
     fn text_index_at(
@@ -241,7 +255,11 @@ impl TextMeasurer for CosmicTextPaintResources {
         request: TextLayoutRequest<'_>,
         point: des_document::Point,
     ) -> usize {
-        self.renderer.text_index_at(request, point)
+        self.stats.hit_test_requests += 1;
+        let start = Instant::now();
+        let result = self.renderer.text_index_at(request, point);
+        self.stats.hit_test_time += start.elapsed();
+        result
     }
 }
 pub fn paint_frame(
@@ -427,7 +445,10 @@ fn paint_atlas_text(
     atlas: &mut TextGlyphAtlas,
     stats: &mut TextPaintStats,
 ) {
+    stats.paint_text_requests += 1;
+    let glyph_run_start = Instant::now();
     let glyph_run = renderer.glyphs(request.clone(), pixels_per_point, Some(visible_rect));
+    stats.glyph_run_time += glyph_run_start.elapsed();
     let scale = pixels_per_point.max(1.0);
     if glyph_run.glyphs.is_empty() {
         return;
@@ -445,6 +466,7 @@ fn paint_atlas_text(
             paint_text_rect(painter, position, rect, scale);
         }
     }
+    let atlas_start = Instant::now();
     for glyph in glyph_run.glyphs {
         let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
             continue;
@@ -463,6 +485,7 @@ fn paint_atlas_text(
         };
         paint_glyph_atlas_entry(painter, position, glyph, entry, scale);
     }
+    stats.glyph_atlas_time += atlas_start.elapsed();
     for decoration in &glyph_run.decorations {
         paint_text_rect(painter, position, *decoration, scale);
     }
