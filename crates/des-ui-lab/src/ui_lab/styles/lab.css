@@ -430,3 +430,293 @@ text {
   background: #eaddff;
   border-color: #6750a4;
 }
+
+.nav-item {
+  width: 100%;
+  height: 64px;
+  padding: 12px;
+  gap: 5px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 7px;
+}
+
+.nav-item:selected {
+  background: #eaddff;
+  border-color: #6750a4;
+}
+
+.nav-item:hover {
+  background: #f3edf7;
+  border-color: #6750a4;
+}
+
+.toolbar-row {
+  flex-direction: row;
+  gap: 8px;
+  background: #faf4fc;
+}
+
+.button {
+  width: 156px;
+  height: 36px;
+  background: #ece6f0;
+  border-color: #cac4d0;
+}
+
+.button:selected {
+  background: #eaddff;
+  border-color: #6750a4;
+}
+
+.button:hover {
+  background: #f3edf7;
+  border-color: #6750a4;
+}
+
+.button:pressed {
+  background: #e0d2f5;
+}
+
+.button-label {
+  font-size: 13px;
+  color: #1d1b20;
+}
+
+.card-row {
+  flex-direction: row;
+  gap: 12px;
+  background: #faf4fc;
+}
+
+.card-row-dense {
+  flex-direction: row;
+  gap: 6px;
+  background: #faf4fc;
+}
+
+.controls-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  gap: 12px;
+  background: #faf4fc;
+}
+
+.control-card {
+  width: 235px;
+  height: auto;
+  min-width: 0px;
+  min-height: 132px;
+  padding: 10px;
+  gap: 8px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.control-row {
+  width: 100%;
+  height: 36px;
+}
+
+.control-row:hover {
+  background: #f3edf7;
+  border-color: #6750a4;
+}
+
+.control-row:pressed {
+  background: #e0d2f5;
+}
+
+.control-row:selected {
+  background: #eaddff;
+  border-color: #6750a4;
+}
+
+.checkbox-mark {
+  width: 18px;
+  height: 18px;
+  padding: 0px;
+  align-items: center;
+  justify-content: center;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 4px;
+}
+
+.checkbox-mark:selected {
+  background: #6750a4;
+  border-color: #6750a4;
+}
+
+.check-glyph {
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+  color: #1d1b20;
+}
+
+.radio-dot {
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  background: #fffbfe;
+  border: 2px solid #cac4d0;
+  border-radius: 9px;
+}
+
+.radio-dot:selected {
+  border: 2px solid #6750a4;
+}
+
+.radio-dot-fill {
+  width: 8px;
+  height: 8px;
+  background: #6750a4;
+  border-radius: 4px;
+}
+
+.control-label {
+  font-size: 12.5px;
+  color: #1d1b20;
+}
+
+.control-label:selected {
+  color: #6750a4;
+}
+
+.control-label:disabled {
+  color: #625b71;
+}
+
+.dropdown-field {
+  width: 100%;
+  height: 38px;
+}
+
+.dropdown-control {
+  width: 100%;
+  height: 100%;
+}
+
+.dropdown-control:hover {
+  background: #f3edf7;
+  border-color: #6750a4;
+}
+
+.dropdown-control:selected {
+  border-color: #6750a4;
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
+}
+
+.dropdown-option {
+  width: 100%;
+  height: 30px;
+  padding: 6px 8px;
+}
+
+.dropdown-option:hover {
+  background: #f3edf7;
+}
+
+.dropdown-option:selected {
+  background: #eaddff;
+}
+
+.input-field {
+  width: 100%;
+  height: 38px;
+}
+
+.input-field:focus {
+  border: 2px solid #6750a4;
+}
+
+.input-field:disabled {
+  background: #faf4fc;
+  border-color: #cac4d0;
+}
+
+.loop-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  gap: 10px;
+  background: #faf4fc;
+}
+
+.loop-control-card {
+  width: 190px;
+  height: 104px;
+  padding: 10px;
+  gap: 8px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.loop-button {
+  width: 100%;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  background: #eaddff;
+  border-color: #6750a4;
+  border-radius: 5px;
+}
+
+.loop-button:hover {
+  background: #eaddff;
+}
+
+.loop-button:pressed {
+  background: #e0d2f5;
+}
+
+.loop-result-card {
+  width: 190px;
+  height: 104px;
+  padding: 10px;
+  gap: 8px;
+  background: #fffbfe;
+  border-color: #cac4d0;
+}
+
+.loop-result-card:selected {
+  background: #cdefdd;
+  border-color: #006a50;
+}
+
+.loop-result-card:focus {
+  background: #e8def8;
+  border-color: #6750a4;
+}
+
+.loop-runtime-local {
+  border-color: #6750a4;
+}
+
+.loop-runtime-remote {
+  border-color: #006a50;
+}
+
+.loop-runtime-hybrid {
+  border-color: #6750a4;
+}
+
+.loop-source-csv {
+  background: #eaddff;
+}
+
+.loop-source-duckdb {
+  background: #fff1cc;
+}
+
+.loop-source-python {
+  background: #ffd8e4;
+}
