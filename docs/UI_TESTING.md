@@ -49,6 +49,9 @@ just ui-shot-windows
 
 ## Graphical Comparison Rules
 
+- Treat broad lab-frame image tests as smoke tests unless they compare against an
+  independent fixture. Same-code-path comparisons prove renderer determinism, not
+  that a visual contract still matches an external baseline.
 - Prefer exact image comparisons only when the same scene is rendered twice in
   the same process.
 - Use tolerances for cross-machine baselines, anti-aliased geometry, font
