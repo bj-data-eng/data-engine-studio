@@ -354,6 +354,16 @@ fn clicked_floating_nav_view_matches_directly_seeded_view() {
 
 #[test]
 fn floating_view_exercises_fallback_shift_and_optional_arrow() {
+    std::thread::Builder::new()
+        .name("floating-contracts".to_string())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(floating_view_exercises_fallback_shift_and_optional_arrow_body)
+        .expect("floating contract test thread should start")
+        .join()
+        .expect("floating contract test should pass");
+}
+
+fn floating_view_exercises_fallback_shift_and_optional_arrow_body() {
     let output = lab_output("floating");
 
     let playground = frame(&output, "floating-playground");
@@ -2430,7 +2440,7 @@ fn text_view_reuses_text_paint_runs_during_nearby_scroll() {
 #[test]
 fn text_view_allows_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
-    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let rect = state_rect(harness.state(), "text-wrap-body");
     let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
     let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
 
@@ -2456,7 +2466,7 @@ fn text_view_allows_pointer_selection_on_selectable_text() {
 fn text_view_paints_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
     let before = render_harness(&mut harness);
-    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let rect = state_rect(harness.state(), "text-wrap-body");
     let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
     let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
 
@@ -2481,7 +2491,7 @@ fn text_view_paints_pointer_selection_on_selectable_text() {
 fn text_view_paints_rtl_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
     let before = render_harness(&mut harness);
-    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-rtl-start-body");
+    let rect = state_rect(harness.state(), "text-rtl-start-body");
     let y = rect.origin.y + (rect.size.height / 2.0);
     let start = egui::pos2(rect.origin.x + rect.size.width - 12.0, y);
     let end = egui::pos2(rect.origin.x + 12.0, y);
@@ -2514,7 +2524,7 @@ fn text_view_paints_rtl_pointer_selection_on_selectable_text() {
 #[test]
 fn text_view_keeps_selection_visible_after_pointer_release() {
     let mut harness = lab_harness("text");
-    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let rect = state_rect(harness.state(), "text-wrap-body");
     let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
     let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
 
@@ -2537,7 +2547,7 @@ fn text_view_keeps_selection_visible_after_pointer_release() {
 #[test]
 fn text_view_copy_event_sends_selected_text_to_clipboard() {
     let mut harness = lab_harness("text");
-    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
+    let rect = state_rect(harness.state(), "text-wrap-body");
     let start = egui::pos2(rect.origin.x + 12.0, rect.origin.y + 12.0);
     let end = egui::pos2(rect.origin.x + 145.0, rect.origin.y + 34.0);
 

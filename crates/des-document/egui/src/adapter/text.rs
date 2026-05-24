@@ -252,8 +252,8 @@ fn text_format(
     let text_decoration = style.text_decoration.unwrap_or(TextDecoration::NONE);
     let family = style
         .font_family
-        .as_ref()
-        .map(|family| egui::FontFamily::Name(family.clone().into()))
+        .as_deref()
+        .map(egui_font_family)
         .unwrap_or(egui::FontFamily::Proportional);
     let coords = variation_coords(style);
     egui::TextFormat {
@@ -286,6 +286,29 @@ fn text_format(
         valign: egui_vertical_align(style.vertical_align.unwrap_or(TextVerticalAlign::Baseline)),
         ..Default::default()
     }
+}
+
+fn egui_font_family(css_family: &str) -> egui::FontFamily {
+    for family in css_family.split(',').map(clean_css_font_family) {
+        match family.to_ascii_lowercase().as_str() {
+            "sans-serif" | "system-ui" | "ui-sans-serif" => {
+                return egui::FontFamily::Proportional;
+            }
+            "monospace" | "ui-monospace" => return egui::FontFamily::Monospace,
+            "serif" | "ui-serif" => continue,
+            "" => continue,
+            "inter" | "aptos" => return egui::FontFamily::Proportional,
+            "jetbrains mono" => return egui::FontFamily::Monospace,
+            _ => {
+                return egui::FontFamily::Name(family.into());
+            }
+        }
+    }
+    egui::FontFamily::Proportional
+}
+
+fn clean_css_font_family(family: &str) -> &str {
+    family.trim().trim_matches('"').trim_matches('\'').trim()
 }
 
 fn egui_vertical_align(vertical_align: TextVerticalAlign) -> egui::Align {
@@ -350,6 +373,22 @@ mod tests {
         assert_eq!(job.wrap.max_width, f32::INFINITY);
         assert_eq!(job.wrap.max_rows, usize::MAX);
         assert_eq!(job.sections[0].format.line_height, Some(18.0));
+    }
+
+    #[test]
+    fn egui_font_family_accepts_css_family_lists() {
+        assert_eq!(
+            egui_font_family("Aptos, Inter, sans-serif"),
+            egui::FontFamily::Proportional
+        );
+        assert_eq!(
+            egui_font_family("'JetBrains Mono', ui-monospace, monospace"),
+            egui::FontFamily::Monospace
+        );
+        assert_eq!(
+            egui_font_family("IconFlow"),
+            egui::FontFamily::Name("IconFlow".into())
+        );
     }
 
     #[test]
