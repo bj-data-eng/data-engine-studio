@@ -2329,6 +2329,40 @@ fn text_view_paints_pointer_selection_on_selectable_text() {
 }
 
 #[test]
+fn text_view_paints_rtl_pointer_selection_on_selectable_text() {
+    let mut harness = lab_harness("text");
+    let before = render_harness(&mut harness);
+    let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-rtl-start-body");
+    let y = rect.origin.y + (rect.size.height / 2.0);
+    let start = egui::pos2(rect.origin.x + rect.size.width - 12.0, y);
+    let end = egui::pos2(rect.origin.x + 12.0, y);
+
+    harness.hover_at(start);
+    harness.drag_at(start);
+    harness.hover_at(end);
+    let after = render_harness(&mut harness);
+
+    let selection = harness
+        .state()
+        .document_engine
+        .text_selection()
+        .expect("dragging RTL selectable text should create document text selection");
+    let comparison = compare_images(&before, &after);
+    let selection_pixels = count_visible_text_selection_pixels_in_rect(&after, rect);
+
+    assert_eq!(selection.target, ElementId::new("text-rtl-start-body"));
+    assert_ne!(selection.anchor_index, selection.focus_index);
+    assert!(
+        comparison.differing_pixels > 0,
+        "dragging RTL selectable text should visibly paint a document text selection"
+    );
+    assert!(
+        selection_pixels > 20,
+        "RTL text selection should use the visible accent selection color; found {selection_pixels} matching pixels"
+    );
+}
+
+#[test]
 fn text_view_keeps_selection_visible_after_pointer_release() {
     let mut harness = lab_harness("text");
     let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
