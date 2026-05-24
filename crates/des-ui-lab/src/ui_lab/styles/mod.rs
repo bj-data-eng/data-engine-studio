@@ -9,8 +9,8 @@ use super::{
 use des_document::{
     AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
     FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
-    Point, Shadow, Style, StyleSelector, StyleSheet, TextLayoutStyle, TextWrapMode, Transition,
-    ViewportQuery, WhiteSpace,
+    Point, Shadow, Style, StyleSelector, StyleSheet, TextLayoutStyle, TextOverflow, TextWrapMode,
+    Transition, ViewportQuery, WhiteSpace,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -916,6 +916,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("text-box-truncate"),
             Style::default().text_layout(TextLayoutStyle {
                 max_lines: Some(1),
+                text_overflow: TextOverflow::Ellipsis,
                 ..TextLayoutStyle::default()
             }),
         )

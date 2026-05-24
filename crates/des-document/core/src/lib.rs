@@ -52,6 +52,6 @@ pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableT
 pub use text::{
     FallbackTextMeasurer, FontWeight, InlineTextStyle, NormalizedText, OverflowWrap, TextAlign,
     TextContent, TextDecoration, TextLayoutLine, TextLayoutRequest, TextLayoutResult,
-    TextLayoutRun, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextRun, TextWrapMode,
-    WhiteSpace, WhiteSpaceCollapse, WordBreak,
+    TextLayoutRun, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextRun,
+    TextWrapMode, WhiteSpace, WhiteSpaceCollapse, WordBreak,
 };

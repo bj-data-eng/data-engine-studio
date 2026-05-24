@@ -4,8 +4,8 @@ use des_document::{
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
     TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextSelectionGranularity, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions,
-    WhiteSpace,
+    TextOverflow, TextSelectionGranularity, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1383,6 +1383,7 @@ fn text_layout_uses_document_wrap_and_truncation_styles() {
                 .width(Length::Px(90.0))
                 .text_layout(TextLayoutStyle {
                     max_lines: Some(1),
+                    text_overflow: TextOverflow::Ellipsis,
                     ..TextLayoutStyle::default()
                 }),
         );

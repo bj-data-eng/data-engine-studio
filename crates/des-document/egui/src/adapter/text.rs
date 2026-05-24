@@ -1,6 +1,6 @@
 use des_document::{
     Color, DocumentOutput, InlineTextStyle, Point, Size, TextAlign, TextDecoration, TextLayoutLine,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
+    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -185,6 +185,10 @@ pub(crate) fn layout_job(
     };
     let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = wrap_width;
+    job.wrap.overflow_character = match request.layout_style.text_overflow {
+        TextOverflow::Clip => None,
+        TextOverflow::Ellipsis => Some('…'),
+    };
     job.halign = egui_text_align(request.layout_style.text_align);
     job.justify = request.layout_style.text_align == TextAlign::Justify;
     if let Some(max_lines) = request.layout_style.max_lines {
@@ -285,7 +289,7 @@ mod tests {
     use super::*;
     use des_document::{
         FontWeight, InlineTextStyle, NormalizedText, TextAlign, TextContent, TextDecoration,
-        TextLayoutStyle, TextRun, WhiteSpace,
+        TextLayoutStyle, TextOverflow, TextRun, WhiteSpace,
     };
 
     #[test]
@@ -331,6 +335,29 @@ mod tests {
         assert_eq!(job.wrap.max_width, 1.0);
         assert_eq!(job.wrap.max_rows, 1);
         assert!(job.wrap.break_anywhere);
+        assert_eq!(job.wrap.overflow_character, None);
+    }
+
+    #[test]
+    fn layout_job_maps_text_overflow_ellipsis() {
+        let text = TextContent::plain("truncate me");
+        let mut style = TextLayoutStyle::default();
+        style.max_lines = Some(1);
+        style.text_overflow = TextOverflow::Ellipsis;
+        let normalized = NormalizedText::from_content(&text, style);
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 60.0,
+                layout_style: style,
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.wrap.overflow_character, Some('…'));
     }
 
     #[test]

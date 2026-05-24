@@ -6,7 +6,7 @@ use crate::graphics_testing::{
 use des_document::{
     DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, Insets, Length, Point,
     PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
-    TextWrapMode,
+    TextOverflow, TextWrapMode,
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
@@ -2110,6 +2110,10 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         "text wrap specimen should be measured as multiple lines"
     );
     assert_eq!(truncated.style.text_layout.max_lines, Some(1));
+    assert_eq!(
+        truncated.style.text_layout.text_overflow,
+        TextOverflow::Ellipsis
+    );
     assert!(truncated.text_layout.as_ref().unwrap().elided);
     assert_eq!(max_lines.style.text_layout.max_lines, Some(2));
     assert!(max_lines.text_layout.as_ref().unwrap().line_count <= 2);

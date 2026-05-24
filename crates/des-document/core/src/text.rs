@@ -196,6 +196,12 @@ pub enum TextAlign {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextOverflow {
+    Clip,
+    Ellipsis,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WhiteSpace {
     Normal,
     Nowrap,
@@ -212,6 +218,7 @@ pub struct TextLayoutStyle {
     pub overflow_wrap: OverflowWrap,
     pub word_break: WordBreak,
     pub text_align: TextAlign,
+    pub text_overflow: TextOverflow,
     pub tab_size: u16,
     pub max_lines: Option<usize>,
 }
@@ -225,6 +232,7 @@ impl TextLayoutStyle {
         overflow_wrap: OverflowWrap::Normal,
         word_break: WordBreak::Normal,
         text_align: TextAlign::Start,
+        text_overflow: TextOverflow::Clip,
         tab_size: Self::DEFAULT_TAB_SIZE,
         max_lines: None,
     };
@@ -845,6 +853,7 @@ mod tests {
                 overflow_wrap: OverflowWrap::Normal,
                 word_break: WordBreak::Normal,
                 text_align: TextAlign::Start,
+                text_overflow: TextOverflow::Clip,
                 tab_size: TextLayoutStyle::DEFAULT_TAB_SIZE,
                 max_lines: None,
             }
