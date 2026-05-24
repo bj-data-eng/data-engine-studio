@@ -972,3 +972,153 @@ text {
   border: 1px solid #cac4d0;
   border-radius: 4px;
 }
+
+.data-table {
+  width: 520px;
+  height: auto;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 5px;
+  overflow-x: scroll;
+  scrollbar-width: 2px;
+}
+
+.table-header-row {
+  background: #ece6f0;
+}
+
+.table-row {
+  background: #f3edf7;
+}
+
+.table-header-cell {
+  font-size: 12px;
+  color: #6750a4;
+  border-color: #cac4d0;
+  border-top-width: 0px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  border-left-width: 0px;
+}
+
+.table-cell {
+  font-size: 12px;
+  color: #1d1b20;
+  border-color: #cac4d0;
+  border-top-width: 0px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  border-left-width: 0px;
+}
+
+.feature-card {
+  width: 250px;
+  height: 98px;
+  background: #fffbfe;
+  border-color: #cac4d0;
+}
+
+.feature-card:hover {
+  background: #f3edf7;
+  border-color: #6750a4;
+}
+
+.feature-card:pressed {
+  background: #e0d2f5;
+}
+
+.stack {
+  width: 620px;
+  height: 320px;
+  padding: 10px;
+  gap: 8px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 7px;
+}
+
+.list-row {
+  width: 600px;
+  height: 58px;
+  background: #f3edf7;
+  border: 1px solid #cac4d0;
+  border-radius: 5px;
+}
+
+.specificity-proof {
+  background: #ece6f0;
+  border-color: #cac4d0;
+}
+
+.specificity-proof:hover {
+  background: #e8def8;
+  border-color: #006a50;
+}
+
+#style-row-state {
+  border-color: #6750a4;
+}
+
+#style-row-state:hover {
+  background: #e8def8;
+  border-color: #6750a4;
+}
+
+.structural-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  gap: 12px;
+  background: #faf4fc;
+}
+
+.structural-list {
+  width: 380px;
+  height: auto;
+  padding: 8px;
+  gap: 6px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.structural-nested-shell {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: 790px;
+  height: auto;
+  gap: 10px;
+  background: #faf4fc;
+}
+
+.structural-item {
+  width: 100%;
+  height: 58px;
+  padding: 7px 10px;
+  background: #f3edf7;
+  border: 1px solid #cac4d0;
+  border-radius: 5px;
+}
+
+.structural-item:first-child {
+  background: #cdefdd;
+  border-color: #006a50;
+}
+
+.structural-item:nth-child(2) {
+  background: #eaddff;
+  border-color: #6750a4;
+}
+
+.structural-item:nth-child(3) {
+  border-top-width: 1px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  border-left-width: 5px;
+}
+
+.structural-item:last-child {
+  border-color: #6750a4;
+  border-radius: 8px;
+}
