@@ -93,7 +93,6 @@ fn apply_text_metrics(context: &egui::Context) {
 
     context.all_styles_mut(move |style| {
         style.text_styles = text_styles.clone();
-        style.visuals.text_options.font_hinting = false;
         style.spacing.item_spacing = vec2(8.0, 6.0);
         style.spacing.button_padding = vec2(10.0, 5.0);
         style.spacing.interact_size = vec2(36.0, 24.0);
@@ -149,18 +148,4 @@ fn monospace_font_candidates() -> Vec<PathBuf> {
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
     ));
     paths
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn host_configuration_disables_font_hinting_for_document_text() {
-        let context = egui::Context::default();
-
-        apply_host_configuration(&context);
-
-        assert!(!context.global_style().visuals.text_options.font_hinting);
-    }
 }
