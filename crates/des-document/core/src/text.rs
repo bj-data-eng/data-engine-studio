@@ -604,59 +604,60 @@ fn wrap_paragraph(
         return wrap_anywhere(text, max_width);
     }
 
+    if overflow_wrap == OverflowWrap::BreakWord {
+        return wrap_words_or_break_long_segments(text, max_width);
+    }
+
+    wrap_at_spaces(text, max_width)
+}
+
+fn wrap_at_spaces(text: &[FallbackLayoutChar], max_width: f32) -> Vec<FallbackLayoutLine> {
     let mut rows = Vec::new();
     let mut current = Vec::new();
     let mut current_width = 0.0;
-    let mut saw_word = false;
-    let mut words = text.split(|ch| ch.value == ' ');
-    while let Some(word) = words.next() {
-        let word_width = word.iter().map(|ch| ch.width).sum::<f32>();
-        let next_width = if !saw_word {
-            word_width
-        } else {
-            let space_width =
-                fallback_char_width(' ', word.first().map_or(13.0, |ch| ch.font_size));
-            current_width + space_width + word_width
-        };
-        if current_width > f32::EPSILON && next_width > max_width {
-            rows.push(FallbackLayoutLine::from(std::mem::take(&mut current)));
-            current_width = word_width;
-            current.extend_from_slice(word);
-        } else {
-            if saw_word {
-                let space = fallback_space_before(word, text);
-                current.push(space);
-            }
-            current.extend_from_slice(word);
-            current_width = next_width;
+    let mut last_break_after = None;
+
+    for ch in text {
+        current.push(*ch);
+        current_width += ch.width;
+        if ch.value == ' ' {
+            last_break_after = Some(current.len());
         }
-        saw_word = true;
+
+        if current_width > max_width
+            && current.len() > 1
+            && let Some(break_after) = last_break_after
+            && break_after < current.len()
+        {
+            let remainder = current.split_off(break_after);
+            rows.push(FallbackLayoutLine::from(std::mem::take(&mut current)));
+            current = remainder;
+            current_width = current.iter().map(|ch| ch.width).sum();
+            last_break_after = current
+                .iter()
+                .rposition(|ch| ch.value == ' ')
+                .map(|index| index + 1);
+        }
     }
-    if overflow_wrap == OverflowWrap::BreakWord && current_width > max_width {
-        rows.extend(wrap_anywhere(text, max_width));
-    } else {
-        rows.push(FallbackLayoutLine::from(current));
-    }
+
+    rows.push(FallbackLayoutLine::from(current));
     rows
 }
 
-fn fallback_space_before(
-    word: &[FallbackLayoutChar],
-    paragraph: &[FallbackLayoutChar],
-) -> FallbackLayoutChar {
-    let font_size = word
-        .first()
-        .or_else(|| paragraph.first())
-        .map_or(13.0, |ch| ch.font_size);
-    let layout_index = word
-        .first()
-        .map_or(0, |ch| ch.layout_index.saturating_sub(1));
-    FallbackLayoutChar {
-        value: ' ',
-        width: fallback_char_width(' ', font_size),
-        font_size,
-        layout_index,
-    }
+fn wrap_words_or_break_long_segments(
+    text: &[FallbackLayoutChar],
+    max_width: f32,
+) -> Vec<FallbackLayoutLine> {
+    wrap_at_spaces(text, max_width)
+        .into_iter()
+        .flat_map(|line| {
+            if line.width > max_width {
+                wrap_anywhere(&line.chars, max_width)
+            } else {
+                vec![line]
+            }
+        })
+        .collect()
 }
 
 fn wrap_anywhere(text: &[FallbackLayoutChar], max_width: f32) -> Vec<FallbackLayoutLine> {
@@ -999,6 +1000,53 @@ mod tests {
         assert_eq!(measured.lines[0].layout_start, 0);
         assert_eq!(measured.lines[0].semantic_start, 0);
         assert!(measured.lines[0].layout_end <= normalized.layout_text().chars().count());
+    }
+
+    #[test]
+    fn fallback_wrapping_preserves_space_indices() {
+        let content = TextContent::plain("a   b");
+        let style = TextLayoutStyle::white_space(WhiteSpace::PreWrap);
+        let normalized = NormalizedText::from_content(&content, style);
+        let mut measurer = FallbackTextMeasurer;
+
+        let measured = measurer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: 25.0,
+            layout_style: style,
+            line_height: None,
+        });
+
+        assert_eq!(measured.line_count, 2);
+        assert_eq!(measured.lines[0].layout_start, 0);
+        assert_eq!(measured.lines[0].layout_end, 4);
+        assert_eq!(measured.lines[0].semantic_start, 0);
+        assert_eq!(measured.lines[0].semantic_end, 4);
+        assert_eq!(measured.lines[1].layout_start, 4);
+        assert_eq!(measured.lines[1].semantic_start, 4);
+    }
+
+    #[test]
+    fn fallback_hit_testing_preserved_wrapped_spaces_uses_original_indices() {
+        let content = TextContent::plain("a   b");
+        let style = TextLayoutStyle::white_space(WhiteSpace::PreWrap);
+        let normalized = NormalizedText::from_content(&content, style);
+        let mut measurer = FallbackTextMeasurer;
+
+        let index = measurer.text_index_at(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 13.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 25.0,
+                layout_style: style,
+                line_height: None,
+            },
+            Point::new(12.0, 0.0),
+        );
+
+        assert_eq!(index, 2);
     }
 
     #[test]
