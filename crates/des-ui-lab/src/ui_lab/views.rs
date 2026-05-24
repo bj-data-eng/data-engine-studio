@@ -1038,6 +1038,12 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-glyph-meshes",
+                "text glyph meshes",
+                perf.text_paint.glyph_meshes.to_string(),
+            );
+            debug_metric_row(
+                ui,
                 "debug-text-pixels",
                 "text upload px",
                 perf.text_paint.uploaded_pixels.to_string(),

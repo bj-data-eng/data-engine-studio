@@ -55,6 +55,7 @@ pub struct TextPaintStats {
     pub glyph_upload_time: Duration,
     pub glyph_paint_time: Duration,
     pub glyphs_painted: usize,
+    pub glyph_meshes: usize,
     pub glyph_cache_hits: usize,
     pub rasterizations: usize,
     pub cached_glyphs: usize,
@@ -511,6 +512,8 @@ fn paint_atlas_text(
         }
     }
     let atlas_start = Instant::now();
+    let paint_start = Instant::now();
+    let mut batch = TextGlyphBatch::default();
     for glyph in glyph_run.glyphs {
         let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
             continue;
@@ -527,10 +530,10 @@ fn paint_atlas_text(
         } else {
             glyph
         };
-        let paint_start = Instant::now();
-        paint_glyph_atlas_entry(painter, position, glyph, entry, scale);
-        stats.glyph_paint_time += paint_start.elapsed();
+        stats.glyph_meshes += batch.push(painter, position, glyph, entry, scale);
     }
+    stats.glyph_meshes += batch.flush(painter);
+    stats.glyph_paint_time += paint_start.elapsed();
     stats.glyph_atlas_time += atlas_start.elapsed();
     for decoration in &glyph_run.decorations {
         paint_text_rect(painter, position, *decoration, scale);
@@ -549,32 +552,57 @@ fn visible_local_rect(clip_rect: egui::Rect, text_rect: egui::Rect) -> Option<Re
     })
 }
 
-fn paint_glyph_atlas_entry(
-    painter: &egui::Painter,
-    text_position: egui::Pos2,
-    glyph: TextGlyph,
-    entry: TextGlyphAtlasEntry,
-    scale: f32,
-) {
-    let min = egui::pos2(
-        text_position.x + (glyph.x_px + entry.placement_px[0]) as f32 / scale,
-        text_position.y + (glyph.y_px - entry.placement_px[1]) as f32 / scale,
-    );
-    let size = egui::vec2(
-        entry.size_px[0] as f32 / scale,
-        entry.size_px[1] as f32 / scale,
-    );
-    let tint = if entry.color_content {
-        egui::Color32::WHITE
-    } else {
-        to_egui_color(glyph.color)
-    };
-    painter.image(
-        entry.texture_id,
-        egui::Rect::from_min_size(min, size),
-        entry.uv,
-        tint,
-    );
+#[derive(Default)]
+struct TextGlyphBatch {
+    mesh: Option<egui::epaint::Mesh>,
+}
+
+impl TextGlyphBatch {
+    fn push(
+        &mut self,
+        painter: &egui::Painter,
+        text_position: egui::Pos2,
+        glyph: TextGlyph,
+        entry: TextGlyphAtlasEntry,
+        scale: f32,
+    ) -> usize {
+        let texture_id = entry.texture_id;
+        let flushed = if self
+            .mesh
+            .as_ref()
+            .is_some_and(|mesh| mesh.texture_id != texture_id)
+        {
+            self.flush(painter)
+        } else {
+            0
+        };
+        let mesh = self
+            .mesh
+            .get_or_insert_with(|| egui::epaint::Mesh::with_texture(texture_id));
+        let min = egui::pos2(
+            text_position.x + (glyph.x_px + entry.placement_px[0]) as f32 / scale,
+            text_position.y + (glyph.y_px - entry.placement_px[1]) as f32 / scale,
+        );
+        let size = egui::vec2(
+            entry.size_px[0] as f32 / scale,
+            entry.size_px[1] as f32 / scale,
+        );
+        let tint = if entry.color_content {
+            egui::Color32::WHITE
+        } else {
+            to_egui_color(glyph.color)
+        };
+        mesh.add_rect_with_uv(egui::Rect::from_min_size(min, size), entry.uv, tint);
+        flushed
+    }
+
+    fn flush(&mut self, painter: &egui::Painter) -> usize {
+        let Some(mesh) = self.mesh.take().filter(|mesh| !mesh.is_empty()) else {
+            return 0;
+        };
+        painter.add(mesh);
+        1
+    }
 }
 
 fn paint_text_rect(

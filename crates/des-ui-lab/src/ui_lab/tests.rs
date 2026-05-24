@@ -2330,6 +2330,10 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         warm_stats.glyph_cache_hits > 0,
         "warm text paint should hit cached atlas glyphs"
     );
+    assert!(
+        warm_stats.glyph_meshes > 0 && warm_stats.glyph_meshes < warm_stats.glyphs_painted,
+        "warm text paint should batch glyphs into fewer egui meshes than glyph image quads; stats={warm_stats:?}"
+    );
 }
 
 #[test]
@@ -2404,6 +2408,10 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
         warm_stats.glyph_cache_hits > 0,
         "warm scrolled text paint should hit cached atlas glyphs"
     );
+    assert!(
+        warm_stats.glyph_meshes > 0 && warm_stats.glyph_meshes < warm_stats.glyphs_painted,
+        "warm scrolled text paint should batch glyphs into fewer egui meshes than glyph image quads; stats={warm_stats:?}"
+    );
 }
 
 #[test]
@@ -2447,6 +2455,7 @@ fn debug_overlay_reports_split_text_paint_timings() {
                     glyph_image_time: std::time::Duration::from_micros(1_250),
                     glyph_upload_time: std::time::Duration::from_micros(2_500),
                     glyph_paint_time: std::time::Duration::from_micros(3_750),
+                    glyph_meshes: 9,
                     ..TextPaintStats::default()
                 },
                 ..UiLabPerf::default()
@@ -2478,6 +2487,14 @@ fn debug_overlay_reports_split_text_paint_timings() {
     assert_eq!(
         frame_text(&output, "debug-text-glyph-paint-time-value"),
         Some("3.75 ms")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-glyph-meshes-label"),
+        Some("text glyph meshes")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-glyph-meshes-value"),
+        Some("9")
     );
 }
 
