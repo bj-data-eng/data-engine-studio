@@ -2438,6 +2438,50 @@ fn text_view_reuses_text_paint_runs_during_nearby_scroll() {
 }
 
 #[test]
+fn debug_overlay_reports_split_text_paint_timings() {
+    let mut document = Document::build(Size::new(TEST_WIDTH, TEST_HEIGHT), |ui| {
+        render_debug_overlay_layer(
+            ui,
+            UiLabPerf {
+                text_paint: TextPaintStats {
+                    glyph_image_time: std::time::Duration::from_micros(1_250),
+                    glyph_upload_time: std::time::Duration::from_micros(2_500),
+                    glyph_paint_time: std::time::Duration::from_micros(3_750),
+                    ..TextPaintStats::default()
+                },
+                ..UiLabPerf::default()
+            },
+        );
+    });
+    let output = DocumentEngine::default().update(&mut document, &stylesheet());
+
+    assert_eq!(
+        frame_text(&output, "debug-text-glyph-image-time-label"),
+        Some("text glyph image")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-glyph-image-time-value"),
+        Some("1.25 ms")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-upload-time-label"),
+        Some("text upload")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-upload-time-value"),
+        Some("2.50 ms")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-glyph-paint-time-label"),
+        Some("text glyph paint")
+    );
+    assert_eq!(
+        frame_text(&output, "debug-text-glyph-paint-time-value"),
+        Some("3.75 ms")
+    );
+}
+
+#[test]
 fn text_view_allows_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
     let rect = state_rect(harness.state(), "text-wrap-body");
