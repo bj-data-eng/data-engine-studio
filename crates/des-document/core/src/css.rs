@@ -1,8 +1,8 @@
 use crate::{
-    AlignContent, AlignItems, Color, Direction, Display, Element, ElementStateSelector,
+    AlignContent, AlignItems, Color, Direction, Display, Easing, Element, ElementStateSelector,
     FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, OverflowWrap, Position,
     Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform,
-    TextWrapMode, ViewportQuery, WhiteSpace,
+    TextWrapMode, Transition, ViewportQuery, WhiteSpace,
 };
 use std::error::Error;
 use std::fmt;
@@ -402,6 +402,7 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "border-color" => style.border = Some(parse_color(value)?),
         "border" => parse_border(style, value)?,
         "border-width" => style.border_width = crate::EdgeStyle::all(parse_px(value)?),
+        "border-style" => style.border_style = Some(parse_border_style(value)?),
         "border-top-width" => style.border_width.top = Some(parse_px(value)?),
         "border-right-width" => style.border_width.right = Some(parse_px(value)?),
         "border-bottom-width" => style.border_width.bottom = Some(parse_px(value)?),
@@ -433,6 +434,7 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "overflow-x" => style.overflow_x = Some(parse_overflow(value)?),
         "overflow-y" => style.overflow_y = Some(parse_overflow(value)?),
         "scrollbar-width" => style.scrollbar_width = Some(parse_px(value)?.max(0.0)),
+        "scrollbar-visible" => style.scrollbar_visible = Some(parse_bool(value)?),
         "position" => style.position = Some(parse_position(value)?),
         "top" => style.inset.top = Some(parse_length(value)?),
         "right" => style.inset.right = Some(parse_length(value)?),
@@ -445,6 +447,7 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
                     .map_err(|_| CssParseError::new("z-index must be an integer"))?,
             );
         }
+        "transition" => style.transition = parse_transition(value)?,
         _ => {
             return Err(CssParseError::new(format!(
                 "unsupported CSS property `{name}`"
@@ -682,13 +685,56 @@ fn parse_border(style: &mut Style, input: &str) -> Result<(), CssParseError> {
     for part in input.split_whitespace() {
         if let Ok(width) = parse_px(part) {
             style.border_width = crate::EdgeStyle::all(width);
-        } else if part == "solid" {
-            style.border_style = Some(crate::BorderStyle::Solid);
+        } else if matches!(part, "solid" | "dashed" | "dotted") {
+            style.border_style = Some(parse_border_style(part)?);
         } else {
             style.border = Some(parse_color(part)?);
         }
     }
     Ok(())
+}
+
+fn parse_border_style(input: &str) -> Result<crate::BorderStyle, CssParseError> {
+    match input {
+        "solid" => Ok(crate::BorderStyle::Solid),
+        "dashed" => Ok(crate::BorderStyle::Dashed),
+        "dotted" => Ok(crate::BorderStyle::Dotted),
+        _ => Err(CssParseError::new(format!(
+            "unsupported border-style `{input}`"
+        ))),
+    }
+}
+
+fn parse_transition(input: &str) -> Result<Option<Transition>, CssParseError> {
+    if input == "none" {
+        return Ok(None);
+    }
+
+    let mut step = None;
+    let mut easing = None;
+    for part in input.split_whitespace() {
+        match part {
+            "all" => {}
+            "linear" => easing = Some(Easing::Linear),
+            "ease-out" | "ease-out-cubic" => easing = Some(Easing::EaseOutCubic),
+            value => step = Some(parse_duration_step(value)?),
+        }
+    }
+
+    Ok(Some(Transition {
+        step: step.ok_or_else(|| CssParseError::new("transition is missing a duration"))?,
+        easing: easing.unwrap_or(Easing::Linear),
+    }))
+}
+
+fn parse_duration_step(input: &str) -> Result<f32, CssParseError> {
+    if let Some(value) = input.strip_suffix("ms") {
+        return Ok(parse_f32(value)? / 1000.0);
+    }
+    if let Some(value) = input.strip_suffix('s') {
+        return parse_f32(value);
+    }
+    parse_f32(input)
 }
 
 fn parse_insets(input: &str) -> Result<Insets, CssParseError> {
@@ -742,6 +788,16 @@ fn parse_usize(input: &str) -> Result<usize, CssParseError> {
     input
         .parse::<usize>()
         .map_err(|_| CssParseError::new(format!("expected positive integer, got `{input}`")))
+}
+
+fn parse_bool(input: &str) -> Result<bool, CssParseError> {
+    match input {
+        "true" | "visible" => Ok(true),
+        "false" | "hidden" => Ok(false),
+        _ => Err(CssParseError::new(format!(
+            "expected boolean, got `{input}`"
+        ))),
+    }
 }
 
 fn parse_color(input: &str) -> Result<Color, CssParseError> {

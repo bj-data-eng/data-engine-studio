@@ -1,6 +1,6 @@
 use crate::{
     AlignContent, AlignItems, Color, ComputedStyle, CornerRadii, Display, Document, DocumentEngine,
-    DocumentEventKind, DocumentInput, Element, ElementId, ElementSpec, ElementState,
+    DocumentEventKind, DocumentInput, Easing, Element, ElementId, ElementSpec, ElementState,
     ElementStateSelector, FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine,
     GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets,
     JustifyContent, Length, NthChildFormula, Overflow, Point, PointerInput, Rect, RepetitionCount,
@@ -505,6 +505,7 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
             max-lines: 2;
             text-selection-background: #6750a4dc;
             text-selection-color: #fffbfe;
+            transition: all 0.24s ease-out;
             padding: 4px 8px;
         }
 
@@ -544,6 +545,7 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
         Color::rgba(103, 80, 164, 220)
     );
     assert_eq!(title.style.text_selection_color, Color::rgb(255, 251, 254));
+    assert_eq!(title.style.transition, Some(Transition::ease_out(0.24)));
     assert_eq!(title.style.background, Some(Color::rgb(238, 229, 255)));
     assert_eq!(title.style.border, Some(Color::rgb(103, 80, 164)));
     assert_eq!(title.style.border_width.top, 1.0);
@@ -552,6 +554,43 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
     assert_eq!(title.style.radius.top_right, 12.0);
     assert_eq!(title.style.radius.bottom_left, 2.0);
     assert_eq!(title.style.padding.left, 8.0);
+}
+
+#[test]
+fn css_stylesheet_parser_accepts_transition_variants() {
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        .linear { transition: all 120ms linear; }
+        .implicit-easing { transition: 0.5s; }
+        .disabled { transition: none; }
+        "#,
+    )
+    .unwrap();
+
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    for class in ["linear", "implicit-easing", "disabled"] {
+        document
+            .append_element("root", class, ElementSpec::new(Element::Div).class(class))
+            .unwrap();
+    }
+
+    document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+
+    let layout = document.resolved_layout().unwrap();
+    assert_eq!(
+        layout.find("linear").unwrap().style.transition,
+        Some(Transition::linear(0.12))
+    );
+    assert_eq!(
+        layout.find("implicit-easing").unwrap().style.transition,
+        Some(Transition {
+            step: 0.5,
+            easing: Easing::Linear,
+        })
+    );
+    assert_eq!(layout.find("disabled").unwrap().style.transition, None);
 }
 
 #[test]

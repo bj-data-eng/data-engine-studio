@@ -2,8 +2,8 @@ mod framework;
 
 use super::{
     CARD, CARD_HOVER, CARD_PRESSED, GREEN, PANEL, PANEL_ALT, PRIMARY_CONTAINER, PURPLE,
-    SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED, SUCCESS_CONTAINER,
-    SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TEXT, TEXT_ACCENT, TEXT_MUTED,
+    SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED, SURFACE_CONTAINER,
+    SURFACE_CONTAINER_HIGH, TEXT, TEXT_ACCENT, TEXT_MUTED,
 };
 use des_document::{
     AlignItems, BorderStyle, Color, ElementStateSelector, FlexDirection, FlexWrap,
@@ -39,53 +39,6 @@ fn lab_stylesheet() -> StyleSheet {
             .top_right_radius(0.0)
             .bottom_left_radius(5.0)
             .bottom_right_radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("drag-workbench"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .flex_wrap(FlexWrap::Wrap)
-            .align_items(AlignItems::Start)
-            .width_fill()
-            .height(Length::Auto)
-            .gap(14.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("drag-grid"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .flex_wrap(FlexWrap::Wrap)
-            .width(Length::Px(0.0))
-            .height(Length::Auto)
-            .flex_basis(Length::Px(0.0))
-            .flex_grow(1.0)
-            .padding(Insets::all(10.0))
-            .gap(8.0)
-            .background(PANEL)
-            .border(STROKE)
-            .radius(6.0)
-            .transition(Transition::ease_out(0.12)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("drag-cell"),
-        Style::default()
-            .width_percent(0.45)
-            .height(Length::Auto)
-            .flex_basis(Length::Percent(0.45))
-            .flex_grow(1.0)
-            .min_size(0.0, 70.0)
-            .padding(Insets::all(7.0))
-            .gap(5.0)
-            .background(SURFACE_CONTAINER)
-            .border(STROKE)
-            .radius(5.0)
-            .transition(Transition::ease_out(0.12)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("drag-cell", ElementStateSelector::Hovered),
-        Style::default()
-            .background(SURFACE_CONTAINER_HIGH)
-            .border(STROKE_SELECTED),
     );
     stylesheet.push_rule(
         StyleSelector::class("shadow-grid"),
@@ -344,150 +297,6 @@ fn lab_stylesheet() -> StyleSheet {
             .font_size(11.0)
             .text_color(TEXT_MUTED)
             .text_wrap_mode(TextWrapMode::Wrap),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-grid"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .flex_wrap(FlexWrap::Wrap)
-            .width_fill()
-            .height(Length::Auto)
-            .gap(12.0)
-            .background(PANEL_ALT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-specimen"),
-        Style::default()
-            .width(Length::Px(318.0))
-            .height(Length::Auto)
-            .padding(Insets::all(8.0))
-            .gap(3.0)
-            .background(SURFACE_CONTAINER)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-surface"),
-        Style::default()
-            .width_fill()
-            .height(Length::Px(132.0))
-            .padding(Insets::all(10.0))
-            .background(PANEL)
-            .border(STROKE),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-box"),
-        Style::default()
-            .size(150.0, 58.0)
-            .min_size(120.0, 44.0)
-            .padding(Insets::all(8.0))
-            .gap(4.0)
-            .background(PRIMARY_CONTAINER)
-            .border(STROKE_SELECTED)
-            .border_width(2.0)
-            .radius(4.0)
-            .transition(Transition::ease_out(0.14)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-box-label"),
-        Style::default().font_size(13.0).text_color(TEXT),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-box-body"),
-        Style::default().font_size(11.0).text_color(TEXT_MUTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-margin-row"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .width_fill()
-            .height(Length::Auto)
-            .padding(Insets::all(8.0))
-            .gap(0.0)
-            .background(PANEL)
-            .border(STROKE)
-            .radius(3.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-margin-chip"),
-        Style::default()
-            .size(48.0, 48.0)
-            .background(STROKE)
-            .border(STROKE)
-            .border_width(2.0)
-            .radius(4.0)
-            .transition(Transition::ease_out(0.18)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("animation-margin-reference"),
-        Style::default().background(SURFACE_CONTAINER_HIGH),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("animation-box-hover-size", ElementStateSelector::Hovered),
-        Style::default().size(220.0, 84.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("animation-box-hover-margin", ElementStateSelector::Hovered),
-        Style::default()
-            .margin(Insets::all(18.0))
-            .background(SUCCESS_CONTAINER)
-            .border(GREEN),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state(
-            "animation-box-pressed-border",
-            ElementStateSelector::Pressed,
-        ),
-        Style::default().border_width(10.0).radius(22.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state(
-            "animation-box-selected-spacing",
-            ElementStateSelector::Selected,
-        ),
-        Style::default()
-            .size(210.0, 92.0)
-            .padding(Insets::all(16.0))
-            .margin(Insets::all(10.0))
-            .gap(18.0)
-            .background(SUCCESS_CONTAINER)
-            .border(GREEN)
-            .radius(12.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("animation-box-label", ElementStateSelector::Selected),
-        Style::default().font_size(18.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state(
-            "animation-box-disabled-color",
-            ElementStateSelector::Disabled,
-        ),
-        Style::default()
-            .background(SURFACE_CONTAINER)
-            .border(STROKE)
-            .text_color(TEXT_MUTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("animation-box-label", ElementStateSelector::Disabled),
-        Style::default().text_color(TEXT_MUTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("animation-box-body", ElementStateSelector::Disabled),
-        Style::default().text_color(TEXT_MUTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state(
-            "animation-box-focused-min-size",
-            ElementStateSelector::Focused,
-        ),
-        Style::default()
-            .size(226.0, 88.0)
-            .min_size(210.0, 78.0)
-            .border_width(6.0)
-            .border(PRIMARY_CONTAINER)
-            .background(SECONDARY_CONTAINER)
-            .radius(16.0),
     );
     stylesheet.push_rule(
         StyleSelector::class("scroll-panel"),
