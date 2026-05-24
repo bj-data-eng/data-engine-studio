@@ -9,7 +9,8 @@ use super::{
 use des_document::{
     AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
     FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
-    Point, Shadow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
+    Point, Shadow, Style, StyleSelector, StyleSheet, TextLayoutStyle, TextWrapMode, Transition,
+    ViewportQuery, WhiteSpace,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -861,7 +862,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("text-copy"),
-            Style::default().text_wrap(TextWrapMode::Wrap),
+            Style::default().text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::class("text-specimen-grid"),
@@ -889,7 +890,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .font_size(11.0)
                 .text_color(TEXT_ACCENT)
-                .text_wrap(TextWrapMode::Wrap),
+                .text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::class("text-box"),
@@ -905,19 +906,24 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("text-box-extend"),
-            Style::default().text_wrap(TextWrapMode::Extend),
+            Style::default().white_space(WhiteSpace::Pre),
         )
         .rule(
             StyleSelector::class("text-box-wrap"),
-            Style::default().text_wrap(TextWrapMode::Wrap),
+            Style::default().text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::class("text-box-truncate"),
-            Style::default().text_wrap(TextWrapMode::Truncate),
+            Style::default().text_layout(TextLayoutStyle {
+                max_lines: Some(1),
+                ..TextLayoutStyle::default()
+            }),
         )
         .rule(
             StyleSelector::class("text-box-max-lines"),
-            Style::default().text_wrap(TextWrapMode::Wrap).max_lines(2),
+            Style::default()
+                .text_wrap_mode(TextWrapMode::Wrap)
+                .max_lines(2),
         )
         .rule(
             StyleSelector::class("data-table"),
@@ -1277,7 +1283,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .height(Length::Px(42.0))
                 .font_size(11.0)
                 .text_color(TEXT_MUTED)
-                .text_wrap(TextWrapMode::Wrap),
+                .text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::class("structural-grid"),

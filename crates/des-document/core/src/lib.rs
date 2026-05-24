@@ -50,6 +50,7 @@ pub use style::{
 };
 pub use table::{TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize};
 pub use text::{
-    FallbackTextMeasurer, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
-    TextWrapMode,
+    FallbackTextMeasurer, FontWeight, InlineTextStyle, NormalizedText, OverflowWrap, TextContent,
+    TextLayoutRequest, TextLayoutResult, TextLayoutRun, TextLayoutStyle, TextMeasurer,
+    TextMeasurerKey, TextRun, TextWrapMode, WhiteSpace, WhiteSpaceCollapse, WordBreak,
 };

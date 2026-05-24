@@ -3,8 +3,9 @@ use des_document::{
     DocumentInput, Element, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
     StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextSelectionGranularity,
-    TextWrapMode, Transition, ViewportQuery, VisualCloneOptions,
+    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+    TextSelectionGranularity, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions,
+    WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -187,7 +188,7 @@ fn visual_clone_preserves_visual_subtree_with_rewritten_ids() {
     assert!(!overlay.interactive());
 
     let label = cloned_output.snapshot().find("overlay/card-label").unwrap();
-    assert_eq!(label.text(), Some("Card label"));
+    assert_eq!(label.text(), Some("Card label".to_string()));
     assert!(label.has_class("label"));
 
     let icon = cloned_output.snapshot().find("overlay/card-icon").unwrap();
@@ -387,7 +388,7 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
     assert_eq!(
         snapshot.find("drop-label").unwrap().text(),
-        Some("Drop here")
+        Some("Drop here".to_string())
     );
     assert_eq!(snapshot.elements_with_class("drop-zone").len(), 1);
     assert_eq!(snapshot.elements_by_element(Element::Div).len(), 2);
@@ -1374,13 +1375,16 @@ fn text_layout_uses_document_wrap_and_truncation_styles() {
             StyleSelector::id("wrapped"),
             Style::default()
                 .width(Length::Px(90.0))
-                .text_wrap(TextWrapMode::Wrap),
+                .text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::id("truncated"),
             Style::default()
                 .width(Length::Px(90.0))
-                .text_wrap(TextWrapMode::Truncate),
+                .text_layout(TextLayoutStyle {
+                    max_lines: Some(1),
+                    ..TextLayoutStyle::default()
+                }),
         );
     let mut document = Document::build(Size::new(240.0, 160.0), |ui| {
         ui.text_element(
@@ -1487,7 +1491,7 @@ fn selectable_text_tracks_pointer_selection_points() {
         StyleSelector::id("label"),
         Style::default()
             .width(Length::Px(160.0))
-            .text_wrap(TextWrapMode::Wrap),
+            .text_wrap_mode(TextWrapMode::Wrap),
     );
     let mut document = Document::build(Size::new(240.0, 160.0), |ui| {
         ui.text_element(
@@ -1574,7 +1578,7 @@ fn selectable_text_exposes_selected_text_for_copy() {
         StyleSelector::id("label"),
         Style::default()
             .width(Length::Px(320.0))
-            .text_wrap(TextWrapMode::Extend),
+            .white_space(WhiteSpace::Pre),
     );
     let mut document = Document::build(Size::new(360.0, 120.0), |ui| {
         ui.text_element(
@@ -1634,7 +1638,7 @@ fn selectable_text_can_disable_copy_without_disabling_selection() {
         StyleSelector::id("label"),
         Style::default()
             .width(Length::Px(320.0))
-            .text_wrap(TextWrapMode::Extend),
+            .white_space(WhiteSpace::Pre),
     );
     let mut document = Document::build(Size::new(360.0, 120.0), |ui| {
         ui.text_element(
@@ -1696,7 +1700,7 @@ fn selectable_text_double_click_selects_word_and_word_drags() {
         StyleSelector::id("label"),
         Style::default()
             .width(Length::Px(320.0))
-            .text_wrap(TextWrapMode::Extend),
+            .white_space(WhiteSpace::Pre),
     );
     let mut document = Document::build(Size::new(360.0, 120.0), |ui| {
         ui.text_element(
@@ -1747,7 +1751,7 @@ fn selectable_text_double_click_drag_left_keeps_original_word() {
         StyleSelector::id("label"),
         Style::default()
             .width(Length::Px(320.0))
-            .text_wrap(TextWrapMode::Extend),
+            .white_space(WhiteSpace::Pre),
     );
     let mut document = Document::build(Size::new(360.0, 120.0), |ui| {
         ui.text_element(
@@ -1794,7 +1798,7 @@ fn selectable_text_triple_click_selects_paragraph() {
         StyleSelector::id("label"),
         Style::default()
             .width(Length::Px(320.0))
-            .text_wrap(TextWrapMode::Wrap),
+            .white_space(WhiteSpace::PreLine),
     );
     let mut document = Document::build(Size::new(360.0, 160.0), |ui| {
         ui.text_element(

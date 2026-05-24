@@ -1,7 +1,8 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_document::{
     BorderStyle, ClipRect, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph,
-    Insets, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
+    Insets, NormalizedText, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest,
+    TextWrapMode,
 };
 use eframe::egui;
 pub fn paint_frame(
@@ -52,15 +53,16 @@ fn paint_frame_clipped(
 
         if let Some(text) = &frame.text {
             let text_rect = frame_content_rect(rect, frame);
+            let normalized = NormalizedText::from_content(text, frame.style.text_layout);
             let request = TextLayoutRequest {
-                text,
+                text: &normalized,
                 font_size: frame.style.font_size,
-                wrap_width: match frame.style.text_wrap {
-                    TextWrapMode::Extend => f32::INFINITY,
-                    TextWrapMode::Wrap | TextWrapMode::Truncate => text_rect.width(),
+                color: frame.style.text_color,
+                wrap_width: match frame.style.text_layout.text_wrap_mode {
+                    TextWrapMode::NoWrap => f32::INFINITY,
+                    TextWrapMode::Wrap => text_rect.width(),
                 },
-                wrap_mode: frame.style.text_wrap,
-                max_lines: frame.style.max_lines,
+                layout_style: frame.style.text_layout,
                 line_height: frame.style.line_height,
             };
             let color = to_egui_color(frame.style.text_color);
@@ -69,9 +71,11 @@ fn paint_frame_clipped(
                 && let Some(selection) = text_selection
                 && selection.target == frame.id
             {
+                let anchor_index = normalized.semantic_to_layout_index(selection.anchor_index);
+                let focus_index = normalized.semantic_to_layout_index(selection.focus_index);
                 let cursor_range = egui::text_selection::CCursorRange::two(
-                    egui::text::CCursor::new(selection.anchor_index),
-                    egui::text::CCursor::new(selection.focus_index),
+                    egui::text::CCursor::new(anchor_index),
+                    egui::text::CCursor::new(focus_index),
                 );
                 paint_document_text_selection(
                     &mut galley,

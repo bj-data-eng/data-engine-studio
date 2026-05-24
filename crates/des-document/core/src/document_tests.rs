@@ -43,7 +43,7 @@ impl TextMeasurer for RecordingTextMeasurer {
 
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
         self.requests
-            .push((request.text.to_string(), request.wrap_width));
+            .push((request.text.semantic_text().to_string(), request.wrap_width));
         TextLayoutResult {
             size: Size::new(64.0, 18.0),
             line_count: 1,
@@ -63,7 +63,7 @@ impl TextMeasurer for CountingTextMeasurer {
     }
 
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
-        if request.text == "Measured" {
+        if request.text.semantic_text() == "Measured" {
             COMPUTE_TEXT_MEASURE_COUNT.fetch_add(1, Ordering::SeqCst);
         }
         TextLayoutResult {
@@ -606,7 +606,10 @@ fn document_emits_resolved_element_tree_from_retained_layout() {
     assert_eq!(panel.rect, Rect::new(0.0, 0.0, 200.0, 100.0));
     assert_eq!(panel.style.padding, Insets::all(10.0));
     assert!(panel.interactive);
-    assert_eq!(label.text.as_deref(), Some("Retained text"));
+    assert_eq!(
+        label.text.as_ref().map(|text| text.semantic_text()),
+        Some("Retained text".to_string())
+    );
     assert_eq!(label.rect, Rect::new(10.0, 10.0, 80.0, 20.0));
     assert!(label.selectable_text);
     assert!(label.copyable_text);
@@ -629,7 +632,7 @@ fn document_emits_text_layout_from_retained_layout() {
             .size(120.0, 40.0)
             .padding(Insets::all(8.0))
             .border_width(2.0)
-            .text_wrap(TextWrapMode::Wrap),
+            .text_wrap_mode(TextWrapMode::Wrap),
     );
     let mut text_measurer = RecordingTextMeasurer::default();
 
@@ -778,12 +781,24 @@ fn document_engine_does_not_reuse_cached_layout_for_distinct_document_with_same_
     let second_output = engine.update(&mut second, &stylesheet);
 
     assert_eq!(
-        first_output.layout.find("label").unwrap().text.as_deref(),
-        Some("first")
+        first_output
+            .layout
+            .find("label")
+            .unwrap()
+            .text
+            .as_ref()
+            .map(|text| text.semantic_text()),
+        Some("first".to_string())
     );
     assert_eq!(
-        second_output.layout.find("label").unwrap().text.as_deref(),
-        Some("second")
+        second_output
+            .layout
+            .find("label")
+            .unwrap()
+            .text
+            .as_ref()
+            .map(|text| text.semantic_text()),
+        Some("second".to_string())
     );
 }
 

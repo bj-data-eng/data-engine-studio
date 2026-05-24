@@ -2104,14 +2104,14 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
 
-    assert_eq!(wrapped.style.text_wrap, TextWrapMode::Wrap);
+    assert_eq!(wrapped.style.text_layout.text_wrap_mode, TextWrapMode::Wrap);
     assert!(
         wrapped.text_layout.unwrap().line_count > 1,
         "text wrap specimen should be measured as multiple lines"
     );
-    assert_eq!(truncated.style.text_wrap, TextWrapMode::Truncate);
+    assert_eq!(truncated.style.text_layout.max_lines, Some(1));
     assert!(truncated.text_layout.unwrap().elided);
-    assert_eq!(max_lines.style.max_lines, Some(2));
+    assert_eq!(max_lines.style.text_layout.max_lines, Some(2));
     assert!(max_lines.text_layout.unwrap().line_count <= 2);
     assert!(
         wrapped.rect.size.height > wrapped.text_layout.unwrap().size.height,

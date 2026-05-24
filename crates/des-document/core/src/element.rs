@@ -1,6 +1,7 @@
 use crate::geometry::Point;
 use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
+use crate::text::TextContent;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Element {
@@ -257,7 +258,7 @@ impl ElementSpec {
 pub(crate) struct DocumentNode {
     pub id: ElementId,
     pub spec: ElementSpec,
-    pub text: Option<String>,
+    pub text: Option<TextContent>,
     pub children: Vec<DocumentNode>,
 }
 
@@ -266,7 +267,7 @@ pub struct VisualElementClone {
     pub source_id: ElementId,
     pub element: Element,
     pub classes: Vec<ClassName>,
-    pub text: Option<String>,
+    pub text: Option<TextContent>,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub children: Vec<VisualElementClone>,

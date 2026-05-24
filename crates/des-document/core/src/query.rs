@@ -92,8 +92,12 @@ impl<'a> ElementSnapshot<'a> {
         self.element.clip_rect
     }
 
-    pub fn text(&self) -> Option<&str> {
-        self.element.text.as_deref()
+    pub fn text(&self) -> Option<String> {
+        self.element.text.as_ref().map(|text| text.semantic_text())
+    }
+
+    pub fn text_content(&self) -> Option<&crate::TextContent> {
+        self.element.text.as_ref()
     }
 
     pub fn text_layout(&self) -> Option<crate::TextLayoutResult> {

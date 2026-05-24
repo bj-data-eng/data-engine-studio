@@ -4,7 +4,9 @@ use crate::geometry::{
     JustifyContent, Length, Overflow, Point, Position, PositionInsets, Size,
 };
 use crate::state::ElementState;
-use crate::text::TextWrapMode;
+use crate::text::{
+    OverflowWrap, TextLayoutStyle, TextWrapMode, WhiteSpace, WhiteSpaceCollapse, WordBreak,
+};
 pub use des_layout::prelude::{
     Display, GridAutoFlow, MaxTrackSizingFunction, MinTrackSizingFunction, RepetitionCount,
     TrackSizingFunction,
@@ -598,8 +600,7 @@ pub struct Style {
     pub text_selection_background: Option<Color>,
     pub text_selection_color: Option<Color>,
     pub font_size: Option<f32>,
-    pub text_wrap: Option<TextWrapMode>,
-    pub max_lines: Option<usize>,
+    pub text_layout: Option<TextLayoutStyle>,
     pub line_height: Option<f32>,
     pub radius: CornerStyle,
     pub overflow_x: Option<Overflow>,
@@ -1048,13 +1049,51 @@ impl Style {
         self
     }
 
-    pub fn text_wrap(mut self, wrap_mode: TextWrapMode) -> Self {
-        self.text_wrap = Some(wrap_mode);
+    pub fn text_layout(mut self, layout: TextLayoutStyle) -> Self {
+        self.text_layout = Some(layout);
+        self
+    }
+
+    pub fn white_space(mut self, white_space: WhiteSpace) -> Self {
+        self.text_layout = Some(TextLayoutStyle {
+            max_lines: self.text_layout.and_then(|layout| layout.max_lines),
+            ..TextLayoutStyle::white_space(white_space)
+        });
+        self
+    }
+
+    pub fn text_wrap_mode(mut self, wrap_mode: TextWrapMode) -> Self {
+        let mut layout = self.text_layout.unwrap_or_default();
+        layout.text_wrap_mode = wrap_mode;
+        self.text_layout = Some(layout);
+        self
+    }
+
+    pub fn white_space_collapse(mut self, collapse: WhiteSpaceCollapse) -> Self {
+        let mut layout = self.text_layout.unwrap_or_default();
+        layout.white_space_collapse = collapse;
+        self.text_layout = Some(layout);
+        self
+    }
+
+    pub fn overflow_wrap(mut self, overflow_wrap: OverflowWrap) -> Self {
+        let mut layout = self.text_layout.unwrap_or_default();
+        layout.overflow_wrap = overflow_wrap;
+        self.text_layout = Some(layout);
+        self
+    }
+
+    pub fn word_break(mut self, word_break: WordBreak) -> Self {
+        let mut layout = self.text_layout.unwrap_or_default();
+        layout.word_break = word_break;
+        self.text_layout = Some(layout);
         self
     }
 
     pub fn max_lines(mut self, max_lines: usize) -> Self {
-        self.max_lines = Some(max_lines.max(1));
+        let mut layout = self.text_layout.unwrap_or_default();
+        layout.max_lines = Some(max_lines.max(1));
+        self.text_layout = Some(layout);
         self
     }
 
@@ -1465,8 +1504,7 @@ pub struct ComputedStyle {
     pub text_selection_background: Color,
     pub text_selection_color: Color,
     pub font_size: f32,
-    pub text_wrap: TextWrapMode,
-    pub max_lines: Option<usize>,
+    pub text_layout: TextLayoutStyle,
     pub line_height: Option<f32>,
     pub radius: CornerRadii,
     pub overflow_x: Overflow,
@@ -1540,8 +1578,7 @@ impl Default for ComputedStyle {
             text_selection_background: Color::rgba(234, 221, 255, 190),
             text_selection_color: Color::rgb(29, 27, 32),
             font_size: 13.0,
-            text_wrap: TextWrapMode::Extend,
-            max_lines: None,
+            text_layout: TextLayoutStyle::default(),
             line_height: None,
             radius: CornerRadii::ZERO,
             overflow_x: Overflow::Visible,
@@ -1722,11 +1759,8 @@ impl ComputedStyle {
         if let Some(value) = style.font_size {
             self.font_size = value;
         }
-        if let Some(value) = style.text_wrap {
-            self.text_wrap = value;
-        }
-        if let Some(value) = style.max_lines {
-            self.max_lines = Some(value.max(1));
+        if let Some(value) = style.text_layout {
+            self.text_layout = value;
         }
         if let Some(value) = style.line_height {
             self.line_height = Some(value.max(1.0));
@@ -2080,8 +2114,7 @@ fn layout_relevant_style_changed(previous: &ComputedStyle, next: &ComputedStyle)
         || previous.max_size != next.max_size
         || previous.border_width != next.border_width
         || previous.font_size != next.font_size
-        || previous.text_wrap != next.text_wrap
-        || previous.max_lines != next.max_lines
+        || previous.text_layout != next.text_layout
         || previous.line_height != next.line_height
         || previous.overflow_x != next.overflow_x
         || previous.overflow_y != next.overflow_y

@@ -4,7 +4,7 @@ use crate::query::DocumentSnapshot;
 use crate::style::{
     ComputedStyle, FloatingHideData, FloatingPlacement, FloatingVisibility, Transition,
 };
-use crate::text::TextLayoutResult;
+use crate::text::{TextContent, TextLayoutResult};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ElementState {
@@ -37,7 +37,7 @@ pub struct ResolvedElement {
     pub rect: Rect,
     pub clip_rect: ClipRect,
     pub style: ComputedStyle,
-    pub text: Option<String>,
+    pub text: Option<TextContent>,
     pub text_layout: Option<TextLayoutResult>,
     pub selectable_text: bool,
     pub copyable_text: bool,
@@ -93,8 +93,8 @@ impl DocumentOutput {
         if !frame.copyable_text {
             return None;
         }
-        let text = frame.text.as_ref()?;
-        selection.selected_text_from(text)
+        let text = frame.text.as_ref()?.semantic_text();
+        selection.selected_text_from(&text)
     }
 }
 

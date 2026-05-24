@@ -15,7 +15,7 @@ use crate::style::{
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 #[cfg(test)]
 use crate::text::FallbackTextMeasurer;
-use crate::text::{TextLayoutRequest, TextMeasurer, TextWrapMode};
+use crate::text::{NormalizedText, TextContent, TextLayoutRequest, TextMeasurer};
 use des_layout::floating::{FloatingBoundary, FloatingRect, compute_floating_position};
 use des_layout::geometry::{Point as LayoutPoint, Size as FloatingSize};
 use des_layout::prelude::{
@@ -74,7 +74,7 @@ impl std::error::Error for DocumentError {}
 pub(crate) struct DocumentElement {
     pub id: ElementId,
     pub spec: ElementSpec,
-    pub text: Option<String>,
+    pub text: Option<TextContent>,
     pub computed_style: ComputedStyle,
     scroll_offset: Point,
     layout_node: NodeId,
@@ -84,7 +84,7 @@ pub(crate) struct DocumentElement {
 struct DocumentLayoutNode {
     id: ElementId,
     element: Element,
-    text: Option<String>,
+    text: Option<TextContent>,
 }
 
 pub struct Document {
@@ -226,7 +226,7 @@ impl Document {
         parent: impl Into<ElementId>,
         id: impl Into<ElementId>,
         spec: ElementSpec,
-        text: impl Into<String>,
+        text: impl Into<TextContent>,
     ) -> DocumentResult<()> {
         self.append_node(parent.into(), id.into(), spec, Some(text.into()))?;
         Ok(())
@@ -249,7 +249,7 @@ impl Document {
     pub fn set_text(
         &mut self,
         id: impl Into<ElementId>,
-        text: impl Into<String>,
+        text: impl Into<TextContent>,
     ) -> DocumentResult<bool> {
         let id = id.into();
         let text = Some(text.into());
@@ -560,7 +560,7 @@ impl Document {
                         return LayoutSize::ZERO;
                     };
                     let measured = measure_text_content(
-                        input.text.as_str(),
+                        &input.text,
                         &input.style,
                         known_dimensions
                             .width
@@ -726,7 +726,7 @@ impl Document {
         parent: ElementId,
         id: ElementId,
         spec: ElementSpec,
-        text: Option<String>,
+        text: Option<TextContent>,
     ) -> DocumentResult<NodeId> {
         if self.elements.contains_key(&id) {
             return Err(DocumentError::DuplicateElement(id));
@@ -827,7 +827,7 @@ impl Document {
         };
         let text_layout = element
             .text
-            .as_deref()
+            .as_ref()
             .map(|text| measure_text(text, &element.computed_style, rect, text_measurer));
         anchors.insert(element.id.clone(), rect);
         boundaries.insert(
@@ -1132,7 +1132,7 @@ impl DocumentBuilder {
         });
     }
 
-    pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<String>) {
+    pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) {
         self.text_element(id, ElementSpec::new(Element::Text), text);
     }
 
@@ -1140,7 +1140,7 @@ impl DocumentBuilder {
         &mut self,
         id: impl Into<ElementId>,
         spec: ElementSpec,
-        text: impl Into<String>,
+        text: impl Into<TextContent>,
     ) {
         self.children.push(DocumentNode {
             id: id.into(),
@@ -1216,7 +1216,7 @@ impl ElementBuilder<'_> {
         self.push(None, Vec::new());
     }
 
-    pub fn text(self, text: impl Into<String>) {
+    pub fn text(self, text: impl Into<TextContent>) {
         self.push(Some(text.into()), Vec::new());
     }
 
@@ -1226,7 +1226,7 @@ impl ElementBuilder<'_> {
         self.push(None, child_builder.children);
     }
 
-    fn push(self, text: Option<String>, children: Vec<DocumentNode>) {
+    fn push(self, text: Option<TextContent>, children: Vec<DocumentNode>) {
         self.parent.children.push(DocumentNode {
             id: self.id,
             spec: self.spec,
@@ -1237,7 +1237,7 @@ impl ElementBuilder<'_> {
 }
 
 struct DocumentMeasureInput {
-    text: String,
+    text: TextContent,
     style: ComputedStyle,
 }
 
@@ -1513,7 +1513,7 @@ fn viewport_axis_position(
 }
 
 fn measure_text(
-    text: &str,
+    text: &TextContent,
     style: &ComputedStyle,
     rect: DocumentRect,
     text_measurer: &mut dyn TextMeasurer,
@@ -1523,7 +1523,7 @@ fn measure_text(
 }
 
 fn measure_text_content(
-    text: &str,
+    text: &TextContent,
     style: &ComputedStyle,
     available_width: Option<f32>,
     text_measurer: &mut dyn TextMeasurer,
@@ -1538,21 +1538,22 @@ fn measure_text_content(
 }
 
 fn measure_text_with_wrap_width(
-    text: &str,
+    text: &TextContent,
     style: &ComputedStyle,
     available_width: f32,
     text_measurer: &mut dyn TextMeasurer,
 ) -> crate::text::TextLayoutResult {
-    let wrap_width = match style.text_wrap {
-        TextWrapMode::Extend => f32::INFINITY,
-        TextWrapMode::Wrap | TextWrapMode::Truncate => available_width,
+    let normalized = NormalizedText::from_content(text, style.text_layout);
+    let wrap_width = match style.text_layout.text_wrap_mode {
+        crate::text::TextWrapMode::NoWrap => f32::INFINITY,
+        crate::text::TextWrapMode::Wrap => available_width,
     };
     text_measurer.measure_text(TextLayoutRequest {
-        text,
+        text: &normalized,
         font_size: style.font_size,
+        color: style.text_color,
         wrap_width,
-        wrap_mode: style.text_wrap,
-        max_lines: style.max_lines,
+        layout_style: style.text_layout,
         line_height: style.line_height,
     })
 }

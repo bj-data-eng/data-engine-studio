@@ -10,7 +10,9 @@ use crate::state::{
     TextSelectionGranularity,
 };
 use crate::style::StyleSheet;
-use crate::text::{FallbackTextMeasurer, TextMeasurer, TextMeasurerKey};
+use crate::text::{
+    FallbackTextMeasurer, NormalizedText, TextLayoutRequest, TextMeasurer, TextMeasurerKey,
+};
 use std::collections::{BTreeSet, HashMap};
 
 const POINTER_DRAG_ACTIVATION_DISTANCE: f32 = 5.0;
@@ -671,7 +673,11 @@ impl DocumentEngine {
             _ => TextSelectionGranularity::Character,
         };
         let (anchor_index, focus_index) = selection_range_for_granularity(
-            frame.text.as_deref().unwrap_or_default(),
+            &frame
+                .text
+                .as_ref()
+                .map(|text| text.semantic_text())
+                .unwrap_or_default(),
             text_index,
             granularity,
         );
@@ -732,7 +738,11 @@ impl DocumentEngine {
                 .map(|frame| {
                     let text_index = text_index_at_point(frame, pointer.position, text_measurer);
                     let (anchor_index, focus_index) = selection_indices_for_granularity(
-                        frame.text.as_deref().unwrap_or_default(),
+                        &frame
+                            .text
+                            .as_ref()
+                            .map(|text| text.semantic_text())
+                            .unwrap_or_default(),
                         selection.anchor_range_start,
                         selection.anchor_range_end,
                         text_index,
@@ -970,13 +980,25 @@ fn text_index_at_point(
     point: Point,
     text_measurer: &mut dyn TextMeasurer,
 ) -> usize {
-    let Some(text) = frame.text.as_deref() else {
+    let Some(text) = frame.text.as_ref() else {
         return 0;
     };
     let text_rect = text_content_rect(frame);
     let local_point = Point::new(point.x - text_rect.origin.x, point.y - text_rect.origin.y);
+    let normalized = NormalizedText::from_content(text, frame.style.text_layout);
+    let wrap_width = match frame.style.text_layout.text_wrap_mode {
+        crate::text::TextWrapMode::NoWrap => f32::INFINITY,
+        crate::text::TextWrapMode::Wrap => text_rect.size.width,
+    };
     text_measurer.text_index_at(
-        text_request_for_frame(frame, text, text_rect.size.width),
+        TextLayoutRequest {
+            text: &normalized,
+            font_size: frame.style.font_size,
+            color: frame.style.text_color,
+            wrap_width,
+            layout_style: frame.style.text_layout,
+            line_height: frame.style.line_height,
+        },
         local_point,
     )
 }
@@ -986,24 +1008,6 @@ fn text_content_rect(frame: &ResolvedElement) -> Rect {
         .rect
         .inset(frame.style.border_width)
         .inset(frame.style.padding)
-}
-
-fn text_request_for_frame<'a>(
-    frame: &ResolvedElement,
-    text: &'a str,
-    wrap_width: f32,
-) -> crate::text::TextLayoutRequest<'a> {
-    crate::text::TextLayoutRequest {
-        text,
-        font_size: frame.style.font_size,
-        wrap_width: match frame.style.text_wrap {
-            crate::text::TextWrapMode::Extend => f32::INFINITY,
-            crate::text::TextWrapMode::Wrap | crate::text::TextWrapMode::Truncate => wrap_width,
-        },
-        wrap_mode: frame.style.text_wrap,
-        max_lines: frame.style.max_lines,
-        line_height: frame.style.line_height,
-    }
 }
 
 fn selection_range_for_granularity(

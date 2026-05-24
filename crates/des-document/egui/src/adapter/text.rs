@@ -1,6 +1,6 @@
 use des_document::{
-    Color, DocumentOutput, Point, Size, TextLayoutRequest, TextLayoutResult, TextMeasurer,
-    TextMeasurerKey, TextWrapMode,
+    Color, DocumentOutput, InlineTextStyle, Point, Size, TextLayoutRequest, TextLayoutResult,
+    TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -25,7 +25,7 @@ impl TextMeasurer for EguiTextMeasurer {
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
         let galley = self
             .ctx
-            .fonts_mut(|fonts| fonts.layout_job(layout_job(request, egui::Color32::WHITE)));
+            .fonts_mut(|fonts| fonts.layout_job(layout_job(request.clone(), egui::Color32::WHITE)));
         let size = galley.size();
         TextLayoutResult {
             size: Size::new(size.x, size.y),
@@ -37,8 +37,10 @@ impl TextMeasurer for EguiTextMeasurer {
     fn text_index_at(&mut self, request: TextLayoutRequest<'_>, point: Point) -> usize {
         let galley = self
             .ctx
-            .fonts_mut(|fonts| fonts.layout_job(layout_job(request, egui::Color32::WHITE)));
-        galley.cursor_from_pos(egui::vec2(point.x, point.y)).index
+            .fonts_mut(|fonts| fonts.layout_job(layout_job(request.clone(), egui::Color32::WHITE)));
+        request
+            .text
+            .layout_to_semantic_index(galley.cursor_from_pos(egui::vec2(point.x, point.y)).index)
     }
 }
 pub fn configure_text_selection_input(context: &egui::Context) {
@@ -150,38 +152,80 @@ pub(crate) fn paint_document_text_selection(
 
 pub(crate) fn layout_job(
     request: TextLayoutRequest<'_>,
-    color: egui::Color32,
+    _color: egui::Color32,
 ) -> egui::text::LayoutJob {
-    let wrap_width = if request.wrap_mode == TextWrapMode::Extend {
-        f32::INFINITY
-    } else {
-        request.wrap_width.max(1.0)
+    let wrap_width = match request.layout_style.text_wrap_mode {
+        TextWrapMode::NoWrap => f32::INFINITY,
+        TextWrapMode::Wrap => request.wrap_width.max(1.0),
     };
-    let mut job = egui::text::LayoutJob::simple(
-        request.text.to_owned(),
-        egui::FontId::proportional(request.font_size),
-        color,
-        wrap_width,
-    );
+    let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = wrap_width;
-    if request.wrap_mode == TextWrapMode::Truncate {
-        job.wrap.max_rows = 1;
-        job.wrap.break_anywhere = true;
-    }
-    if request.wrap_mode != TextWrapMode::Truncate
-        && let Some(max_lines) = request.max_lines
-    {
+    if let Some(max_lines) = request.layout_style.max_lines {
         job.wrap.max_rows = max_lines.max(1);
         if job.wrap.max_rows == 1 {
             job.wrap.break_anywhere = true;
         }
     }
-    if let Some(line_height) = request.line_height {
-        if let Some(section) = job.sections.first_mut() {
-            section.format.line_height = Some(line_height.max(1.0));
-        }
+    job.wrap.break_anywhere = job.wrap.break_anywhere
+        || matches!(
+            request.layout_style.overflow_wrap,
+            des_document::OverflowWrap::Anywhere
+        )
+        || matches!(
+            request.layout_style.word_break,
+            des_document::WordBreak::BreakAll
+        );
+    for run in request.text.runs() {
+        job.append(
+            &run.text,
+            0.0,
+            text_format(
+                &run.style,
+                request.font_size,
+                request.color,
+                request.line_height,
+            ),
+        );
     }
     job
+}
+
+fn text_format(
+    style: &InlineTextStyle,
+    inherited_font_size: f32,
+    inherited_color: Color,
+    inherited_line_height: Option<f32>,
+) -> egui::TextFormat {
+    let color = style.color.unwrap_or(inherited_color);
+    let family = style
+        .font_family
+        .as_ref()
+        .map(|family| egui::FontFamily::Name(family.clone().into()))
+        .unwrap_or(egui::FontFamily::Proportional);
+    egui::TextFormat {
+        font_id: egui::FontId::new(style.font_size.unwrap_or(inherited_font_size), family),
+        color: to_egui_color(color),
+        italics: style.italic.unwrap_or(false),
+        strikethrough: if style.strikethrough.unwrap_or(false) {
+            egui::Stroke::new(1.0, to_egui_color(color))
+        } else {
+            egui::Stroke::NONE
+        },
+        underline: if style.underline.unwrap_or(false) {
+            egui::Stroke::new(1.0, to_egui_color(color))
+        } else {
+            egui::Stroke::NONE
+        },
+        background: style
+            .background
+            .map(to_egui_color)
+            .unwrap_or(egui::Color32::TRANSPARENT),
+        line_height: style
+            .line_height
+            .or(inherited_line_height)
+            .map(|height| height.max(1.0)),
+        ..Default::default()
+    }
 }
 
 fn to_egui_color(color: Color) -> egui::Color32 {
@@ -191,35 +235,43 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use des_document::{NormalizedText, TextContent, TextLayoutStyle, WhiteSpace};
 
     #[test]
     fn layout_job_extends_without_wrapping() {
+        let text = TextContent::plain("A line that should not wrap");
+        let normalized =
+            NormalizedText::from_content(&text, TextLayoutStyle::white_space(WhiteSpace::Pre));
         let job = layout_job(
             TextLayoutRequest {
-                text: "A line that should not wrap",
+                text: &normalized,
                 font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
                 wrap_width: 10.0,
-                wrap_mode: TextWrapMode::Extend,
-                max_lines: Some(1),
+                layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
                 line_height: Some(18.0),
             },
             egui::Color32::WHITE,
         );
 
         assert_eq!(job.wrap.max_width, f32::INFINITY);
-        assert_eq!(job.wrap.max_rows, 1);
+        assert_eq!(job.wrap.max_rows, usize::MAX);
         assert_eq!(job.sections[0].format.line_height, Some(18.0));
     }
 
     #[test]
-    fn layout_job_truncate_forces_single_breakable_row() {
+    fn layout_job_max_lines_forces_single_breakable_row() {
+        let text = TextContent::plain("truncate me");
+        let mut style = TextLayoutStyle::default();
+        style.max_lines = Some(1);
+        let normalized = NormalizedText::from_content(&text, style);
         let job = layout_job(
             TextLayoutRequest {
-                text: "truncate me",
+                text: &normalized,
                 font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
                 wrap_width: 0.0,
-                wrap_mode: TextWrapMode::Truncate,
-                max_lines: Some(3),
+                layout_style: style,
                 line_height: None,
             },
             egui::Color32::WHITE,
