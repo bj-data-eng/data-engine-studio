@@ -1,7 +1,7 @@
 use cosmic_text::{
     Align, Attrs, Buffer, CacheKey, Color as CosmicColor, Ellipsize, EllipsizeHeightLimit, Family,
-    FontSystem, Metrics, PhysicalGlyph, Renderer, Shaping, Style, SwashCache, SwashContent,
-    UnderlineStyle, Weight, Wrap, render_decoration,
+    FontSystem, Metrics, PhysicalGlyph, Renderer, Shaping, Stretch, Style, SwashCache,
+    SwashContent, UnderlineStyle, Weight, Wrap, render_decoration,
 };
 use des_document::{
     Color, Direction, FontStyle, InlineTextStyle, Point, Rect, Size, TextAlign, TextLayoutLine,
@@ -929,6 +929,9 @@ fn cosmic_attrs(
     if let Some(weight) = style.font_weight {
         attrs = attrs.weight(Weight(weight.value()));
     }
+    if let Some(stretch) = style.font_stretch {
+        attrs = attrs.stretch(cosmic_stretch(stretch.value()));
+    }
     if matches!(
         style.font_style,
         Some(FontStyle::Italic | FontStyle::Oblique)
@@ -953,6 +956,32 @@ fn cosmic_attrs(
         }
     }
     attrs
+}
+
+fn cosmic_stretch(percent: f32) -> Stretch {
+    let percent = percent.clamp(
+        des_document::FontStretch::MIN_PERCENT,
+        des_document::FontStretch::MAX_PERCENT,
+    );
+    if percent <= 56.25 {
+        Stretch::UltraCondensed
+    } else if percent <= 68.75 {
+        Stretch::ExtraCondensed
+    } else if percent <= 81.25 {
+        Stretch::Condensed
+    } else if percent <= 93.75 {
+        Stretch::SemiCondensed
+    } else if percent < 106.25 {
+        Stretch::Normal
+    } else if percent < 118.75 {
+        Stretch::SemiExpanded
+    } else if percent < 137.5 {
+        Stretch::Expanded
+    } else if percent < 175.0 {
+        Stretch::ExtraExpanded
+    } else {
+        Stretch::UltraExpanded
+    }
 }
 
 fn run_backgrounds(text: &des_document::NormalizedText) -> Vec<Option<Color>> {
@@ -1402,6 +1431,36 @@ mod tests {
                 .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px > 0),
             "underline runs should become paintable decoration rectangles"
         );
+    }
+
+    #[test]
+    fn maps_font_stretch_to_cosmic_width_classes() {
+        assert_eq!(cosmic_stretch(50.0), Stretch::UltraCondensed);
+        assert_eq!(cosmic_stretch(62.5), Stretch::ExtraCondensed);
+        assert_eq!(cosmic_stretch(75.0), Stretch::Condensed);
+        assert_eq!(cosmic_stretch(87.5), Stretch::SemiCondensed);
+        assert_eq!(cosmic_stretch(100.0), Stretch::Normal);
+        assert_eq!(cosmic_stretch(112.5), Stretch::SemiExpanded);
+        assert_eq!(cosmic_stretch(125.0), Stretch::Expanded);
+        assert_eq!(cosmic_stretch(150.0), Stretch::ExtraExpanded);
+        assert_eq!(cosmic_stretch(200.0), Stretch::UltraExpanded);
+    }
+
+    #[test]
+    fn applies_font_stretch_to_cosmic_attrs() {
+        let attrs = cosmic_attrs(
+            &InlineTextStyle {
+                font_stretch: Some(des_document::FontStretch::EXPANDED),
+                ..InlineTextStyle::default()
+            },
+            16.0,
+            Color::rgb(1, 2, 3),
+            None,
+            1.0,
+            0,
+        );
+
+        assert_eq!(attrs.stretch, Stretch::Expanded);
     }
 
     #[test]
