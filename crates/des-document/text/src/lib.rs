@@ -120,8 +120,11 @@ pub struct CosmicTextRenderer {
     font_system: FontSystem,
     swash_cache: SwashCache,
     buffers: HashMap<TextBufferKey, Buffer>,
+    paint_runs: HashMap<TextPaintGlyphRunKey, TextPaintGlyphRun>,
     buffer_cache_hits: usize,
     buffer_cache_misses: usize,
+    paint_run_cache_hits: usize,
+    paint_run_cache_misses: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -129,6 +132,9 @@ pub struct TextBufferStats {
     pub cache_entries: usize,
     pub cache_hits: usize,
     pub cache_misses: usize,
+    pub paint_run_cache_entries: usize,
+    pub paint_run_cache_hits: usize,
+    pub paint_run_cache_misses: usize,
 }
 
 impl CosmicTextRenderer {
@@ -155,14 +161,19 @@ impl CosmicTextRenderer {
             font_system: FontSystem::new_with_locale_and_db(locale, db),
             swash_cache: SwashCache::new(),
             buffers: HashMap::new(),
+            paint_runs: HashMap::new(),
             buffer_cache_hits: 0,
             buffer_cache_misses: 0,
+            paint_run_cache_hits: 0,
+            paint_run_cache_misses: 0,
         }
     }
 
     pub fn begin_frame(&mut self) {
         self.buffer_cache_hits = 0;
         self.buffer_cache_misses = 0;
+        self.paint_run_cache_hits = 0;
+        self.paint_run_cache_misses = 0;
     }
 
     pub fn buffer_stats(&self) -> TextBufferStats {
@@ -170,6 +181,9 @@ impl CosmicTextRenderer {
             cache_entries: self.buffers.len(),
             cache_hits: self.buffer_cache_hits,
             cache_misses: self.buffer_cache_misses,
+            paint_run_cache_entries: self.paint_runs.len(),
+            paint_run_cache_hits: self.paint_run_cache_hits,
+            paint_run_cache_misses: self.paint_run_cache_misses,
         }
     }
 
@@ -266,9 +280,21 @@ impl CosmicTextRenderer {
         visible_rect: Option<Rect>,
     ) -> TextPaintGlyphRun {
         let scale = pixels_per_point.max(1.0);
-        self.with_buffer(request.clone(), scale, |buffer, _| {
+        let buffer_key = TextBufferKey::new(&request, scale);
+        let paint_key = TextPaintGlyphRunKey::new(buffer_key.clone(), visible_rect);
+        if let Some(run) = self.paint_runs.get(&paint_key).cloned() {
+            self.paint_run_cache_hits += 1;
+            return run;
+        }
+        self.paint_run_cache_misses += 1;
+        if self.paint_runs.len() > 1024 {
+            self.paint_runs.clear();
+        }
+        let run = self.with_buffer_key(buffer_key, request.clone(), scale, |buffer, _| {
             collect_text_paint_glyph_run(&request, buffer, scale, visible_rect)
-        })
+        });
+        self.paint_runs.insert(paint_key, run.clone());
+        run
     }
 
     pub fn selection_rects(
@@ -356,8 +382,19 @@ impl CosmicTextRenderer {
         f: impl FnOnce(&mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>, &mut SwashCache) -> R,
     ) -> R {
         let key = TextBufferKey::new(&request, scale);
+        self.with_buffer_key(key, request, scale, f)
+    }
+
+    fn with_buffer_key<R>(
+        &mut self,
+        key: TextBufferKey,
+        request: TextLayoutRequest<'_>,
+        scale: f32,
+        f: impl FnOnce(&mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>, &mut SwashCache) -> R,
+    ) -> R {
         if self.buffers.len() > 512 && !self.buffers.contains_key(&key) {
             self.buffers.clear();
+            self.paint_runs.clear();
         }
         if self.buffers.contains_key(&key) {
             self.buffer_cache_hits += 1;
@@ -440,6 +477,40 @@ impl TextBufferKey {
                     style: InlineStyleKey::from(&run.style),
                 })
                 .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct TextPaintGlyphRunKey {
+    buffer: TextBufferKey,
+    visible_rect: Option<RectKey>,
+}
+
+impl TextPaintGlyphRunKey {
+    fn new(buffer: TextBufferKey, visible_rect: Option<Rect>) -> Self {
+        Self {
+            buffer,
+            visible_rect: visible_rect.map(RectKey::from),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct RectKey {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+impl From<Rect> for RectKey {
+    fn from(rect: Rect) -> Self {
+        Self {
+            x: f32_key(rect.origin.x),
+            y: f32_key(rect.origin.y),
+            width: f32_key(rect.size.width),
+            height: f32_key(rect.size.height),
         }
     }
 }
@@ -1848,6 +1919,26 @@ mod tests {
                 .any(|rect| rect.color == highlight && rect.width_px > 0 && rect.height_px > 0),
             "paint-only glyph runs should preserve inline background output"
         );
+    }
+
+    #[test]
+    fn paint_glyphs_reuse_cached_visible_runs() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Paint cache keeps warm frames cheap");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let request = request(&normalized, 24.0, 400.0);
+        let visible = Some(Rect::new(0.0, 0.0, 240.0, 80.0));
+
+        let cold = renderer.paint_glyphs(request.clone(), 2.0, visible);
+        assert!(!cold.glyphs.is_empty());
+        renderer.begin_frame();
+        let warm = renderer.paint_glyphs(request, 2.0, visible);
+        let stats = renderer.buffer_stats();
+
+        assert_eq!(warm, cold);
+        assert_eq!(stats.paint_run_cache_hits, 1);
+        assert_eq!(stats.paint_run_cache_misses, 0);
+        assert!(stats.paint_run_cache_entries > 0);
     }
 
     #[test]

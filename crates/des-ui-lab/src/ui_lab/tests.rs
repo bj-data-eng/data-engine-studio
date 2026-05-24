@@ -2226,9 +2226,17 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         warm_stats.layout_cache_misses, 0,
         "warm text paint should reuse retained cosmic text buffers without reshaping misses"
     );
+    assert_eq!(
+        warm_stats.paint_run_cache_misses, 0,
+        "warm text paint should reuse retained visible glyph runs"
+    );
     assert!(
-        warm_stats.layout_cache_hits > 0,
-        "warm text paint should hit retained cosmic text buffers"
+        warm_stats.paint_run_cache_hits > 0,
+        "warm text paint should hit retained visible glyph runs"
+    );
+    assert!(
+        warm_stats.layout_cache_entries > 0,
+        "warm text paint should retain cosmic text buffers even when paint runs avoid touching them"
     );
     assert!(
         warm_stats.glyph_cache_hits > 0,
@@ -2284,9 +2292,17 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
         warm_stats.layout_cache_misses, 0,
         "warm scrolled text paint should reuse retained cosmic text buffers without reshaping misses"
     );
+    assert_eq!(
+        warm_stats.paint_run_cache_misses, 0,
+        "warm scrolled text paint should reuse retained visible glyph runs"
+    );
     assert!(
-        warm_stats.layout_cache_hits > 0,
-        "warm scrolled text paint should hit retained cosmic text buffers"
+        warm_stats.paint_run_cache_hits > 0,
+        "warm scrolled text paint should hit retained visible glyph runs"
+    );
+    assert!(
+        warm_stats.layout_cache_entries > 0,
+        "warm scrolled text paint should retain cosmic text buffers even when paint runs avoid touching them"
     );
     assert!(
         warm_stats.glyph_cache_hits > 0,

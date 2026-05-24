@@ -973,6 +973,17 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-paint-run-cache",
+                "text paint runs",
+                format!(
+                    "{} hit / {} miss / {} cached",
+                    perf.text_paint.paint_run_cache_hits,
+                    perf.text_paint.paint_run_cache_misses,
+                    perf.text_paint.paint_run_cache_entries
+                ),
+            );
+            debug_metric_row(
+                ui,
                 "debug-text-measure",
                 "text measure",
                 format!(

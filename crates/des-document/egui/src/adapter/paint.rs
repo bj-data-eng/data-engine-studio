@@ -60,6 +60,9 @@ pub struct TextPaintStats {
     pub layout_cache_hits: usize,
     pub layout_cache_misses: usize,
     pub layout_cache_entries: usize,
+    pub paint_run_cache_hits: usize,
+    pub paint_run_cache_misses: usize,
+    pub paint_run_cache_entries: usize,
 }
 
 impl CosmicTextPaintResources {
@@ -77,6 +80,7 @@ impl CosmicTextPaintResources {
             cached_glyphs: self.atlas.entries.len(),
             atlas_pages: self.atlas.pages.len(),
             layout_cache_entries: self.renderer.buffer_stats().cache_entries,
+            paint_run_cache_entries: self.renderer.buffer_stats().paint_run_cache_entries,
             ..TextPaintStats::default()
         };
     }
@@ -89,6 +93,9 @@ impl CosmicTextPaintResources {
             layout_cache_hits: layout_stats.cache_hits,
             layout_cache_misses: layout_stats.cache_misses,
             layout_cache_entries: layout_stats.cache_entries,
+            paint_run_cache_hits: layout_stats.paint_run_cache_hits,
+            paint_run_cache_misses: layout_stats.paint_run_cache_misses,
+            paint_run_cache_entries: layout_stats.paint_run_cache_entries,
             ..self.stats
         }
     }
