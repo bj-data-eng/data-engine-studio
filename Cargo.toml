@@ -11,7 +11,7 @@ members = [
     "crates/des-ui-lab",
     "crates/des-document/widgets",
 ]
-exclude = ["crates/des-apple-dispatch"]
+exclude = ["vendor/des-apple-dispatch"]
 resolver = "3"
 
 [workspace.package]
@@ -39,4 +39,4 @@ pyo3 = { version = "=0.27.2", features = ["extension-module", "abi3-py311"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 
 [patch.crates-io]
-dispatch = { path = "crates/des-apple-dispatch" }
+dispatch = { path = "vendor/des-apple-dispatch" }
