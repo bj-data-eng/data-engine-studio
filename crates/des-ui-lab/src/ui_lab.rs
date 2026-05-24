@@ -25,6 +25,7 @@ use des_widgets::{
     SortableDropPreview, SortableItemId, SortableModel,
 };
 use eframe::egui;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 const BACKGROUND: Color = Color::rgb(247, 239, 250);
@@ -55,6 +56,7 @@ const DROP_ZONE_COUNT: usize = 6;
 const SCROLL_LIST_ITEM_COUNT: usize = 14;
 const TEXT_CONTEXT_MENU_ID: &str = "text-context-menu";
 const TEXT_CONTEXT_MENU_COPY_ID: &str = "text-context-menu-copy";
+static TEXT_RENDER_DIAGNOSTICS_LOG_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LabView {
@@ -242,6 +244,7 @@ impl UiLabState {
 
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
         configure_text_selection_input(ui.ctx());
+        log_text_render_diagnostics("before-layout", ui.ctx(), ui.max_rect().size());
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
         let viewport_size = Size::new(viewport.x, viewport.y);
@@ -317,6 +320,7 @@ impl UiLabState {
         paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
         let paint_time = paint_start.elapsed();
+        log_text_render_diagnostics("after-paint", ui.ctx(), ui.max_rect().size());
         self.last_perf = UiLabPerf {
             document_time,
             engine_time,
@@ -1345,6 +1349,23 @@ fn shadow_tune_action_for_id(id: &str) -> Option<LabAction> {
         field,
         direction,
     })
+}
+
+fn log_text_render_diagnostics(label: &str, ctx: &egui::Context, viewport: egui::Vec2) {
+    if std::env::var_os("DES_UI_TEXT_RENDER_DIAGNOSTICS").is_none() {
+        return;
+    }
+    if TEXT_RENDER_DIAGNOSTICS_LOG_COUNT.fetch_add(1, Ordering::Relaxed) >= 2 {
+        return;
+    }
+
+    let pixels_per_point = ctx.pixels_per_point();
+    let native_pixels_per_point = ctx.native_pixels_per_point();
+    let font_image_size = ctx.fonts(|fonts| fonts.font_image_size());
+    eprintln!(
+        "DES text render diagnostics ({label}): pixels_per_point={pixels_per_point:.3}, native_pixels_per_point={native_pixels_per_point:?}, font_image_size={font_image_size:?}, viewport_points=({:.1}, {:.1})",
+        viewport.x, viewport.y
+    );
 }
 
 #[derive(Clone, Copy, Debug, Default)]
