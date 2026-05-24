@@ -614,6 +614,68 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_browser_shorthands() {
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        .panel {
+            flex-flow: row wrap;
+            flex: 2 3 calc(40% - 12px);
+            place-items: center stretch;
+            place-self: end start;
+            place-content: space-between center;
+            border-width: 1px 2px 3px 4px;
+            border-radius: 5px 6px 7px 8px;
+            position: absolute-parent;
+            inset: 10px 20px 30px 40px;
+        }
+        "#,
+    )
+    .unwrap();
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+
+    document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    let panel = document
+        .resolved_layout()
+        .unwrap()
+        .find("panel")
+        .unwrap()
+        .clone();
+
+    assert_eq!(panel.style.flex_direction, FlexDirection::Row);
+    assert_eq!(panel.style.flex_wrap, FlexWrap::Wrap);
+    assert_eq!(panel.style.flex_grow, 2.0);
+    assert_eq!(panel.style.flex_shrink, 3.0);
+    assert_eq!(panel.style.flex_basis, Length::calc(0.4, -12.0));
+    assert_eq!(panel.style.align_items, AlignItems::Center);
+    assert_eq!(panel.style.justify_items, Some(AlignItems::Stretch));
+    assert_eq!(panel.style.align_self, Some(AlignItems::End));
+    assert_eq!(panel.style.justify_self, Some(AlignItems::Start));
+    assert_eq!(panel.style.align_content, AlignContent::SpaceBetween);
+    assert_eq!(panel.style.justify_content, JustifyContent::Center);
+    assert_eq!(panel.style.border_width.top, 1.0);
+    assert_eq!(panel.style.border_width.right, 2.0);
+    assert_eq!(panel.style.border_width.bottom, 3.0);
+    assert_eq!(panel.style.border_width.left, 4.0);
+    assert_eq!(panel.style.radius.top_left, 5.0);
+    assert_eq!(panel.style.radius.top_right, 6.0);
+    assert_eq!(panel.style.radius.bottom_right, 7.0);
+    assert_eq!(panel.style.radius.bottom_left, 8.0);
+    assert_eq!(panel.style.inset.top, Some(Length::Px(10.0)));
+    assert_eq!(panel.style.inset.right, Some(Length::Px(20.0)));
+    assert_eq!(panel.style.inset.bottom, Some(Length::Px(30.0)));
+    assert_eq!(panel.style.inset.left, Some(Length::Px(40.0)));
+}
+
+#[test]
 fn css_stylesheet_parser_resolves_descendant_selectors() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document

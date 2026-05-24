@@ -292,7 +292,7 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
         return Ok(StyleSelector::Complex(ComplexSelector::new(parts)));
     }
 
-    let parts = input.split_whitespace().collect::<Vec<_>>();
+    let parts = split_top_level_whitespace(input);
     if parts.len() > 1 {
         let selectors = parts
             .into_iter()
@@ -548,13 +548,36 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "direction" => style.direction = Some(parse_direction(value)?),
         "flex-direction" => style.flex_direction = Some(parse_flex_direction(value)?),
         "flex-wrap" => style.flex_wrap = Some(parse_flex_wrap(value)?),
+        "flex-flow" => {
+            let (direction, wrap) = parse_flex_flow(value)?;
+            style.flex_direction = Some(direction);
+            style.flex_wrap = Some(wrap);
+        }
+        "flex" => parse_flex(style, value)?,
         "flex-basis" => style.flex_basis = Some(parse_length(value)?),
         "flex-grow" => style.flex_grow = Some(parse_f32(value)?.max(0.0)),
         "flex-shrink" => style.flex_shrink = Some(parse_f32(value)?.max(0.0)),
         "align-items" => style.align_items = Some(parse_align_items(value)?),
         "align-self" => style.align_self = Some(parse_align_items(value)?),
+        "justify-items" => style.justify_items = Some(parse_align_items(value)?),
+        "justify-self" => style.justify_self = Some(parse_align_items(value)?),
+        "place-items" => {
+            let (align, justify) = parse_place_alignment(value)?;
+            style.align_items = Some(align);
+            style.justify_items = Some(justify);
+        }
+        "place-self" => {
+            let (align, justify) = parse_place_alignment(value)?;
+            style.align_self = Some(align);
+            style.justify_self = Some(justify);
+        }
         "justify-content" => style.justify_content = Some(parse_justify_content(value)?),
         "align-content" => style.align_content = Some(parse_align_content(value)?),
+        "place-content" => {
+            let (align, justify) = parse_place_content(value)?;
+            style.align_content = Some(align);
+            style.justify_content = Some(justify);
+        }
         "gap" => style.gap = Some(parse_length(value)?),
         "row-gap" => style.row_gap = Some(parse_length(value)?),
         "column-gap" => style.column_gap = Some(parse_length(value)?),
@@ -589,13 +612,13 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "background" | "background-color" => style.background = Some(parse_color(value)?),
         "border-color" => style.border = Some(parse_color(value)?),
         "border" => parse_border(style, value)?,
-        "border-width" => style.border_width = crate::EdgeStyle::all(parse_px(value)?),
+        "border-width" => style.border_width = crate::EdgeStyle::from_insets(parse_insets(value)?),
         "border-style" => style.border_style = Some(parse_border_style(value)?),
         "border-top-width" => style.border_width.top = Some(parse_px(value)?),
         "border-right-width" => style.border_width.right = Some(parse_px(value)?),
         "border-bottom-width" => style.border_width.bottom = Some(parse_px(value)?),
         "border-left-width" => style.border_width.left = Some(parse_px(value)?),
-        "border-radius" | "radius" => style.radius = crate::CornerStyle::all(parse_px(value)?),
+        "border-radius" | "radius" => style.radius = parse_corner_style(value)?,
         "border-top-left-radius" => style.radius.top_left = Some(parse_px(value)?),
         "border-top-right-radius" => style.radius.top_right = Some(parse_px(value)?),
         "border-bottom-right-radius" => style.radius.bottom_right = Some(parse_px(value)?),
@@ -664,6 +687,7 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "animate-paint" => style.animate_paint = Some(parse_bool(value)?),
         "animate-shadows" => style.animate_shadows = Some(parse_bool(value)?),
         "position" => style.position = Some(parse_position(value)?),
+        "inset" => style.inset = parse_position_insets(value)?,
         "top" => style.inset.top = Some(parse_length(value)?),
         "right" => style.inset.right = Some(parse_length(value)?),
         "bottom" => style.inset.bottom = Some(parse_length(value)?),
@@ -789,6 +813,87 @@ fn parse_flex_wrap(input: &str) -> Result<FlexWrap, CssParseError> {
     }
 }
 
+fn parse_flex_flow(input: &str) -> Result<(FlexDirection, FlexWrap), CssParseError> {
+    let mut direction = None;
+    let mut wrap = None;
+    for part in input.split_whitespace() {
+        if direction.is_none() {
+            if let Ok(value) = parse_flex_direction(part) {
+                direction = Some(value);
+                continue;
+            }
+        }
+        if wrap.is_none() {
+            if let Ok(value) = parse_flex_wrap(part) {
+                wrap = Some(value);
+                continue;
+            }
+        }
+        return Err(CssParseError::new(format!(
+            "unsupported flex-flow component `{part}`"
+        )));
+    }
+    Ok((
+        direction.unwrap_or(FlexDirection::Row),
+        wrap.unwrap_or(FlexWrap::NoWrap),
+    ))
+}
+
+fn parse_flex(style: &mut Style, input: &str) -> Result<(), CssParseError> {
+    match input {
+        "none" => {
+            style.flex_grow = Some(0.0);
+            style.flex_shrink = Some(0.0);
+            style.flex_basis = Some(Length::Auto);
+            return Ok(());
+        }
+        "auto" => {
+            style.flex_grow = Some(1.0);
+            style.flex_shrink = Some(1.0);
+            style.flex_basis = Some(Length::Auto);
+            return Ok(());
+        }
+        "initial" => {
+            style.flex_grow = Some(0.0);
+            style.flex_shrink = Some(1.0);
+            style.flex_basis = Some(Length::Auto);
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    let parts = split_top_level_whitespace(input);
+    match parts.as_slice() {
+        [grow] => {
+            style.flex_grow = Some(parse_f32(grow)?.max(0.0));
+            style.flex_shrink = Some(1.0);
+            style.flex_basis = Some(Length::Percent(0.0));
+        }
+        [grow, second] => {
+            style.flex_grow = Some(parse_f32(grow)?.max(0.0));
+            if let Ok(shrink) = parse_f32(second) {
+                style.flex_shrink = Some(shrink.max(0.0));
+                style.flex_basis = Some(Length::Percent(0.0));
+            } else {
+                style.flex_shrink = Some(1.0);
+                style.flex_basis = Some(parse_length(second)?);
+            }
+        }
+        [grow, shrink, basis] => {
+            style.flex_grow = Some(parse_f32(grow)?.max(0.0));
+            style.flex_shrink = Some(parse_f32(shrink)?.max(0.0));
+            style.flex_basis = Some(parse_length(basis)?);
+        }
+        _ => {
+            return Err(CssParseError::new(
+                "flex expects none, auto, initial, or one to three components",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn parse_align_items(input: &str) -> Result<AlignItems, CssParseError> {
     match input {
         "start" => Ok(AlignItems::Start),
@@ -801,6 +906,20 @@ fn parse_align_items(input: &str) -> Result<AlignItems, CssParseError> {
         _ => Err(CssParseError::new(format!(
             "unsupported alignment `{input}`"
         ))),
+    }
+}
+
+fn parse_place_alignment(input: &str) -> Result<(AlignItems, AlignItems), CssParseError> {
+    let parts = input.split_whitespace().collect::<Vec<_>>();
+    match parts.as_slice() {
+        [both] => {
+            let value = parse_align_items(both)?;
+            Ok((value, value))
+        }
+        [align, justify] => Ok((parse_align_items(align)?, parse_align_items(justify)?)),
+        _ => Err(CssParseError::new(
+            "place alignment expects one or two alignment keywords",
+        )),
     }
 }
 
@@ -818,6 +937,17 @@ fn parse_justify_content(input: &str) -> Result<JustifyContent, CssParseError> {
         _ => Err(CssParseError::new(format!(
             "unsupported justify-content `{input}`"
         ))),
+    }
+}
+
+fn parse_place_content(input: &str) -> Result<(AlignContent, JustifyContent), CssParseError> {
+    let parts = input.split_whitespace().collect::<Vec<_>>();
+    match parts.as_slice() {
+        [both] => Ok((parse_align_content(both)?, parse_justify_content(both)?)),
+        [align, justify] => Ok((parse_align_content(align)?, parse_justify_content(justify)?)),
+        _ => Err(CssParseError::new(
+            "place-content expects one or two content alignment keywords",
+        )),
     }
 }
 
@@ -1113,6 +1243,50 @@ fn parse_insets(input: &str) -> Result<Insets, CssParseError> {
             left: *left,
         }),
         _ => Err(CssParseError::new("expected 1 to 4 inset values")),
+    }
+}
+
+fn parse_corner_style(input: &str) -> Result<crate::CornerStyle, CssParseError> {
+    let insets = parse_insets(input)?;
+    Ok(crate::CornerStyle {
+        top_left: Some(insets.top),
+        top_right: Some(insets.right),
+        bottom_right: Some(insets.bottom),
+        bottom_left: Some(insets.left),
+    })
+}
+
+fn parse_position_insets(input: &str) -> Result<crate::PositionInsets, CssParseError> {
+    let values = input
+        .split_whitespace()
+        .map(parse_length)
+        .collect::<Result<Vec<_>, _>>()?;
+    match values.as_slice() {
+        [all] => Ok(crate::PositionInsets {
+            top: Some(*all),
+            right: Some(*all),
+            bottom: Some(*all),
+            left: Some(*all),
+        }),
+        [vertical, horizontal] => Ok(crate::PositionInsets {
+            top: Some(*vertical),
+            right: Some(*horizontal),
+            bottom: Some(*vertical),
+            left: Some(*horizontal),
+        }),
+        [top, horizontal, bottom] => Ok(crate::PositionInsets {
+            top: Some(*top),
+            right: Some(*horizontal),
+            bottom: Some(*bottom),
+            left: Some(*horizontal),
+        }),
+        [top, right, bottom, left] => Ok(crate::PositionInsets {
+            top: Some(*top),
+            right: Some(*right),
+            bottom: Some(*bottom),
+            left: Some(*left),
+        }),
+        _ => Err(CssParseError::new("inset expects 1 to 4 length values")),
     }
 }
 
