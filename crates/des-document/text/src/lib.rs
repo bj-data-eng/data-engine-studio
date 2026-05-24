@@ -2072,6 +2072,41 @@ mod tests {
     }
 
     #[test]
+    fn measures_trailing_spaces_when_white_space_preserves_them() {
+        let mut renderer = renderer();
+        let plain = TextContent::plain("a");
+        let spaced = TextContent::plain("a   ");
+        let style = TextLayoutStyle::white_space(des_document::WhiteSpace::BreakSpaces);
+        let plain = NormalizedText::from_content(&plain, style);
+        let spaced = NormalizedText::from_content(&spaced, style);
+
+        let plain_measured = renderer.measure_text(TextLayoutRequest {
+            text: &plain,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 400.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+        let spaced_measured = renderer.measure_text(TextLayoutRequest {
+            text: &spaced,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 400.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+
+        assert_eq!(spaced.layout_text(), "a   ");
+        assert!(
+            spaced_measured.size.width > plain_measured.size.width,
+            "white-space: break-spaces should preserve trailing spaces in measured width"
+        );
+    }
+
+    #[test]
     fn resolves_start_and_end_alignment_against_direction() {
         let mut renderer = renderer();
         let content = TextContent::plain("abcd");

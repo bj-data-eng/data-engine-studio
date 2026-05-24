@@ -2123,6 +2123,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
     let pre = frame(&output, "text-pre-body");
+    let break_spaces = frame(&output, "text-break-spaces-body");
     let rtl = frame(&output, "text-rtl-start-body");
 
     assert_eq!(wrapped.style.text_layout.text_wrap_mode, TextWrapMode::Wrap);
@@ -2159,6 +2160,23 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         pre.text_layout.as_ref().unwrap().line_count,
         2,
         "pre specimen should preserve the explicit newline as a measured line break"
+    );
+    assert_eq!(
+        break_spaces.style.text_layout.white_space_collapse,
+        des_document::WhiteSpaceCollapse::BreakSpaces
+    );
+    assert_eq!(
+        break_spaces.style.text_layout.overflow_wrap,
+        OverflowWrap::Anywhere
+    );
+    assert!(
+        break_spaces
+            .normalized_text
+            .as_ref()
+            .unwrap()
+            .layout_text()
+            .contains("spaces   \n"),
+        "break-spaces specimen should preserve trailing spaces before explicit line breaks"
     );
     assert_eq!(rtl.style.direction, des_document::Direction::Rtl);
     assert_eq!(

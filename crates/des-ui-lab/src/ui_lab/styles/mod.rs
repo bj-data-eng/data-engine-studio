@@ -1066,6 +1066,10 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default().white_space(WhiteSpace::Pre),
         )
         .rule(
+            StyleSelector::class("text-box-break-spaces"),
+            Style::default().white_space(WhiteSpace::BreakSpaces),
+        )
+        .rule(
             StyleSelector::class("text-box-uppercase"),
             Style::default()
                 .text_wrap_mode(TextWrapMode::Wrap)

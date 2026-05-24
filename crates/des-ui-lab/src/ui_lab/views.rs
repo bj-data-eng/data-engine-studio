@@ -2974,6 +2974,14 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
             );
             text_specimen(
                 ui,
+                "text-break-spaces",
+                "Break spaces",
+                "white-space: break-spaces",
+                "trailing spaces   \nwraps after every preserved space",
+                "text-box-break-spaces",
+            );
+            text_specimen(
+                ui,
                 "text-transform",
                 "Transform",
                 "text-transform: uppercase",
