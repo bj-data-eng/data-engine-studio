@@ -848,11 +848,21 @@ fn layout_result(
         line_count += 1;
         max_width = max_width.max(run.line_w);
         max_height = max_height.max(run.line_top + run.line_height);
-        let layout_start = run.glyphs.first().map(|glyph| glyph.start).unwrap_or(0);
+        let layout_start = run
+            .glyphs
+            .first()
+            .map(|glyph| {
+                line_byte_to_layout_index(request.text.layout_text(), run.line_i, glyph.start)
+            })
+            .unwrap_or_else(|| {
+                line_byte_to_layout_index(request.text.layout_text(), run.line_i, 0)
+            });
         let layout_end = run
             .glyphs
             .last()
-            .map(|glyph| glyph.end)
+            .map(|glyph| {
+                line_byte_to_layout_index(request.text.layout_text(), run.line_i, glyph.end)
+            })
             .unwrap_or(layout_start);
         lines.push(TextLayoutLine {
             layout_start,
@@ -911,8 +921,10 @@ fn x_for_layout_index(text: &str, run: &cosmic_text::LayoutRun<'_>, layout_index
         .fold(0.0_f32, f32::max);
 
     for glyph in run.glyphs {
-        let glyph_start = line_byte_to_layout_index(text, run.line_i, glyph.start) - line_start;
-        let glyph_end = line_byte_to_layout_index(text, run.line_i, glyph.end) - line_start;
+        let glyph_start =
+            line_byte_to_layout_index(text, run.line_i, glyph.start).saturating_sub(line_start);
+        let glyph_end =
+            line_byte_to_layout_index(text, run.line_i, glyph.end).saturating_sub(line_start);
         if local_index <= glyph_start {
             return glyph.x;
         }
@@ -1533,6 +1545,57 @@ mod tests {
         assert_eq!(rects[0].color, Color::rgba(234, 221, 255, 190));
         assert!(rects[0].width_px > 0);
         assert!(rects[0].height_px > 0);
+    }
+
+    #[test]
+    fn layout_lines_use_character_indices_for_unicode_text() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("aé🙂b");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let measured = renderer.measure_text(request(&normalized, 24.0, 400.0));
+        let line = measured
+            .lines
+            .first()
+            .expect("unicode text should produce one measured line");
+
+        assert_eq!(normalized.layout_text().chars().count(), 4);
+        assert_eq!(normalized.layout_text().len(), 8);
+        assert_eq!(line.layout_start, 0);
+        assert_eq!(line.layout_end, 4);
+        assert_eq!(line.semantic_start, 0);
+        assert_eq!(line.semantic_end, 4);
+        assert!(
+            measured
+                .lines
+                .iter()
+                .all(|line| line.layout_end <= normalized.layout_text().chars().count()),
+            "layout line ranges must never expose UTF-8 byte offsets"
+        );
+    }
+
+    #[test]
+    fn glyph_ranges_use_character_indices_for_unicode_text() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("aé🙂b");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let glyph_run = renderer.glyphs(request(&normalized, 24.0, 400.0), 2.0, None);
+        let char_count = normalized.layout_text().chars().count();
+
+        assert!(!glyph_run.glyphs.is_empty());
+        assert!(
+            glyph_run
+                .glyphs
+                .iter()
+                .all(|glyph| glyph.layout_start <= char_count && glyph.layout_end <= char_count),
+            "glyph ranges must stay in document layout character coordinates"
+        );
+        assert!(
+            glyph_run
+                .glyphs
+                .iter()
+                .any(|glyph| glyph.layout_start < 2 && glyph.layout_end > 1),
+            "accented character should have a paintable glyph range"
+        );
     }
 
     #[test]
