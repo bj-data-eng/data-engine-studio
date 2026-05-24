@@ -2834,14 +2834,14 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "text-heading",
         ElementSpec::new(Element::Text).class("heading"),
-        "Text Measurement",
+        "Text Specimens",
     );
     ui.text_element(
         "text-copy",
         ElementSpec::new(Element::Text)
             .class("muted")
             .class("text-copy"),
-        "These specimens use the document text contract with egui/epaint providing the real measurement and galley painting.",
+        "These specimens exercise the document text contract with egui/epaint providing real measurement and galley painting.",
     );
     ui.element(
         "text-specimen-grid",
@@ -2879,6 +2879,124 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
                 "Preview descriptions can wrap for two lines and then stop cleanly when they still have more content.",
                 "text-box-max-lines",
             );
+            text_specimen(
+                ui,
+                "text-pre",
+                "Preserved",
+                "white-space: pre",
+                "columns:\talpha\tbeta\nspaces:   one   two   three",
+                "text-box-pre",
+            );
+            text_specimen(
+                ui,
+                "text-transform",
+                "Transform",
+                "text-transform: uppercase",
+                "Straße mixed Case analytics text stays semantic when copied.",
+                "text-box-uppercase",
+            );
+            text_specimen(
+                ui,
+                "text-rtl-start",
+                "RTL start",
+                "direction: rtl; text-align: start",
+                "Start aligned RTL containers should hug the right edge.",
+                "text-box-rtl",
+            );
+        },
+    );
+    render_text_ramp_panel(ui);
+    render_text_tones_panel(ui);
+    ui.element(
+        "text-rich-panel",
+        ElementSpec::new(Element::Div).class("text-antialias-panel"),
+        |ui| {
+            ui.text_element(
+                "text-rich-title",
+                ElementSpec::new(Element::Text).class("section-title"),
+                "Rich Inline Runs",
+            );
+            ui.text_element(
+                "text-rich-weight",
+                ElementSpec::new(Element::Text)
+                    .class("text-rich-line")
+                    .selectable_text(),
+                rich_weight_specimen(),
+            );
+            ui.text_element(
+                "text-rich-shape",
+                ElementSpec::new(Element::Text)
+                    .class("text-rich-line")
+                    .selectable_text(),
+                rich_shape_specimen(),
+            );
+            ui.text_element(
+                "text-rich-decoration",
+                ElementSpec::new(Element::Text)
+                    .class("text-rich-line")
+                    .selectable_text(),
+                rich_decoration_specimen(),
+            );
+            ui.text_element(
+                "text-rich-baseline",
+                ElementSpec::new(Element::Text)
+                    .class("text-rich-line")
+                    .selectable_text(),
+                rich_baseline_specimen(),
+            );
+        },
+    );
+}
+
+fn render_text_ramp_panel(ui: &mut des_document::DocumentBuilder) {
+    ui.element(
+        "text-antialias-panel",
+        ElementSpec::new(Element::Div).class("text-antialias-panel"),
+        |ui| {
+            ui.text_element(
+                "text-antialias-title",
+                ElementSpec::new(Element::Text).class("section-title"),
+                "Raster Quality Ramp",
+            );
+            for size in [9, 10, 11, 12, 13, 14, 16, 18, 22, 28, 36] {
+                ui.text_element(
+                    format!("text-ramp-{size}"),
+                    ElementSpec::new(Element::Text)
+                        .class("text-ramp-line")
+                        .class(format!("text-size-{size}"))
+                        .selectable_text(),
+                    format!("{size}px  Hamburgefonts AVATAR 0123456789  Il1|/\\ .,:; curved edges"),
+                );
+            }
+        },
+    );
+}
+
+fn render_text_tones_panel(ui: &mut des_document::DocumentBuilder) {
+    ui.element(
+        "text-tones-panel",
+        ElementSpec::new(Element::Div).class("text-antialias-panel"),
+        |ui| {
+            ui.text_element(
+                "text-tones-title",
+                ElementSpec::new(Element::Text).class("section-title"),
+                "Tone And Subpixel Checks",
+            );
+            for (id, class, label) in [
+                ("dark", "text-tone-dark", "dark text on pale surface"),
+                ("muted", "text-tone-muted", "muted text on pale surface"),
+                ("accent", "text-tone-accent", "accent text on pale surface"),
+                ("inverse", "text-tone-inverse", "light text on dark surface"),
+            ] {
+                ui.text_element(
+                    format!("text-tone-{id}"),
+                    ElementSpec::new(Element::Text)
+                        .class("text-tone-line")
+                        .class(class)
+                        .selectable_text(),
+                    format!("{label}: O0 Cc e o s S 1lI <> /\\ -"),
+                );
+            }
         },
     );
 }
@@ -2917,6 +3035,132 @@ fn text_specimen(
             );
         },
     );
+}
+
+fn rich_weight_specimen() -> TextContent {
+    TextContent::new(vec![
+        TextRun::styled(
+            "w300 ",
+            InlineTextStyle {
+                font_weight: Some(FontWeight::new(300)),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "w400 ",
+            InlineTextStyle {
+                font_weight: Some(FontWeight::NORMAL),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "w600 ",
+            InlineTextStyle {
+                font_weight: Some(FontWeight::new(600)),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "w700 ",
+            InlineTextStyle {
+                font_weight: Some(FontWeight::BOLD),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::plain("edge comparison: mm nn oo ee"),
+    ])
+}
+
+fn rich_shape_specimen() -> TextContent {
+    TextContent::new(vec![
+        TextRun::styled(
+            "condensed ",
+            InlineTextStyle {
+                font_stretch: Some(FontStretch::CONDENSED),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "normal ",
+            InlineTextStyle {
+                font_stretch: Some(FontStretch::NORMAL),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "expanded ",
+            InlineTextStyle {
+                font_stretch: Some(FontStretch::EXPANDED),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "italic oblique",
+            InlineTextStyle {
+                font_style: Some(FontStyle::Italic),
+                ..InlineTextStyle::default()
+            },
+        ),
+    ])
+}
+
+fn rich_decoration_specimen() -> TextContent {
+    TextContent::new(vec![
+        TextRun::styled(
+            "underline ",
+            InlineTextStyle {
+                text_decoration: Some(
+                    TextDecoration::UNDERLINE
+                        .color(Color::rgb(103, 80, 164))
+                        .thickness(1.0),
+                ),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "strike ",
+            InlineTextStyle {
+                text_decoration: Some(
+                    TextDecoration::LINE_THROUGH
+                        .color(Color::rgb(122, 71, 0))
+                        .thickness(1.0),
+                ),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "highlight",
+            InlineTextStyle {
+                background: Some(Color::rgba(234, 221, 255, 180)),
+                color: Some(Color::rgb(29, 27, 32)),
+                ..InlineTextStyle::default()
+            },
+        ),
+    ])
+}
+
+fn rich_baseline_specimen() -> TextContent {
+    TextContent::new(vec![
+        TextRun::plain("baseline H"),
+        TextRun::styled(
+            "2",
+            InlineTextStyle {
+                vertical_align: Some(TextVerticalAlign::Super),
+                font_size: Some(10.0),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::plain("O + CO"),
+        TextRun::styled(
+            "2",
+            InlineTextStyle {
+                vertical_align: Some(TextVerticalAlign::Sub),
+                font_size: Some(10.0),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::plain(" with small shifted glyphs"),
+    ])
 }
 
 fn sample_table_spec() -> TableSpec {

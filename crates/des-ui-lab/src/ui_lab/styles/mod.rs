@@ -7,10 +7,10 @@ use super::{
     TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
 use des_document::{
-    AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
-    FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
-    Point, Shadow, Style, StyleSelector, StyleSheet, TextLayoutStyle, TextOverflow, TextWrapMode,
-    Transition, ViewportQuery, WhiteSpace,
+    AlignItems, BorderStyle, Color, Direction, Element, ElementStateSelector, FlexDirection,
+    FlexWrap, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length,
+    Overflow, Point, Shadow, Style, StyleSelector, StyleSheet, TextAlign, TextLayoutStyle,
+    TextOverflow, TextTransform, TextWrapMode, Transition, ViewportQuery, WhiteSpace,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -865,6 +865,97 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default().text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
+            StyleSelector::class("text-antialias-panel"),
+            Style::default()
+                .width_fill()
+                .height(Length::Auto)
+                .padding(Insets::all(12.0))
+                .gap(7.0)
+                .background(PANEL)
+                .border(STROKE)
+                .radius(6.0),
+        )
+        .rule(
+            StyleSelector::class("text-ramp-line"),
+            Style::default()
+                .white_space(WhiteSpace::Pre)
+                .line_height(42.0)
+                .text_color(TEXT),
+        )
+        .rule(
+            StyleSelector::class("text-size-9"),
+            Style::default().font_size(9.0).line_height(13.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-10"),
+            Style::default().font_size(10.0).line_height(14.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-11"),
+            Style::default().font_size(11.0).line_height(15.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-12"),
+            Style::default().font_size(12.0).line_height(16.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-13"),
+            Style::default().font_size(13.0).line_height(18.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-14"),
+            Style::default().font_size(14.0).line_height(19.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-16"),
+            Style::default().font_size(16.0).line_height(22.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-18"),
+            Style::default().font_size(18.0).line_height(25.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-22"),
+            Style::default().font_size(22.0).line_height(30.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-28"),
+            Style::default().font_size(28.0).line_height(38.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-36"),
+            Style::default().font_size(36.0).line_height(48.0),
+        )
+        .rule(
+            StyleSelector::class("text-tone-line"),
+            Style::default()
+                .white_space(WhiteSpace::Pre)
+                .font_size(17.0)
+                .line_height(25.0)
+                .padding(Insets::symmetric(8.0, 5.0))
+                .background(PANEL_ALT)
+                .border(STROKE)
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::class("text-tone-dark"),
+            Style::default().text_color(Color::rgb(29, 27, 32)),
+        )
+        .rule(
+            StyleSelector::class("text-tone-muted"),
+            Style::default().text_color(TEXT_MUTED),
+        )
+        .rule(
+            StyleSelector::class("text-tone-accent"),
+            Style::default().text_color(TEXT_ACCENT),
+        )
+        .rule(
+            StyleSelector::class("text-tone-inverse"),
+            Style::default()
+                .background(Color::rgb(29, 27, 32))
+                .text_color(Color::rgb(255, 251, 254)),
+        )
+        .rule(
             StyleSelector::class("text-specimen-grid"),
             Style::default()
                 .flex_direction(FlexDirection::Row)
@@ -925,6 +1016,35 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .text_wrap_mode(TextWrapMode::Wrap)
                 .max_lines(2),
+        )
+        .rule(
+            StyleSelector::class("text-box-pre"),
+            Style::default().white_space(WhiteSpace::Pre),
+        )
+        .rule(
+            StyleSelector::class("text-box-uppercase"),
+            Style::default()
+                .text_wrap_mode(TextWrapMode::Wrap)
+                .text_transform(TextTransform::Uppercase),
+        )
+        .rule(
+            StyleSelector::class("text-box-rtl"),
+            Style::default()
+                .text_wrap_mode(TextWrapMode::Wrap)
+                .text_align(TextAlign::Start)
+                .direction(Direction::Rtl),
+        )
+        .rule(
+            StyleSelector::class("text-rich-line"),
+            Style::default()
+                .width_fill()
+                .white_space(WhiteSpace::PreWrap)
+                .font_size(17.0)
+                .line_height(26.0)
+                .padding(Insets::symmetric(10.0, 6.0))
+                .background(PANEL_ALT)
+                .border(STROKE)
+                .radius(4.0),
         )
         .rule(
             StyleSelector::class("data-table"),
