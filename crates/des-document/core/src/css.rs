@@ -424,6 +424,7 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "text-align" => *style = style.clone().text_align(parse_text_align(value)?),
         "text-overflow" => *style = style.clone().text_overflow(parse_text_overflow(value)?),
         "text-transform" => *style = style.clone().text_transform(parse_text_transform(value)?),
+        "max-lines" => *style = style.clone().max_lines(parse_usize(value)?),
         "overflow" => {
             let overflow = parse_overflow(value)?;
             style.overflow_x = Some(overflow);
@@ -735,6 +736,12 @@ fn parse_f32(input: &str) -> Result<f32, CssParseError> {
     input
         .parse::<f32>()
         .map_err(|_| CssParseError::new(format!("expected number, got `{input}`")))
+}
+
+fn parse_usize(input: &str) -> Result<usize, CssParseError> {
+    input
+        .parse::<usize>()
+        .map_err(|_| CssParseError::new(format!("expected positive integer, got `{input}`")))
 }
 
 fn parse_color(input: &str) -> Result<Color, CssParseError> {

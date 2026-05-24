@@ -720,3 +720,255 @@ text {
 .loop-source-python {
   background: #ffd8e4;
 }
+
+.specimen-card {
+  width: 600px;
+  height: auto;
+  padding: 12px;
+  gap: 10px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.text-copy {
+  width: 100%;
+  height: auto;
+  text-wrap: wrap;
+}
+
+.param-description {
+  width: 100.0%;
+  height: auto;
+  text-wrap: wrap;
+}
+
+.specimen-description {
+  height: auto;
+  text-wrap: wrap;
+}
+
+.text-antialias-panel {
+  width: 100%;
+  height: auto;
+  padding: 12px;
+  gap: 7px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.text-ramp-line {
+  white-space: pre;
+  line-height: 42px;
+  color: #1d1b20;
+}
+
+.text-render-path-row {
+  flex-direction: row;
+  width: 100%;
+  gap: 12px;
+}
+
+.text-diagnostics {
+  height: auto;
+  font-size: 11px;
+  line-height: 15px;
+  text-wrap: wrap;
+}
+
+.text-render-path-pane {
+  width: 50%;
+  height: 150px;
+  padding: 8px;
+  gap: 6px;
+  background: #faf4fc;
+  border: 1px solid #cac4d0;
+  border-radius: 4px;
+}
+
+.text-render-path-slot {
+  width: 100%;
+  height: 112px;
+  white-space: pre;
+  color: #1d1b20;
+}
+
+.text-size-9 {
+  font-size: 9px;
+  line-height: 13px;
+}
+
+.text-size-10 {
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.text-size-11 {
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.text-size-12 {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.text-size-13 {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.text-size-14 {
+  font-size: 14px;
+  line-height: 19px;
+}
+
+.text-size-16 {
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.text-size-18 {
+  font-size: 18px;
+  line-height: 25px;
+}
+
+.text-size-22 {
+  font-size: 22px;
+  line-height: 30px;
+}
+
+.text-size-28 {
+  font-size: 28px;
+  line-height: 38px;
+}
+
+.text-size-36 {
+  font-size: 36px;
+  line-height: 48px;
+}
+
+.text-size-100 {
+  font-size: 100px;
+  line-height: 112px;
+}
+
+.text-tone-line {
+  height: auto;
+  white-space: pre;
+  font-size: 17px;
+  line-height: 25px;
+  padding: 5px 8px;
+  background: #faf4fc;
+  border: 1px solid #cac4d0;
+  border-radius: 4px;
+}
+
+.text-tone-dark {
+  color: #1d1b20;
+}
+
+.text-tone-muted {
+  color: #625b71;
+}
+
+.text-tone-accent {
+  color: #6750a4;
+}
+
+.text-tone-inverse {
+  background: #1d1b20;
+  color: #fffbfe;
+}
+
+.text-specimen-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  gap: 12px;
+  background: #faf4fc;
+}
+
+.text-specimen-card {
+  width: 280px;
+  height: auto;
+  padding: 12px;
+  gap: 8px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 6px;
+}
+
+.text-rule {
+  width: 100%;
+  height: auto;
+  font-size: 11px;
+  color: #6750a4;
+  text-wrap: wrap;
+}
+
+.text-box {
+  width: 100%;
+  height: auto;
+  padding: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  border-radius: 4px;
+}
+
+.text-box-extend {
+  white-space: pre;
+}
+
+.text-box-wrap {
+  text-wrap: wrap;
+}
+
+.text-box-break-word {
+  text-wrap: wrap;
+  overflow-wrap: break-word;
+}
+
+.text-box-truncate {
+  max-lines: 1;
+  text-overflow: ellipsis;
+}
+
+.text-box-max-lines {
+  text-wrap: wrap;
+  max-lines: 2;
+}
+
+.text-box-pre {
+  white-space: pre;
+}
+
+.text-box-break-spaces {
+  white-space: break-spaces;
+}
+
+.text-box-uppercase {
+  text-wrap: wrap;
+  text-transform: uppercase;
+}
+
+.text-box-rtl {
+  text-wrap: wrap;
+  text-align: start;
+  direction: rtl;
+}
+
+.text-rich-line {
+  width: 100%;
+  white-space: pre-wrap;
+  font-size: 17px;
+  line-height: 26px;
+  padding: 6px 10px;
+  background: #faf4fc;
+  border: 1px solid #cac4d0;
+  border-radius: 4px;
+}

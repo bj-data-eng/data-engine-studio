@@ -502,6 +502,7 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
             font-size: 18px;
             flex-basis: 50%;
             text-wrap: wrap;
+            max-lines: 2;
             text-selection-background: #6750a4dc;
             text-selection-color: #fffbfe;
             padding: 4px 8px;
@@ -537,6 +538,7 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
     assert_eq!(title.style.height, Length::Auto);
     assert_eq!(title.style.text_color, Color::rgb(103, 80, 164));
     assert_eq!(title.style.flex_basis, Length::Percent(0.5));
+    assert_eq!(title.style.text_layout.max_lines, Some(2));
     assert_eq!(
         title.style.text_selection_background,
         Color::rgba(103, 80, 164, 220)
