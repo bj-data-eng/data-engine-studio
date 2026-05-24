@@ -883,7 +883,7 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
     let mut layout_index = 0usize;
     for run in request.text.runs() {
         let font_size = run.style.font_size.unwrap_or(request.font_size).max(1.0);
-        let letter_spacing = run.style.letter_spacing.unwrap_or(0.0).max(0.0);
+        let letter_spacing = run.style.letter_spacing.unwrap_or(0.0);
         let baseline_shift = fallback_baseline_shift(
             run.style
                 .vertical_align
@@ -964,8 +964,7 @@ fn fallback_char_width(ch: char, font_size: f32, letter_spacing: f32, font_stret
     if ch == '\n' {
         0.0
     } else {
-        ((font_size.max(1.0) * (7.5 / 13.0) * font_stretch.max(0.0)) + letter_spacing.max(0.0))
-            .max(0.0)
+        ((font_size.max(1.0) * (7.5 / 13.0) * font_stretch.max(0.0)) + letter_spacing).max(0.0)
     }
 }
 
@@ -1630,6 +1629,42 @@ mod tests {
         });
 
         assert!(spaced.size.width > normal.size.width);
+    }
+
+    #[test]
+    fn fallback_measurement_allows_negative_inline_letter_spacing() {
+        let normal = TextContent::plain("MMMM");
+        let tight = TextContent::new(vec![TextRun::styled(
+            "MMMM",
+            InlineTextStyle {
+                letter_spacing: Some(-1.5),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized_normal = NormalizedText::from_content(&normal, TextLayoutStyle::default());
+        let normalized_tight = NormalizedText::from_content(&tight, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let normal = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_normal,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+        let tight = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_tight,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            direction: Direction::Ltr,
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+
+        assert!(tight.size.width < normal.size.width);
     }
 
     #[test]

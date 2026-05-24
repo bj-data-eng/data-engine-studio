@@ -2196,6 +2196,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let diagnostics = frame_text(&output, "text-cosmic-diagnostics").unwrap();
     let rich_sample = frame(&output, "text-rich-100-sample");
     let rich_shape = frame(&output, "text-rich-shape");
+    let rich_spacing = frame(&output, "text-rich-spacing");
     let rich_decoration = frame(&output, "text-rich-decoration");
     let rich_family = frame(&output, "text-rich-family");
     assert_eq!(rich_sample.style.font_size, 100.0);
@@ -2220,6 +2221,14 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         .as_ref()
         .expect("rich decoration specimen should retain normalized text")
         .runs();
+    let spacing_runs = rich_spacing
+        .normalized_text
+        .as_ref()
+        .expect("rich spacing specimen should retain normalized text")
+        .runs();
+    assert_eq!(spacing_runs[0].style.letter_spacing, Some(-0.75));
+    assert_eq!(spacing_runs[1].style.letter_spacing, Some(0.0));
+    assert_eq!(spacing_runs[2].style.letter_spacing, Some(2.0));
     assert_eq!(
         decoration_runs[2].style.text_decoration,
         Some(

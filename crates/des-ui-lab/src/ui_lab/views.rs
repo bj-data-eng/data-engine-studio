@@ -3025,6 +3025,13 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
                 rich_shape_specimen(),
             );
             ui.text_element(
+                "text-rich-spacing",
+                ElementSpec::new(Element::Text)
+                    .class("text-rich-line")
+                    .selectable_text(),
+                rich_spacing_specimen(),
+            );
+            ui.text_element(
                 "text-rich-decoration",
                 ElementSpec::new(Element::Text)
                     .class("text-rich-line")
@@ -3268,6 +3275,32 @@ fn rich_shape_specimen() -> TextContent {
             "oblique",
             InlineTextStyle {
                 font_style: Some(FontStyle::Oblique),
+                ..InlineTextStyle::default()
+            },
+        ),
+    ])
+}
+
+fn rich_spacing_specimen() -> TextContent {
+    TextContent::new(vec![
+        TextRun::styled(
+            "tight tracking ",
+            InlineTextStyle {
+                letter_spacing: Some(-0.75),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "normal tracking ",
+            InlineTextStyle {
+                letter_spacing: Some(0.0),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "loose tracking",
+            InlineTextStyle {
+                letter_spacing: Some(2.0),
                 ..InlineTextStyle::default()
             },
         ),

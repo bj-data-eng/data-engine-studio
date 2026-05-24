@@ -1165,7 +1165,7 @@ fn cosmic_attrs<'a>(
         Some(FontStyle::Normal) | None => {}
     }
     if let Some(letter_spacing) = style.letter_spacing {
-        attrs = attrs.letter_spacing((letter_spacing / logical_font_size).max(0.0));
+        attrs = attrs.letter_spacing(letter_spacing / logical_font_size);
     }
     if let Some(decoration) = style.text_decoration {
         let decoration_color = cosmic_color(decoration.stroke_color(color));
@@ -2591,6 +2591,25 @@ mod tests {
 
         assert!((at_1x.size.width - at_2x.size.width).abs() < 0.05);
         assert!((at_1x.size.height - at_2x.size.height).abs() < 0.05);
+    }
+
+    #[test]
+    fn negative_letter_spacing_tightens_cosmic_layout() {
+        let mut renderer = renderer();
+        let normal = TextContent::plain("Tracking");
+        let tight = TextContent::new(vec![TextRun::styled(
+            "Tracking",
+            InlineTextStyle {
+                letter_spacing: Some(-1.0),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normal = NormalizedText::from_content(&normal, TextLayoutStyle::default());
+        let tight = NormalizedText::from_content(&tight, TextLayoutStyle::default());
+        let normal = renderer.layout(request(&normal, 16.0, 400.0), 1.0);
+        let tight = renderer.layout(request(&tight, 16.0, 400.0), 1.0);
+
+        assert!(tight.size.width < normal.size.width);
     }
 
     #[test]
