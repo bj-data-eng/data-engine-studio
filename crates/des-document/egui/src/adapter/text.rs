@@ -1,6 +1,6 @@
 use des_document::{
-    Color, DocumentOutput, InlineTextStyle, Point, Size, TextLayoutLine, TextLayoutRequest,
-    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
+    Color, DocumentOutput, InlineTextStyle, Point, Size, TextDecoration, TextLayoutLine,
+    TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -235,12 +235,20 @@ fn text_format(
         color: to_egui_color(color),
         coords,
         italics: style.italic.unwrap_or(false),
-        strikethrough: if style.strikethrough.unwrap_or(false) {
+        strikethrough: if style
+            .text_decoration
+            .unwrap_or(TextDecoration::NONE)
+            .line_through
+        {
             egui::Stroke::new(1.0, to_egui_color(color))
         } else {
             egui::Stroke::NONE
         },
-        underline: if style.underline.unwrap_or(false) {
+        underline: if style
+            .text_decoration
+            .unwrap_or(TextDecoration::NONE)
+            .underline
+        {
             egui::Stroke::new(1.0, to_egui_color(color))
         } else {
             egui::Stroke::NONE
@@ -265,8 +273,8 @@ fn to_egui_color(color: Color) -> egui::Color32 {
 mod tests {
     use super::*;
     use des_document::{
-        FontWeight, InlineTextStyle, NormalizedText, TextContent, TextLayoutStyle, TextRun,
-        WhiteSpace,
+        FontWeight, InlineTextStyle, NormalizedText, TextContent, TextDecoration, TextLayoutStyle,
+        TextRun, WhiteSpace,
     };
 
     #[test]
@@ -325,8 +333,7 @@ mod tests {
                     font_size: Some(18.0),
                     font_weight: Some(FontWeight::BOLD),
                     italic: Some(true),
-                    underline: Some(true),
-                    strikethrough: Some(true),
+                    text_decoration: Some(TextDecoration::lines(true, false, true)),
                     background: Some(Color::rgb(0, 0, 255)),
                     ..InlineTextStyle::default()
                 },

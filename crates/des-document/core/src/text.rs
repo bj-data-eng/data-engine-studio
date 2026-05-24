@@ -92,8 +92,7 @@ pub struct InlineTextStyle {
     pub font_family: Option<String>,
     pub font_weight: Option<FontWeight>,
     pub italic: Option<bool>,
-    pub underline: Option<bool>,
-    pub strikethrough: Option<bool>,
+    pub text_decoration: Option<TextDecoration>,
     pub background: Option<Color>,
 }
 
@@ -118,6 +117,45 @@ impl FontWeight {
 
     pub const fn value(self) -> u16 {
         self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TextDecoration {
+    pub underline: bool,
+    pub overline: bool,
+    pub line_through: bool,
+}
+
+impl TextDecoration {
+    pub const NONE: Self = Self {
+        underline: false,
+        overline: false,
+        line_through: false,
+    };
+    pub const UNDERLINE: Self = Self {
+        underline: true,
+        ..Self::NONE
+    };
+    pub const OVERLINE: Self = Self {
+        overline: true,
+        ..Self::NONE
+    };
+    pub const LINE_THROUGH: Self = Self {
+        line_through: true,
+        ..Self::NONE
+    };
+
+    pub const fn lines(underline: bool, overline: bool, line_through: bool) -> Self {
+        Self {
+            underline,
+            overline,
+            line_through,
+        }
+    }
+
+    pub const fn is_none(self) -> bool {
+        !self.underline && !self.overline && !self.line_through
     }
 }
 
@@ -856,6 +894,22 @@ mod tests {
         assert_eq!(FontWeight::new(50).value(), 50);
         assert_eq!(FontWeight::new(0).value(), FontWeight::MIN);
         assert_eq!(FontWeight::new(1200).value(), FontWeight::MAX);
+    }
+
+    #[test]
+    fn text_decoration_represents_css_line_combinations() {
+        assert!(TextDecoration::NONE.is_none());
+        assert_eq!(
+            TextDecoration::lines(true, true, true),
+            TextDecoration {
+                underline: true,
+                overline: true,
+                line_through: true,
+            }
+        );
+        assert!(TextDecoration::UNDERLINE.underline);
+        assert!(TextDecoration::OVERLINE.overline);
+        assert!(TextDecoration::LINE_THROUGH.line_through);
     }
 
     #[test]
