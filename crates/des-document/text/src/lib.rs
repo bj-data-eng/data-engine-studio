@@ -1099,11 +1099,10 @@ fn cosmic_attrs<'a>(
     if let Some(stretch) = style.font_stretch {
         attrs = attrs.stretch(cosmic_stretch(stretch.value()));
     }
-    if matches!(
-        style.font_style,
-        Some(FontStyle::Italic | FontStyle::Oblique)
-    ) {
-        attrs = attrs.style(Style::Italic);
+    match style.font_style {
+        Some(FontStyle::Italic) => attrs = attrs.style(Style::Italic),
+        Some(FontStyle::Oblique) => attrs = attrs.style(Style::Oblique),
+        Some(FontStyle::Normal) | None => {}
     }
     if let Some(letter_spacing) = style.letter_spacing {
         attrs = attrs.letter_spacing((letter_spacing / font_size).max(0.0));
@@ -2214,6 +2213,26 @@ mod tests {
         let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
 
         assert_eq!(attrs.family, Family::Name(INTER_FAMILY));
+    }
+
+    #[test]
+    fn maps_font_style_keywords_to_cosmic_style() {
+        let resolver = FontFamilyResolver::from_names([INTER_FAMILY, JETBRAINS_MONO_FAMILY]);
+        let italic = InlineTextStyle {
+            font_style: Some(FontStyle::Italic),
+            ..InlineTextStyle::default()
+        };
+        let oblique = InlineTextStyle {
+            font_style: Some(FontStyle::Oblique),
+            ..InlineTextStyle::default()
+        };
+        let italic_attrs =
+            cosmic_attrs(&italic, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
+        let oblique_attrs =
+            cosmic_attrs(&oblique, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
+
+        assert_eq!(italic_attrs.style, Style::Italic);
+        assert_eq!(oblique_attrs.style, Style::Oblique);
     }
 
     #[test]

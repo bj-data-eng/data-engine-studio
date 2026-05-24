@@ -3242,9 +3242,16 @@ fn rich_shape_specimen() -> TextContent {
             },
         ),
         TextRun::styled(
-            "italic oblique",
+            "italic ",
             InlineTextStyle {
                 font_style: Some(FontStyle::Italic),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "oblique",
+            InlineTextStyle {
+                font_style: Some(FontStyle::Oblique),
                 ..InlineTextStyle::default()
             },
         ),

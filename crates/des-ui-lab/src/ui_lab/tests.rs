@@ -4,9 +4,9 @@ use crate::graphics_testing::{
     test_harness,
 };
 use des_document::{
-    DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, Insets, Length, Point,
-    PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
-    TextOverflow, TextWrapMode,
+    DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle, Insets, Length,
+    Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
+    StyleSheet, TextOverflow, TextWrapMode,
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
@@ -2168,12 +2168,20 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let legacy_pane = frame(&output, "text-legacy-100-pane");
     let diagnostics = frame_text(&output, "text-cosmic-diagnostics").unwrap();
     let rich_sample = frame(&output, "text-rich-100-sample");
+    let rich_shape = frame(&output, "text-rich-shape");
     let rich_family = frame(&output, "text-rich-family");
     assert_eq!(rich_sample.style.font_size, 100.0);
     assert_eq!(
         rich_sample.text.as_ref().unwrap().semantic_text(),
         "Ag 100px"
     );
+    let shape_runs = rich_shape
+        .normalized_text
+        .as_ref()
+        .expect("rich shape specimen should retain normalized text")
+        .runs();
+    assert_eq!(shape_runs[3].style.font_style, Some(FontStyle::Italic));
+    assert_eq!(shape_runs[4].style.font_style, Some(FontStyle::Oblique));
     let family_runs = rich_family
         .normalized_text
         .as_ref()
