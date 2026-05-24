@@ -461,20 +461,39 @@ fn paint_children_clipped(
             text_resources,
         ),
         children => {
-            let mut sorted: Vec<_> = children.iter().collect();
-            sorted.sort_by_key(|child| child.style.z_index);
-            for child in sorted {
-                paint_frame_clipped(
-                    ui,
-                    origin,
-                    child,
-                    host_clip_rect,
-                    text_selection,
-                    text_resources.as_deref_mut(),
-                );
+            if children_need_z_sort(children) {
+                let mut sorted: Vec<_> = children.iter().collect();
+                sorted.sort_by_key(|child| child.style.z_index);
+                for child in sorted {
+                    paint_frame_clipped(
+                        ui,
+                        origin,
+                        child,
+                        host_clip_rect,
+                        text_selection,
+                        text_resources.as_deref_mut(),
+                    );
+                }
+            } else {
+                for child in children {
+                    paint_frame_clipped(
+                        ui,
+                        origin,
+                        child,
+                        host_clip_rect,
+                        text_selection,
+                        text_resources.as_deref_mut(),
+                    );
+                }
             }
         }
     }
+}
+
+fn children_need_z_sort(children: &[ResolvedElement]) -> bool {
+    children
+        .windows(2)
+        .any(|pair| pair[0].style.z_index > pair[1].style.z_index)
 }
 
 fn paint_atlas_text(
@@ -1538,6 +1557,27 @@ mod tests {
             "test-sized atlas should grow to multiple pages"
         );
         assert_eq!(stats.rasterizations, 16);
+    }
+
+    #[test]
+    fn child_paint_order_skips_z_sort_when_already_ordered() {
+        let children = vec![
+            resolved_frame("back", -1, Color::rgb(255, 0, 0)),
+            resolved_frame("middle", 0, Color::rgb(0, 0, 255)),
+            resolved_frame("front", 10, Color::rgb(0, 255, 0)),
+        ];
+
+        assert!(!children_need_z_sort(&children));
+    }
+
+    #[test]
+    fn child_paint_order_detects_unordered_z_index() {
+        let children = vec![
+            resolved_frame("front", 10, Color::rgb(0, 255, 0)),
+            resolved_frame("back", -1, Color::rgb(255, 0, 0)),
+        ];
+
+        assert!(children_need_z_sort(&children));
     }
 
     #[test]
