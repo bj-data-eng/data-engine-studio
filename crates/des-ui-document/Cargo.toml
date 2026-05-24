@@ -6,4 +6,4 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-layout_engine = { package = "des-layout-engine", path = "../des-layout-engine", default-features = false, features = ["std", "layout_tree", "flexbox", "grid", "content_size", "calc"] }
+layout_engine = { package = "des-layout-engine", path = "../des-layout-engine", version = "=0.1.0", default-features = false, features = ["std", "layout_tree", "flexbox", "grid", "content_size", "calc"] }

@@ -21,15 +21,15 @@ license = "MIT"
 repository = "https://github.com/bj-data-eng/data-engine-studio"
 
 [workspace.dependencies]
-des-app = { path = "crates/des-app" }
-des-core = { path = "crates/des-core" }
-des-graph-egui = { path = "crates/des-graph-egui" }
-des-layout-engine = { path = "crates/des-layout-engine" }
-des-template = { path = "crates/des-template" }
-des-ui-document = { path = "crates/des-ui-document" }
-des-ui-egui = { path = "crates/des-ui-egui" }
-des-ui-lab = { path = "crates/des-ui-lab" }
-des-ui-widgets = { path = "crates/des-ui-widgets" }
+des-app = { path = "crates/des-app", version = "=0.1.0" }
+des-core = { path = "crates/des-core", version = "=0.1.0" }
+des-graph-egui = { path = "crates/des-graph-egui", version = "=0.1.0" }
+des-layout-engine = { path = "crates/des-layout-engine", version = "=0.1.0" }
+des-template = { path = "crates/des-template", version = "=0.1.0" }
+des-ui-document = { path = "crates/des-ui-document", version = "=0.1.0" }
+des-ui-egui = { path = "crates/des-ui-egui", version = "=0.1.0" }
+des-ui-lab = { path = "crates/des-ui-lab", version = "=0.1.0" }
+des-ui-widgets = { path = "crates/des-ui-widgets", version = "=0.1.0" }
 eframe = { version = "=0.34.1", default-features = true }
 egui = "=0.34.1"
 iconflow = { version = "=1.0.0", default-features = false }
