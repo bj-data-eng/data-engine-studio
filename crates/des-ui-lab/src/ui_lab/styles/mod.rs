@@ -883,6 +883,32 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .text_color(TEXT),
         )
         .rule(
+            StyleSelector::class("text-render-path-row"),
+            Style::default()
+                .flex_direction(FlexDirection::Row)
+                .width_fill()
+                .gap(12.0),
+        )
+        .rule(
+            StyleSelector::class("text-render-path-pane"),
+            Style::default()
+                .width_percent(0.5)
+                .height(Length::Px(150.0))
+                .padding(Insets::all(8.0))
+                .gap(6.0)
+                .background(PANEL_ALT)
+                .border(STROKE)
+                .radius(4.0),
+        )
+        .rule(
+            StyleSelector::class("text-render-path-slot"),
+            Style::default()
+                .width_fill()
+                .height(Length::Px(112.0))
+                .white_space(WhiteSpace::Pre)
+                .text_color(TEXT),
+        )
+        .rule(
             StyleSelector::class("text-size-9"),
             Style::default().font_size(9.0).line_height(13.0),
         )
@@ -925,6 +951,10 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-size-36"),
             Style::default().font_size(36.0).line_height(48.0),
+        )
+        .rule(
+            StyleSelector::class("text-size-100"),
+            Style::default().font_size(100.0).line_height(112.0),
         )
         .rule(
             StyleSelector::class("text-tone-line"),

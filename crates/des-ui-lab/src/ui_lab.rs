@@ -15,9 +15,9 @@ use views::{
 use des_document::{
     Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
     DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector,
-    FontStretch, FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput, Shadow, Size,
-    Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextContent, TextDecoration, TextRun, TextVerticalAlign, VisualCloneOptions,
+    FontStretch, FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput, Rect, Shadow,
+    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextContent, TextDecoration, TextRun, TextVerticalAlign, VisualCloneOptions,
     VisualElementClone,
 };
 use des_widgets::{
@@ -315,6 +315,9 @@ impl UiLabState {
 
         let paint_start = Instant::now();
         paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
+        if self.view == LabView::Text {
+            paint_legacy_text_path_comparison(ui, origin, &output);
+        }
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
         let paint_time = paint_start.elapsed();
         self.last_perf = UiLabPerf {
@@ -1345,6 +1348,60 @@ fn shadow_tune_action_for_id(id: &str) -> Option<LabAction> {
         field,
         direction,
     })
+}
+
+fn paint_legacy_text_path_comparison(ui: &egui::Ui, origin: egui::Pos2, output: &DocumentOutput) {
+    let Some(pane) = output.layout.find("text-legacy-100-pane") else {
+        return;
+    };
+
+    let content_rect = pane.rect.inset(pane.style.padding);
+    let clip_rect = document_rect_to_egui(
+        origin,
+        Rect::new(
+            content_rect.origin.x,
+            content_rect.origin.y + 35.0,
+            content_rect.size.width,
+            (content_rect.size.height - 35.0).max(0.0),
+        ),
+    );
+    let color = egui_color(TEXT);
+    let galley = ui.painter().layout_job(legacy_simple_text_job(
+        "Ag 100px".to_owned(),
+        100.0,
+        color,
+        f32::INFINITY,
+    ));
+    ui.painter()
+        .with_clip_rect(clip_rect)
+        .galley(clip_rect.min, galley, color);
+}
+
+fn legacy_simple_text_job(
+    text: String,
+    font_size: f32,
+    color: egui::Color32,
+    wrap_width: f32,
+) -> egui::text::LayoutJob {
+    let mut job = egui::text::LayoutJob::simple(
+        text,
+        egui::FontId::proportional(font_size),
+        color,
+        wrap_width,
+    );
+    job.wrap.max_width = wrap_width;
+    job
+}
+
+fn document_rect_to_egui(origin: egui::Pos2, rect: Rect) -> egui::Rect {
+    egui::Rect::from_min_size(
+        egui::pos2(origin.x + rect.origin.x, origin.y + rect.origin.y),
+        egui::vec2(rect.size.width, rect.size.height),
+    )
+}
+
+fn egui_color(color: Color) -> egui::Color32 {
+    egui::Color32::from_rgba_premultiplied(color.r, color.g, color.b, color.a)
 }
 
 #[derive(Clone, Copy, Debug, Default)]

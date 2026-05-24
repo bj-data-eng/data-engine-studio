@@ -2905,6 +2905,7 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
             );
         },
     );
+    render_text_rendering_path_comparison(ui);
     render_text_ramp_panel(ui);
     render_text_tones_panel(ui);
     ui.element(
@@ -2943,6 +2944,61 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
                     .class("text-rich-line")
                     .selectable_text(),
                 rich_baseline_specimen(),
+            );
+        },
+    );
+}
+
+fn render_text_rendering_path_comparison(ui: &mut des_document::DocumentBuilder) {
+    const SAMPLE: &str = "Ag 100px";
+
+    ui.element(
+        "text-render-path-panel",
+        ElementSpec::new(Element::Div).class("text-antialias-panel"),
+        |ui| {
+            ui.text_element(
+                "text-render-path-title",
+                ElementSpec::new(Element::Text).class("section-title"),
+                "Rendering Path Comparison",
+            );
+            ui.element(
+                "text-render-path-row",
+                ElementSpec::new(Element::Div).class("text-render-path-row"),
+                |ui| {
+                    ui.element(
+                        "text-legacy-100-pane",
+                        ElementSpec::new(Element::Div).class("text-render-path-pane"),
+                        |ui| {
+                            ui.text_element(
+                                "text-legacy-100-label",
+                                ElementSpec::new(Element::Text).class("muted"),
+                                "legacy simple LayoutJob",
+                            );
+                            ui.div("text-legacy-100-slot")
+                                .class("text-render-path-slot")
+                                .value(SAMPLE);
+                        },
+                    );
+                    ui.element(
+                        "text-rich-100-pane",
+                        ElementSpec::new(Element::Div).class("text-render-path-pane"),
+                        |ui| {
+                            ui.text_element(
+                                "text-rich-100-label",
+                                ElementSpec::new(Element::Text).class("muted"),
+                                "current rich document text",
+                            );
+                            ui.text_element(
+                                "text-rich-100-sample",
+                                ElementSpec::new(Element::Text)
+                                    .class("text-render-path-slot")
+                                    .class("text-size-100")
+                                    .selectable_text(),
+                                SAMPLE,
+                            );
+                        },
+                    );
+                },
             );
         },
     );

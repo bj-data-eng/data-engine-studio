@@ -2128,6 +2128,18 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         wrapped.rect.size.height > wrapped.text_layout.as_ref().unwrap().size.height,
         "text specimens should include padding in the border-box height"
     );
+
+    let legacy_pane = frame(&output, "text-legacy-100-pane");
+    let rich_sample = frame(&output, "text-rich-100-sample");
+    assert_eq!(rich_sample.style.font_size, 100.0);
+    assert_eq!(
+        rich_sample.text.as_ref().unwrap().semantic_text(),
+        "Ag 100px"
+    );
+    assert!(
+        legacy_pane.rect.size.width > 300.0,
+        "legacy simple rendering slot should sit beside the rich text sample"
+    );
 }
 
 #[test]
