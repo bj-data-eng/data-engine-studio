@@ -26,10 +26,7 @@ use des_widgets::{
     SortableDropPreview, SortableItemId, SortableModel,
 };
 use eframe::egui;
-use std::{
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 const BACKGROUND: Color = Color::rgb(247, 239, 250);
 const PANEL: Color = Color::rgb(255, 251, 254);
@@ -154,34 +151,7 @@ pub(crate) struct UiLabState {
     pending_stage_scroll: Option<Point>,
     lab_document: Option<RetainedLabDocument<LabDocumentKey>>,
     last_output: Option<RetainedLabOutput<LabDocumentKey>>,
-    pointer_move_filter: Option<Arc<Mutex<NativePointerMoveFilter>>>,
     last_perf: UiLabPerf,
-}
-
-#[derive(Debug)]
-pub(crate) struct NativePointerMoveFilter {
-    pixels_per_point: f32,
-    inert_rect: Option<Rect>,
-}
-
-impl Default for NativePointerMoveFilter {
-    fn default() -> Self {
-        Self {
-            pixels_per_point: 1.0,
-            inert_rect: None,
-        }
-    }
-}
-
-impl NativePointerMoveFilter {
-    pub(crate) fn should_skip_cursor_moved(&self, physical_x: f64, physical_y: f64) -> bool {
-        let Some(rect) = self.inert_rect else {
-            return false;
-        };
-        let scale = self.pixels_per_point.max(0.01);
-        let point = Point::new(physical_x as f32 / scale, physical_y as f32 / scale);
-        rect.contains(point)
-    }
 }
 
 struct RetainedLabDocument<Key> {
@@ -260,7 +230,6 @@ impl Default for UiLabState {
             pending_stage_scroll: None,
             lab_document: None,
             last_output: None,
-            pointer_move_filter: None,
             last_perf: UiLabPerf::default(),
         }
     }
@@ -281,10 +250,6 @@ impl UiLabState {
         }
         state.pending_stage_scroll = stage_scroll;
         state
-    }
-
-    pub(crate) fn set_pointer_move_filter(&mut self, filter: Arc<Mutex<NativePointerMoveFilter>>) {
-        self.pointer_move_filter = Some(filter);
     }
 
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
@@ -327,7 +292,6 @@ impl UiLabState {
                 text_paint,
                 metrics: output.metrics,
             };
-            self.publish_pointer_move_filter(ui.ctx().pixels_per_point(), pointer, output);
             if debug_overlay {
                 self.paint_debug_overlay_document(ui, origin, viewport);
             }
@@ -438,13 +402,6 @@ impl UiLabState {
             key,
             output,
         });
-        if let Some(retained) = self.last_output.as_ref() {
-            self.publish_pointer_move_filter(
-                ui.ctx().pixels_per_point(),
-                pointer,
-                &retained.output,
-            );
-        }
     }
 
     fn can_reuse_last_output(
@@ -493,22 +450,6 @@ impl UiLabState {
             return false;
         };
         hit.id == *previous_hit && !hit.interactive && !hit.selectable_text
-    }
-
-    fn publish_pointer_move_filter(
-        &self,
-        pixels_per_point: f32,
-        pointer: Option<PointerInput>,
-        output: &DocumentOutput,
-    ) {
-        let Some(filter) = self.pointer_move_filter.as_ref() else {
-            return;
-        };
-        let mut filter = filter
-            .lock()
-            .expect("native pointer filter lock is healthy");
-        filter.pixels_per_point = pixels_per_point;
-        filter.inert_rect = inert_pointer_region(pointer, output);
     }
 
     fn take_lab_document(
@@ -1620,30 +1561,6 @@ fn inert_pointer_move(input: DocumentInput) -> bool {
                 && pointer.primary_click_count == 0
                 && !pointer.secondary_clicked
         })
-}
-
-fn inert_pointer_region(pointer: Option<PointerInput>, output: &DocumentOutput) -> Option<Rect> {
-    if output.animating
-        || output.active_drag.is_some()
-        || output.completed_drag.is_some()
-        || !output.events.is_empty()
-        || output
-            .text_selection
-            .as_ref()
-            .is_some_and(|selection| selection.active)
-    {
-        return None;
-    }
-    let pointer = pointer?;
-    if !inert_pointer_move(DocumentInput {
-        pointer: Some(pointer),
-        scroll_delta: Point::ZERO,
-    }) {
-        return None;
-    }
-    let previous_hit = output.hit_id.as_ref()?;
-    let hit = deepest_frame_at(&output.layout, pointer.position)?;
-    (hit.id == *previous_hit && !hit.interactive && !hit.selectable_text).then_some(hit.rect)
 }
 
 fn deepest_frame_at(
