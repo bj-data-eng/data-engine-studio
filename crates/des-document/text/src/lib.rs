@@ -869,7 +869,7 @@ fn layout_result(
             layout_end,
             semantic_start: request.text.layout_to_semantic_index(layout_start),
             semantic_end: request.text.layout_to_semantic_index(layout_end),
-            x_offset: first_glyph_x(run.glyphs),
+            x_offset: glyph_span_min_x(run.glyphs),
             width: run.line_w,
             height: run.line_height,
             baseline: run.line_y,
@@ -916,8 +916,15 @@ fn layout_elided(request: &TextLayoutRequest<'_>, lines: &[TextLayoutLine]) -> b
         .is_some_and(|max_lines| lines.len() >= max_lines && last.layout_end < all_layout_chars)
 }
 
-fn first_glyph_x(glyphs: &[cosmic_text::LayoutGlyph]) -> f32 {
-    glyphs.first().map(|glyph| glyph.x).unwrap_or(0.0)
+fn glyph_span_min_x(glyphs: &[cosmic_text::LayoutGlyph]) -> f32 {
+    if glyphs.is_empty() {
+        0.0
+    } else {
+        glyphs
+            .iter()
+            .map(|glyph| glyph.x.min(glyph.x + glyph.w))
+            .fold(f32::INFINITY, f32::min)
+    }
 }
 
 fn x_for_layout_index(text: &str, run: &cosmic_text::LayoutRun<'_>, layout_index: usize) -> f32 {
@@ -1627,6 +1634,68 @@ mod tests {
             "expected hit testing to produce an interior semantic index, got {middle}"
         );
         assert_eq!(end, content.semantic_text().chars().count());
+    }
+
+    #[test]
+    fn rtl_hit_testing_tracks_visual_start_and_end() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("אבגד");
+        let mut style = TextLayoutStyle::white_space(des_document::WhiteSpace::Pre);
+        style.text_align = TextAlign::Start;
+        let normalized = NormalizedText::from_content(&content, style);
+        let text_request = TextLayoutRequest {
+            text: &normalized,
+            font_size: 24.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Rtl,
+            wrap_width: 240.0,
+            layout_style: style,
+            line_height: Some(32.0),
+        };
+        let measured = renderer.measure_text(text_request.clone());
+        let line = measured.lines[0];
+        let y = line.baseline;
+
+        let visual_start = renderer.text_index_at(
+            text_request.clone(),
+            Point::new(line.x_offset + line.width - 1.0, y),
+        );
+        let visual_end = renderer.text_index_at(text_request, Point::new(line.x_offset + 1.0, y));
+
+        assert_eq!(visual_start, 0);
+        assert_eq!(visual_end, content.semantic_text().chars().count());
+    }
+
+    #[test]
+    fn rtl_selection_rects_cover_right_aligned_visual_range() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("אבגד");
+        let mut style = TextLayoutStyle::white_space(des_document::WhiteSpace::Pre);
+        style.text_align = TextAlign::Start;
+        let normalized = NormalizedText::from_content(&content, style);
+        let text_request = TextLayoutRequest {
+            text: &normalized,
+            font_size: 24.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Rtl,
+            wrap_width: 240.0,
+            layout_style: style,
+            line_height: Some(32.0),
+        };
+        let measured = renderer.measure_text(text_request.clone());
+        let rects = renderer.selection_rects(
+            text_request,
+            1.0,
+            0..normalized.layout_text().chars().count(),
+            Color::rgba(234, 221, 255, 190),
+        );
+
+        assert_eq!(rects.len(), 1);
+        assert!(rects[0].width_px > 0);
+        assert!(
+            rects[0].x_px as f32 >= measured.lines[0].x_offset.floor(),
+            "RTL selection should be positioned inside the right-aligned line"
+        );
     }
 
     #[test]
