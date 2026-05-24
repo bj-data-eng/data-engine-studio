@@ -147,11 +147,13 @@ pub enum FontStyle {
     Oblique,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TextDecoration {
     pub underline: bool,
     pub overline: bool,
     pub line_through: bool,
+    pub color: Option<Color>,
+    pub thickness: Option<f32>,
 }
 
 impl TextDecoration {
@@ -159,6 +161,8 @@ impl TextDecoration {
         underline: false,
         overline: false,
         line_through: false,
+        color: None,
+        thickness: None,
     };
     pub const UNDERLINE: Self = Self {
         underline: true,
@@ -178,7 +182,26 @@ impl TextDecoration {
             underline,
             overline,
             line_through,
+            ..Self::NONE
         }
+    }
+
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = Some(color);
+        self
+    }
+
+    pub fn thickness(mut self, thickness: f32) -> Self {
+        self.thickness = Some(thickness.max(0.0));
+        self
+    }
+
+    pub fn stroke_color(self, current_color: Color) -> Color {
+        self.color.unwrap_or(current_color)
+    }
+
+    pub fn stroke_thickness(self) -> f32 {
+        self.thickness.unwrap_or(1.0).max(0.0)
     }
 
     pub const fn is_none(self) -> bool {
@@ -1117,11 +1140,30 @@ mod tests {
                 underline: true,
                 overline: true,
                 line_through: true,
+                color: None,
+                thickness: None,
             }
         );
         assert!(TextDecoration::UNDERLINE.underline);
         assert!(TextDecoration::OVERLINE.overline);
         assert!(TextDecoration::LINE_THROUGH.line_through);
+
+        let styled = TextDecoration::UNDERLINE
+            .color(Color::rgb(220, 40, 80))
+            .thickness(2.5);
+        assert_eq!(
+            styled.stroke_color(Color::rgb(0, 0, 0)),
+            Color::rgb(220, 40, 80)
+        );
+        assert_eq!(styled.stroke_thickness(), 2.5);
+        assert_eq!(
+            TextDecoration::UNDERLINE.stroke_color(Color::rgb(1, 2, 3)),
+            Color::rgb(1, 2, 3)
+        );
+        assert_eq!(
+            TextDecoration::UNDERLINE.thickness(-1.0).stroke_thickness(),
+            0.0
+        );
     }
 
     #[test]

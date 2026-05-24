@@ -247,6 +247,7 @@ fn text_format(
     inherited_line_height: Option<f32>,
 ) -> egui::TextFormat {
     let color = style.color.unwrap_or(inherited_color);
+    let text_decoration = style.text_decoration.unwrap_or(TextDecoration::NONE);
     let family = style
         .font_family
         .as_ref()
@@ -262,21 +263,13 @@ fn text_format(
             style.font_style,
             Some(FontStyle::Italic | FontStyle::Oblique)
         ),
-        strikethrough: if style
-            .text_decoration
-            .unwrap_or(TextDecoration::NONE)
-            .line_through
-        {
-            egui::Stroke::new(1.0, to_egui_color(color))
+        strikethrough: if text_decoration.line_through {
+            text_decoration_stroke(text_decoration, color)
         } else {
             egui::Stroke::NONE
         },
-        underline: if style
-            .text_decoration
-            .unwrap_or(TextDecoration::NONE)
-            .underline
-        {
-            egui::Stroke::new(1.0, to_egui_color(color))
+        underline: if text_decoration.underline {
+            text_decoration_stroke(text_decoration, color)
         } else {
             egui::Stroke::NONE
         },
@@ -290,6 +283,13 @@ fn text_format(
             .map(|height| height.max(1.0)),
         ..Default::default()
     }
+}
+
+fn text_decoration_stroke(decoration: TextDecoration, current_color: Color) -> egui::Stroke {
+    egui::Stroke::new(
+        decoration.stroke_thickness(),
+        to_egui_color(decoration.stroke_color(current_color)),
+    )
 }
 
 fn variation_coords(style: &InlineTextStyle) -> egui::epaint::text::VariationCoords {
@@ -440,7 +440,11 @@ mod tests {
                     font_weight: Some(FontWeight::BOLD),
                     font_stretch: Some(FontStretch::CONDENSED),
                     font_style: Some(FontStyle::Italic),
-                    text_decoration: Some(TextDecoration::lines(true, false, true)),
+                    text_decoration: Some(
+                        TextDecoration::lines(true, false, true)
+                            .color(Color::rgb(0, 255, 0))
+                            .thickness(2.0),
+                    ),
                     background: Some(Color::rgb(0, 0, 255)),
                     ..InlineTextStyle::default()
                 },
@@ -466,8 +470,13 @@ mod tests {
         assert_eq!(format.font_id.size, 18.0);
         assert_eq!(format.extra_letter_spacing, 1.5);
         assert!(format.italics);
-        assert_ne!(format.underline, egui::Stroke::NONE);
-        assert_ne!(format.strikethrough, egui::Stroke::NONE);
+        assert_eq!(format.underline.width, 2.0);
+        assert_eq!(format.underline.color, egui::Color32::from_rgb(0, 255, 0));
+        assert_eq!(format.strikethrough.width, 2.0);
+        assert_eq!(
+            format.strikethrough.color,
+            egui::Color32::from_rgb(0, 255, 0)
+        );
         assert_eq!(format.background, egui::Color32::from_rgb(0, 0, 255));
         assert_eq!(
             format.coords.as_ref(),
