@@ -3289,9 +3289,9 @@ fn rich_decoration_specimen() -> TextContent {
 fn rich_family_specimen() -> TextContent {
     TextContent::new(vec![
         TextRun::styled(
-            "declared Aptos ",
+            "fallback Aptos -> Inter ",
             InlineTextStyle {
-                font_family: Some("Aptos".to_string()),
+                font_family: Some("Aptos, Inter, sans-serif".to_string()),
                 ..InlineTextStyle::default()
             },
         ),

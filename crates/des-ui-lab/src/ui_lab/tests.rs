@@ -2179,7 +2179,10 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         .as_ref()
         .expect("rich family specimen should retain normalized text")
         .runs();
-    assert_eq!(family_runs[0].style.font_family.as_deref(), Some("Aptos"));
+    assert_eq!(
+        family_runs[0].style.font_family.as_deref(),
+        Some("Aptos, Inter, sans-serif")
+    );
     assert_eq!(family_runs[1].style.font_family.as_deref(), Some("serif"));
     assert_eq!(
         family_runs[2].style.font_family.as_deref(),

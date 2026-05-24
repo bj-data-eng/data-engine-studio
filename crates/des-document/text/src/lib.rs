@@ -7,7 +7,12 @@ use des_document::{
     Color, Direction, FontStyle, InlineTextStyle, Point, Rect, Size, TextAlign, TextLayoutLine,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
 };
-use std::{collections::HashMap, hash::Hash, ops::Range, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    ops::Range,
+    sync::Arc,
+};
 
 pub const INTER_FAMILY: &str = "Inter";
 pub const JETBRAINS_MONO_FAMILY: &str = "JetBrains Mono";
@@ -119,6 +124,7 @@ pub struct TextDiagnostics {
 pub struct CosmicTextRenderer {
     font_system: FontSystem,
     swash_cache: SwashCache,
+    font_families: FontFamilyResolver,
     buffers: HashMap<TextBufferKey, Buffer>,
     paint_runs: HashMap<TextPaintGlyphRunKey, TextPaintGlyphRun>,
     buffer_cache_hits: usize,
@@ -155,11 +161,13 @@ impl CosmicTextRenderer {
         }
         db.set_sans_serif_family(INTER_FAMILY);
         db.set_monospace_family(JETBRAINS_MONO_FAMILY);
+        let font_families = FontFamilyResolver::from_db(&db);
 
         let locale = std::env::var("LANG").unwrap_or_else(|_| "en-US".to_string());
         Self {
             font_system: FontSystem::new_with_locale_and_db(locale, db),
             swash_cache: SwashCache::new(),
+            font_families,
             buffers: HashMap::new(),
             paint_runs: HashMap::new(),
             buffer_cache_hits: 0,
@@ -402,13 +410,17 @@ impl CosmicTextRenderer {
             self.buffer_cache_misses += 1;
         }
         let font_system = &mut self.font_system;
-        let buffer = self.buffers.entry(key).or_insert_with(|| {
+        if !self.buffers.contains_key(&key) {
             let metrics = buffer_metrics(&request, scale);
             let mut buffer = Buffer::new_empty(metrics);
             let mut borrowed = buffer.borrow_with(font_system);
-            configure_buffer(&mut borrowed, &request, scale);
-            buffer
-        });
+            configure_buffer(&mut borrowed, &request, scale, &self.font_families);
+            self.buffers.insert(key.clone(), buffer);
+        }
+        let buffer = self
+            .buffers
+            .get_mut(&key)
+            .expect("text buffer should exist after insertion");
         let mut buffer = buffer.borrow_with(font_system);
         f(&mut buffer, &mut self.swash_cache)
     }
@@ -807,6 +819,7 @@ fn configure_buffer(
     buffer: &mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>,
     request: &TextLayoutRequest<'_>,
     scale: f32,
+    font_families: &FontFamilyResolver,
 ) {
     let metrics = buffer_metrics(request, scale);
     buffer.set_metrics(metrics);
@@ -832,6 +845,7 @@ fn configure_buffer(
         request.line_height,
         scale,
         0,
+        font_families,
     );
     let spans = request.text.runs().iter().enumerate().map(|(index, run)| {
         (
@@ -843,6 +857,7 @@ fn configure_buffer(
                 request.line_height,
                 scale,
                 index + 1,
+                font_families,
             ),
         )
     });
@@ -1062,6 +1077,7 @@ fn cosmic_attrs<'a>(
     inherited_line_height: Option<f32>,
     scale: f32,
     metadata: usize,
+    font_families: &FontFamilyResolver,
 ) -> Attrs<'a> {
     let color = style.color.unwrap_or(inherited_color);
     let font_size = style.font_size.unwrap_or(inherited_font_size).max(1.0) * scale;
@@ -1071,7 +1087,7 @@ fn cosmic_attrs<'a>(
         .unwrap_or(font_size / scale * 1.2)
         .max(1.0)
         * scale;
-    let family = cosmic_family(style.font_family.as_deref());
+    let family = font_families.cosmic_family(style.font_family.as_deref());
     let mut attrs = Attrs::new()
         .family(family)
         .metrics(Metrics::new(font_size, line_height))
@@ -1109,16 +1125,127 @@ fn cosmic_attrs<'a>(
     attrs
 }
 
+#[derive(Clone, Debug, Default)]
+struct FontFamilyResolver {
+    available_names: HashSet<String>,
+}
+
+impl FontFamilyResolver {
+    fn from_db(db: &fontdb::Database) -> Self {
+        let mut resolver = Self::default();
+        for face in db.faces() {
+            for (family, _) in &face.families {
+                resolver.available_names.insert(family.to_lowercase());
+            }
+        }
+        resolver
+    }
+
+    fn cosmic_family<'a>(&self, declaration: Option<&'a str>) -> Family<'a> {
+        let Some(declaration) = declaration else {
+            return Family::Name(INTER_FAMILY);
+        };
+        let mut first_named = None;
+        for family in parse_font_family_list(declaration) {
+            if family.eq_ignore_ascii_case("monospace")
+                || family.eq_ignore_ascii_case("mono")
+                || family.eq_ignore_ascii_case(JETBRAINS_MONO_FAMILY)
+            {
+                return Family::Name(JETBRAINS_MONO_FAMILY);
+            }
+            if family.eq_ignore_ascii_case("serif") {
+                return Family::Serif;
+            }
+            if family.eq_ignore_ascii_case("sans-serif") {
+                return Family::SansSerif;
+            }
+            if family.eq_ignore_ascii_case("cursive") {
+                return Family::Cursive;
+            }
+            if family.eq_ignore_ascii_case("fantasy") {
+                return Family::Fantasy;
+            }
+            first_named.get_or_insert(family);
+            if family.eq_ignore_ascii_case(INTER_FAMILY) || self.has_family(family) {
+                return if family.eq_ignore_ascii_case(INTER_FAMILY) {
+                    Family::Name(INTER_FAMILY)
+                } else {
+                    Family::Name(family)
+                };
+            }
+        }
+        first_named.map_or(Family::Name(INTER_FAMILY), Family::Name)
+    }
+
+    fn has_family(&self, family: &str) -> bool {
+        self.available_names.contains(&family.to_lowercase())
+    }
+
+    #[cfg(test)]
+    fn from_names(names: impl IntoIterator<Item = &'static str>) -> Self {
+        Self {
+            available_names: names
+                .into_iter()
+                .map(str::to_lowercase)
+                .collect::<HashSet<_>>(),
+        }
+    }
+}
+
+fn parse_font_family_list(declaration: &str) -> Vec<&str> {
+    let mut families = Vec::new();
+    let mut start = 0;
+    let mut quote = None;
+    for (index, character) in declaration.char_indices() {
+        match (quote, character) {
+            (Some(active), next) if next == active => quote = None,
+            (None, '\'' | '"') => quote = Some(character),
+            (None, ',') => {
+                push_font_family_candidate(&mut families, &declaration[start..index]);
+                start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    push_font_family_candidate(&mut families, &declaration[start..]);
+    families
+}
+
+fn push_font_family_candidate<'a>(families: &mut Vec<&'a str>, candidate: &'a str) {
+    let candidate = strip_font_family_quotes(candidate.trim());
+    if !candidate.is_empty() {
+        families.push(candidate);
+    }
+}
+
+fn strip_font_family_quotes(candidate: &str) -> &str {
+    if candidate.len() >= 2 {
+        let bytes = candidate.as_bytes();
+        let first = bytes[0];
+        let last = bytes[bytes.len() - 1];
+        if (first == b'\'' && last == b'\'') || (first == b'"' && last == b'"') {
+            return &candidate[1..candidate.len() - 1];
+        }
+    }
+    candidate
+}
+
+#[cfg(test)]
 fn cosmic_family(family: Option<&str>) -> Family<'_> {
-    match family {
-        Some("monospace") | Some("mono") | Some(JETBRAINS_MONO_FAMILY) => {
+    match family.map(str::trim) {
+        Some(family)
+            if family.eq_ignore_ascii_case("monospace")
+                || family.eq_ignore_ascii_case("mono")
+                || family.eq_ignore_ascii_case(JETBRAINS_MONO_FAMILY) =>
+        {
             Family::Name(JETBRAINS_MONO_FAMILY)
         }
-        Some("serif") => Family::Serif,
-        Some("sans-serif") => Family::SansSerif,
-        Some("cursive") => Family::Cursive,
-        Some("fantasy") => Family::Fantasy,
-        Some(INTER_FAMILY) | None => Family::Name(INTER_FAMILY),
+        Some(family) if family.eq_ignore_ascii_case("serif") => Family::Serif,
+        Some(family) if family.eq_ignore_ascii_case("sans-serif") => Family::SansSerif,
+        Some(family) if family.eq_ignore_ascii_case("cursive") => Family::Cursive,
+        Some(family) if family.eq_ignore_ascii_case("fantasy") => Family::Fantasy,
+        Some(family) if family.eq_ignore_ascii_case(INTER_FAMILY) => Family::Name(INTER_FAMILY),
+        None => Family::Name(INTER_FAMILY),
         Some(family) => Family::Name(family),
     }
 }
@@ -2029,7 +2156,8 @@ mod tests {
             font_stretch: Some(des_document::FontStretch::EXPANDED),
             ..InlineTextStyle::default()
         };
-        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0);
+        let resolver = FontFamilyResolver::from_names([INTER_FAMILY, JETBRAINS_MONO_FAMILY]);
+        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
 
         assert_eq!(attrs.stretch, Stretch::Expanded);
     }
@@ -2051,9 +2179,41 @@ mod tests {
             font_family: Some(declared_family.to_string()),
             ..InlineTextStyle::default()
         };
-        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0);
+        let resolver = FontFamilyResolver::from_names([INTER_FAMILY, JETBRAINS_MONO_FAMILY]);
+        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
 
         assert_eq!(attrs.family, Family::Name("Aptos"));
+    }
+
+    #[test]
+    fn maps_css_font_family_lists_to_first_available_cosmic_family() {
+        let resolver = FontFamilyResolver::from_names([INTER_FAMILY, JETBRAINS_MONO_FAMILY]);
+
+        assert_eq!(
+            parse_font_family_list("\"Aptos\", Inter, sans-serif"),
+            vec!["Aptos", "Inter", "sans-serif"]
+        );
+        assert_eq!(
+            resolver.cosmic_family(Some("Aptos, Inter, sans-serif")),
+            Family::Name(INTER_FAMILY)
+        );
+        assert_eq!(resolver.cosmic_family(Some("Aptos, serif")), Family::Serif);
+        assert_eq!(
+            resolver.cosmic_family(Some("\"JetBrains Mono\", monospace")),
+            Family::Name(JETBRAINS_MONO_FAMILY)
+        );
+        assert_eq!(
+            resolver.cosmic_family(Some("Aptos, Unknown Sans")),
+            Family::Name("Aptos")
+        );
+
+        let style = InlineTextStyle {
+            font_family: Some("Aptos, Inter, sans-serif".to_string()),
+            ..InlineTextStyle::default()
+        };
+        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0, &resolver);
+
+        assert_eq!(attrs.family, Family::Name(INTER_FAMILY));
     }
 
     #[test]
