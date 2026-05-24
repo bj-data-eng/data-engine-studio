@@ -89,6 +89,7 @@ pub struct InlineTextStyle {
     pub color: Option<Color>,
     pub font_size: Option<f32>,
     pub line_height: Option<f32>,
+    pub letter_spacing: Option<f32>,
     pub font_family: Option<String>,
     pub font_weight: Option<FontWeight>,
     pub italic: Option<bool>,
@@ -736,6 +737,7 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
     let mut layout_index = 0usize;
     for run in request.text.runs() {
         let font_size = run.style.font_size.unwrap_or(request.font_size).max(1.0);
+        let letter_spacing = run.style.letter_spacing.unwrap_or(0.0).max(0.0);
         for ch in run.text.chars() {
             if ch == '\n' {
                 paragraphs.push(Vec::new());
@@ -746,7 +748,7 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
                     .expect("paragraph list always has a current paragraph")
                     .push(FallbackLayoutChar {
                         value: ch,
-                        width: fallback_char_width(ch, font_size),
+                        width: fallback_char_width(ch, font_size, letter_spacing),
                         font_size,
                         layout_index,
                     });
@@ -777,11 +779,11 @@ fn fallback_default_line_height(font_size: f32) -> f32 {
     (font_size * 1.25).max(18.0)
 }
 
-fn fallback_char_width(ch: char, font_size: f32) -> f32 {
+fn fallback_char_width(ch: char, font_size: f32, letter_spacing: f32) -> f32 {
     if ch == '\n' {
         0.0
     } else {
-        font_size.max(1.0) * (7.5 / 13.0)
+        (font_size.max(1.0) * (7.5 / 13.0) + letter_spacing.max(0.0)).max(0.0)
     }
 }
 
@@ -1141,6 +1143,40 @@ mod tests {
     }
 
     #[test]
+    fn fallback_measurement_uses_inline_letter_spacing() {
+        let normal = TextContent::plain("MMMM");
+        let spaced = TextContent::new(vec![TextRun::styled(
+            "MMMM",
+            InlineTextStyle {
+                letter_spacing: Some(2.0),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized_normal = NormalizedText::from_content(&normal, TextLayoutStyle::default());
+        let normalized_spaced = NormalizedText::from_content(&spaced, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let normal = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_normal,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+        let spaced = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_spaced,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+
+        assert!(spaced.size.width > normal.size.width);
+    }
+
+    #[test]
     fn fallback_hit_testing_uses_inline_run_font_sizes() {
         let rich = TextContent::new(vec![
             TextRun::plain("AA"),
@@ -1168,6 +1204,33 @@ mod tests {
         );
 
         assert_eq!(index, 3);
+    }
+
+    #[test]
+    fn fallback_hit_testing_uses_inline_letter_spacing() {
+        let spaced = TextContent::new(vec![TextRun::styled(
+            "AB",
+            InlineTextStyle {
+                letter_spacing: Some(6.0),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized = NormalizedText::from_content(&spaced, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let index = measurer.text_index_at(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 13.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: f32::INFINITY,
+                layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+                line_height: None,
+            },
+            Point::new(8.0, 0.0),
+        );
+
+        assert_eq!(index, 1);
     }
 
     #[test]

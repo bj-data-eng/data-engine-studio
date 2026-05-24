@@ -247,6 +247,7 @@ fn text_format(
         .unwrap_or_default();
     egui::TextFormat {
         font_id: egui::FontId::new(style.font_size.unwrap_or(inherited_font_size), family),
+        extra_letter_spacing: style.letter_spacing.unwrap_or(0.0).max(0.0),
         color: to_egui_color(color),
         coords,
         italics: style.italic.unwrap_or(false),
@@ -413,6 +414,7 @@ mod tests {
                 InlineTextStyle {
                     color: Some(Color::rgb(255, 0, 0)),
                     font_size: Some(18.0),
+                    letter_spacing: Some(1.5),
                     font_weight: Some(FontWeight::BOLD),
                     italic: Some(true),
                     text_decoration: Some(TextDecoration::lines(true, false, true)),
@@ -439,6 +441,7 @@ mod tests {
         let format = &job.sections[1].format;
         assert_eq!(format.color, egui::Color32::from_rgb(255, 0, 0));
         assert_eq!(format.font_id.size, 18.0);
+        assert_eq!(format.extra_letter_spacing, 1.5);
         assert!(format.italics);
         assert_ne!(format.underline, egui::Stroke::NONE);
         assert_ne!(format.strikethrough, egui::Stroke::NONE);
