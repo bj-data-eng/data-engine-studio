@@ -774,6 +774,7 @@ fn configure_buffer(
 ) {
     let metrics = buffer_metrics(request, scale);
     buffer.set_metrics(metrics);
+    buffer.set_tab_width(request.layout_style.tab_size.max(1));
     buffer.set_wrap(cosmic_wrap(request));
     buffer.set_size(wrap_width(request, scale), height_limit(request, metrics));
     if request.layout_style.text_overflow == TextOverflow::Ellipsis {
@@ -1467,6 +1468,72 @@ mod tests {
         assert!(measured.first_baseline.is_some());
         assert!(measured.lines[0].baseline > 0.0);
         assert!(measured.lines[0].baseline <= measured.lines[0].height);
+    }
+
+    #[test]
+    fn preserves_blank_lines_in_preformatted_text() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("a\n\nb");
+        let style = TextLayoutStyle::white_space(des_document::WhiteSpace::Pre);
+        let normalized = NormalizedText::from_content(&content, style);
+        let measured = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 400.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+
+        assert_eq!(normalized.layout_text(), "a\n\nb");
+        assert_eq!(measured.line_count, 3);
+        assert_eq!(measured.lines.len(), 3);
+        assert_eq!(measured.lines[0].layout_start, 0);
+        assert_eq!(measured.lines[0].layout_end, 1);
+        assert_eq!(measured.lines[1].layout_start, 2);
+        assert_eq!(measured.lines[1].layout_end, 2);
+        assert_eq!(measured.lines[2].layout_start, 3);
+        assert_eq!(measured.lines[2].layout_end, 4);
+        assert!(measured.size.height >= 60.0);
+    }
+
+    #[test]
+    fn measures_normalized_css_tab_size_spacing() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("a\tb");
+        let mut compact_style = TextLayoutStyle::white_space(des_document::WhiteSpace::Pre);
+        compact_style.tab_size = 2;
+        let mut wide_style = TextLayoutStyle::white_space(des_document::WhiteSpace::Pre);
+        wide_style.tab_size = 8;
+        let compact = NormalizedText::from_content(&content, compact_style);
+        let wide = NormalizedText::from_content(&content, wide_style);
+
+        let compact_measured = renderer.measure_text(TextLayoutRequest {
+            text: &compact,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 400.0,
+            layout_style: compact_style,
+            line_height: Some(20.0),
+        });
+        let wide_measured = renderer.measure_text(TextLayoutRequest {
+            text: &wide,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 400.0,
+            layout_style: wide_style,
+            line_height: Some(20.0),
+        });
+
+        assert_eq!(compact.layout_text(), "a  b");
+        assert_eq!(wide.layout_text(), "a        b");
+        assert!(
+            wide_measured.size.width > compact_measured.size.width,
+            "larger CSS tab-size should widen preserved tab stops"
+        );
     }
 
     #[test]

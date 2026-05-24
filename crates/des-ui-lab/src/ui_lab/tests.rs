@@ -2121,6 +2121,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let wrapped = frame(&output, "text-wrap-body");
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
+    let pre = frame(&output, "text-pre-body");
 
     assert_eq!(wrapped.style.text_layout.text_wrap_mode, TextWrapMode::Wrap);
     assert!(
@@ -2135,6 +2136,20 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     assert!(truncated.text_layout.as_ref().unwrap().elided);
     assert_eq!(max_lines.style.text_layout.max_lines, Some(2));
     assert!(max_lines.text_layout.as_ref().unwrap().line_count <= 2);
+    assert_eq!(
+        pre.style.text_layout.white_space_collapse,
+        des_document::WhiteSpaceCollapse::Preserve
+    );
+    assert_eq!(pre.style.text_layout.tab_size, 8);
+    assert_eq!(
+        pre.text.as_ref().unwrap().semantic_text(),
+        "columns:\talpha\tbeta\nspaces:   one   two   three"
+    );
+    assert_eq!(
+        pre.text_layout.as_ref().unwrap().line_count,
+        2,
+        "pre specimen should preserve the explicit newline as a measured line break"
+    );
     assert!(
         wrapped.rect.size.height > wrapped.text_layout.as_ref().unwrap().size.height,
         "text specimens should include padding in the border-box height"
