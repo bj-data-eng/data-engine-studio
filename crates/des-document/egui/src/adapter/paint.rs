@@ -6,8 +6,22 @@ use des_document::{
 };
 use des_text::{CosmicTextRenderer, RasterizedText};
 use eframe::egui;
-use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
+
+pub struct CosmicTextPaintResources {
+    renderer: CosmicTextRenderer,
+    textures: HashMap<u64, egui::TextureHandle>,
+}
+
+impl CosmicTextPaintResources {
+    pub fn new(renderer: CosmicTextRenderer) -> Self {
+        Self {
+            renderer,
+            textures: HashMap::new(),
+        }
+    }
+}
 pub fn paint_frame(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
@@ -17,12 +31,12 @@ pub fn paint_frame(
     paint_frame_clipped(ui, origin, frame, ui.clip_rect(), text_selection, None);
 }
 
-pub fn paint_frame_with_text_renderer(
+pub fn paint_frame_with_text_resources(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
     frame: &ResolvedElement,
     text_selection: Option<&DocumentTextSelection>,
-    text_renderer: &mut CosmicTextRenderer,
+    text_resources: &mut CosmicTextPaintResources,
 ) {
     paint_frame_clipped(
         ui,
@@ -30,8 +44,23 @@ pub fn paint_frame_with_text_renderer(
         frame,
         ui.clip_rect(),
         text_selection,
-        Some(text_renderer),
+        Some(text_resources),
     );
+}
+
+pub fn paint_frame_with_text_renderer(
+    ui: &mut egui::Ui,
+    origin: egui::Pos2,
+    frame: &ResolvedElement,
+    text_selection: Option<&DocumentTextSelection>,
+    text_renderer: &mut CosmicTextRenderer,
+) {
+    let mut resources = CosmicTextPaintResources::new(std::mem::replace(
+        text_renderer,
+        crate::document_text_renderer(),
+    ));
+    paint_frame_with_text_resources(ui, origin, frame, text_selection, &mut resources);
+    *text_renderer = resources.renderer;
 }
 
 fn paint_frame_clipped(
@@ -40,7 +69,7 @@ fn paint_frame_clipped(
     frame: &ResolvedElement,
     host_clip_rect: egui::Rect,
     text_selection: Option<&DocumentTextSelection>,
-    mut text_renderer: Option<&mut CosmicTextRenderer>,
+    mut text_resources: Option<&mut CosmicTextPaintResources>,
 ) {
     let clip_rect = apply_document_clip(origin, host_clip_rect, frame.clip_rect);
     let painter = ui.painter().with_clip_rect(clip_rect);
@@ -87,9 +116,17 @@ fn paint_frame_clipped(
                 layout_style: frame.style.text_layout,
                 line_height: frame.style.line_height,
             };
-            if let Some(renderer) = text_renderer.as_deref_mut() {
-                let rasterized = renderer.rasterize(request, ui.ctx().pixels_per_point());
-                paint_rasterized_text(&painter, text_rect.min, frame, &rasterized);
+            if let Some(resources) = text_resources.as_deref_mut() {
+                let rasterized = resources
+                    .renderer
+                    .rasterize(request, ui.ctx().pixels_per_point());
+                paint_rasterized_text(
+                    &painter,
+                    text_rect.min,
+                    frame,
+                    &rasterized,
+                    &mut resources.textures,
+                );
             } else {
                 let color = to_egui_color(frame.style.text_color);
                 let mut galley = painter.layout_job(layout_job(request, color));
@@ -134,7 +171,7 @@ fn paint_frame_clipped(
             child,
             host_clip_rect,
             text_selection,
-            text_renderer.as_deref_mut(),
+            text_resources.as_deref_mut(),
         );
     }
 }
@@ -144,6 +181,7 @@ fn paint_rasterized_text(
     position: egui::Pos2,
     frame: &ResolvedElement,
     rasterized: &RasterizedText,
+    textures: &mut HashMap<u64, egui::TextureHandle>,
 ) {
     if rasterized.surface.is_empty() {
         return;
@@ -155,15 +193,15 @@ fn paint_rasterized_text(
         ],
         &rasterized.surface.rgba,
     );
-    let texture = painter.ctx().load_texture(
-        format!(
-            "des-cosmic-text-{}-{}",
-            frame.id.as_str(),
-            text_texture_hash(frame)
-        ),
-        color_image,
-        egui::TextureOptions::LINEAR,
-    );
+    let texture_key = text_texture_hash(frame, rasterized);
+    let texture = textures.entry(texture_key).or_insert_with(|| {
+        painter.ctx().load_texture(
+            format!("des-cosmic-text-{}-{texture_key}", frame.id.as_str()),
+            color_image.clone(),
+            egui::TextureOptions::LINEAR,
+        )
+    });
+    texture.set(color_image, egui::TextureOptions::LINEAR);
     let rect = egui::Rect::from_min_size(
         position,
         egui::vec2(
@@ -179,7 +217,7 @@ fn paint_rasterized_text(
     );
 }
 
-fn text_texture_hash(frame: &ResolvedElement) -> u64 {
+fn text_texture_hash(frame: &ResolvedElement, rasterized: &RasterizedText) -> u64 {
     let mut hasher = DefaultHasher::new();
     frame.id.as_str().hash(&mut hasher);
     if let Some(text) = &frame.text {
@@ -191,6 +229,13 @@ fn text_texture_hash(frame: &ResolvedElement) -> u64 {
     frame.style.text_color.g.hash(&mut hasher);
     frame.style.text_color.b.hash(&mut hasher);
     frame.style.text_color.a.hash(&mut hasher);
+    rasterized.surface.width_px.hash(&mut hasher);
+    rasterized.surface.height_px.hash(&mut hasher);
+    rasterized
+        .surface
+        .pixels_per_point
+        .to_bits()
+        .hash(&mut hasher);
     hasher.finish()
 }
 

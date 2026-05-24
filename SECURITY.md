@@ -23,6 +23,13 @@ Vendored or forked code must keep its provenance visible in the crate metadata a
 - `crates/des-graph-egui`, a vendored graph interaction crate that was audited before promotion into the workspace.
 - `vendor/des-apple-dispatch`, a small local replacement for the external `dispatch` crate, patched through `[patch.crates-io]`.
 
+Bundled document fonts must keep their license notices beside the font files. The current bundled document fonts are:
+
+- Inter Variable in `crates/des-document/egui/assets/fonts/inter`, licensed under the SIL Open Font License 1.1.
+- JetBrains Mono Variable in `crates/des-document/egui/assets/fonts/jetbrains-mono`, licensed under the SIL Open Font License 1.1.
+
+The document text stack currently uses `cosmic-text` for shaping, fallback, layout, and Swash-backed rasterization. Treat changes to this stack as supply-chain-sensitive because they affect font parsing and text rendering of project-authored content.
+
 ## Required Security Checks
 
 Run the full security target:

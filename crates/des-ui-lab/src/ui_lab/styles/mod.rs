@@ -890,6 +890,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .gap(12.0),
         )
         .rule(
+            StyleSelector::class("text-diagnostics"),
+            Style::default()
+                .font_size(11.0)
+                .line_height(15.0)
+                .text_wrap_mode(TextWrapMode::Wrap),
+        )
+        .rule(
             StyleSelector::class("text-render-path-pane"),
             Style::default()
                 .width_percent(0.5)

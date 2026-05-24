@@ -4,8 +4,9 @@ mod tests;
 mod views;
 
 use des_egui::adapter::{
-    EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
-    document_input, paint_frame, paint_frame_with_text_renderer, paint_scroll_chrome,
+    CosmicTextPaintResources, EguiTextMeasurer, configure_text_selection_input,
+    copy_selected_text_on_command, document_input, paint_frame, paint_frame_with_text_resources,
+    paint_scroll_chrome,
 };
 use styles::stylesheet;
 use views::{
@@ -147,6 +148,7 @@ pub(crate) struct UiLabState {
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
     text_renderer: des_text::CosmicTextRenderer,
+    text_paint_resources: CosmicTextPaintResources,
     pending_stage_scroll: Option<Point>,
     lab_document: Option<RetainedLabDocument<LabDocumentKey>>,
     last_perf: UiLabPerf,
@@ -218,6 +220,7 @@ impl Default for UiLabState {
             scroll_list_drop_preview: None,
             text_context_menu: None,
             text_renderer: des_egui::document_text_renderer(),
+            text_paint_resources: CosmicTextPaintResources::new(des_egui::document_text_renderer()),
             pending_stage_scroll: None,
             lab_document: None,
             last_perf: UiLabPerf::default(),
@@ -312,12 +315,12 @@ impl UiLabState {
         apply_cursor_icon(ui, &output);
 
         let paint_start = Instant::now();
-        paint_frame_with_text_renderer(
+        paint_frame_with_text_resources(
             ui,
             origin,
             &output.layout,
             output.text_selection.as_ref(),
-            &mut self.text_renderer,
+            &mut self.text_paint_resources,
         );
         if self.view == LabView::Text {
             paint_legacy_text_path_comparison(ui, origin, &output);
@@ -943,9 +946,12 @@ impl UiLabState {
     fn lab_document_output_for_test(&mut self, viewport: Size) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
-        let output = self
-            .document_engine
-            .update(&mut retained.document, &stylesheet);
+        let output = self.document_engine.update_with_input_and_text_measurer(
+            &mut retained.document,
+            &stylesheet,
+            DocumentInput::default(),
+            &mut self.text_renderer,
+        );
         self.lab_document = Some(retained);
         output
     }
@@ -958,13 +964,20 @@ impl UiLabState {
     ) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
-        self.document_engine
-            .update(&mut retained.document, &stylesheet);
+        self.document_engine.update_with_input_and_text_measurer(
+            &mut retained.document,
+            &stylesheet,
+            DocumentInput::default(),
+            &mut self.text_renderer,
+        );
         self.document_engine
             .scroll_element_to("stage", Point::new(0.0, scroll_y));
-        let output = self
-            .document_engine
-            .update(&mut retained.document, &stylesheet);
+        let output = self.document_engine.update_with_input_and_text_measurer(
+            &mut retained.document,
+            &stylesheet,
+            DocumentInput::default(),
+            &mut self.text_renderer,
+        );
         self.lab_document = Some(retained);
         output
     }
@@ -995,9 +1008,12 @@ impl UiLabState {
     ) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
-        let output =
-            self.document_engine
-                .update_with_input(&mut retained.document, &stylesheet, input);
+        let output = self.document_engine.update_with_input_and_text_measurer(
+            &mut retained.document,
+            &stylesheet,
+            input,
+            &mut self.text_renderer,
+        );
         self.lab_document = Some(retained);
         output
     }

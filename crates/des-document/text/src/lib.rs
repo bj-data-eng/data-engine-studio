@@ -94,7 +94,10 @@ impl CosmicTextRenderer {
         );
         let wrap_width = match request.layout_style.text_wrap_mode {
             TextWrapMode::NoWrap => None,
-            TextWrapMode::Wrap => Some((request.wrap_width * scale).max(1.0)),
+            TextWrapMode::Wrap if request.wrap_width.is_finite() && request.wrap_width > 1.0 => {
+                Some((request.wrap_width * scale).max(1.0))
+            }
+            TextWrapMode::Wrap => None,
         };
         let height = request
             .layout_style
@@ -150,7 +153,7 @@ impl CosmicTextRenderer {
             request.layout_style.text_wrap_mode,
             scale,
         );
-        let height_px = layout.size.height.max(1.0).ceil() as u32;
+        let height_px = finite_surface_extent(layout.size.height).ceil() as u32;
         let mut rgba = vec![0; width_px.saturating_mul(height_px).saturating_mul(4) as usize];
         let mut glyph_rects = 0usize;
         buffer.draw(
@@ -294,9 +297,20 @@ fn surface_width_px(
 ) -> u32 {
     let width = match wrap_mode {
         TextWrapMode::NoWrap => layout.size.width.max(1.0),
-        TextWrapMode::Wrap => (wrap_width * scale).max(layout.size.width).max(1.0),
+        TextWrapMode::Wrap if wrap_width.is_finite() && wrap_width > 1.0 => {
+            (wrap_width * scale).max(layout.size.width).max(1.0)
+        }
+        TextWrapMode::Wrap => layout.size.width.max(1.0),
     };
-    width.ceil() as u32
+    finite_surface_extent(width).ceil() as u32
+}
+
+fn finite_surface_extent(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(1.0, 16_384.0)
+    } else {
+        16_384.0
+    }
 }
 
 fn cosmic_wrap(request: &TextLayoutRequest<'_>) -> Wrap {
@@ -312,7 +326,7 @@ fn cosmic_wrap(request: &TextLayoutRequest<'_>) -> Wrap {
             ) {
                 Wrap::Glyph
             } else {
-                Wrap::WordOrGlyph
+                Wrap::Word
             }
         }
     }
