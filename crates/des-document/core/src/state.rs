@@ -94,7 +94,7 @@ impl DocumentOutput {
             return None;
         }
         let text = frame.text.as_ref()?.semantic_text();
-        selection.selected_text_from(&text)
+        selection.selected_text_from(text)
     }
 }
 

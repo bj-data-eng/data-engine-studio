@@ -672,15 +672,13 @@ impl DocumentEngine {
             2 => TextSelectionGranularity::Word,
             _ => TextSelectionGranularity::Character,
         };
-        let (anchor_index, focus_index) = selection_range_for_granularity(
-            &frame
-                .text
-                .as_ref()
-                .map(|text| text.semantic_text())
-                .unwrap_or_default(),
-            text_index,
-            granularity,
-        );
+        let text = frame
+            .text
+            .as_ref()
+            .map(|text| text.semantic_text())
+            .unwrap_or_default();
+        let (anchor_index, focus_index) =
+            selection_range_for_granularity(text, text_index, granularity);
         let next = DocumentTextSelection {
             target: frame.id.clone(),
             anchor: pointer.position,
@@ -737,12 +735,13 @@ impl DocumentEngine {
                 .find(selection.target.as_str())
                 .map(|frame| {
                     let text_index = text_index_at_point(frame, pointer.position, text_measurer);
+                    let text = frame
+                        .text
+                        .as_ref()
+                        .map(|text| text.semantic_text())
+                        .unwrap_or_default();
                     let (anchor_index, focus_index) = selection_indices_for_granularity(
-                        &frame
-                            .text
-                            .as_ref()
-                            .map(|text| text.semantic_text())
-                            .unwrap_or_default(),
+                        text,
                         selection.anchor_range_start,
                         selection.anchor_range_end,
                         text_index,

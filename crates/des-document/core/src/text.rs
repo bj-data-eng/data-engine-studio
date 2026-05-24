@@ -33,8 +33,8 @@ impl TextContent {
         self.runs.iter().all(|run| run.text.is_empty())
     }
 
-    pub fn semantic_text(&self) -> String {
-        self.semantic_text.clone()
+    pub fn semantic_text(&self) -> &str {
+        &self.semantic_text
     }
 
     pub fn as_str(&self) -> &str {

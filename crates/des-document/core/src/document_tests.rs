@@ -600,7 +600,7 @@ fn document_emits_resolved_element_tree_from_retained_layout() {
     assert!(panel.interactive);
     assert_eq!(
         label.text.as_ref().map(|text| text.semantic_text()),
-        Some("Retained text".to_string())
+        Some("Retained text")
     );
     assert_eq!(label.rect, Rect::new(10.0, 10.0, 80.0, 20.0));
     assert!(label.selectable_text);
@@ -776,7 +776,7 @@ fn document_engine_does_not_reuse_cached_layout_for_distinct_document_with_same_
             .text
             .as_ref()
             .map(|text| text.semantic_text()),
-        Some("first".to_string())
+        Some("first")
     );
     assert_eq!(
         second_output
@@ -786,7 +786,7 @@ fn document_engine_does_not_reuse_cached_layout_for_distinct_document_with_same_
             .text
             .as_ref()
             .map(|text| text.semantic_text()),
-        Some("second".to_string())
+        Some("second")
     );
 }
 

@@ -93,7 +93,10 @@ impl<'a> ElementSnapshot<'a> {
     }
 
     pub fn text(&self) -> Option<String> {
-        self.element.text.as_ref().map(|text| text.semantic_text())
+        self.element
+            .text
+            .as_ref()
+            .map(|text| text.semantic_text().to_owned())
     }
 
     pub fn text_content(&self) -> Option<&crate::TextContent> {
