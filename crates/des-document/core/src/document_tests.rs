@@ -44,11 +44,7 @@ impl TextMeasurer for RecordingTextMeasurer {
     fn measure_text(&mut self, request: TextLayoutRequest<'_>) -> TextLayoutResult {
         self.requests
             .push((request.text.semantic_text().to_string(), request.wrap_width));
-        TextLayoutResult {
-            size: Size::new(64.0, 18.0),
-            line_count: 1,
-            elided: false,
-        }
+        TextLayoutResult::new(Size::new(64.0, 18.0), 1, false)
     }
 }
 
@@ -66,11 +62,7 @@ impl TextMeasurer for CountingTextMeasurer {
         if request.text.semantic_text() == "Measured" {
             COMPUTE_TEXT_MEASURE_COUNT.fetch_add(1, Ordering::SeqCst);
         }
-        TextLayoutResult {
-            size: Size::new(64.0, 18.0),
-            line_count: 1,
-            elided: false,
-        }
+        TextLayoutResult::new(Size::new(64.0, 18.0), 1, false)
     }
 }
 
@@ -647,11 +639,7 @@ fn document_emits_text_layout_from_retained_layout() {
 
     assert_eq!(
         label.text_layout,
-        Some(TextLayoutResult {
-            size: Size::new(64.0, 18.0),
-            line_count: 1,
-            elided: false,
-        })
+        Some(TextLayoutResult::new(Size::new(64.0, 18.0), 1, false))
     );
     assert_eq!(
         text_measurer.requests,
@@ -1391,6 +1379,7 @@ fn document_engine_update_uses_document_text_layout() {
             .find("label")
             .unwrap()
             .text_layout
+            .as_ref()
             .unwrap()
             .size,
         Size::new(64.0, 18.0)

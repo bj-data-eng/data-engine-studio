@@ -258,11 +258,33 @@ pub struct TextLayoutRequest<'a> {
     pub line_height: Option<f32>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextLayoutResult {
     pub size: Size,
     pub line_count: usize,
     pub elided: bool,
+    pub lines: Vec<TextLayoutLine>,
+}
+
+impl TextLayoutResult {
+    pub fn new(size: Size, line_count: usize, elided: bool) -> Self {
+        Self {
+            size,
+            line_count,
+            elided,
+            lines: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextLayoutLine {
+    pub layout_start: usize,
+    pub layout_end: usize,
+    pub semantic_start: usize,
+    pub semantic_end: usize,
+    pub width: f32,
+    pub height: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -425,6 +447,11 @@ fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
         .fold(0.0, f32::max);
     let elided = lines.len() > visible_lines;
 
+    let visible_layout_lines = lines
+        .iter()
+        .take(visible_lines)
+        .map(|line| line.to_text_layout_line(request.text, line_height))
+        .collect();
     TextLayoutResult {
         size: Size::new(
             max_line_width.min(max_width),
@@ -432,6 +459,7 @@ fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
         ),
         line_count: visible_lines,
         elided,
+        lines: visible_layout_lines,
     }
 }
 
@@ -575,6 +603,24 @@ impl From<Vec<FallbackLayoutChar>> for FallbackLayoutLine {
     fn from(chars: Vec<FallbackLayoutChar>) -> Self {
         let width = chars.iter().map(|ch| ch.width).sum();
         Self { chars, width }
+    }
+}
+
+impl FallbackLayoutLine {
+    fn to_text_layout_line(&self, text: &NormalizedText, height: f32) -> TextLayoutLine {
+        let layout_start = self.chars.first().map_or(0, |ch| ch.layout_index);
+        let layout_end = self
+            .chars
+            .last()
+            .map_or(layout_start, |ch| ch.layout_index + 1);
+        TextLayoutLine {
+            layout_start,
+            layout_end,
+            semantic_start: text.layout_to_semantic_index(layout_start),
+            semantic_end: text.layout_to_semantic_index(layout_end),
+            width: self.width,
+            height,
+        }
     }
 }
 
@@ -768,6 +814,27 @@ mod tests {
         });
 
         assert!(measured.line_count > 1);
+    }
+
+    #[test]
+    fn fallback_measurement_reports_line_metadata() {
+        let content = TextContent::plain("Alpha beta");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let measured = measurer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: 40.0,
+            layout_style: TextLayoutStyle::default(),
+            line_height: None,
+        });
+
+        assert_eq!(measured.lines.len(), measured.line_count);
+        assert_eq!(measured.lines[0].layout_start, 0);
+        assert_eq!(measured.lines[0].semantic_start, 0);
+        assert!(measured.lines[0].layout_end <= normalized.layout_text().chars().count());
     }
 
     #[test]

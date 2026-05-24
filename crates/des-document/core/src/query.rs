@@ -101,7 +101,7 @@ impl<'a> ElementSnapshot<'a> {
     }
 
     pub fn text_layout(&self) -> Option<crate::TextLayoutResult> {
-        self.element.text_layout
+        self.element.text_layout.clone()
     }
 
     pub fn selectable_text(&self) -> bool {

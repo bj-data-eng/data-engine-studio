@@ -1404,11 +1404,11 @@ fn text_layout_uses_document_wrap_and_truncation_styles() {
     let truncated = output.layout.find("truncated").unwrap();
 
     assert!(
-        wrapped.text_layout.unwrap().line_count > 1,
+        wrapped.text_layout.as_ref().unwrap().line_count > 1,
         "wrapped text should report multiple measured lines"
     );
-    assert_eq!(truncated.text_layout.unwrap().line_count, 1);
-    assert!(truncated.text_layout.unwrap().elided);
+    assert_eq!(truncated.text_layout.as_ref().unwrap().line_count, 1);
+    assert!(truncated.text_layout.as_ref().unwrap().elided);
 }
 
 #[test]
@@ -1425,8 +1425,8 @@ fn text_layout_respects_padding_and_border_box_size() {
     let output = engine.update(&mut document, &stylesheet);
     let label = output.layout.find("label").unwrap();
 
-    assert_close(label.text_layout.unwrap().size.width, 15.0);
-    assert_close(label.text_layout.unwrap().size.height, 18.0);
+    assert_close(label.text_layout.as_ref().unwrap().size.width, 15.0);
+    assert_close(label.text_layout.as_ref().unwrap().size.height, 18.0);
     assert_close(label.rect.size.width, 27.0);
     assert_close(label.rect.size.height, 30.0);
 }
@@ -1444,11 +1444,7 @@ fn text_measurer_cache_key_invalidates_cached_layout() {
         }
 
         fn measure_text(&mut self, _request: TextLayoutRequest<'_>) -> TextLayoutResult {
-            TextLayoutResult {
-                size: Size::new(self.width, 18.0),
-                line_count: 1,
-                elided: false,
-            }
+            TextLayoutResult::new(Size::new(self.width, 18.0), 1, false)
         }
     }
 

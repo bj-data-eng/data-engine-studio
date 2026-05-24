@@ -1,6 +1,6 @@
 use des_document::{
-    Color, DocumentOutput, InlineTextStyle, Point, Size, TextLayoutRequest, TextLayoutResult,
-    TextMeasurer, TextMeasurerKey, TextWrapMode,
+    Color, DocumentOutput, InlineTextStyle, Point, Size, TextLayoutLine, TextLayoutRequest,
+    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -27,10 +27,12 @@ impl TextMeasurer for EguiTextMeasurer {
             .ctx
             .fonts_mut(|fonts| fonts.layout_job(layout_job(request.clone(), egui::Color32::WHITE)));
         let size = galley.size();
+        let lines = galley_lines(&request, &galley);
         TextLayoutResult {
             size: Size::new(size.x, size.y),
             line_count: galley.rows.len(),
             elided: galley.elided,
+            lines,
         }
     }
 
@@ -42,6 +44,28 @@ impl TextMeasurer for EguiTextMeasurer {
             .text
             .layout_to_semantic_index(galley.cursor_from_pos(egui::vec2(point.x, point.y)).index)
     }
+}
+
+fn galley_lines(request: &TextLayoutRequest<'_>, galley: &egui::Galley) -> Vec<TextLayoutLine> {
+    let mut layout_start = 0usize;
+    galley
+        .rows
+        .iter()
+        .map(|row| {
+            let row_len = row.glyphs.len() + usize::from(row.ends_with_newline);
+            let layout_end = layout_start + row_len;
+            let line = TextLayoutLine {
+                layout_start,
+                layout_end,
+                semantic_start: request.text.layout_to_semantic_index(layout_start),
+                semantic_end: request.text.layout_to_semantic_index(layout_end),
+                width: row.size.x,
+                height: row.size.y,
+            };
+            layout_start = layout_end;
+            line
+        })
+        .collect()
 }
 pub fn configure_text_selection_input(context: &egui::Context) {
     context.options_mut(|options| {
