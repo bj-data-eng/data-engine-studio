@@ -3291,6 +3291,28 @@ fn rich_decoration_specimen() -> TextContent {
             },
         ),
         TextRun::styled(
+            "overline ",
+            InlineTextStyle {
+                text_decoration: Some(
+                    TextDecoration::OVERLINE
+                        .color(Color::rgb(0, 95, 102))
+                        .thickness(1.0),
+                ),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "combo ",
+            InlineTextStyle {
+                text_decoration: Some(
+                    TextDecoration::lines(true, true, true)
+                        .color(Color::rgb(86, 69, 0))
+                        .thickness(1.0),
+                ),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
             "highlight",
             InlineTextStyle {
                 background: Some(Color::rgba(234, 221, 255, 180)),

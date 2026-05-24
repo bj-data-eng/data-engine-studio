@@ -6,7 +6,7 @@ use crate::graphics_testing::{
 use des_document::{
     DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle, Insets, Length,
     OverflowWrap, Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style,
-    StyleSelector, StyleSheet, TextOverflow, TextWrapMode,
+    StyleSelector, StyleSheet, TextDecoration, TextOverflow, TextWrapMode,
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
@@ -2178,6 +2178,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let diagnostics = frame_text(&output, "text-cosmic-diagnostics").unwrap();
     let rich_sample = frame(&output, "text-rich-100-sample");
     let rich_shape = frame(&output, "text-rich-shape");
+    let rich_decoration = frame(&output, "text-rich-decoration");
     let rich_family = frame(&output, "text-rich-family");
     assert_eq!(rich_sample.style.font_size, 100.0);
     assert_eq!(
@@ -2196,6 +2197,27 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         .as_ref()
         .expect("rich family specimen should retain normalized text")
         .runs();
+    let decoration_runs = rich_decoration
+        .normalized_text
+        .as_ref()
+        .expect("rich decoration specimen should retain normalized text")
+        .runs();
+    assert_eq!(
+        decoration_runs[2].style.text_decoration,
+        Some(
+            TextDecoration::OVERLINE
+                .color(Color::rgb(0, 95, 102))
+                .thickness(1.0)
+        )
+    );
+    assert_eq!(
+        decoration_runs[3].style.text_decoration,
+        Some(
+            TextDecoration::lines(true, true, true)
+                .color(Color::rgb(86, 69, 0))
+                .thickness(1.0)
+        )
+    );
     assert_eq!(
         family_runs[0].style.font_family.as_deref(),
         Some("Aptos, Inter, sans-serif")

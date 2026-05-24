@@ -2253,6 +2253,7 @@ mod tests {
         let highlight = Color::rgba(234, 221, 255, 180);
         let underline = Color::rgb(103, 80, 164);
         let strike = Color::rgb(122, 71, 0);
+        let combo = Color::rgb(86, 69, 0);
         let content = TextContent::new(vec![
             TextRun::styled(
                 "under ",
@@ -2268,6 +2269,17 @@ mod tests {
                 InlineTextStyle {
                     text_decoration: Some(
                         TextDecoration::LINE_THROUGH.color(strike).thickness(2.0),
+                    ),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::styled(
+                "combo ",
+                InlineTextStyle {
+                    text_decoration: Some(
+                        TextDecoration::lines(true, true, true)
+                            .color(combo)
+                            .thickness(2.0),
                     ),
                     ..InlineTextStyle::default()
                 },
@@ -2303,6 +2315,16 @@ mod tests {
                 .iter()
                 .any(|rect| rect.color == strike && rect.width_px > 0 && rect.height_px >= 4),
             "line-through runs should preserve requested decoration thickness at device scale"
+        );
+        let combo_rects: Vec<_> = glyph_run
+            .decorations
+            .iter()
+            .filter(|rect| rect.color == combo && rect.width_px > 0 && rect.height_px >= 4)
+            .collect();
+        assert_eq!(
+            combo_rects.len(),
+            3,
+            "combined text-decoration should paint underline, overline, and line-through"
         );
     }
 
