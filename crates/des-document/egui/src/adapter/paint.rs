@@ -1,8 +1,8 @@
 use super::text::{layout_job, paint_document_text_selection};
 use des_document::{
     BorderStyle, ClipRect, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph,
-    Insets, NormalizedText, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest,
-    TextLayoutResult, TextMeasurer, TextMeasurerKey, TextWrapMode,
+    Insets, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextLayoutResult,
+    TextMeasurer, TextMeasurerKey, TextWrapMode,
 };
 use des_text::{
     CosmicTextRenderer, TextGlyph, TextGlyphCacheKey, TextGlyphImage, TextGlyphImageContent,
@@ -344,11 +344,10 @@ fn paint_frame_clipped(
             }
         }
 
-        if self_visible && let Some(text) = &frame.text {
+        if self_visible && let Some(normalized) = &frame.normalized_text {
             let text_rect = frame_content_rect(rect, frame);
-            let normalized = NormalizedText::from_content(text, frame.style.text_layout);
             let request = TextLayoutRequest {
-                text: &normalized,
+                text: normalized,
                 font_size: frame.style.font_size,
                 color: frame.style.text_color,
                 direction: frame.style.direction,
@@ -418,17 +417,48 @@ fn paint_frame_clipped(
         }
     }
 
-    let mut children: Vec<_> = frame.children.iter().collect();
-    children.sort_by_key(|child| child.style.z_index);
-    for child in children {
-        paint_frame_clipped(
+    paint_children_clipped(
+        ui,
+        origin,
+        frame,
+        host_clip_rect,
+        text_selection,
+        text_resources,
+    );
+}
+
+fn paint_children_clipped(
+    ui: &mut egui::Ui,
+    origin: egui::Pos2,
+    frame: &ResolvedElement,
+    host_clip_rect: egui::Rect,
+    text_selection: Option<&DocumentTextSelection>,
+    mut text_resources: Option<&mut CosmicTextPaintResources>,
+) {
+    match frame.children.as_slice() {
+        [] => {}
+        [child] => paint_frame_clipped(
             ui,
             origin,
             child,
             host_clip_rect,
             text_selection,
-            text_resources.as_deref_mut(),
-        );
+            text_resources,
+        ),
+        children => {
+            let mut sorted: Vec<_> = children.iter().collect();
+            sorted.sort_by_key(|child| child.style.z_index);
+            for child in sorted {
+                paint_frame_clipped(
+                    ui,
+                    origin,
+                    child,
+                    host_clip_rect,
+                    text_selection,
+                    text_resources.as_deref_mut(),
+                );
+            }
+        }
     }
 }
 
@@ -1366,6 +1396,7 @@ mod tests {
             clip_rect: ClipRect::from_rect(Rect::new(0.0, 0.0, 20.0, 20.0)),
             style,
             text: None,
+            normalized_text: None,
             text_layout: None,
             selectable_text: false,
             copyable_text: false,

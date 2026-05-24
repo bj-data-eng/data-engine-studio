@@ -10,9 +10,7 @@ use crate::state::{
     TextSelectionGranularity,
 };
 use crate::style::StyleSheet;
-use crate::text::{
-    FallbackTextMeasurer, NormalizedText, TextLayoutRequest, TextMeasurer, TextMeasurerKey,
-};
+use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextMeasurerKey};
 use std::collections::{BTreeSet, HashMap};
 
 const POINTER_DRAG_ACTIVATION_DISTANCE: f32 = 5.0;
@@ -979,19 +977,18 @@ fn text_index_at_point(
     point: Point,
     text_measurer: &mut dyn TextMeasurer,
 ) -> usize {
-    let Some(text) = frame.text.as_ref() else {
+    let Some(normalized) = frame.normalized_text.as_ref() else {
         return 0;
     };
     let text_rect = text_content_rect(frame);
     let local_point = Point::new(point.x - text_rect.origin.x, point.y - text_rect.origin.y);
-    let normalized = NormalizedText::from_content(text, frame.style.text_layout);
     let wrap_width = match frame.style.text_layout.text_wrap_mode {
         crate::text::TextWrapMode::NoWrap => f32::INFINITY,
         crate::text::TextWrapMode::Wrap => text_rect.size.width,
     };
     text_measurer.text_index_at(
         TextLayoutRequest {
-            text: &normalized,
+            text: normalized,
             font_size: frame.style.font_size,
             color: frame.style.text_color,
             direction: frame.style.direction,

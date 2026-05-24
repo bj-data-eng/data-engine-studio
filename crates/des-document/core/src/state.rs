@@ -4,7 +4,7 @@ use crate::query::DocumentSnapshot;
 use crate::style::{
     ComputedStyle, FloatingHideData, FloatingPlacement, FloatingVisibility, Transition,
 };
-use crate::text::{TextContent, TextLayoutResult};
+use crate::text::{NormalizedText, TextContent, TextLayoutResult};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ElementState {
@@ -38,6 +38,7 @@ pub struct ResolvedElement {
     pub clip_rect: ClipRect,
     pub style: ComputedStyle,
     pub text: Option<TextContent>,
+    pub normalized_text: Option<NormalizedText>,
     pub text_layout: Option<TextLayoutResult>,
     pub selectable_text: bool,
     pub copyable_text: bool,

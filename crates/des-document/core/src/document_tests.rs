@@ -642,6 +642,13 @@ fn document_emits_text_layout_from_retained_layout() {
         Some(TextLayoutResult::new(Size::new(64.0, 18.0), 1, false))
     );
     assert_eq!(
+        label
+            .normalized_text
+            .as_ref()
+            .map(|text| text.semantic_text()),
+        Some("Retained text")
+    );
+    assert_eq!(
         text_measurer.requests,
         vec![("Retained text".to_string(), 100.0)]
     );

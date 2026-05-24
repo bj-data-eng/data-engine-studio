@@ -825,10 +825,18 @@ impl Document {
         } else {
             parent_clip
         };
-        let text_layout = element
+        let normalized_text = element
             .text
             .as_ref()
-            .map(|text| measure_text(text, &element.computed_style, rect, text_measurer));
+            .map(|text| NormalizedText::from_content(text, element.computed_style.text_layout));
+        let text_layout = normalized_text.as_ref().map(|text| {
+            let content_width = rect
+                .inset(element.computed_style.border_width)
+                .inset(element.computed_style.padding)
+                .size
+                .width;
+            measure_normalized_text(text, &element.computed_style, content_width, text_measurer)
+        });
         anchors.insert(element.id.clone(), rect);
         boundaries.insert(
             element.id.clone(),
@@ -852,6 +860,7 @@ impl Document {
             clip_rect,
             style: element.computed_style.clone(),
             text: element.text.clone(),
+            normalized_text,
             text_layout,
             selectable_text: element.spec.selectable_text && element.text.is_some(),
             copyable_text: element.spec.selectable_text
@@ -1512,16 +1521,6 @@ fn viewport_axis_position(
     fallback
 }
 
-fn measure_text(
-    text: &TextContent,
-    style: &ComputedStyle,
-    rect: DocumentRect,
-    text_measurer: &mut dyn TextMeasurer,
-) -> crate::text::TextLayoutResult {
-    let content_rect = rect.inset(style.border_width).inset(style.padding);
-    measure_text_with_wrap_width(text, style, content_rect.size.width, text_measurer)
-}
-
 fn measure_text_content(
     text: &TextContent,
     style: &ComputedStyle,
@@ -1537,19 +1536,18 @@ fn measure_text_content(
     .size
 }
 
-fn measure_text_with_wrap_width(
-    text: &TextContent,
+fn measure_normalized_text(
+    text: &NormalizedText,
     style: &ComputedStyle,
     available_width: f32,
     text_measurer: &mut dyn TextMeasurer,
 ) -> crate::text::TextLayoutResult {
-    let normalized = NormalizedText::from_content(text, style.text_layout);
     let wrap_width = match style.text_layout.text_wrap_mode {
         crate::text::TextWrapMode::NoWrap => f32::INFINITY,
         crate::text::TextWrapMode::Wrap => available_width,
     };
     text_measurer.measure_text(TextLayoutRequest {
-        text: &normalized,
+        text,
         font_size: style.font_size,
         color: style.text_color,
         direction: style.direction,
@@ -1557,6 +1555,16 @@ fn measure_text_with_wrap_width(
         layout_style: style.text_layout,
         line_height: style.line_height,
     })
+}
+
+fn measure_text_with_wrap_width(
+    text: &TextContent,
+    style: &ComputedStyle,
+    available_width: f32,
+    text_measurer: &mut dyn TextMeasurer,
+) -> crate::text::TextLayoutResult {
+    let normalized = NormalizedText::from_content(text, style.text_layout);
+    measure_normalized_text(&normalized, style, available_width, text_measurer)
 }
 
 impl Document {
