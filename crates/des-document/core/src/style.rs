@@ -13,6 +13,7 @@ pub use des_layout::prelude::{
     TrackSizingFunction,
 };
 pub use des_layout::style::Direction;
+use std::collections::HashMap;
 
 pub use des_layout::floating::{
     FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
@@ -1942,6 +1943,7 @@ impl StyleRule {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StyleSheet {
     pub(crate) rules: Vec<StyleRule>,
+    index: StyleRuleIndex,
 }
 
 impl StyleSheet {
@@ -1950,7 +1952,7 @@ impl StyleSheet {
     }
 
     pub fn rule(mut self, selector: StyleSelector, style: Style) -> Self {
-        self.rules.push(StyleRule::new(selector, style));
+        self.push_rule(selector, style);
         self
     }
 
@@ -1960,8 +1962,7 @@ impl StyleSheet {
         selector: StyleSelector,
         style: Style,
     ) -> Self {
-        self.rules
-            .push(StyleRule::conditional(condition, selector, style));
+        self.push_conditional_rule(condition, selector, style);
         self
     }
 
@@ -2016,7 +2017,7 @@ impl StyleSheet {
     }
 
     pub fn push_rule(&mut self, selector: StyleSelector, style: Style) {
-        self.rules.push(StyleRule::new(selector, style));
+        self.push_style_rule(StyleRule::new(selector, style));
     }
 
     pub fn push_conditional_rule(
@@ -2025,8 +2026,7 @@ impl StyleSheet {
         selector: StyleSelector,
         style: Style,
     ) {
-        self.rules
-            .push(StyleRule::conditional(condition, selector, style));
+        self.push_style_rule(StyleRule::conditional(condition, selector, style));
     }
 
     pub fn push_viewport_rule(
@@ -2048,13 +2048,122 @@ impl StyleSheet {
     }
 
     pub fn extend(&mut self, stylesheet: StyleSheet) {
-        self.rules.extend(stylesheet.rules);
+        self.rules.reserve(stylesheet.rules.len());
+        for rule in stylesheet.rules {
+            self.push_style_rule(rule);
+        }
+    }
+
+    pub fn parse_css(input: &str) -> Result<Self, crate::CssParseError> {
+        crate::css::parse_stylesheet(input)
+    }
+
+    pub fn extend_css(&mut self, input: &str) -> Result<(), crate::CssParseError> {
+        self.extend(Self::parse_css(input)?);
+        Ok(())
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    fn push_style_rule(&mut self, rule: StyleRule) {
+        let index = self.rules.len();
+        self.index.insert(index, &rule.selector);
+        self.rules.push(rule);
     }
 
     pub(crate) fn has_container_rules(&self) -> bool {
         self.rules
             .iter()
             .any(|rule| rule.condition.is_some_and(StyleCondition::is_container))
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct StyleRuleIndex {
+    universal: Vec<usize>,
+    by_id: HashMap<ElementId, Vec<usize>>,
+    by_class: HashMap<ClassName, Vec<usize>>,
+    by_element: HashMap<Element, Vec<usize>>,
+}
+
+impl StyleRuleIndex {
+    fn insert(&mut self, index: usize, selector: &StyleSelector) {
+        match primary_selector_key(selector) {
+            SelectorIndexKey::Universal => self.universal.push(index),
+            SelectorIndexKey::Id(id) => self.by_id.entry(id).or_default().push(index),
+            SelectorIndexKey::Class(class) => self.by_class.entry(class).or_default().push(index),
+            SelectorIndexKey::Element(element) => {
+                self.by_element.entry(element).or_default().push(index);
+            }
+        }
+    }
+
+    fn candidates_for(&self, element: &DocumentNode) -> Vec<usize> {
+        let mut candidates = Vec::with_capacity(
+            self.universal.len()
+                + self.by_id.get(&element.id).map_or(0, Vec::len)
+                + self
+                    .by_element
+                    .get(&element.spec.element)
+                    .map_or(0, Vec::len)
+                + element
+                    .spec
+                    .classes
+                    .iter()
+                    .map(|class| self.by_class.get(class).map_or(0, Vec::len))
+                    .sum::<usize>(),
+        );
+        candidates.extend(self.universal.iter().copied());
+        if let Some(rules) = self.by_id.get(&element.id) {
+            candidates.extend(rules.iter().copied());
+        }
+        if let Some(rules) = self.by_element.get(&element.spec.element) {
+            candidates.extend(rules.iter().copied());
+        }
+        for class in &element.spec.classes {
+            if let Some(rules) = self.by_class.get(class) {
+                candidates.extend(rules.iter().copied());
+            }
+        }
+        candidates.sort_unstable();
+        candidates.dedup();
+        candidates
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum SelectorIndexKey {
+    Universal,
+    Id(ElementId),
+    Class(ClassName),
+    Element(Element),
+}
+
+fn primary_selector_key(selector: &StyleSelector) -> SelectorIndexKey {
+    match selector {
+        StyleSelector::Element(element) => SelectorIndexKey::Element(*element),
+        StyleSelector::Class(class) => SelectorIndexKey::Class(class.clone()),
+        StyleSelector::Id(id) => SelectorIndexKey::Id(id.clone()),
+        StyleSelector::ClassState(class, _) => SelectorIndexKey::Class(class.clone()),
+        StyleSelector::IdState(id, _) => SelectorIndexKey::Id(id.clone()),
+        StyleSelector::Compound(selector) => {
+            if let Some(id) = &selector.id {
+                SelectorIndexKey::Id(id.clone())
+            } else if let Some(class) = selector.classes.last() {
+                SelectorIndexKey::Class(class.clone())
+            } else if let Some(element) = selector.element {
+                SelectorIndexKey::Element(element)
+            } else {
+                SelectorIndexKey::Universal
+            }
+        }
+        StyleSelector::State(_)
+        | StyleSelector::FirstChild
+        | StyleSelector::LastChild
+        | StyleSelector::NthChild(_)
+        | StyleSelector::NthChildFormula(_) => SelectorIndexKey::Universal,
     }
 }
 
@@ -2068,7 +2177,8 @@ pub(crate) fn resolve_style_with_position(
 ) -> ComputedStyle {
     let mut style = ComputedStyle::default();
 
-    for rule in &stylesheet.rules {
+    for index in stylesheet.index.candidates_for(element) {
+        let rule = &stylesheet.rules[index];
         if rule_matches(rule, element, state, position, viewport, container) {
             style.apply(&rule.style);
         }

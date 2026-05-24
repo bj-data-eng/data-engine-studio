@@ -3,7 +3,7 @@ use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
 use crate::text::TextContent;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Element {
     Root,
     Div,
@@ -49,7 +49,7 @@ pub enum Glyph {
     DragHandle,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ElementStateSelector {
     Hovered,
     Pressed,

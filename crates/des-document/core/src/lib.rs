@@ -6,6 +6,7 @@
 //! [`DocumentInput`] and paint [`DocumentOutput::layout`].
 
 mod animation;
+mod css;
 mod document;
 #[cfg(test)]
 mod document_tests;
@@ -20,6 +21,7 @@ mod style;
 mod table;
 mod text;
 
+pub use css::CssParseError;
 pub use document::{Document, DocumentBuilder, DocumentError, DocumentResult, ElementBuilder};
 pub use element::{
     ClassName, Color, Element, ElementId, ElementSpec, ElementStateSelector, Glyph,

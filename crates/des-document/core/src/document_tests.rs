@@ -483,6 +483,98 @@ fn document_resolves_stylesheet_over_retained_elements() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_text(
+            "root",
+            "title",
+            ElementSpec::new(Element::Text).class("section-title"),
+            "Parsed CSS",
+        )
+        .unwrap();
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        text.section-title {
+            width: 100%;
+            height: auto;
+            color: #6750a4;
+            font-size: 18px;
+            text-wrap: wrap;
+            padding: 4px 8px;
+        }
+
+        #title:hover {
+            background: #eee5ff;
+            border: 1px solid #6750a4;
+        }
+        "#,
+    )
+    .unwrap();
+    let mut states = HashMap::new();
+    let mut title_state = ElementState::default();
+    title_state.hovered = true;
+    states.insert(ElementId::new("title"), title_state);
+
+    document.apply_stylesheet(&stylesheet, &states).unwrap();
+    document.compute_layout().unwrap();
+    let title = document
+        .resolved_layout()
+        .unwrap()
+        .find("title")
+        .unwrap()
+        .clone();
+
+    assert_eq!(stylesheet.rule_count(), 2);
+    assert_eq!(title.style.width, Length::Fill);
+    assert_eq!(title.style.height, Length::Auto);
+    assert_eq!(title.style.text_color, Color::rgb(103, 80, 164));
+    assert_eq!(title.style.background, Some(Color::rgb(238, 229, 255)));
+    assert_eq!(title.style.border, Some(Color::rgb(103, 80, 164)));
+    assert_eq!(title.style.border_width.top, 1.0);
+    assert_eq!(title.style.padding.left, 8.0);
+}
+
+#[test]
+fn css_stylesheet_scales_to_many_rules_on_default_stack() {
+    let mut css = String::new();
+    for index in 0..10_000 {
+        css.push_str(&format!(
+            ".rule-{index} {{ width: 100%; height: auto; font-size: 13px; }}\n"
+        ));
+    }
+    css.push_str(".target { width: 240px; height: 32px; background: #cdf0dd; }\n");
+    let stylesheet = StyleSheet::parse_css(&css).unwrap();
+
+    let mut document = Document::new(Size::new(1024.0, 768.0));
+    for index in 0..1_000 {
+        let class = if index == 777 {
+            "target".to_string()
+        } else {
+            format!("node-{index}")
+        };
+        document
+            .append_element(
+                "root",
+                format!("node-{index}"),
+                ElementSpec::new(Element::Div).class(class),
+            )
+            .unwrap();
+    }
+
+    document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    document.compute_layout().unwrap();
+
+    assert_eq!(stylesheet.rule_count(), 10_001);
+    assert_eq!(
+        document.layout_rect("node-777").unwrap().size,
+        Size::new(240.0, 32.0)
+    );
+}
+
+#[test]
 fn document_does_not_dirty_layout_graph_when_resolved_layout_style_is_unchanged() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document
