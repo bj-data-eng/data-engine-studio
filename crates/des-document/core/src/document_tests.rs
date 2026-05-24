@@ -1,11 +1,12 @@
 use crate::{
     AlignContent, AlignItems, Color, ComputedStyle, CornerRadii, Display, Document, DocumentEngine,
     DocumentEventKind, DocumentInput, Easing, Element, ElementId, ElementSpec, ElementState,
-    ElementStateSelector, FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine,
-    GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets,
-    JustifyContent, Length, NthChildFormula, Overflow, Point, PointerInput, Rect, RepetitionCount,
-    ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
-    TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    ElementStateSelector, FlexDirection, FlexWrap, FloatingAxisOffset, FloatingPlacement,
+    FloatingShift, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
+    GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets, JustifyContent, Length,
+    NthChildFormula, Overflow, Point, PointerInput, Rect, RepetitionCount, ScrollAxis, Shadow,
+    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
     TextWrapMode, Transition,
 };
 use des_layout::prelude::{
@@ -669,6 +670,81 @@ fn css_stylesheet_parser_accepts_transition_variants() {
         })
     );
     assert_eq!(layout.find("disabled").unwrap().style.transition, None);
+}
+
+#[test]
+fn css_stylesheet_parser_accepts_anchor_and_floating_metadata() {
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        #legacy {
+            position: absolute-parent;
+            anchor-bottom-start: anchor 0px -1px;
+        }
+
+        #popover {
+            floating-to: anchor;
+            floating-placement: top-start;
+            floating-offset: 0px 8px;
+            floating-boundary-to: boundary;
+            floating-shift: cross;
+            floating-flip: true;
+            floating-alignment-axis-offset: floating-width(-1);
+        }
+        "#,
+    )
+    .unwrap();
+
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    for id in ["anchor", "boundary", "legacy", "popover"] {
+        document
+            .append_element("root", id, ElementSpec::new(Element::Div))
+            .unwrap();
+    }
+    document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+
+    let layout = document.resolved_layout().unwrap();
+    let legacy_anchor = layout
+        .find("legacy")
+        .unwrap()
+        .style
+        .anchor
+        .as_ref()
+        .unwrap();
+    assert_eq!(legacy_anchor.target, ElementId::new("anchor"));
+    assert_eq!(
+        legacy_anchor.options.placement,
+        FloatingPlacement::BottomStart
+    );
+    assert_eq!(legacy_anchor.options.offset.main_axis.px, -1.0);
+
+    let popover_anchor = layout
+        .find("popover")
+        .unwrap()
+        .style
+        .anchor
+        .as_ref()
+        .unwrap();
+    assert_eq!(popover_anchor.target, ElementId::new("anchor"));
+    assert_eq!(
+        popover_anchor.boundary_target,
+        Some(ElementId::new("boundary"))
+    );
+    assert_eq!(
+        popover_anchor.options.placement,
+        FloatingPlacement::TopStart
+    );
+    assert_eq!(popover_anchor.options.offset.cross_axis.px, 8.0);
+    assert_eq!(
+        popover_anchor.options.shift,
+        Some(FloatingShift::new(false, true))
+    );
+    assert!(popover_anchor.options.flip);
+    assert_eq!(
+        popover_anchor.options.offset.alignment_axis,
+        Some(FloatingAxisOffset::floating_width(-1.0))
+    );
 }
 
 #[test]

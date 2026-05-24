@@ -43,6 +43,22 @@ input {
   border-radius: 5px;
 }
 
+.dropdown-menu {
+  position: absolute-parent;
+  anchor-bottom-start: control-dropdown 0px -1px;
+  z-index: 20;
+  width: 100%;
+  height: auto;
+  padding: 4px;
+  gap: 4px;
+  background: #fffbfe;
+  border: 1px solid #6750a4;
+  border-top-left-radius: 0px;
+  border-top-right-radius: 0px;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
 icon {
   width: 14px;
   height: 14px;
@@ -1816,6 +1832,126 @@ text {
 #floating-vertical-flip-reference,
 #floating-edge-flip-reference {
   margin: 132px 0px 0px 118px;
+}
+
+#floating-offset-zero-popover {
+  floating-to: floating-offset-zero-reference;
+  floating-placement: bottom;
+  floating-offset: 0px 0px;
+}
+
+#floating-offset-ten-popover {
+  floating-to: floating-offset-ten-reference;
+  floating-placement: bottom;
+  floating-offset: 10px 0px;
+}
+
+#floating-main-axis-top-popover {
+  floating-to: floating-main-axis-top-reference;
+  floating-placement: top;
+}
+
+#floating-main-axis-bottom-popover {
+  floating-to: floating-main-axis-bottom-reference;
+  floating-placement: bottom;
+}
+
+#floating-main-axis-left-popover {
+  floating-to: floating-main-axis-left-reference;
+  floating-placement: left;
+}
+
+#floating-main-axis-right-popover {
+  floating-to: floating-main-axis-right-reference;
+  floating-placement: right;
+}
+
+#floating-cross-axis-top-popover {
+  floating-to: floating-cross-axis-top-reference;
+  floating-placement: top-end;
+}
+
+#floating-cross-axis-bottom-popover {
+  floating-to: floating-cross-axis-bottom-reference;
+  floating-placement: bottom-end;
+}
+
+#floating-cross-axis-left-popover {
+  floating-to: floating-cross-axis-left-reference;
+  floating-placement: left-end;
+}
+
+#floating-cross-axis-right-popover {
+  floating-to: floating-cross-axis-right-reference;
+  floating-placement: right-end;
+}
+
+#floating-alignment-axis-cross-start-popover {
+  floating-to: floating-alignment-axis-cross-start-reference;
+  floating-placement: top-start;
+  floating-offset: 0px 8px;
+}
+
+#floating-alignment-axis-cross-end-popover {
+  floating-to: floating-alignment-axis-cross-end-reference;
+  floating-placement: top-end;
+  floating-offset: 0px 8px;
+}
+
+#floating-alignment-axis-start-popover {
+  floating-to: floating-alignment-axis-start-reference;
+  floating-placement: top-start;
+  floating-alignment-axis: 8px;
+}
+
+#floating-alignment-axis-end-popover {
+  floating-to: floating-alignment-axis-end-reference;
+  floating-placement: top-end;
+  floating-alignment-axis: 8px;
+}
+
+#floating-centered-axis-popover {
+  floating-to: floating-centered-axis-reference;
+  floating-placement: center;
+}
+
+#floating-top-start-popover {
+  floating-to: floating-top-start-reference;
+  floating-placement: top-start;
+  floating-alignment-axis-offset: floating-width(-1);
+}
+
+#floating-scroll-shift-popover {
+  floating-to: floating-scroll-shift-reference;
+  floating-placement: bottom;
+  floating-boundary-to: floating-scroll-shift-panel;
+  floating-shift: cross;
+}
+
+#floating-scroll-attach-popover {
+  floating-to: floating-scroll-attach-reference;
+  floating-placement: bottom;
+}
+
+#floating-vertical-overlap-popover {
+  floating-to: floating-vertical-overlap-reference;
+  floating-placement: top;
+  floating-boundary-to: floating-vertical-overlap-panel;
+  floating-shift: main;
+}
+
+#floating-vertical-flip-popover {
+  floating-to: floating-vertical-flip-reference;
+  floating-placement: bottom;
+  floating-boundary-to: floating-vertical-flip-panel;
+  floating-flip: true;
+}
+
+#floating-edge-flip-popover {
+  floating-to: floating-edge-flip-reference;
+  floating-placement: bottom-start;
+  floating-boundary-to: floating-edge-flip-panel;
+  floating-flip: true;
 }
 
 .nest-outer {

@@ -1,8 +1,9 @@
 use crate::{
     AlignContent, AlignItems, Color, Direction, Display, Easing, Element, ElementStateSelector,
-    FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, OverflowWrap, Point,
-    Position, Shadow, Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, WhiteSpace,
+    FlexDirection, FlexWrap, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets,
+    JustifyContent, Length, Overflow, OverflowWrap, Point, Position, Shadow, Style, StyleCondition,
+    StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform, TextWrapMode, Transition,
+    ViewportQuery, WhiteSpace,
 };
 use std::error::Error;
 use std::fmt;
@@ -477,6 +478,28 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "right" => style.inset.right = Some(parse_length(value)?),
         "bottom" => style.inset.bottom = Some(parse_length(value)?),
         "left" => style.inset.left = Some(parse_length(value)?),
+        "anchor-bottom-start" => *style = parse_anchor_bottom_start(style.clone(), value)?,
+        "floating-to" => *style = style.clone().floating_to(value),
+        "floating-placement" => {
+            *style = style
+                .clone()
+                .floating_placement(parse_floating_placement(value)?);
+        }
+        "floating-offset" => {
+            let (main_axis, cross_axis) = parse_two_px_values(value)?;
+            *style = style.clone().floating_offset(main_axis, cross_axis);
+        }
+        "floating-boundary-to" => *style = style.clone().floating_boundary_to(value),
+        "floating-shift" => *style = style.clone().floating_shift(parse_floating_shift(value)?),
+        "floating-flip" => *style = style.clone().floating_flip(parse_bool(value)?),
+        "floating-alignment-axis" => {
+            *style = style.clone().floating_alignment_axis(parse_px(value)?);
+        }
+        "floating-alignment-axis-offset" => {
+            *style = style
+                .clone()
+                .floating_alignment_axis_offset(parse_floating_axis_offset(value)?);
+        }
         "z-index" => {
             style.z_index = Some(
                 value
@@ -716,6 +739,71 @@ fn parse_position(input: &str) -> Result<Position, CssParseError> {
             "unsupported position `{input}`"
         ))),
     }
+}
+
+fn parse_anchor_bottom_start(style: Style, input: &str) -> Result<Style, CssParseError> {
+    let parts = input.split_whitespace().collect::<Vec<_>>();
+    let [target, offset_x, offset_y] = parts.as_slice() else {
+        return Err(CssParseError::new(
+            "anchor-bottom-start expects `<target> <offset-x> <offset-y>`",
+        ));
+    };
+    Ok(style.anchor_bottom_start(*target, parse_px(offset_x)?, parse_px(offset_y)?))
+}
+
+fn parse_floating_placement(input: &str) -> Result<FloatingPlacement, CssParseError> {
+    match input {
+        "center" => Ok(FloatingPlacement::Center),
+        "top" => Ok(FloatingPlacement::Top),
+        "top-start" => Ok(FloatingPlacement::TopStart),
+        "top-end" => Ok(FloatingPlacement::TopEnd),
+        "right" => Ok(FloatingPlacement::Right),
+        "right-start" => Ok(FloatingPlacement::RightStart),
+        "right-end" => Ok(FloatingPlacement::RightEnd),
+        "bottom" => Ok(FloatingPlacement::Bottom),
+        "bottom-start" => Ok(FloatingPlacement::BottomStart),
+        "bottom-end" => Ok(FloatingPlacement::BottomEnd),
+        "left" => Ok(FloatingPlacement::Left),
+        "left-start" => Ok(FloatingPlacement::LeftStart),
+        "left-end" => Ok(FloatingPlacement::LeftEnd),
+        _ => Err(CssParseError::new(format!(
+            "unsupported floating-placement `{input}`"
+        ))),
+    }
+}
+
+fn parse_two_px_values(input: &str) -> Result<(f32, f32), CssParseError> {
+    let parts = input.split_whitespace().collect::<Vec<_>>();
+    match parts.as_slice() {
+        [both] => {
+            let value = parse_px(both)?;
+            Ok((value, value))
+        }
+        [first, second] => Ok((parse_px(first)?, parse_px(second)?)),
+        _ => Err(CssParseError::new("expected one or two pixel values")),
+    }
+}
+
+fn parse_floating_shift(input: &str) -> Result<FloatingShift, CssParseError> {
+    match input {
+        "none" => Ok(FloatingShift::new(false, false)),
+        "main" => Ok(FloatingShift::new(true, false)),
+        "cross" => Ok(FloatingShift::new(false, true)),
+        "both" | "main cross" | "cross main" => Ok(FloatingShift::new(true, true)),
+        _ => Err(CssParseError::new(format!(
+            "unsupported floating-shift `{input}`"
+        ))),
+    }
+}
+
+fn parse_floating_axis_offset(input: &str) -> Result<FloatingAxisOffset, CssParseError> {
+    if let Some(value) = input
+        .strip_prefix("floating-width(")
+        .and_then(|value| value.strip_suffix(')'))
+    {
+        return Ok(FloatingAxisOffset::floating_width(parse_f32(value)?));
+    }
+    Ok(FloatingAxisOffset::px(parse_px(input)?))
 }
 
 fn parse_border(style: &mut Style, input: &str) -> Result<(), CssParseError> {
