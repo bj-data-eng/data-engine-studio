@@ -37,7 +37,11 @@ When reviewing text-stack dependency changes, inspect the runtime dependency sur
 ```sh
 cargo tree -p des-text --edges normal
 cargo tree -p cosmic-text --edges normal
+cargo tree -p des-text --edges features | rg "fontconfig|fontconfig-parser"
 ```
+
+The last command should print no dependency matches. If it starts reporting `fontconfig` or
+`fontconfig-parser`, review the change as a text-stack supply-chain expansion.
 
 At minimum, review changes involving font discovery, font parsing, shaping, rasterization, Unicode segmentation, bidi, line breaking, and memory-mapped font loading crates before merging.
 
