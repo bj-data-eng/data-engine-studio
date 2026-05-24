@@ -123,17 +123,26 @@ pub(crate) fn app_subtitle_font() -> FontId {
 }
 
 pub fn document_text_renderer() -> des_text::CosmicTextRenderer {
-    des_text::CosmicTextRenderer::new([
-        des_text::FontAsset::new(des_text::INTER_FAMILY, INTER_VARIABLE_FONT),
-        des_text::FontAsset::new(
-            des_text::JETBRAINS_MONO_FAMILY,
-            JETBRAINS_MONO_VARIABLE_FONT,
-        ),
-        des_text::FontAsset::new(
-            des_text::JETBRAINS_MONO_FAMILY,
-            JETBRAINS_MONO_ITALIC_VARIABLE_FONT,
-        ),
-    ])
+    document_text_renderer_with_system_font_loading(des_text::SystemFontLoading::IncludeSystemFonts)
+}
+
+fn document_text_renderer_with_system_font_loading(
+    system_font_loading: des_text::SystemFontLoading,
+) -> des_text::CosmicTextRenderer {
+    des_text::CosmicTextRenderer::with_system_font_loading(
+        [
+            des_text::FontAsset::new(des_text::INTER_FAMILY, INTER_VARIABLE_FONT),
+            des_text::FontAsset::new(
+                des_text::JETBRAINS_MONO_FAMILY,
+                JETBRAINS_MONO_VARIABLE_FONT,
+            ),
+            des_text::FontAsset::new(
+                des_text::JETBRAINS_MONO_FAMILY,
+                JETBRAINS_MONO_ITALIC_VARIABLE_FONT,
+            ),
+        ],
+        system_font_loading,
+    )
 }
 
 fn load_first_font(paths: &[PathBuf]) -> Option<FontData> {
@@ -153,6 +162,37 @@ fn system_ui_font_candidates() -> Vec<PathBuf> {
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ));
     paths
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use des_document::{
+        Color, Direction, NormalizedText, TextContent, TextLayoutRequest, TextLayoutStyle,
+        TextMeasurer,
+    };
+
+    #[test]
+    fn document_text_renderer_keeps_bundled_default_font_metrics_without_system_fallbacks() {
+        let mut renderer = document_text_renderer_with_system_font_loading(
+            des_text::SystemFontLoading::BundledOnly,
+        );
+        let content = TextContent::plain("Ag 100px");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let measured = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 24.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 400.0,
+            layout_style: TextLayoutStyle::default(),
+            line_height: Some(30.0),
+        });
+
+        assert!(measured.size.width > 0.0);
+        assert_eq!(measured.line_count, 1);
+        assert_eq!(measured.first_baseline, Some(measured.lines[0].baseline));
+    }
 }
 
 fn monospace_font_candidates() -> Vec<PathBuf> {
