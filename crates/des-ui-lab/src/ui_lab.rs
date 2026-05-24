@@ -5,7 +5,7 @@ mod views;
 
 use des_egui::adapter::{
     EguiTextMeasurer, configure_text_selection_input, copy_selected_text_on_command,
-    document_input, paint_frame, paint_scroll_chrome,
+    document_input, paint_frame, paint_frame_with_text_renderer, paint_scroll_chrome,
 };
 use styles::stylesheet;
 use views::{
@@ -146,6 +146,7 @@ pub(crate) struct UiLabState {
     drag_drop_preview: Option<SortableDropPreview>,
     scroll_list_drop_preview: Option<SortableDropPreview>,
     text_context_menu: Option<TextContextMenu>,
+    text_renderer: des_text::CosmicTextRenderer,
     pending_stage_scroll: Option<Point>,
     lab_document: Option<RetainedLabDocument<LabDocumentKey>>,
     last_perf: UiLabPerf,
@@ -216,6 +217,7 @@ impl Default for UiLabState {
             drag_drop_preview: None,
             scroll_list_drop_preview: None,
             text_context_menu: None,
+            text_renderer: des_egui::document_text_renderer(),
             pending_stage_scroll: None,
             lab_document: None,
             last_perf: UiLabPerf::default(),
@@ -259,24 +261,22 @@ impl UiLabState {
         let input = document_input(ui, origin);
         let pointer = input.pointer;
         let engine_start = Instant::now();
-        let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
         let mut output = self.document_engine.update_with_input_and_text_measurer(
             &mut retained.document,
             &stylesheet,
             input,
-            &mut text_measurer,
+            &mut self.text_renderer,
         );
         self.lab_document = Some(retained);
 
         if self.sync_drag_state(ui, &output) {
             let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
-            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
                 &stylesheet,
                 input,
-                &mut text_measurer,
+                &mut self.text_renderer,
             );
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
@@ -284,12 +284,11 @@ impl UiLabState {
         if self.sync_drag_press_state(&output, pointer) {
             let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
-            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
                 &stylesheet,
                 input,
-                &mut text_measurer,
+                &mut self.text_renderer,
             );
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
@@ -297,12 +296,11 @@ impl UiLabState {
         if self.apply_clicked_document_actions(ui, &output) {
             let stylesheet = self.active_stylesheet();
             let mut retained = self.take_lab_document(viewport_size, debug_overlay);
-            let mut text_measurer = EguiTextMeasurer::new(ui.ctx());
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
                 &stylesheet,
                 repaint_input_after_action(input),
-                &mut text_measurer,
+                &mut self.text_renderer,
             );
             self.lab_document = Some(retained);
             self.sync_drag_state(ui, &output);
@@ -314,7 +312,13 @@ impl UiLabState {
         apply_cursor_icon(ui, &output);
 
         let paint_start = Instant::now();
-        paint_frame(ui, origin, &output.layout, output.text_selection.as_ref());
+        paint_frame_with_text_renderer(
+            ui,
+            origin,
+            &output.layout,
+            output.text_selection.as_ref(),
+            &mut self.text_renderer,
+        );
         if self.view == LabView::Text {
             paint_legacy_text_path_comparison(ui, origin, &output);
         }

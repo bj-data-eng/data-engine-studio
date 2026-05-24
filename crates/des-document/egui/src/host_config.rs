@@ -6,6 +6,11 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
 const INTER_FONT_NAME: &str = "studio-inter";
 const INTER_VARIABLE_FONT: &[u8] = include_bytes!("../assets/fonts/inter/InterVariable.ttf");
+const JETBRAINS_MONO_FONT_NAME: &str = "studio-jetbrains-mono";
+const JETBRAINS_MONO_VARIABLE_FONT: &[u8] =
+    include_bytes!("../assets/fonts/jetbrains-mono/JetBrainsMono[wght].ttf");
+const JETBRAINS_MONO_ITALIC_VARIABLE_FONT: &[u8] =
+    include_bytes!("../assets/fonts/jetbrains-mono/JetBrainsMono-Italic[wght].ttf");
 
 pub fn apply_host_configuration(context: &egui::Context) {
     apply_fonts(context);
@@ -35,6 +40,16 @@ fn apply_fonts(context: &egui::Context) {
         .entry(FontFamily::Proportional)
         .or_default()
         .insert(0, INTER_FONT_NAME.to_string());
+
+    definitions.font_data.insert(
+        JETBRAINS_MONO_FONT_NAME.to_string(),
+        Arc::new(FontData::from_static(JETBRAINS_MONO_VARIABLE_FONT)),
+    );
+    definitions
+        .families
+        .entry(FontFamily::Monospace)
+        .or_default()
+        .insert(0, JETBRAINS_MONO_FONT_NAME.to_string());
 
     if let Some(font) = load_first_font(&monospace_font_candidates()) {
         definitions
@@ -105,6 +120,20 @@ pub(crate) fn app_title_font() -> FontId {
 
 pub(crate) fn app_subtitle_font() -> FontId {
     FontId::new(12.5, FontFamily::Proportional)
+}
+
+pub fn document_text_renderer() -> des_text::CosmicTextRenderer {
+    des_text::CosmicTextRenderer::new([
+        des_text::FontAsset::new(des_text::INTER_FAMILY, INTER_VARIABLE_FONT),
+        des_text::FontAsset::new(
+            des_text::JETBRAINS_MONO_FAMILY,
+            JETBRAINS_MONO_VARIABLE_FONT,
+        ),
+        des_text::FontAsset::new(
+            des_text::JETBRAINS_MONO_FAMILY,
+            JETBRAINS_MONO_ITALIC_VARIABLE_FONT,
+        ),
+    ])
 }
 
 fn load_first_font(paths: &[PathBuf]) -> Option<FontData> {

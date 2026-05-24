@@ -2986,7 +2986,7 @@ fn render_text_rendering_path_comparison(ui: &mut des_document::DocumentBuilder)
                             ui.text_element(
                                 "text-rich-100-label",
                                 ElementSpec::new(Element::Text).class("muted"),
-                                "current rich document text",
+                                "cosmic-text document path",
                             );
                             ui.text_element(
                                 "text-rich-100-sample",

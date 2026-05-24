@@ -1,0 +1,11 @@
+[package]
+name = "des-text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cosmic-text.workspace = true
+des-document.workspace = true
+fontdb.workspace = true

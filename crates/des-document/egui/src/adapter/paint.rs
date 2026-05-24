@@ -4,14 +4,34 @@ use des_document::{
     Insets, NormalizedText, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest,
     TextWrapMode,
 };
+use des_text::{CosmicTextRenderer, RasterizedText};
 use eframe::egui;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 pub fn paint_frame(
     ui: &mut egui::Ui,
     origin: egui::Pos2,
     frame: &ResolvedElement,
     text_selection: Option<&DocumentTextSelection>,
 ) {
-    paint_frame_clipped(ui, origin, frame, ui.clip_rect(), text_selection);
+    paint_frame_clipped(ui, origin, frame, ui.clip_rect(), text_selection, None);
+}
+
+pub fn paint_frame_with_text_renderer(
+    ui: &mut egui::Ui,
+    origin: egui::Pos2,
+    frame: &ResolvedElement,
+    text_selection: Option<&DocumentTextSelection>,
+    text_renderer: &mut CosmicTextRenderer,
+) {
+    paint_frame_clipped(
+        ui,
+        origin,
+        frame,
+        ui.clip_rect(),
+        text_selection,
+        Some(text_renderer),
+    );
 }
 
 fn paint_frame_clipped(
@@ -20,6 +40,7 @@ fn paint_frame_clipped(
     frame: &ResolvedElement,
     host_clip_rect: egui::Rect,
     text_selection: Option<&DocumentTextSelection>,
+    mut text_renderer: Option<&mut CosmicTextRenderer>,
 ) {
     let clip_rect = apply_document_clip(origin, host_clip_rect, frame.clip_rect);
     let painter = ui.painter().with_clip_rect(clip_rect);
@@ -66,26 +87,31 @@ fn paint_frame_clipped(
                 layout_style: frame.style.text_layout,
                 line_height: frame.style.line_height,
             };
-            let color = to_egui_color(frame.style.text_color);
-            let mut galley = painter.layout_job(layout_job(request, color));
-            if frame.selectable_text
-                && let Some(selection) = text_selection
-                && selection.target == frame.id
-            {
-                let anchor_index = normalized.semantic_to_layout_index(selection.anchor_index);
-                let focus_index = normalized.semantic_to_layout_index(selection.focus_index);
-                let cursor_range = egui::text_selection::CCursorRange::two(
-                    egui::text::CCursor::new(anchor_index),
-                    egui::text::CCursor::new(focus_index),
-                );
-                paint_document_text_selection(
-                    &mut galley,
-                    &cursor_range,
-                    frame.style.text_selection_background,
-                    frame.style.text_selection_color,
-                );
+            if let Some(renderer) = text_renderer.as_deref_mut() {
+                let rasterized = renderer.rasterize(request, ui.ctx().pixels_per_point());
+                paint_rasterized_text(&painter, text_rect.min, frame, &rasterized);
+            } else {
+                let color = to_egui_color(frame.style.text_color);
+                let mut galley = painter.layout_job(layout_job(request, color));
+                if frame.selectable_text
+                    && let Some(selection) = text_selection
+                    && selection.target == frame.id
+                {
+                    let anchor_index = normalized.semantic_to_layout_index(selection.anchor_index);
+                    let focus_index = normalized.semantic_to_layout_index(selection.focus_index);
+                    let cursor_range = egui::text_selection::CCursorRange::two(
+                        egui::text::CCursor::new(anchor_index),
+                        egui::text::CCursor::new(focus_index),
+                    );
+                    paint_document_text_selection(
+                        &mut galley,
+                        &cursor_range,
+                        frame.style.text_selection_background,
+                        frame.style.text_selection_color,
+                    );
+                }
+                painter.galley(text_rect.min, galley, color);
             }
-            painter.galley(text_rect.min, galley, color);
         }
 
         if let Some(glyph) = frame.glyph {
@@ -102,8 +128,70 @@ fn paint_frame_clipped(
     let mut children: Vec<_> = frame.children.iter().collect();
     children.sort_by_key(|child| child.style.z_index);
     for child in children {
-        paint_frame_clipped(ui, origin, child, host_clip_rect, text_selection);
+        paint_frame_clipped(
+            ui,
+            origin,
+            child,
+            host_clip_rect,
+            text_selection,
+            text_renderer.as_deref_mut(),
+        );
     }
+}
+
+fn paint_rasterized_text(
+    painter: &egui::Painter,
+    position: egui::Pos2,
+    frame: &ResolvedElement,
+    rasterized: &RasterizedText,
+) {
+    if rasterized.surface.is_empty() {
+        return;
+    }
+    let color_image = egui::ColorImage::from_rgba_unmultiplied(
+        [
+            rasterized.surface.width_px as usize,
+            rasterized.surface.height_px as usize,
+        ],
+        &rasterized.surface.rgba,
+    );
+    let texture = painter.ctx().load_texture(
+        format!(
+            "des-cosmic-text-{}-{}",
+            frame.id.as_str(),
+            text_texture_hash(frame)
+        ),
+        color_image,
+        egui::TextureOptions::LINEAR,
+    );
+    let rect = egui::Rect::from_min_size(
+        position,
+        egui::vec2(
+            rasterized.surface.size.width,
+            rasterized.surface.size.height,
+        ),
+    );
+    painter.image(
+        texture.id(),
+        rect,
+        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+        egui::Color32::WHITE,
+    );
+}
+
+fn text_texture_hash(frame: &ResolvedElement) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    frame.id.as_str().hash(&mut hasher);
+    if let Some(text) = &frame.text {
+        text.semantic_text().hash(&mut hasher);
+    }
+    frame.style.font_size.to_bits().hash(&mut hasher);
+    frame.style.line_height.map(f32::to_bits).hash(&mut hasher);
+    frame.style.text_color.r.hash(&mut hasher);
+    frame.style.text_color.g.hash(&mut hasher);
+    frame.style.text_color.b.hash(&mut hasher);
+    frame.style.text_color.a.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn apply_document_clip(
