@@ -1115,18 +1115,8 @@ fn cosmic_align(text_align: TextAlign, direction: Direction) -> Align {
     }
 }
 
-fn shaping_for(request: &TextLayoutRequest<'_>) -> Shaping {
-    if request.direction == Direction::Ltr
-        && request
-            .text
-            .layout_text()
-            .chars()
-            .all(|character| character.is_ascii())
-    {
-        Shaping::Basic
-    } else {
-        Shaping::Advanced
-    }
+fn shaping_for(_request: &TextLayoutRequest<'_>) -> Shaping {
+    Shaping::Advanced
 }
 
 fn cosmic_attrs<'a>(
@@ -1937,6 +1927,17 @@ mod tests {
 
         assert!(measured.size.width > 0.0);
         assert!(measured.line_count >= 1);
+    }
+
+    #[test]
+    fn uses_advanced_shaping_for_browser_grade_ascii_text() {
+        let content = TextContent::plain("office AVATAR 123");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+
+        assert_eq!(
+            shaping_for(&request(&normalized, 16.0, 300.0)),
+            Shaping::Advanced
+        );
     }
 
     #[test]

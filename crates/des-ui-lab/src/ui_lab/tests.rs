@@ -2254,7 +2254,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         family_runs[2].style.font_family.as_deref(),
         Some("monospace")
     );
-    assert!(diagnostics.contains("cosmic-text + Swash raster"));
+    assert!(diagnostics.contains("cosmic-text advanced shaping + Swash raster"));
     assert!(diagnostics.contains("JetBrains Mono Variable"));
     assert!(diagnostics.contains("bundled-only default"));
     assert!(
