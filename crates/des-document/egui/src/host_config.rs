@@ -4,6 +4,9 @@ use eframe::egui;
 use egui::{FontData, FontDefinitions, FontFamily, FontId, TextStyle, vec2};
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
+const INTER_FONT_NAME: &str = "studio-inter";
+const INTER_VARIABLE_FONT: &[u8] = include_bytes!("../assets/fonts/inter/InterVariable.ttf");
+
 pub fn apply_host_configuration(context: &egui::Context) {
     apply_fonts(context);
     apply_text_metrics(context);
@@ -11,7 +14,6 @@ pub fn apply_host_configuration(context: &egui::Context) {
 
 fn apply_fonts(context: &egui::Context) {
     let mut definitions = FontDefinitions::default();
-    let fallback_fonts: Vec<String> = definitions.font_data.keys().cloned().collect();
 
     if let Some(font) = load_first_font(&system_ui_font_candidates()) {
         definitions
@@ -24,6 +26,16 @@ fn apply_fonts(context: &egui::Context) {
             .insert(0, "studio-system-ui".to_string());
     }
 
+    definitions.font_data.insert(
+        INTER_FONT_NAME.to_string(),
+        Arc::new(FontData::from_static(INTER_VARIABLE_FONT)),
+    );
+    definitions
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .insert(0, INTER_FONT_NAME.to_string());
+
     if let Some(font) = load_first_font(&monospace_font_candidates()) {
         definitions
             .font_data
@@ -35,6 +47,7 @@ fn apply_fonts(context: &egui::Context) {
             .insert(0, "studio-monospace".to_string());
     }
 
+    let fallback_fonts: Vec<String> = definitions.font_data.keys().cloned().collect();
     for font in iconflow::fonts() {
         let family_name = font.family.to_string();
         definitions.font_data.insert(
