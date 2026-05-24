@@ -1,7 +1,7 @@
 use cosmic_text::{
     Align, Attrs, Buffer, CacheKey, Color as CosmicColor, Ellipsize, EllipsizeHeightLimit, Family,
-    FontSystem, Metrics, PhysicalGlyph, Renderer, Shaping, Stretch, Style, SwashCache,
-    SwashContent, UnderlineStyle, Weight, Wrap, render_decoration,
+    FontSystem, Metrics, Shaping, Stretch, Style, SwashCache, SwashContent, UnderlineStyle, Weight,
+    Wrap,
 };
 use des_document::{
     Color, Direction, FontStyle, InlineTextStyle, Point, Rect, Size, TextAlign, TextLayoutLine,
@@ -1342,6 +1342,46 @@ fn run_backgrounds(text: &des_document::NormalizedText) -> Vec<Option<Color>> {
     backgrounds
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct TextDecorationPaint {
+    underline: bool,
+    overline: bool,
+    line_through: bool,
+    color: Color,
+    thickness: f32,
+}
+
+impl TextDecorationPaint {
+    fn from_style(style: &InlineTextStyle, inherited_color: Color, scale: f32) -> Option<Self> {
+        let decoration = style.text_decoration?;
+        (!decoration.is_none()).then(|| {
+            let color = decoration.stroke_color(style.color.unwrap_or(inherited_color));
+            Self {
+                underline: decoration.underline,
+                overline: decoration.overline,
+                line_through: decoration.line_through,
+                color,
+                thickness: (decoration.stroke_thickness() * scale).max(1.0),
+            }
+        })
+    }
+}
+
+fn run_decorations(
+    text: &des_document::NormalizedText,
+    inherited_color: Color,
+    scale: f32,
+) -> Vec<Option<TextDecorationPaint>> {
+    let mut decorations = Vec::with_capacity(text.runs().len() + 1);
+    decorations.push(None);
+    decorations.extend(
+        text.runs()
+            .iter()
+            .map(|run| TextDecorationPaint::from_style(&run.style, inherited_color, scale)),
+    );
+    decorations
+}
+
 fn run_baseline_shifts(
     text: &des_document::NormalizedText,
     inherited_font_size: f32,
@@ -1377,6 +1417,7 @@ fn collect_text_paint_glyph_run(
     let mut backgrounds = Vec::new();
     let mut decorations = Vec::new();
     let run_backgrounds = run_backgrounds(request.text);
+    let run_decorations = run_decorations(request.text, request.color, scale);
     let baseline_shifts = run_baseline_shifts(request.text, request.font_size, scale);
     for run in buffer.layout_runs() {
         collect_run_backgrounds(
@@ -1386,6 +1427,14 @@ fn collect_text_paint_glyph_run(
             &run_backgrounds,
             &baseline_shifts,
             &mut backgrounds,
+        );
+        collect_run_decorations(
+            run.glyphs,
+            run.line_top,
+            run.line_y,
+            &run_decorations,
+            &baseline_shifts,
+            &mut decorations,
         );
         for glyph in run.glyphs {
             let baseline_shift = baseline_shifts.get(glyph.metadata).copied().unwrap_or(0.0);
@@ -1421,10 +1470,6 @@ fn collect_text_paint_glyph_run(
                 ),
             });
         }
-        let mut collector = DecorationCollector {
-            rects: &mut decorations,
-        };
-        render_decoration(&mut collector, &run, cosmic_color(request.color));
     }
     TextPaintGlyphRun {
         glyphs,
@@ -1504,6 +1549,131 @@ fn collect_run_backgrounds(
     }
 }
 
+fn collect_run_decorations(
+    glyphs: &[cosmic_text::LayoutGlyph],
+    line_top: f32,
+    line_y: f32,
+    decorations: &[Option<TextDecorationPaint>],
+    baseline_shifts: &[f32],
+    output: &mut Vec<TextGlyphRect>,
+) {
+    let mut active: Option<(usize, f32, f32, f32, f32, TextDecorationPaint)> = None;
+    for glyph in glyphs {
+        let decoration = decorations
+            .get(glyph.metadata)
+            .and_then(|decoration| *decoration);
+        let baseline_shift = baseline_shifts.get(glyph.metadata).copied().unwrap_or(0.0);
+        match (active, decoration) {
+            (
+                Some((metadata, min_x, max_x, active_shift, font_size, active_decoration)),
+                Some(decoration),
+            ) if metadata == glyph.metadata
+                && active_shift == baseline_shift
+                && font_size == glyph.font_size
+                && active_decoration == decoration =>
+            {
+                active = Some((
+                    metadata,
+                    min_x.min(glyph.x),
+                    max_x.max(glyph.x + glyph.w),
+                    active_shift,
+                    font_size,
+                    decoration,
+                ));
+            }
+            (Some((_, min_x, max_x, active_shift, font_size, active_decoration)), next) => {
+                push_decoration_rects(
+                    output,
+                    min_x,
+                    max_x,
+                    line_top,
+                    line_y,
+                    active_shift,
+                    font_size,
+                    active_decoration,
+                );
+                active = next.map(|decoration| {
+                    (
+                        glyph.metadata,
+                        glyph.x,
+                        glyph.x + glyph.w,
+                        baseline_shift,
+                        glyph.font_size,
+                        decoration,
+                    )
+                });
+            }
+            (None, Some(decoration)) => {
+                active = Some((
+                    glyph.metadata,
+                    glyph.x,
+                    glyph.x + glyph.w,
+                    baseline_shift,
+                    glyph.font_size,
+                    decoration,
+                ));
+            }
+            (None, None) => {}
+        }
+    }
+    if let Some((_, min_x, max_x, baseline_shift, font_size, decoration)) = active {
+        push_decoration_rects(
+            output,
+            min_x,
+            max_x,
+            line_top,
+            line_y,
+            baseline_shift,
+            font_size,
+            decoration,
+        );
+    }
+}
+
+fn push_decoration_rects(
+    output: &mut Vec<TextGlyphRect>,
+    min_x: f32,
+    max_x: f32,
+    line_top: f32,
+    line_y: f32,
+    baseline_shift: f32,
+    font_size: f32,
+    decoration: TextDecorationPaint,
+) {
+    let baseline = line_y - baseline_shift;
+    let width = max_x - min_x;
+    if decoration.overline {
+        push_text_rect(
+            output,
+            min_x,
+            line_top - baseline_shift,
+            width,
+            decoration.thickness,
+            decoration.color,
+        );
+    }
+    if decoration.line_through {
+        push_text_rect(
+            output,
+            min_x,
+            baseline - font_size * 0.3,
+            width,
+            decoration.thickness,
+            decoration.color,
+        );
+    }
+    if decoration.underline {
+        push_text_rect(
+            output,
+            min_x,
+            baseline + font_size * 0.1,
+            width,
+            decoration.thickness,
+            decoration.color,
+        );
+    }
+}
+
 fn push_text_rect(
     output: &mut Vec<TextGlyphRect>,
     x: f32,
@@ -1527,26 +1697,6 @@ fn push_text_rect(
             color,
         });
     }
-}
-
-struct DecorationCollector<'a> {
-    rects: &'a mut Vec<TextGlyphRect>,
-}
-
-impl Renderer for DecorationCollector<'_> {
-    fn rectangle(&mut self, x: i32, y: i32, w: u32, h: u32, color: CosmicColor) {
-        if w > 0 && h > 0 {
-            self.rects.push(TextGlyphRect {
-                x_px: x,
-                y_px: y,
-                width_px: w,
-                height_px: h,
-                color: cosmic_to_document_color(color),
-            });
-        }
-    }
-
-    fn glyph(&mut self, _physical_glyph: PhysicalGlyph, _color: CosmicColor) {}
 }
 
 fn cosmic_color(color: Color) -> CosmicColor {
@@ -2102,11 +2252,23 @@ mod tests {
         let mut renderer = renderer();
         let highlight = Color::rgba(234, 221, 255, 180);
         let underline = Color::rgb(103, 80, 164);
+        let strike = Color::rgb(122, 71, 0);
         let content = TextContent::new(vec![
             TextRun::styled(
                 "under ",
                 InlineTextStyle {
-                    text_decoration: Some(TextDecoration::UNDERLINE.color(underline)),
+                    text_decoration: Some(
+                        TextDecoration::UNDERLINE.color(underline).thickness(3.0),
+                    ),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::styled(
+                "strike ",
+                InlineTextStyle {
+                    text_decoration: Some(
+                        TextDecoration::LINE_THROUGH.color(strike).thickness(2.0),
+                    ),
                     ..InlineTextStyle::default()
                 },
             ),
@@ -2132,8 +2294,15 @@ mod tests {
             glyph_run
                 .decorations
                 .iter()
-                .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px > 0),
-            "underline runs should become paintable decoration rectangles"
+                .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px >= 6),
+            "underline runs should preserve requested decoration thickness at device scale"
+        );
+        assert!(
+            glyph_run
+                .decorations
+                .iter()
+                .any(|rect| rect.color == strike && rect.width_px > 0 && rect.height_px >= 4),
+            "line-through runs should preserve requested decoration thickness at device scale"
         );
     }
 
