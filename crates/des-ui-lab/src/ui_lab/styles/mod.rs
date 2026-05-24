@@ -2,8 +2,8 @@ mod framework;
 
 use super::{
     CARD, CARD_HOVER, CARD_PRESSED, GREEN, PANEL, PANEL_ALT, PRIMARY_CONTAINER, PURPLE,
-    SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED, SURFACE_CONTAINER,
-    SURFACE_CONTAINER_HIGH, TEXT, TEXT_ACCENT, TEXT_MUTED,
+    SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED, SURFACE_CONTAINER, TEXT,
+    TEXT_ACCENT, TEXT_MUTED,
 };
 use des_document::{
     AlignItems, BorderStyle, Color, ElementStateSelector, FlexDirection, FlexWrap,
@@ -299,145 +299,8 @@ fn lab_stylesheet() -> StyleSheet {
             .text_wrap_mode(TextWrapMode::Wrap),
     );
     stylesheet.push_rule(
-        StyleSelector::class("scroll-panel"),
-        Style::default()
-            .size(318.0, 300.0)
-            .padding(Insets::all(10.0))
-            .gap(7.0)
-            .background(SURFACE_CONTAINER)
-            .border(STROKE)
-            .radius(7.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-list"),
-        Style::default()
-            .width_fill()
-            .height(des_document::Length::Px(250.0))
-            .padding(Insets::symmetric(4.0, 4.0))
-            .gap(7.0)
-            .overflow_y(Overflow::Scroll)
-            .scrollbar_width(2.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-list-horizontal"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .width_fill()
-            .height(des_document::Length::Px(250.0))
-            .padding(Insets::symmetric(4.0, 4.0))
-            .gap(7.0)
-            .overflow_x(Overflow::Scroll)
-            .overflow_y(Overflow::Visible)
-            .scrollbar_width(2.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-list-two-axis"),
-        Style::default()
-            .width_fill()
-            .height(des_document::Length::Px(250.0))
-            .padding(Insets::symmetric(4.0, 4.0))
-            .gap(7.0)
-            .overflow(Overflow::Scroll)
-            .scrollbar_width(2.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-list-nested"),
-        Style::default().height(des_document::Length::Px(222.0)),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-nested-shell"),
-        Style::default()
-            .width_fill()
-            .height(des_document::Length::Px(250.0))
-            .padding(Insets::all(12.0))
-            .background(PANEL)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("scroll-panel", ElementStateSelector::Hovered),
-        Style::default().border(STROKE_SELECTED),
-    );
-    stylesheet.push_rule(
         styled_scrollbar_selector().selector(),
         styled_scrollbar_style(),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-row-card"),
-        Style::default()
-            .width_fill()
-            .height(des_document::Length::Px(34.0))
-            .padding(Insets::symmetric(9.0, 7.0))
-            .background(CARD)
-            .border(STROKE)
-            .radius(4.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-wide-row-card"),
-        Style::default()
-            .size(156.0, 214.0)
-            .padding(Insets::symmetric(9.0, 7.0))
-            .gap(7.0)
-            .background(CARD)
-            .border(STROKE)
-            .radius(4.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-mini-list"),
-        Style::default()
-            .width_fill()
-            .height(des_document::Length::Px(158.0))
-            .padding(Insets::symmetric(3.0, 3.0))
-            .gap(4.0)
-            .background(SURFACE_CONTAINER)
-            .border(STROKE)
-            .radius(4.0)
-            .overflow_y(Overflow::Scroll)
-            .scrollbar_width(2.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-mini-row"),
-        Style::default()
-            .width_fill()
-            .height(des_document::Length::Px(24.0))
-            .padding(Insets::symmetric(6.0, 4.0))
-            .background(SURFACE_CONTAINER_HIGH)
-            .border(STROKE)
-            .radius(3.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("scroll-xy-row-card"),
-        Style::default()
-            .width(des_document::Length::Px(430.0))
-            .height(des_document::Length::Px(34.0))
-            .padding(Insets::symmetric(9.0, 7.0))
-            .background(CARD)
-            .border(STROKE)
-            .radius(4.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("scroll-row-card", ElementStateSelector::Hovered),
-        Style::default()
-            .background(CARD_HOVER)
-            .border(STROKE_SELECTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("scroll-wide-row-card", ElementStateSelector::Hovered),
-        Style::default()
-            .background(CARD_HOVER)
-            .border(STROKE_SELECTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("scroll-mini-row", ElementStateSelector::Hovered),
-        Style::default()
-            .background(SURFACE_CONTAINER_HIGH)
-            .border(STROKE_SELECTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class_state("scroll-xy-row-card", ElementStateSelector::Hovered),
-        Style::default()
-            .background(CARD_HOVER)
-            .border(STROKE_SELECTED),
     );
     stylesheet.push_rule(
         StyleSelector::class("floating-playground"),

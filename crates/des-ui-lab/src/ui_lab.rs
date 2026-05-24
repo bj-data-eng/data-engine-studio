@@ -41,7 +41,6 @@ const TEXT_ACCENT: Color = Color::rgb(103, 80, 164);
 const GREEN: Color = Color::rgb(0, 106, 80);
 const PURPLE: Color = Color::rgb(103, 80, 164);
 const SURFACE_CONTAINER: Color = Color::rgb(243, 237, 247);
-const SURFACE_CONTAINER_HIGH: Color = Color::rgb(236, 230, 240);
 const PRIMARY_CONTAINER: Color = Color::rgb(234, 221, 255);
 const SECONDARY_CONTAINER: Color = Color::rgb(232, 222, 248);
 #[cfg(test)]
