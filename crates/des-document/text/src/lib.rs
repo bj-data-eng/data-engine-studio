@@ -182,7 +182,7 @@ impl CosmicTextRenderer {
     ) -> RasterizedText {
         let scale = pixels_per_point.max(1.0);
         let (layout, surface) = self.with_buffer(request.clone(), scale, |buffer, swash_cache| {
-            let layout = layout_result(&request, buffer);
+            let layout = layout_result(&request, buffer, scale);
             let surface = rasterize_surface(
                 buffer,
                 swash_cache,
@@ -221,7 +221,7 @@ impl CosmicTextRenderer {
     ) -> TextLayoutResult {
         let scale = pixels_per_point.max(1.0);
         let layout = self.with_buffer(request.clone(), scale, |buffer, _| {
-            layout_result(&request, buffer)
+            layout_result(&request, buffer, scale)
         });
         TextLayoutResult {
             size: Size::new(layout.size.width / scale, layout.size.height / scale),
@@ -238,7 +238,7 @@ impl CosmicTextRenderer {
         let scale = pixels_per_point.max(1.0);
         let (layout, glyphs, backgrounds, decorations) =
             self.with_buffer(request.clone(), scale, |buffer, _| {
-                let layout = layout_result(&request, buffer);
+                let layout = layout_result(&request, buffer, scale);
                 let mut glyphs = Vec::new();
                 let mut backgrounds = Vec::new();
                 let mut decorations = Vec::new();
@@ -839,6 +839,7 @@ fn height_limit(request: &TextLayoutRequest<'_>, metrics: Metrics) -> Option<f32
 fn layout_result(
     request: &TextLayoutRequest<'_>,
     buffer: &mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>,
+    scale: f32,
 ) -> TextLayoutResult {
     let mut lines = Vec::new();
     let mut max_width: f32 = 0.0;
@@ -874,6 +875,23 @@ fn layout_result(
             height: run.line_height,
             baseline: run.line_y,
         });
+    }
+
+    if lines.is_empty() {
+        let metrics = buffer_metrics(request, scale);
+        let baseline = (metrics.font_size * 0.8).clamp(0.0, metrics.line_height);
+        lines.push(TextLayoutLine {
+            layout_start: 0,
+            layout_end: 0,
+            semantic_start: 0,
+            semantic_end: 0,
+            x_offset: 0.0,
+            width: 0.0,
+            height: metrics.line_height,
+            baseline,
+        });
+        max_height = metrics.line_height;
+        line_count = 1;
     }
 
     TextLayoutResult {
@@ -1429,6 +1447,26 @@ mod tests {
 
         assert!(measured.size.width > 0.0);
         assert!(measured.line_count >= 1);
+    }
+
+    #[test]
+    fn measures_empty_text_as_a_line_box() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let measured = renderer.measure_text(request(&normalized, 16.0, 90.0));
+
+        assert_eq!(measured.line_count, 1);
+        assert_eq!(measured.lines.len(), 1);
+        assert_eq!(measured.lines[0].layout_start, 0);
+        assert_eq!(measured.lines[0].layout_end, 0);
+        assert_eq!(measured.lines[0].semantic_start, 0);
+        assert_eq!(measured.lines[0].semantic_end, 0);
+        assert_eq!(measured.size.width, 0.0);
+        assert!(measured.size.height > 0.0);
+        assert!(measured.first_baseline.is_some());
+        assert!(measured.lines[0].baseline > 0.0);
+        assert!(measured.lines[0].baseline <= measured.lines[0].height);
     }
 
     #[test]
