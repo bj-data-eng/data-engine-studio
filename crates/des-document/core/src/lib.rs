@@ -53,5 +53,6 @@ pub use text::{
     FallbackTextMeasurer, FontStretch, FontStyle, FontWeight, InlineTextStyle, NormalizedText,
     OverflowWrap, TextAlign, TextContent, TextDecoration, TextLayoutLine, TextLayoutRequest,
     TextLayoutResult, TextLayoutRun, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow,
-    TextRun, TextTransform, TextWrapMode, WhiteSpace, WhiteSpaceCollapse, WordBreak,
+    TextRun, TextTransform, TextVerticalAlign, TextWrapMode, WhiteSpace, WhiteSpaceCollapse,
+    WordBreak,
 };

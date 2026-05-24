@@ -84,6 +84,7 @@ pub struct InlineTextStyle {
     pub font_style: Option<FontStyle>,
     pub text_transform: Option<TextTransform>,
     pub text_decoration: Option<TextDecoration>,
+    pub vertical_align: Option<TextVerticalAlign>,
     pub background: Option<Color>,
 }
 
@@ -249,6 +250,16 @@ pub enum TextAlign {
 pub enum TextOverflow {
     Clip,
     Ellipsis,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextVerticalAlign {
+    Baseline,
+    Top,
+    Middle,
+    Bottom,
+    Sub,
+    Super,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -808,6 +819,7 @@ struct FallbackLayoutChar {
     value: char,
     width: f32,
     font_size: f32,
+    baseline_shift: f32,
     layout_index: usize,
 }
 
@@ -851,8 +863,11 @@ impl FallbackLayoutLine {
 }
 
 fn fallback_baseline_for_line(line: &FallbackLayoutLine, line_height: f32) -> f32 {
-    let max_font_size = line.chars.iter().map(|ch| ch.font_size).fold(0.0, f32::max);
-    let font_baseline = max_font_size * 0.8;
+    let font_baseline = line
+        .chars
+        .iter()
+        .map(|ch| fallback_font_baseline(ch.font_size) + ch.baseline_shift.max(0.0))
+        .fold(0.0, f32::max);
     font_baseline.clamp(0.0, line_height)
 }
 
@@ -862,6 +877,12 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
     for run in request.text.runs() {
         let font_size = run.style.font_size.unwrap_or(request.font_size).max(1.0);
         let letter_spacing = run.style.letter_spacing.unwrap_or(0.0).max(0.0);
+        let baseline_shift = fallback_baseline_shift(
+            run.style
+                .vertical_align
+                .unwrap_or(TextVerticalAlign::Baseline),
+            font_size,
+        );
         let font_stretch = run
             .style
             .font_stretch
@@ -879,6 +900,7 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
                         value: ch,
                         width: fallback_char_width(ch, font_size, letter_spacing, font_stretch),
                         font_size,
+                        baseline_shift,
                         layout_index,
                     });
                 layout_index += 1;
@@ -897,11 +919,34 @@ fn fallback_line_height(request: &TextLayoutRequest<'_>) -> f32 {
         .runs()
         .iter()
         .map(|run| {
+            let font_size = run.style.font_size.unwrap_or(request.font_size);
+            let baseline_shift = fallback_baseline_shift(
+                run.style
+                    .vertical_align
+                    .unwrap_or(TextVerticalAlign::Baseline),
+                font_size,
+            )
+            .abs();
             run.style.line_height.unwrap_or_else(|| {
                 fallback_default_line_height(run.style.font_size.unwrap_or(request.font_size))
-            })
+            }) + baseline_shift
         })
         .fold(inherited.max(1.0), f32::max)
+}
+
+fn fallback_font_baseline(font_size: f32) -> f32 {
+    font_size.max(1.0) * 0.8
+}
+
+fn fallback_baseline_shift(vertical_align: TextVerticalAlign, font_size: f32) -> f32 {
+    match vertical_align {
+        TextVerticalAlign::Super => font_size.max(1.0) * 0.35,
+        TextVerticalAlign::Sub => -(font_size.max(1.0) * 0.2),
+        TextVerticalAlign::Baseline
+        | TextVerticalAlign::Top
+        | TextVerticalAlign::Middle
+        | TextVerticalAlign::Bottom => 0.0,
+    }
 }
 
 fn fallback_default_line_height(font_size: f32) -> f32 {
@@ -1368,6 +1413,51 @@ mod tests {
 
         assert!(rich.lines[0].baseline > plain.lines[0].baseline);
         assert_eq!(rich.first_baseline, Some(rich.lines[0].baseline));
+    }
+
+    #[test]
+    fn fallback_line_metrics_account_for_super_and_subscript_runs() {
+        let normal = TextContent::plain("AA");
+        let shifted = TextContent::new(vec![
+            TextRun::plain("A"),
+            TextRun::styled(
+                "A",
+                InlineTextStyle {
+                    vertical_align: Some(TextVerticalAlign::Super),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::styled(
+                "A",
+                InlineTextStyle {
+                    vertical_align: Some(TextVerticalAlign::Sub),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized_normal = NormalizedText::from_content(&normal, TextLayoutStyle::default());
+        let normalized_shifted = NormalizedText::from_content(&shifted, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let normal = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_normal,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+        let shifted = measurer.measure_text(TextLayoutRequest {
+            text: &normalized_shifted,
+            font_size: 13.0,
+            color: Color::rgb(255, 255, 255),
+            wrap_width: f32::INFINITY,
+            layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+            line_height: None,
+        });
+
+        assert!(shifted.size.height > normal.size.height);
+        assert!(shifted.lines[0].baseline > normal.lines[0].baseline);
     }
 
     #[test]

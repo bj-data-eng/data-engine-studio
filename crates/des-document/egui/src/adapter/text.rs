@@ -1,7 +1,7 @@
 use des_document::{
     Color, DocumentOutput, FontStyle, InlineTextStyle, Point, Size, TextAlign, TextDecoration,
     TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextWrapMode,
+    TextOverflow, TextVerticalAlign, TextWrapMode,
 };
 use eframe::egui;
 use std::{sync::Arc, time::Duration};
@@ -281,7 +281,18 @@ fn text_format(
             .line_height
             .or(inherited_line_height)
             .map(|height| height.max(1.0)),
+        valign: egui_vertical_align(style.vertical_align.unwrap_or(TextVerticalAlign::Baseline)),
         ..Default::default()
+    }
+}
+
+fn egui_vertical_align(vertical_align: TextVerticalAlign) -> egui::Align {
+    match vertical_align {
+        TextVerticalAlign::Top | TextVerticalAlign::Super => egui::Align::TOP,
+        TextVerticalAlign::Middle => egui::Align::Center,
+        TextVerticalAlign::Baseline | TextVerticalAlign::Bottom | TextVerticalAlign::Sub => {
+            egui::Align::BOTTOM
+        }
     }
 }
 
@@ -312,7 +323,8 @@ mod tests {
     use super::*;
     use des_document::{
         FontStretch, FontStyle, FontWeight, InlineTextStyle, NormalizedText, TextAlign,
-        TextContent, TextDecoration, TextLayoutStyle, TextOverflow, TextRun, WhiteSpace,
+        TextContent, TextDecoration, TextLayoutStyle, TextOverflow, TextRun, TextVerticalAlign,
+        WhiteSpace,
     };
 
     #[test]
@@ -445,6 +457,7 @@ mod tests {
                             .color(Color::rgb(0, 255, 0))
                             .thickness(2.0),
                     ),
+                    vertical_align: Some(TextVerticalAlign::Super),
                     background: Some(Color::rgb(0, 0, 255)),
                     ..InlineTextStyle::default()
                 },
@@ -470,6 +483,7 @@ mod tests {
         assert_eq!(format.font_id.size, 18.0);
         assert_eq!(format.extra_letter_spacing, 1.5);
         assert!(format.italics);
+        assert_eq!(format.valign, egui::Align::TOP);
         assert_eq!(format.underline.width, 2.0);
         assert_eq!(format.underline.color, egui::Color32::from_rgb(0, 255, 0));
         assert_eq!(format.strikethrough.width, 2.0);
@@ -569,6 +583,32 @@ mod tests {
         );
 
         assert!(job.sections[0].format.italics);
+    }
+
+    #[test]
+    fn layout_job_maps_vertical_align_keywords() {
+        let text = TextContent::new(vec![TextRun::styled(
+            "sub",
+            InlineTextStyle {
+                vertical_align: Some(TextVerticalAlign::Sub),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized = NormalizedText::from_content(&text, TextLayoutStyle::default());
+
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 240.0,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.sections[0].format.valign, egui::Align::BOTTOM);
     }
 
     #[test]
