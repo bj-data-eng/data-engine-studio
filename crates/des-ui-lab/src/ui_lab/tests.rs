@@ -2207,10 +2207,12 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let legacy_pane = frame(&output, "text-legacy-100-pane");
     let diagnostics = frame_text(&output, "text-cosmic-diagnostics").unwrap();
     let rich_sample = frame(&output, "text-rich-100-sample");
+    let rich_weight = frame(&output, "text-rich-weight");
     let rich_shape = frame(&output, "text-rich-shape");
     let rich_spacing = frame(&output, "text-rich-spacing");
     let rich_decoration = frame(&output, "text-rich-decoration");
     let rich_family = frame(&output, "text-rich-family");
+    let rich_baseline = frame(&output, "text-rich-baseline");
     assert_eq!(rich_sample.style.font_size, 100.0);
     assert_eq!(
         rich_sample.text.as_ref().unwrap().semantic_text(),
@@ -2220,11 +2222,24 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         frame_text(&output, "text-rich-shape"),
         Some("normal italic oblique")
     );
+    assert_eq!(
+        frame_text(&output, "text-rich-family"),
+        Some("fallback Aptos -> Inter generic sans bundled mono")
+    );
+    let weight_runs = rich_weight
+        .normalized_text
+        .as_ref()
+        .expect("rich weight specimen should retain normalized text")
+        .runs();
     let shape_runs = rich_shape
         .normalized_text
         .as_ref()
         .expect("rich shape specimen should retain normalized text")
         .runs();
+    assert_eq!(weight_runs[0].style.font_weight, Some(FontWeight::new(300)));
+    assert_eq!(weight_runs[1].style.font_weight, Some(FontWeight::NORMAL));
+    assert_eq!(weight_runs[2].style.font_weight, Some(FontWeight::new(600)));
+    assert_eq!(weight_runs[3].style.font_weight, Some(FontWeight::BOLD));
     assert_eq!(shape_runs[0].style.font_style, None);
     assert_eq!(shape_runs[1].style.font_style, Some(FontStyle::Italic));
     assert_eq!(shape_runs[2].style.font_style, Some(FontStyle::Oblique));
@@ -2242,6 +2257,11 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         .normalized_text
         .as_ref()
         .expect("rich spacing specimen should retain normalized text")
+        .runs();
+    let baseline_runs = rich_baseline
+        .normalized_text
+        .as_ref()
+        .expect("rich baseline specimen should retain normalized text")
         .runs();
     assert_eq!(spacing_runs[0].style.letter_spacing, Some(-0.75));
     assert_eq!(spacing_runs[1].style.letter_spacing, Some(0.0));
@@ -2266,10 +2286,21 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         family_runs[0].style.font_family.as_deref(),
         Some("Aptos, Inter, sans-serif")
     );
-    assert_eq!(family_runs[1].style.font_family.as_deref(), Some("serif"));
+    assert_eq!(
+        family_runs[1].style.font_family.as_deref(),
+        Some("sans-serif")
+    );
     assert_eq!(
         family_runs[2].style.font_family.as_deref(),
         Some("monospace")
+    );
+    assert_eq!(
+        baseline_runs[1].style.vertical_align,
+        Some(des_document::TextVerticalAlign::Super)
+    );
+    assert_eq!(
+        baseline_runs[3].style.vertical_align,
+        Some(des_document::TextVerticalAlign::Sub)
     );
     assert!(diagnostics.contains("cosmic-text advanced shaping + Swash raster"));
     assert!(diagnostics.contains("JetBrains Mono Variable"));

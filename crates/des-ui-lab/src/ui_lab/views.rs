@@ -3389,9 +3389,9 @@ fn rich_family_specimen() -> TextContent {
             },
         ),
         TextRun::styled(
-            "generic serif ",
+            "generic sans ",
             InlineTextStyle {
-                font_family: Some("serif".to_string()),
+                font_family: Some("sans-serif".to_string()),
                 ..InlineTextStyle::default()
             },
         ),
