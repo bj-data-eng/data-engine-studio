@@ -821,12 +821,10 @@ fn configure_buffer(
 }
 
 fn wrap_width(request: &TextLayoutRequest<'_>, scale: f32) -> Option<f32> {
-    match request.layout_style.text_wrap_mode {
-        TextWrapMode::NoWrap => None,
-        TextWrapMode::Wrap if request.wrap_width.is_finite() && request.wrap_width > 1.0 => {
-            Some((request.wrap_width * scale).max(1.0))
-        }
-        TextWrapMode::Wrap => None,
+    if request.wrap_width.is_finite() && request.wrap_width > 1.0 {
+        Some((request.wrap_width * scale).max(1.0))
+    } else {
+        None
     }
 }
 
@@ -1533,6 +1531,62 @@ mod tests {
         assert!(
             wide_measured.size.width > compact_measured.size.width,
             "larger CSS tab-size should widen preserved tab stops"
+        );
+    }
+
+    #[test]
+    fn resolves_start_and_end_alignment_against_direction() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("abcd");
+        let mut style = TextLayoutStyle::white_space(des_document::WhiteSpace::Pre);
+        style.text_align = TextAlign::Start;
+        let normalized = NormalizedText::from_content(&content, style);
+
+        let rtl_start = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Rtl,
+            wrap_width: 120.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+
+        style.text_align = TextAlign::End;
+        let ltr_end = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 120.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+        let rtl_end = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Rtl,
+            wrap_width: 120.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+
+        assert!(
+            rtl_start.lines[0].x_offset > 0.0,
+            "RTL start alignment should place the line at the right edge"
+        );
+        assert!(
+            ltr_end.lines[0].x_offset > 0.0,
+            "LTR end alignment should place the line at the right edge"
+        );
+        assert!(
+            (rtl_start.lines[0].x_offset - ltr_end.lines[0].x_offset).abs() < 0.5,
+            "RTL start and LTR end should resolve to matching physical alignment"
+        );
+        assert!(
+            rtl_end.lines[0].x_offset.abs() < 0.5,
+            "RTL end alignment should place the line at the left edge"
         );
     }
 

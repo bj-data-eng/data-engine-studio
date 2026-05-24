@@ -2122,6 +2122,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
     let pre = frame(&output, "text-pre-body");
+    let rtl = frame(&output, "text-rtl-start-body");
 
     assert_eq!(wrapped.style.text_layout.text_wrap_mode, TextWrapMode::Wrap);
     assert!(
@@ -2149,6 +2150,15 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
         pre.text_layout.as_ref().unwrap().line_count,
         2,
         "pre specimen should preserve the explicit newline as a measured line break"
+    );
+    assert_eq!(rtl.style.direction, des_document::Direction::Rtl);
+    assert_eq!(
+        rtl.style.text_layout.text_align,
+        des_document::TextAlign::Start
+    );
+    assert!(
+        rtl.text_layout.as_ref().unwrap().lines[0].x_offset > 0.0,
+        "RTL start specimen should be physically aligned to the right edge"
     );
     assert!(
         wrapped.rect.size.height > wrapped.text_layout.as_ref().unwrap().size.height,
