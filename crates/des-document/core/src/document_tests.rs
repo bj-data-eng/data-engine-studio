@@ -510,6 +510,10 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
         #title:hover {
             background: #eee5ff;
             border: 1px solid #6750a4;
+            border-left-width: 4px;
+            border-bottom-width: 3px;
+            border-top-right-radius: 12px;
+            border-bottom-left-radius: 2px;
         }
         "#,
     )
@@ -541,6 +545,10 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
     assert_eq!(title.style.background, Some(Color::rgb(238, 229, 255)));
     assert_eq!(title.style.border, Some(Color::rgb(103, 80, 164)));
     assert_eq!(title.style.border_width.top, 1.0);
+    assert_eq!(title.style.border_width.left, 4.0);
+    assert_eq!(title.style.border_width.bottom, 3.0);
+    assert_eq!(title.style.radius.top_right, 12.0);
+    assert_eq!(title.style.radius.bottom_left, 2.0);
     assert_eq!(title.style.padding.left, 8.0);
 }
 

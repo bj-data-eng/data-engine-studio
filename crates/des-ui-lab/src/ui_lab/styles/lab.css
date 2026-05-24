@@ -308,3 +308,125 @@ text {
   overflow: scroll;
   scrollbar-width: 2px;
 }
+
+.box-subject-side-radius {
+  width: 64px;
+  height: 44px;
+  border: 2px solid #6750a4;
+  border-radius: 4px;
+}
+
+.box-subject-side-radius {
+  border-left-width: 8px;
+  border-bottom-width: 5px;
+  border-top-right-radius: 14px;
+  border-bottom-left-radius: 0px;
+}
+
+.box-subject-nested-nine {
+  width: auto;
+  height: auto;
+}
+
+.box-nested-outer {
+  width: auto;
+  height: auto;
+  margin: 8px;
+  border: 3px solid #6750a4;
+  background: #eaddff;
+}
+
+.box-nested-inner {
+  width: auto;
+  height: auto;
+  padding: 5px;
+  gap: 4px;
+  border: 2px solid #006a50;
+  background: #eaddff;
+}
+
+.box-nested-row {
+  flex-direction: row;
+  width: auto;
+  height: auto;
+  gap: 4px;
+  background: #d2e4fa;
+}
+
+.box-nested-cell {
+  width: 10px;
+  height: 10px;
+  background: #cdefdd;
+}
+
+.box-subject-inset-percent {
+  width: auto;
+  height: auto;
+}
+
+.box-inset-percent-parent {
+  width: 88px;
+  height: 88px;
+  padding: 8px;
+  border: 2px solid #6750a4;
+  background: #d2e4fa;
+}
+
+.box-inset-percent-child {
+  width: 50%;
+  height: 50%;
+  background: #cdefdd;
+}
+
+.box-subject-absolute-parent {
+  width: auto;
+  height: auto;
+}
+
+.box-absolute-parent-frame {
+  width: 88px;
+  height: 64px;
+  padding: 8px;
+  border: 2px solid #6750a4;
+  background: #d2e4fa;
+}
+
+.box-absolute-flow-child {
+  width: 16px;
+  height: 16px;
+  background: #bed7f6;
+}
+
+.box-absolute-parent-child {
+  position: absolute;
+  top: 8px;
+  left: 14px;
+  width: 26px;
+  height: 26px;
+  z-index: 2;
+  background: #cdefdd;
+  border-color: #006a50;
+}
+
+.box-subject-absolute-window {
+  width: auto;
+  height: auto;
+}
+
+.box-absolute-window-host {
+  width: 88px;
+  height: 64px;
+  border: 2px solid #6750a4;
+  background: #eaddff;
+}
+
+.box-absolute-window-child {
+  position: fixed;
+  top: 140px;
+  left: 420px;
+  width: 26px;
+  height: 26px;
+  z-index: 20;
+  background: #eaddff;
+  border-color: #6750a4;
+}
