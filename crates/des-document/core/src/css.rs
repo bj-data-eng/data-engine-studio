@@ -1,8 +1,8 @@
 use crate::{
     AlignContent, AlignItems, Color, Direction, Display, Easing, Element, ElementStateSelector,
-    FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, OverflowWrap, Position,
-    Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform,
-    TextWrapMode, Transition, ViewportQuery, WhiteSpace,
+    FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, OverflowWrap, Point,
+    Position, Shadow, Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, WhiteSpace,
 };
 use std::error::Error;
 use std::fmt;
@@ -412,6 +412,7 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "border-top-right-radius" => style.radius.top_right = Some(parse_px(value)?),
         "border-bottom-right-radius" => style.radius.bottom_right = Some(parse_px(value)?),
         "border-bottom-left-radius" => style.radius.bottom_left = Some(parse_px(value)?),
+        "box-shadow" => style.shadows = Some(parse_box_shadow(value)?),
         "color" | "text-color" => style.text_color = Some(parse_color(value)?),
         "text-selection-background" => style.text_selection_background = Some(parse_color(value)?),
         "text-selection-color" => style.text_selection_color = Some(parse_color(value)?),
@@ -682,7 +683,7 @@ fn parse_position(input: &str) -> Result<Position, CssParseError> {
 }
 
 fn parse_border(style: &mut Style, input: &str) -> Result<(), CssParseError> {
-    for part in input.split_whitespace() {
+    for part in split_top_level_whitespace(input) {
         if let Ok(width) = parse_px(part) {
             style.border_width = crate::EdgeStyle::all(width);
         } else if matches!(part, "solid" | "dashed" | "dotted") {
@@ -702,6 +703,46 @@ fn parse_border_style(input: &str) -> Result<crate::BorderStyle, CssParseError> 
         _ => Err(CssParseError::new(format!(
             "unsupported border-style `{input}`"
         ))),
+    }
+}
+
+fn parse_box_shadow(input: &str) -> Result<Vec<Shadow>, CssParseError> {
+    if input == "none" {
+        return Ok(Vec::new());
+    }
+
+    split_top_level_commas(input)
+        .into_iter()
+        .map(|part| parse_shadow(part.trim()))
+        .collect::<Result<Vec<_>, _>>()
+}
+
+fn parse_shadow(input: &str) -> Result<Shadow, CssParseError> {
+    let mut lengths = Vec::new();
+    let mut color = None;
+    for part in split_top_level_whitespace(input) {
+        if part == "inset" {
+            return Err(CssParseError::new(
+                "inset box-shadow is not supported by this renderer",
+            ));
+        }
+        if let Ok(length) = parse_px(part) {
+            lengths.push(length);
+        } else {
+            color = Some(parse_color(part)?);
+        }
+    }
+
+    match lengths.as_slice() {
+        [offset_x, offset_y] | [offset_x, offset_y, _] | [offset_x, offset_y, _, _] => Ok(Shadow {
+            offset: Point::new(*offset_x, *offset_y),
+            blur: lengths.get(2).copied().unwrap_or(0.0),
+            spread: lengths.get(3).copied().unwrap_or(0.0),
+            color: color.unwrap_or_else(|| Color::rgb(0, 0, 0)),
+        }),
+        _ => Err(CssParseError::new(
+            "box-shadow expects offset-x offset-y with optional blur, spread, and color",
+        )),
     }
 }
 
@@ -807,6 +848,9 @@ fn parse_color(input: &str) -> Result<Color, CssParseError> {
         "white" => return Ok(Color::rgb(255, 255, 255)),
         _ => {}
     }
+    if input.starts_with("rgb(") || input.starts_with("rgba(") {
+        return parse_rgb_color(input);
+    }
     let hex = input
         .strip_prefix('#')
         .ok_or_else(|| CssParseError::new(format!("unsupported color `{input}`")))?;
@@ -828,6 +872,107 @@ fn parse_color(input: &str) -> Result<Color, CssParseError> {
         )),
         _ => Err(CssParseError::new(format!("invalid color `{input}`"))),
     }
+}
+
+fn parse_rgb_color(input: &str) -> Result<Color, CssParseError> {
+    let Some(open) = input.find('(') else {
+        return Err(CssParseError::new(format!("invalid color `{input}`")));
+    };
+    let Some(body) = input.strip_suffix(')').map(|value| &value[open + 1..]) else {
+        return Err(CssParseError::new(format!("invalid color `{input}`")));
+    };
+    let (channels, alpha) = if let Some((channels, alpha)) = body.split_once('/') {
+        (channels.trim(), Some(alpha.trim()))
+    } else {
+        (body.trim(), None)
+    };
+    let channel_parts = split_color_function_args(channels);
+    let alpha = alpha.or_else(|| channel_parts.get(3).copied());
+    if channel_parts.len() < 3 || channel_parts.len() > 4 {
+        return Err(CssParseError::new(format!("invalid color `{input}`")));
+    }
+    Ok(Color::rgba(
+        parse_color_channel(channel_parts[0])?,
+        parse_color_channel(channel_parts[1])?,
+        parse_color_channel(channel_parts[2])?,
+        alpha.map(parse_alpha_channel).transpose()?.unwrap_or(255),
+    ))
+}
+
+fn split_color_function_args(input: &str) -> Vec<&str> {
+    if input.contains(',') {
+        input.split(',').map(str::trim).collect()
+    } else {
+        input.split_whitespace().collect()
+    }
+}
+
+fn parse_color_channel(input: &str) -> Result<u8, CssParseError> {
+    if let Some(percent) = input.strip_suffix('%') {
+        return Ok(((parse_f32(percent)? / 100.0) * 255.0).round() as u8);
+    }
+    Ok(parse_f32(input)?.round().clamp(0.0, 255.0) as u8)
+}
+
+fn parse_alpha_channel(input: &str) -> Result<u8, CssParseError> {
+    if let Some(percent) = input.strip_suffix('%') {
+        return Ok(((parse_f32(percent)? / 100.0) * 255.0).round() as u8);
+    }
+    let alpha = parse_f32(input)?;
+    if alpha <= 1.0 {
+        Ok((alpha * 255.0).round().clamp(0.0, 255.0) as u8)
+    } else {
+        Ok(alpha.round().clamp(0.0, 255.0) as u8)
+    }
+}
+
+fn split_top_level_commas(input: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0usize;
+    let mut depth = 0usize;
+    for (index, ch) in input.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                parts.push(&input[start..index]);
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    parts.push(&input[start..]);
+    parts
+}
+
+fn split_top_level_whitespace(input: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = None;
+    let mut depth = 0usize;
+    for (index, ch) in input.char_indices() {
+        match ch {
+            '(' => {
+                depth += 1;
+                start.get_or_insert(index);
+            }
+            ')' => {
+                depth = depth.saturating_sub(1);
+                start.get_or_insert(index);
+            }
+            ch if ch.is_whitespace() && depth == 0 => {
+                if let Some(part_start) = start.take() {
+                    parts.push(&input[part_start..index]);
+                }
+            }
+            _ => {
+                start.get_or_insert(index);
+            }
+        }
+    }
+    if let Some(part_start) = start {
+        parts.push(&input[part_start..]);
+    }
+    parts
 }
 
 fn is_ident_char(ch: char) -> bool {

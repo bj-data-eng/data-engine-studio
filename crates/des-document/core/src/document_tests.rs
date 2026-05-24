@@ -4,8 +4,8 @@ use crate::{
     ElementStateSelector, FlexDirection, FlexWrap, GridAutoFlow, GridPlacement, GridPlacementLine,
     GridTemplateArea, GridTemplateComponent, GridTemplateRepetition, GridTrack, Insets,
     JustifyContent, Length, NthChildFormula, Overflow, Point, PointerInput, Rect, RepetitionCount,
-    ScrollAxis, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
+    ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
+    TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
     TextWrapMode, Transition,
 };
 use des_layout::prelude::{
@@ -505,6 +505,7 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
             max-lines: 2;
             text-selection-background: #6750a4dc;
             text-selection-color: #fffbfe;
+            box-shadow: 0px 4px 10px 0px #0000003a, 0px 1px 2px rgba(103, 80, 164, 0.4);
             transition: all 0.24s ease-out;
             padding: 4px 8px;
         }
@@ -545,6 +546,23 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
         Color::rgba(103, 80, 164, 220)
     );
     assert_eq!(title.style.text_selection_color, Color::rgb(255, 251, 254));
+    assert_eq!(
+        title.style.shadows,
+        vec![
+            Shadow {
+                offset: Point::new(0.0, 4.0),
+                blur: 10.0,
+                spread: 0.0,
+                color: Color::rgba(0, 0, 0, 58),
+            },
+            Shadow {
+                offset: Point::new(0.0, 1.0),
+                blur: 2.0,
+                spread: 0.0,
+                color: Color::rgba(103, 80, 164, 102),
+            },
+        ]
+    );
     assert_eq!(title.style.transition, Some(Transition::ease_out(0.24)));
     assert_eq!(title.style.background, Some(Color::rgb(238, 229, 255)));
     assert_eq!(title.style.border, Some(Color::rgb(103, 80, 164)));
@@ -554,6 +572,34 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
     assert_eq!(title.style.radius.top_right, 12.0);
     assert_eq!(title.style.radius.bottom_left, 2.0);
     assert_eq!(title.style.padding.left, 8.0);
+}
+
+#[test]
+fn css_stylesheet_parser_accepts_box_shadow_none() {
+    let stylesheet = StyleSheet::parse_css(".panel { box-shadow: none; }").unwrap();
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+
+    document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+
+    assert_eq!(
+        document
+            .resolved_layout()
+            .unwrap()
+            .find("panel")
+            .unwrap()
+            .style
+            .shadows,
+        Vec::<Shadow>::new()
+    );
 }
 
 #[test]
