@@ -34,6 +34,10 @@ impl Drop for TempTemplatePath {
     }
 }
 
+fn node_text(node: &RenderedNode) -> Option<&str> {
+    node.text.as_deref()
+}
+
 #[test]
 fn compiled_template_renders_markup_interpolation_and_loops() {
     let template = CompiledTemplate::compile(
@@ -74,13 +78,14 @@ fn compiled_template_renders_markup_interpolation_and_loops() {
     assert_eq!(rendered[0].tag, "panel");
     assert_eq!(rendered[0].classes, ["orders-panel"]);
     assert_eq!(rendered[0].children[0].tag, "text");
-    assert_eq!(rendered[0].children[0].text.as_deref(), Some("Open orders"));
+    assert_eq!(node_text(&rendered[0].children[0]), Some("Open orders"));
     assert_eq!(rendered[0].children[1].tag, "list");
     assert_eq!(rendered[0].children[1].children.len(), 2);
     assert_eq!(
         rendered[0].children[1].children[0].children[0]
             .text
-            .as_deref(),
+            .as_ref()
+            .map(String::as_str),
         Some("Acme")
     );
     assert_eq!(
@@ -112,7 +117,7 @@ fn compiled_template_renders_conditionals() {
     let rendered = template.render(&context).expect("template should render");
 
     assert_eq!(rendered[0].children.len(), 1);
-    assert_eq!(rendered[0].children[0].text.as_deref(), Some("Ready"));
+    assert_eq!(node_text(&rendered[0].children[0]), Some("Ready"));
 }
 
 #[test]
@@ -177,7 +182,7 @@ fn compiled_template_locks_attribute_class_and_text_normalization() {
         Some("active"),
         "later duplicate attributes intentionally replace earlier values"
     );
-    assert_eq!(rendered[0].children[0].text.as_deref(), Some("Ready"));
+    assert_eq!(node_text(&rendered[0].children[0]), Some("Ready"));
 }
 
 #[test]
@@ -192,10 +197,7 @@ fn compiled_template_renders_markup_like_interpolation_as_text() {
 
     let rendered = template.render(&context).expect("template should render");
 
-    assert_eq!(
-        rendered[0].text.as_deref(),
-        Some("<strong>not markup</strong>")
-    );
+    assert_eq!(node_text(&rendered[0]), Some("<strong>not markup</strong>"));
     assert!(rendered[0].children.is_empty());
 }
 
@@ -233,12 +235,12 @@ fn compiled_template_resolves_indexed_paths_root_paths_and_loop_metadata() {
 
     assert_eq!(rendered[0].children[0].classes, ["active"]);
     assert_eq!(
-        rendered[0].children[0].children[0].text.as_deref(),
+        node_text(&rendered[0].children[0].children[0]),
         Some("Orders:1/2:true:false:Acme:Acme")
     );
     assert_eq!(rendered[0].children[1].classes, ["inactive"]);
     assert_eq!(
-        rendered[0].children[1].children[0].text.as_deref(),
+        node_text(&rendered[0].children[1].children[0]),
         Some("Orders:2/2:false:true:Acme:Globex")
     );
 }
@@ -602,7 +604,7 @@ fn compiled_template_renders_nested_inline_conditionals() {
 
     let rendered = template.render(&context).expect("template should render");
 
-    assert_eq!(rendered[0].text.as_deref(), Some("enabled"));
+    assert_eq!(node_text(&rendered[0]), Some("enabled"));
 }
 
 #[test]
@@ -643,5 +645,5 @@ fn compiled_template_renders_large_integer_like_numbers_without_saturating() {
 
     let rendered = template.render(&context).expect("template should render");
 
-    assert_eq!(rendered[0].text.as_deref(), Some("100000000000000000000"));
+    assert_eq!(node_text(&rendered[0]), Some("100000000000000000000"));
 }

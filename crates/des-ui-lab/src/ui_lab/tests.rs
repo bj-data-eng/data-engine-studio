@@ -68,6 +68,13 @@ fn frame<'a>(output: &'a DocumentOutput, id: &str) -> &'a ResolvedElement {
     find_frame(&output.layout, id).unwrap_or_else(|| panic!("expected layout frame for {id}"))
 }
 
+fn frame_text<'a>(output: &'a DocumentOutput, id: &str) -> Option<&'a str> {
+    frame(output, id)
+        .text
+        .as_ref()
+        .map(|text| text.semantic_text())
+}
+
 fn state_output(state: &UiLabState) -> DocumentOutput {
     let viewport = state_viewport(state);
     let mut state = state.clone_for_retained_test();
@@ -1105,7 +1112,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
     let output = state_output(harness.state());
 
     assert_eq!(
-        frame(&output, "loop-checkbox-result").text.as_deref(),
+        frame_text(&output, "loop-checkbox-result"),
         Some("Profiling: enabled by checkbox")
     );
     assert!(
@@ -1153,7 +1160,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
 
     assert_eq!(harness.state().loop_action_count, 1);
     assert_eq!(
-        frame(&output, "loop-button-result").text.as_deref(),
+        frame_text(&output, "loop-button-result"),
         Some("Button events received: 1")
     );
     assert_eq!(
@@ -1161,7 +1168,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
         Some("button-count=1")
     );
     assert_eq!(
-        frame(&output, "loop-checkbox-result").text.as_deref(),
+        frame_text(&output, "loop-checkbox-result"),
         Some("Profiling: disabled by checkbox")
     );
     assert!(
@@ -1171,7 +1178,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
             .is_some_and(|color| color == SUCCESS_CONTAINER)
     );
     assert_eq!(
-        frame(&output, "loop-radio-result").text.as_deref(),
+        frame_text(&output, "loop-radio-result"),
         Some("Runtime target: Remote worker")
     );
     assert!(has_class(
@@ -1179,7 +1186,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
         "loop-runtime-remote"
     ));
     assert_eq!(
-        frame(&output, "loop-dropdown-result").text.as_deref(),
+        frame_text(&output, "loop-dropdown-result"),
         Some("Source adapter: Python node")
     );
     assert!(has_class(
@@ -1187,7 +1194,7 @@ fn interaction_update_loop_mutates_target_boxes_from_control_events() {
         "loop-source-python"
     ));
     assert_eq!(
-        frame(&output, "loop-summary-result").text.as_deref(),
+        frame_text(&output, "loop-summary-result"),
         Some("profile off | remote | python | 1 click")
     );
     assert_eq!(
@@ -1217,7 +1224,7 @@ fn interaction_update_loop_refreshes_text_on_repeated_button_clicks() {
         let expected_text = format!("Button events received: {expected}");
         let expected_value = format!("button-count={expected}");
         assert_eq!(
-            frame(&output, "loop-button-result").text.as_deref(),
+            frame_text(&output, "loop-button-result"),
             Some(expected_text.as_str())
         );
         assert_eq!(
@@ -1281,7 +1288,7 @@ fn draggable_drag_drop_grid_moves_items_between_cells() {
     assert!(harness.state().active_drag.is_some());
     let output = state_output_with_egui_text(harness.state(), &harness.ctx);
     let overlay = frame(&output, "drag-overlay");
-    assert_eq!(overlay.text.as_deref(), None);
+    assert_eq!(overlay.text.as_ref().map(|text| text.semantic_text()), None);
     assert!(has_class(overlay, "drag-overlay"));
     assert!(
         !has_class(overlay, "drag-item-active"),

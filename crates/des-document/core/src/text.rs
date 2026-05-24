@@ -36,18 +36,6 @@ impl TextContent {
     pub fn semantic_text(&self) -> &str {
         &self.semantic_text
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.semantic_text
-    }
-}
-
-impl std::ops::Deref for TextContent {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
 }
 
 impl From<&str> for TextContent {

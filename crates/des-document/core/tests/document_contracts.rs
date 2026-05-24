@@ -58,7 +58,13 @@ fn document_builder_and_engine_update_are_front_door_api() {
 
     assert_eq!(output.layout.find("panel").unwrap().rect.size.width, 120.0);
     assert_eq!(
-        output.layout.find("label").unwrap().text.as_deref(),
+        output
+            .layout
+            .find("label")
+            .unwrap()
+            .text
+            .as_ref()
+            .map(|text| text.semantic_text()),
         Some("Hello")
     );
 }
@@ -92,7 +98,10 @@ fn document_builder_supports_fluent_html_like_elements() {
 
     assert_eq!(app.element, Element::Main);
     assert_eq!(run.element, Element::Button);
-    assert_eq!(run.text.as_deref(), Some("Run"));
+    assert_eq!(
+        run.text.as_ref().map(|text| text.semantic_text()),
+        Some("Run")
+    );
     assert_eq!(run.rect.size.width, 72.0);
 }
 
@@ -328,7 +337,10 @@ fn document_mutation_can_set_text_value_and_authored_states() {
 
     let output = engine.update(&mut document, &stylesheet);
     let label = output.layout.find("label").unwrap();
-    assert_eq!(label.text.as_deref(), Some("Short"));
+    assert_eq!(
+        label.text.as_ref().map(|text| text.semantic_text()),
+        Some("Short")
+    );
     assert_eq!(label.rect.size.width, 38.0);
 
     assert!(document.set_text("label", "Much longer text").unwrap());
@@ -341,7 +353,10 @@ fn document_mutation_can_set_text_value_and_authored_states() {
     let label = output.layout.find("label").unwrap();
     let control = output.layout.find("control").unwrap();
 
-    assert_eq!(label.text.as_deref(), Some("Much longer text"));
+    assert_eq!(
+        label.text.as_ref().map(|text| text.semantic_text()),
+        Some("Much longer text")
+    );
     assert_eq!(label.rect.size.width, 120.0);
     assert_eq!(control.value.as_deref(), Some("updated"));
     assert_eq!(control.style.background, Some(Color::rgb(35, 56, 78)));
