@@ -2207,6 +2207,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     );
     assert!(diagnostics.contains("cosmic-text + Swash raster"));
     assert!(diagnostics.contains("JetBrains Mono Variable"));
+    assert!(diagnostics.contains("bundled-only default"));
     assert!(
         legacy_pane.rect.size.width > 300.0,
         "legacy simple rendering slot should sit beside the rich text sample"

@@ -30,6 +30,8 @@ Bundled document fonts must keep their license notices beside the font files. Th
 
 The document text stack currently uses `cosmic-text` for shaping, fallback, layout, and Swash-backed rasterization. Treat changes to this stack as supply-chain-sensitive because they affect font parsing and text rendering of project-authored content.
 
+The default document text renderer uses bundled fonts only, currently Inter Variable and JetBrains Mono Variable, to keep startup, fallback, and font discovery deterministic. System font fallback is opt-in through `document_text_renderer_with_system_fallbacks()` and should be treated as a security- and performance-sensitive change because it expands the font parsing and discovery surface.
+
 When reviewing text-stack dependency changes, inspect the runtime dependency surface explicitly:
 
 ```sh

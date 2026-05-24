@@ -3058,7 +3058,7 @@ fn render_text_rendering_path_comparison(ui: &mut des_document::DocumentBuilder)
                 ElementSpec::new(Element::Text)
                     .class("muted")
                     .class("text-diagnostics"),
-                "cosmic-text + Swash raster, Inter Variable proportional, JetBrains Mono Variable mono, egui texture compositing",
+                "cosmic-text + Swash raster, Inter Variable proportional, JetBrains Mono Variable mono, bundled-only default, egui texture compositing",
             );
             ui.element(
                 "text-render-path-row",

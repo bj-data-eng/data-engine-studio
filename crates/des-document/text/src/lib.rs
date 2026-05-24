@@ -24,6 +24,15 @@ pub enum SystemFontLoading {
     IncludeSystemFonts,
 }
 
+impl SystemFontLoading {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::BundledOnly => "bundled-only",
+            Self::IncludeSystemFonts => "system-fallbacks",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FontAsset {
     pub family: &'static str,
@@ -115,6 +124,7 @@ pub struct TextDiagnostics {
     pub backend: &'static str,
     pub proportional_family: &'static str,
     pub monospace_family: &'static str,
+    pub font_loading: &'static str,
     pub pixels_per_point: f32,
     pub width_px: u32,
     pub height_px: u32,
@@ -124,6 +134,7 @@ pub struct TextDiagnostics {
 pub struct CosmicTextRenderer {
     font_system: FontSystem,
     swash_cache: SwashCache,
+    system_font_loading: SystemFontLoading,
     font_families: FontFamilyResolver,
     buffers: HashMap<TextBufferKey, Buffer>,
     paint_runs: HashMap<TextPaintGlyphRunKey, TextPaintGlyphRun>,
@@ -167,6 +178,7 @@ impl CosmicTextRenderer {
         Self {
             font_system: FontSystem::new_with_locale_and_db(locale, db),
             swash_cache: SwashCache::new(),
+            system_font_loading,
             font_families,
             buffers: HashMap::new(),
             paint_runs: HashMap::new(),
@@ -227,6 +239,7 @@ impl CosmicTextRenderer {
             backend: "cosmic-text",
             proportional_family: INTER_FAMILY,
             monospace_family: JETBRAINS_MONO_FAMILY,
+            font_loading: self.system_font_loading.label(),
             pixels_per_point: scale,
             width_px: surface.surface.width_px,
             height_px: surface.surface.height_px,
@@ -1652,6 +1665,19 @@ mod tests {
         ])
     }
 
+    fn renderer_with_system_font_loading(
+        system_font_loading: SystemFontLoading,
+    ) -> CosmicTextRenderer {
+        CosmicTextRenderer::with_system_font_loading(
+            [
+                FontAsset::new(INTER_FAMILY, INTER),
+                FontAsset::new(JETBRAINS_MONO_FAMILY, JETBRAINS_MONO),
+                FontAsset::new(JETBRAINS_MONO_FAMILY, JETBRAINS_MONO_ITALIC),
+            ],
+            system_font_loading,
+        )
+    }
+
     fn request<'a>(
         normalized: &'a NormalizedText,
         font_size: f32,
@@ -1677,8 +1703,32 @@ mod tests {
 
         assert!(rasterized.surface.width_px > 0);
         assert!(rasterized.surface.height_px > 0);
+        assert_eq!(rasterized.diagnostics.font_loading, "bundled-only");
         assert!(rasterized.diagnostics.glyph_rects > 0);
         assert!(rasterized.surface.rgba.iter().any(|channel| *channel != 0));
+    }
+
+    #[test]
+    fn diagnostics_report_system_font_loading_mode() {
+        let content = TextContent::plain("Hello");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let mut bundled = renderer_with_system_font_loading(SystemFontLoading::BundledOnly);
+        let mut system = renderer_with_system_font_loading(SystemFontLoading::IncludeSystemFonts);
+
+        assert_eq!(
+            bundled
+                .rasterize(request(&normalized, 16.0, 300.0), 1.0)
+                .diagnostics
+                .font_loading,
+            "bundled-only"
+        );
+        assert_eq!(
+            system
+                .rasterize(request(&normalized, 16.0, 300.0), 1.0)
+                .diagnostics
+                .font_loading,
+            "system-fallbacks"
+        );
     }
 
     #[test]
