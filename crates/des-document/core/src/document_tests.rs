@@ -1323,6 +1323,42 @@ fn document_engine_update_untransitioned_hover_color_reuses_layout_and_updates_p
 }
 
 #[test]
+fn document_engine_repeated_hover_on_same_target_is_noop() {
+    let mut document = Document::new(Size::new(320.0, 200.0));
+    document
+        .append_element("root", "card", ElementSpec::new(Element::Div).interactive())
+        .unwrap();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::Element(Element::Div),
+            Style::default()
+                .size(100.0, 40.0)
+                .background(Color::rgb(20, 20, 20)),
+        )
+        .rule(
+            StyleSelector::State(ElementStateSelector::Hovered),
+            Style::default().background(Color::rgb(40, 70, 95)),
+        );
+    let mut engine = DocumentEngine::default();
+    let input = hover_input(Point::new(2.0, 2.0));
+
+    engine.update(&mut document, &stylesheet);
+    let first = engine.update_with_input(&mut document, &stylesheet, input);
+    let second = engine.update_with_input(&mut document, &stylesheet, input);
+
+    assert!(first.metrics.input_changed_state);
+    assert_eq!(
+        second.layout.find("card").unwrap().style.background,
+        Some(Color::rgb(40, 70, 95))
+    );
+    assert!(!second.metrics.input_changed_state);
+    assert!(second.metrics.reused_input_layout);
+    assert!(!second.metrics.animation_changed_style);
+    assert!(!second.metrics.animation_changed_layout);
+    assert!(!second.metrics.animation_changed_paint);
+}
+
+#[test]
 fn document_engine_update_untransitioned_hover_layout_change_rebuilds_layout() {
     let mut document = Document::new(Size::new(320.0, 200.0));
     document
