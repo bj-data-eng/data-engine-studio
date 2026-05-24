@@ -5,8 +5,8 @@ use crate::graphics_testing::{
 };
 use des_document::{
     DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle, Insets, Length,
-    Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector,
-    StyleSheet, TextOverflow, TextWrapMode,
+    OverflowWrap, Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style,
+    StyleSelector, StyleSheet, TextOverflow, TextWrapMode,
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
@@ -2119,6 +2119,7 @@ fn table_view_renders_document_table_elements_and_shared_tracks() {
 fn text_view_renders_wrapped_and_truncated_specimens() {
     let output = lab_output("text");
     let wrapped = frame(&output, "text-wrap-body");
+    let break_word = frame(&output, "text-break-word-body");
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
     let pre = frame(&output, "text-pre-body");
@@ -2128,6 +2129,14 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     assert!(
         wrapped.text_layout.as_ref().unwrap().line_count > 1,
         "text wrap specimen should be measured as multiple lines"
+    );
+    assert_eq!(
+        break_word.style.text_layout.overflow_wrap,
+        OverflowWrap::BreakWord
+    );
+    assert!(
+        break_word.text_layout.as_ref().unwrap().line_count > 1,
+        "overflow-wrap: break-word should break an otherwise unbreakable token"
     );
     assert_eq!(truncated.style.text_layout.max_lines, Some(1));
     assert_eq!(

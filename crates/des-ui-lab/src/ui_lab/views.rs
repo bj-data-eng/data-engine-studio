@@ -2942,6 +2942,14 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
             );
             text_specimen(
                 ui,
+                "text-break-word",
+                "Break word",
+                "overflow-wrap: break-word",
+                "supercalifragilisticexpialidocious_filename_without_separators.parquet",
+                "text-box-break-word",
+            );
+            text_specimen(
+                ui,
                 "text-truncate",
                 "Truncate",
                 "width: Px(220); text-wrap: Truncate",

@@ -1032,7 +1032,7 @@ fn cosmic_wrap(request: &TextLayoutRequest<'_>) -> Wrap {
         TextWrapMode::Wrap => {
             if matches!(
                 request.layout_style.overflow_wrap,
-                des_document::OverflowWrap::Anywhere
+                des_document::OverflowWrap::Anywhere | des_document::OverflowWrap::BreakWord
             ) || matches!(
                 request.layout_style.word_break,
                 des_document::WordBreak::BreakAll
@@ -1690,6 +1690,30 @@ mod tests {
 
         assert!(measured.size.width > 0.0);
         assert!(measured.line_count >= 1);
+    }
+
+    #[test]
+    fn measures_break_word_as_wrappable_long_token() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("supercalifragilisticexpialidocious");
+        let mut style = TextLayoutStyle::default();
+        style.overflow_wrap = des_document::OverflowWrap::BreakWord;
+        let normalized = NormalizedText::from_content(&content, style);
+
+        let measured = renderer.measure_text(TextLayoutRequest {
+            text: &normalized,
+            font_size: 16.0,
+            color: Color::rgb(24, 24, 30),
+            direction: Direction::Ltr,
+            wrap_width: 70.0,
+            layout_style: style,
+            line_height: Some(20.0),
+        });
+
+        assert!(
+            measured.line_count > 1,
+            "overflow-wrap: break-word should break long unspaced text"
+        );
     }
 
     #[test]
