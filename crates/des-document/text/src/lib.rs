@@ -144,6 +144,8 @@ pub struct CosmicTextRenderer {
     paint_run_cache_misses: usize,
 }
 
+const MIN_TEXT_PAINT_CACHE_TILE: f32 = 256.0;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TextBufferStats {
     pub cache_entries: usize,
@@ -302,7 +304,8 @@ impl CosmicTextRenderer {
     ) -> TextPaintGlyphRun {
         let scale = pixels_per_point.max(1.0);
         let buffer_key = TextBufferKey::new(&request, scale);
-        let paint_key = TextPaintGlyphRunKey::new(buffer_key.clone(), visible_rect);
+        let cache_rect = visible_rect.map(text_paint_cache_rect);
+        let paint_key = TextPaintGlyphRunKey::new(buffer_key.clone(), cache_rect);
         if let Some(run) = self.paint_runs.get(&paint_key).cloned() {
             self.paint_run_cache_hits += 1;
             return run;
@@ -312,7 +315,7 @@ impl CosmicTextRenderer {
             self.paint_runs.clear();
         }
         let run = self.with_buffer_key(buffer_key, request.clone(), scale, |buffer, _| {
-            collect_text_paint_glyph_run(&request, buffer, scale, visible_rect)
+            collect_text_paint_glyph_run(&request, buffer, scale, cache_rect)
         });
         self.paint_runs.insert(paint_key, run.clone());
         run
@@ -538,6 +541,25 @@ impl From<Rect> for RectKey {
             height: f32_key(rect.size.height),
         }
     }
+}
+
+fn text_paint_cache_rect(rect: Rect) -> Rect {
+    if !rect.origin.x.is_finite()
+        || !rect.origin.y.is_finite()
+        || !rect.size.width.is_finite()
+        || !rect.size.height.is_finite()
+    {
+        return rect;
+    }
+
+    // Cache a snapped coverage rect, not the exact clip. egui still owns final clipping;
+    // this just prevents small scroll deltas from forcing a new cosmic paint run.
+    let tile_width = rect.size.width.max(MIN_TEXT_PAINT_CACHE_TILE).ceil();
+    let tile_height = rect.size.height.max(MIN_TEXT_PAINT_CACHE_TILE).ceil();
+    let origin_x = (rect.origin.x / tile_width).floor() * tile_width;
+    let origin_y = (rect.origin.y / tile_height).floor() * tile_height;
+
+    Rect::new(origin_x, origin_y, tile_width * 2.0, tile_height * 2.0)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -2139,6 +2161,38 @@ mod tests {
         assert_eq!(stats.paint_run_cache_hits, 1);
         assert_eq!(stats.paint_run_cache_misses, 0);
         assert!(stats.paint_run_cache_entries > 0);
+    }
+
+    #[test]
+    fn paint_glyphs_reuse_cached_runs_across_nearby_visible_rects() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Nearby scroll offsets should not reshape warm text");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let request = request(&normalized, 24.0, 420.0);
+        let first_visible = Some(Rect::new(0.0, 0.0, 240.0, 80.0));
+        let nearby_visible = Some(Rect::new(0.0, 32.0, 240.0, 80.0));
+
+        let cold = renderer.paint_glyphs(request.clone(), 2.0, first_visible);
+        assert!(!cold.glyphs.is_empty());
+        renderer.begin_frame();
+        let nearby = renderer.paint_glyphs(request, 2.0, nearby_visible);
+        let stats = renderer.buffer_stats();
+
+        assert_eq!(nearby, cold);
+        assert_eq!(stats.paint_run_cache_hits, 1);
+        assert_eq!(stats.paint_run_cache_misses, 0);
+    }
+
+    #[test]
+    fn text_paint_cache_rect_covers_adjacent_scroll_offsets() {
+        let first = text_paint_cache_rect(Rect::new(0.0, 0.0, 240.0, 80.0));
+        let nearby = text_paint_cache_rect(Rect::new(0.0, 32.0, 240.0, 80.0));
+        let distant = text_paint_cache_rect(Rect::new(0.0, 300.0, 240.0, 80.0));
+
+        assert_eq!(nearby, first);
+        assert_ne!(distant, first);
+        assert!(first.size.width >= 480.0);
+        assert!(first.size.height >= 512.0);
     }
 
     #[test]

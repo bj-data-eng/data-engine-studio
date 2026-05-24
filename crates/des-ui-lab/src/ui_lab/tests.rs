@@ -2332,6 +2332,37 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
 }
 
 #[test]
+fn text_view_reuses_text_paint_runs_during_nearby_scroll() {
+    let mut harness = lab_harness("text");
+    let initial = render_harness(&mut harness);
+    harness
+        .state_mut()
+        .document_engine
+        .element_state_mut("stage")
+        .expect("text view has stage scroll state")
+        .scroll_y = 32.0;
+    let nearby = render_harness(&mut harness);
+    let nearby_stats = harness.state().last_perf.text_paint;
+
+    assert!(
+        image_stats(&initial).non_transparent_pixels > 20_000,
+        "initial text view should render visible specimen output"
+    );
+    assert!(
+        image_stats(&nearby).non_transparent_pixels > 20_000,
+        "nearby scrolled text view should render visible specimen output"
+    );
+    assert!(
+        compare_images(&initial, &nearby).differing_pixels > 1_000,
+        "test should actually exercise a changed scroll viewport"
+    );
+    assert!(
+        nearby_stats.paint_run_cache_hits > 0,
+        "nearby scroll should reuse retained expanded cosmic text paint runs"
+    );
+}
+
+#[test]
 fn text_view_allows_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
     let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");
