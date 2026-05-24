@@ -901,6 +901,33 @@ pub fn paint_scroll_chrome(ui: &mut egui::Ui, origin: egui::Pos2, chromes: &[Scr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use des_document::{ComputedStyle, Element, ElementId};
+
+    fn resolved_frame(id: &str, z_index: i32, background: Color) -> ResolvedElement {
+        let mut style = ComputedStyle {
+            background: Some(background),
+            z_index,
+            ..ComputedStyle::default()
+        };
+        style.radius = CornerRadii::ZERO;
+        ResolvedElement {
+            id: ElementId::new(id),
+            element: Element::Div,
+            classes: Vec::new(),
+            rect: Rect::new(0.0, 0.0, 20.0, 20.0),
+            clip_rect: ClipRect::from_rect(Rect::new(0.0, 0.0, 20.0, 20.0)),
+            style,
+            text: None,
+            text_layout: None,
+            selectable_text: false,
+            copyable_text: false,
+            value: None,
+            glyph: None,
+            interactive: false,
+            floating: None,
+            children: Vec::new(),
+        }
+    }
 
     #[test]
     fn floating_arrow_points_attach_to_opposite_side_of_placement() {
@@ -959,6 +986,45 @@ mod tests {
                 gap: 0.0,
                 leading_gap: 3.0,
             }
+        );
+    }
+
+    #[test]
+    fn paint_frame_emits_children_in_z_index_order() {
+        let mut root = resolved_frame("root", 0, Color::rgb(0, 0, 0));
+        root.children = vec![
+            resolved_frame("front", 10, Color::rgb(0, 255, 0)),
+            resolved_frame("back", -1, Color::rgb(255, 0, 0)),
+        ];
+        let ctx = egui::Context::default();
+
+        let output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(40.0, 40.0),
+                )),
+                ..Default::default()
+            },
+            |ui| paint_frame(ui, egui::Pos2::ZERO, &root, None),
+        );
+
+        let fills: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::epaint::Shape::Rect(rect) if rect.fill != egui::Color32::TRANSPARENT => {
+                    Some(rect.fill)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            fills,
+            vec![
+                egui::Color32::from_rgb(255, 0, 0),
+                egui::Color32::from_rgb(0, 255, 0),
+            ]
         );
     }
 }

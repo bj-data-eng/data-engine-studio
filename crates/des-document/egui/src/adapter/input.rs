@@ -33,3 +33,59 @@ pub fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
         scroll_delta: Point::new(input.smooth_scroll_delta.x, input.smooth_scroll_delta.y),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn document_input_subtracts_origin_and_preserves_time() {
+        let ctx = egui::Context::default();
+        let raw = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(200.0, 120.0),
+            )),
+            time: Some(7.5),
+            events: vec![egui::Event::PointerMoved(egui::pos2(42.0, 65.0))],
+            ..Default::default()
+        };
+        let mut input = None;
+
+        let _ = ctx.run_ui(raw, |ui| {
+            input = Some(document_input(ui, egui::pos2(10.0, 20.0)));
+        });
+
+        let pointer = input.unwrap().pointer.unwrap();
+        assert_eq!(pointer.position, Point::new(32.0, 45.0));
+        assert_eq!(pointer.time_seconds, 7.5);
+        assert!(!pointer.primary_down);
+    }
+
+    #[test]
+    fn document_input_maps_smooth_scroll_delta() {
+        let ctx = egui::Context::default();
+        let raw = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(200.0, 120.0),
+            )),
+            events: vec![egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(5.0, -7.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::default(),
+            }],
+            ..Default::default()
+        };
+        let mut input = None;
+
+        let _ = ctx.run_ui(raw, |ui| {
+            input = Some(document_input(ui, egui::Pos2::ZERO));
+        });
+
+        let scroll_delta = input.unwrap().scroll_delta;
+        assert!(scroll_delta.x > 0.0);
+        assert!(scroll_delta.y < 0.0);
+    }
+}

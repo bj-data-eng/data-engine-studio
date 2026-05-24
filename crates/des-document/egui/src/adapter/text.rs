@@ -187,3 +187,64 @@ pub(crate) fn layout_job(
 fn to_egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_premultiplied(color.r, color.g, color.b, color.a)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layout_job_extends_without_wrapping() {
+        let job = layout_job(
+            TextLayoutRequest {
+                text: "A line that should not wrap",
+                font_size: 14.0,
+                wrap_width: 10.0,
+                wrap_mode: TextWrapMode::Extend,
+                max_lines: Some(1),
+                line_height: Some(18.0),
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.wrap.max_width, f32::INFINITY);
+        assert_eq!(job.wrap.max_rows, 1);
+        assert_eq!(job.sections[0].format.line_height, Some(18.0));
+    }
+
+    #[test]
+    fn layout_job_truncate_forces_single_breakable_row() {
+        let job = layout_job(
+            TextLayoutRequest {
+                text: "truncate me",
+                font_size: 14.0,
+                wrap_width: 0.0,
+                wrap_mode: TextWrapMode::Truncate,
+                max_lines: Some(3),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(job.wrap.max_width, 1.0);
+        assert_eq!(job.wrap.max_rows, 1);
+        assert!(job.wrap.break_anywhere);
+    }
+
+    #[test]
+    fn configure_text_selection_input_sets_host_click_thresholds() {
+        let ctx = egui::Context::default();
+
+        configure_text_selection_input(&ctx);
+
+        ctx.options(|options| {
+            assert_eq!(
+                options.input_options.max_click_duration,
+                TEXT_SELECTION_CLICK_INTERVAL.as_secs_f64()
+            );
+            assert_eq!(
+                options.input_options.max_click_dist,
+                TEXT_SELECTION_CLICK_DISTANCE
+            );
+        });
+    }
+}
