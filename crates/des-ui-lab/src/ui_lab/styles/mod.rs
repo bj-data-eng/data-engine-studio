@@ -1,20 +1,20 @@
 mod framework;
 
 use super::{
-    BACKGROUND, CARD, CARD_HOVER, CARD_PRESSED, CARD_SELECTED, GREEN, PANEL, PANEL_ALT,
-    PRIMARY_CONTAINER, PURPLE, SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED,
-    SUCCESS_CONTAINER, SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TERTIARY_CONTAINER, TEXT,
-    TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
+    CARD, CARD_HOVER, CARD_PRESSED, CARD_SELECTED, GREEN, PANEL, PANEL_ALT, PRIMARY_CONTAINER,
+    PURPLE, SECONDARY_CONTAINER, SHADOW_COLOR, STROKE, STROKE_SELECTED, SUCCESS_CONTAINER,
+    SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TERTIARY_CONTAINER, TEXT, TEXT_ACCENT, TEXT_MUTED,
+    WARNING_CONTAINER,
 };
 use des_document::{
-    AlignItems, BorderStyle, Color, Direction, Element, ElementStateSelector, FlexDirection,
-    FlexWrap, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length,
-    Overflow, OverflowWrap, Point, Shadow, Style, StyleSelector, StyleSheet, TextAlign,
-    TextLayoutStyle, TextOverflow, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    WhiteSpace,
+    AlignItems, BorderStyle, Color, Direction, ElementStateSelector, FlexDirection, FlexWrap,
+    FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
+    OverflowWrap, Point, Shadow, Style, StyleSelector, StyleSheet, TextAlign, TextLayoutStyle,
+    TextOverflow, TextTransform, TextWrapMode, Transition, ViewportQuery, WhiteSpace,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
+const LAB_CSS: &str = include_str!("lab.css");
 
 pub(super) fn stylesheet() -> StyleSheet {
     let mut stylesheet = lab_stylesheet();
@@ -24,137 +24,7 @@ pub(super) fn stylesheet() -> StyleSheet {
 }
 
 fn lab_stylesheet() -> StyleSheet {
-    let mut stylesheet = StyleSheet::new();
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Root),
-        Style::default()
-            .flex_direction(FlexDirection::Column)
-            .background(BACKGROUND),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Div),
-        Style::default().flex_direction(FlexDirection::Column),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Button),
-        Style::default()
-            .padding(Insets::symmetric(12.0, 7.0))
-            .background(CARD)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Checkbox),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .align_items(AlignItems::Center)
-            .padding(Insets::symmetric(9.0, 7.0))
-            .gap(8.0)
-            .background(CARD)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Radio),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .align_items(AlignItems::Center)
-            .padding(Insets::symmetric(9.0, 7.0))
-            .gap(8.0)
-            .background(CARD)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Select),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .align_items(AlignItems::Center)
-            .justify_content(JustifyContent::SpaceBetween)
-            .padding(Insets::symmetric(10.0, 7.0))
-            .gap(8.0)
-            .background(CARD)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Input),
-        Style::default()
-            .padding(Insets::symmetric(10.0, 7.0))
-            .background(PANEL)
-            .border(STROKE)
-            .radius(5.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Icon),
-        Style::default()
-            .size(14.0, 14.0)
-            .font_size(14.0)
-            .text_color(TEXT_MUTED),
-    );
-    stylesheet.push_rule(
-        StyleSelector::Element(Element::Text),
-        Style::default()
-            .font_size(13.0)
-            .text_color(TEXT)
-            .text_selection_background(Color::rgba(103, 80, 164, 220))
-            .text_selection_color(PANEL),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("lab-root"),
-        Style::default()
-            .width_fill()
-            .height_fill()
-            .background(BACKGROUND)
-            .gap(0.0),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("topbar"),
-        Style::default()
-            .width_fill()
-            .height(Length::Px(58.0))
-            .padding(Insets::symmetric(18.0, 10.0))
-            .gap(3.0)
-            .background(PANEL),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("lab-body"),
-        Style::default()
-            .flex_direction(FlexDirection::Row)
-            .width_fill()
-            .height(Length::Px(0.0))
-            .flex_grow(1.0)
-            .padding(Insets::all(14.0))
-            .gap(14.0)
-            .background(BACKGROUND),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("nav"),
-        Style::default()
-            .width(Length::Px(242.0))
-            .height_fill()
-            .padding(Insets::all(12.0))
-            .gap(8.0)
-            .background(PANEL)
-            .border(STROKE)
-            .radius(8.0)
-            .overflow_y(Overflow::Scroll)
-            .z_index(10),
-    );
-    stylesheet.push_rule(
-        StyleSelector::class("stage"),
-        Style::default()
-            .width(Length::Px(0.0))
-            .height_fill()
-            .flex_grow(1.0)
-            .padding(Insets::all(18.0))
-            .gap(12.0)
-            .background(PANEL_ALT)
-            .border(STROKE)
-            .radius(8.0)
-            .overflow_y(Overflow::Scroll)
-            .scrollbar_width(2.0),
-    );
+    let mut stylesheet = StyleSheet::parse_css(LAB_CSS).expect("lab CSS stylesheet is valid");
     stylesheet.push_rule(
         StyleSelector::class("box-model-grid"),
         Style::default()

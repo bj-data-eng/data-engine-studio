@@ -28,7 +28,6 @@ use des_widgets::{
 use eframe::egui;
 use std::time::{Duration, Instant};
 
-const BACKGROUND: Color = Color::rgb(247, 239, 250);
 const PANEL: Color = Color::rgb(255, 251, 254);
 const PANEL_ALT: Color = Color::rgb(250, 244, 252);
 const CARD: Color = Color::rgb(255, 251, 254);
