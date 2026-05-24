@@ -8,8 +8,8 @@ use des_document::{
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
 };
 use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
+    collections::{HashMap, HashSet, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
     ops::Range,
     sync::Arc,
 };
@@ -474,7 +474,7 @@ impl ScaleTextLayoutResult for TextLayoutResult {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct TextBufferKey {
-    layout_text: String,
+    text: TextContentFingerprint,
     font_size: u32,
     color: [u8; 4],
     direction: DirectionKey,
@@ -482,13 +482,13 @@ struct TextBufferKey {
     layout_style: TextLayoutStyleKey,
     line_height: Option<u32>,
     scale: u32,
-    runs: Vec<TextRunKey>,
+    runs: Vec<InlineStyleKey>,
 }
 
 impl TextBufferKey {
     fn new(request: &TextLayoutRequest<'_>, scale: f32) -> Self {
         Self {
-            layout_text: request.text.layout_text().to_string(),
+            text: TextContentFingerprint::new(request),
             font_size: f32_key(request.font_size),
             color: color_key(request.color),
             direction: DirectionKey::from(request.direction),
@@ -500,11 +500,41 @@ impl TextBufferKey {
                 .text
                 .runs()
                 .iter()
-                .map(|run| TextRunKey {
-                    text: run.text.clone(),
-                    style: InlineStyleKey::from(&run.style),
-                })
+                .map(|run| InlineStyleKey::from(&run.style))
                 .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct TextContentFingerprint {
+    layout_bytes: usize,
+    layout_chars: usize,
+    run_count: usize,
+    hash_a: u64,
+    hash_b: u64,
+}
+
+impl TextContentFingerprint {
+    fn new(request: &TextLayoutRequest<'_>) -> Self {
+        let mut primary = DefaultHasher::new();
+        let mut secondary = DefaultHasher::new();
+        "des-text-layout-v1".hash(&mut primary);
+        "des-text-runs-v1".hash(&mut secondary);
+        request.text.layout_text().hash(&mut primary);
+        request.text.layout_text().hash(&mut secondary);
+        for run in request.text.runs() {
+            run.text.hash(&mut primary);
+            run.text.len().hash(&mut secondary);
+            run.text.hash(&mut secondary);
+        }
+
+        Self {
+            layout_bytes: request.text.layout_text().len(),
+            layout_chars: request.text.layout_text().chars().count(),
+            run_count: request.text.runs().len(),
+            hash_a: primary.finish(),
+            hash_b: secondary.finish(),
         }
     }
 }
@@ -575,12 +605,6 @@ impl From<Direction> for DirectionKey {
             Direction::Rtl => Self::Rtl,
         }
     }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct TextRunKey {
-    text: String,
-    style: InlineStyleKey,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -2181,6 +2205,25 @@ mod tests {
         assert_eq!(nearby, cold);
         assert_eq!(stats.paint_run_cache_hits, 1);
         assert_eq!(stats.paint_run_cache_misses, 0);
+    }
+
+    #[test]
+    fn text_buffer_cache_key_distinguishes_run_boundaries_without_storing_run_text() {
+        let mut renderer = renderer();
+        let first_content = TextContent::new(vec![TextRun::plain("ab"), TextRun::plain("c")]);
+        let second_content = TextContent::new(vec![TextRun::plain("a"), TextRun::plain("bc")]);
+        let first = NormalizedText::from_content(&first_content, TextLayoutStyle::default());
+        let second = NormalizedText::from_content(&second_content, TextLayoutStyle::default());
+
+        assert_eq!(first.layout_text(), second.layout_text());
+
+        renderer.measure_text(request(&first, 16.0, 240.0));
+        renderer.measure_text(request(&second, 16.0, 240.0));
+        let stats = renderer.buffer_stats();
+
+        assert_eq!(stats.cache_misses, 2);
+        assert_eq!(stats.cache_hits, 0);
+        assert_eq!(stats.cache_entries, 2);
     }
 
     #[test]
