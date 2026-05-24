@@ -165,15 +165,19 @@ pub struct TextLayoutStyle {
     pub text_wrap_mode: TextWrapMode,
     pub overflow_wrap: OverflowWrap,
     pub word_break: WordBreak,
+    pub tab_size: u16,
     pub max_lines: Option<usize>,
 }
 
 impl TextLayoutStyle {
+    pub const DEFAULT_TAB_SIZE: u16 = 8;
+
     pub const DEFAULT: Self = Self {
         white_space_collapse: WhiteSpaceCollapse::Collapse,
         text_wrap_mode: TextWrapMode::Wrap,
         overflow_wrap: OverflowWrap::Normal,
         word_break: WordBreak::Normal,
+        tab_size: Self::DEFAULT_TAB_SIZE,
         max_lines: None,
     };
 
@@ -381,7 +385,7 @@ impl TextNormalizer {
                             self.emit_char(ch, semantic_index);
                         }
                     }
-                    WhiteSpaceCollapse::Preserve => self.emit_char(ch, semantic_index),
+                    WhiteSpaceCollapse::Preserve => self.emit_preserved_char(ch, semantic_index),
                     WhiteSpaceCollapse::PreserveBreaks => {
                         if ch == '\n' {
                             self.emit_char(ch, semantic_index);
@@ -396,7 +400,7 @@ impl TextNormalizer {
                     }
                     WhiteSpaceCollapse::BreakSpaces => {
                         if ch == '\t' {
-                            self.emit_char(' ', semantic_index);
+                            self.emit_tab(semantic_index);
                         } else {
                             self.emit_char(ch, semantic_index);
                         }
@@ -445,6 +449,21 @@ impl TextNormalizer {
             self.semantic_to_layout.push(layout_index);
         }
         self.last_emitted_space = ch == ' ' || ch == '\n';
+    }
+
+    fn emit_preserved_char(&mut self, ch: char, semantic_index: usize) {
+        if ch == '\t' {
+            self.emit_tab(semantic_index);
+        } else {
+            self.emit_char(ch, semantic_index);
+        }
+    }
+
+    fn emit_tab(&mut self, semantic_index: usize) {
+        let width = self.style.tab_size.max(1);
+        for _ in 0..width {
+            self.emit_char(' ', semantic_index);
+        }
     }
 }
 
@@ -749,6 +768,7 @@ mod tests {
                 text_wrap_mode: TextWrapMode::Wrap,
                 overflow_wrap: OverflowWrap::Normal,
                 word_break: WordBreak::Normal,
+                tab_size: TextLayoutStyle::DEFAULT_TAB_SIZE,
                 max_lines: None,
             }
         );
@@ -779,6 +799,31 @@ mod tests {
         );
 
         assert_eq!(normalized.layout_text(), "Alpha beta\ngamma");
+    }
+
+    #[test]
+    fn preserved_tabs_expand_with_css_default_tab_size() {
+        let content = TextContent::plain("a\tb");
+        let normalized =
+            NormalizedText::from_content(&content, TextLayoutStyle::white_space(WhiteSpace::Pre));
+
+        assert_eq!(normalized.layout_text(), "a        b");
+        assert_eq!(normalized.layout_to_semantic_index(1), 1);
+        assert_eq!(normalized.layout_to_semantic_index(8), 1);
+        assert_eq!(normalized.semantic_to_layout_index(1), 1);
+        assert_eq!(normalized.semantic_to_layout_index(2), 9);
+    }
+
+    #[test]
+    fn text_layout_style_can_override_tab_size() {
+        let content = TextContent::plain("a\tb");
+        let mut style = TextLayoutStyle::white_space(WhiteSpace::Pre);
+        style.tab_size = 3;
+        let normalized = NormalizedText::from_content(&content, style);
+
+        assert_eq!(normalized.layout_text(), "a   b");
+        assert_eq!(normalized.layout_to_semantic_index(3), 1);
+        assert_eq!(normalized.semantic_to_layout_index(2), 4);
     }
 
     #[test]
