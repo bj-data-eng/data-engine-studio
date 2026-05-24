@@ -752,6 +752,88 @@ fn css_stylesheet_parser_resolves_child_combinators() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_sibling_combinators() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "marker",
+            ElementSpec::new(Element::Div).class("marker"),
+        )
+        .unwrap();
+    document
+        .append_text(
+            "root",
+            "first-title",
+            ElementSpec::new(Element::Text).class("title"),
+            "First title",
+        )
+        .unwrap();
+    document
+        .append_element(
+            "root",
+            "divider",
+            ElementSpec::new(Element::Div).class("divider"),
+        )
+        .unwrap();
+    document
+        .append_text(
+            "root",
+            "second-title",
+            ElementSpec::new(Element::Text).class("title"),
+            "Second title",
+        )
+        .unwrap();
+
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        .marker:hover + text.title {
+            width: 210px;
+            color: #6750a4;
+        }
+
+        .marker ~ text.title {
+            height: 28px;
+        }
+        "#,
+    )
+    .unwrap();
+    let mut states = HashMap::new();
+    let mut marker_state = ElementState::default();
+    marker_state.hovered = true;
+    states.insert(ElementId::new("marker"), marker_state);
+
+    document.apply_stylesheet(&stylesheet, &states).unwrap();
+
+    assert_eq!(
+        document.layout_style("first-title").unwrap().size.width,
+        length::<_, Dimension>(210.0)
+    );
+    assert_eq!(
+        document
+            .resolved_layout()
+            .unwrap()
+            .find("first-title")
+            .unwrap()
+            .style
+            .text_color,
+        Color::rgb(103, 80, 164)
+    );
+    assert_eq!(
+        document.layout_style("first-title").unwrap().size.height,
+        length::<_, Dimension>(28.0)
+    );
+    assert_eq!(
+        document.layout_style("second-title").unwrap().size.width,
+        Dimension::auto()
+    );
+    assert_eq!(
+        document.layout_style("second-title").unwrap().size.height,
+        length::<_, Dimension>(28.0)
+    );
+}
+
+#[test]
 fn css_stylesheet_parser_accepts_box_shadow_none() {
     let stylesheet = StyleSheet::parse_css(".panel { box-shadow: none; }").unwrap();
     let mut document = Document::new(Size::new(800.0, 600.0));

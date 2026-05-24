@@ -287,12 +287,7 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
     if input.is_empty() {
         return Err(CssParseError::new("CSS selector is empty"));
     }
-    if input.contains('+') || input.contains('~') {
-        return Err(CssParseError::new(
-            "sibling combinators are not supported by this CSS slice yet",
-        ));
-    }
-    if input.contains('>') {
+    if input.contains('>') || input.contains('+') || input.contains('~') {
         let parts = parse_complex_selector(input)?;
         return Ok(StyleSelector::Complex(ComplexSelector::new(parts)));
     }
@@ -325,13 +320,14 @@ fn parse_complex_selector(input: &str) -> Result<Vec<ComplexSelectorPart>, CssPa
         }
 
         let rest = &input[cursor..];
-        if rest.starts_with('>') {
-            if parts.is_empty() || pending_combinator == Some(SelectorCombinator::Child) {
-                return Err(CssParseError::new(
-                    "CSS child selector is missing a subject",
-                ));
+        if let Some(combinator) = explicit_combinator(rest) {
+            if parts.is_empty()
+                || pending_combinator
+                    .is_some_and(|pending| pending != SelectorCombinator::Descendant)
+            {
+                return Err(CssParseError::new("CSS combinator is missing a subject"));
             }
-            pending_combinator = Some(SelectorCombinator::Child);
+            pending_combinator = Some(combinator);
             cursor += 1;
             continue;
         }
@@ -342,7 +338,7 @@ fn parse_complex_selector(input: &str) -> Result<Vec<ComplexSelectorPart>, CssPa
                 .chars()
                 .next()
                 .expect("cursor is inside selector");
-            if ch.is_whitespace() || ch == '>' {
+            if ch.is_whitespace() || matches!(ch, '>' | '+' | '~') {
                 break;
             }
             cursor += ch.len_utf8();
@@ -383,6 +379,15 @@ fn parse_complex_selector(input: &str) -> Result<Vec<ComplexSelectorPart>, CssPa
     }
 
     Ok(parts)
+}
+
+fn explicit_combinator(input: &str) -> Option<SelectorCombinator> {
+    match input.chars().next()? {
+        '>' => Some(SelectorCombinator::Child),
+        '+' => Some(SelectorCombinator::AdjacentSibling),
+        '~' => Some(SelectorCombinator::GeneralSibling),
+        _ => None,
+    }
 }
 
 fn skip_selector_whitespace(input: &str, mut cursor: usize) -> usize {

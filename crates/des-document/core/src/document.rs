@@ -462,19 +462,37 @@ impl Document {
         resolve_container_queries: bool,
     ) -> DocumentResult<StyleResolutionReport> {
         let mut positions = Vec::new();
-        self.collect_positions(self.root.clone(), None, &mut Vec::new(), &mut positions)?;
+        self.collect_positions(
+            self.root.clone(),
+            None,
+            &mut Vec::new(),
+            Vec::new(),
+            &mut positions,
+        )?;
         let mut report = StyleResolutionReport {
             visited: positions.len(),
             ..Default::default()
         };
 
-        for (id, position, ancestor_ids) in positions {
+        for (id, position, ancestor_ids, previous_sibling_ids) in positions {
             let element = self.snapshot_element(&id)?;
             let ancestors = ancestor_ids
                 .iter()
                 .map(|(id, position)| self.snapshot_element(id).map(|node| (node, *position)))
                 .collect::<DocumentResult<Vec<_>>>()?;
+            let previous_siblings = previous_sibling_ids
+                .iter()
+                .map(|(id, position)| self.snapshot_element(id).map(|node| (node, *position)))
+                .collect::<DocumentResult<Vec<_>>>()?;
             let ancestor_contexts = ancestors
+                .iter()
+                .map(|(element, position)| StyleMatchContext {
+                    element,
+                    state: states.get(&element.id),
+                    position: *position,
+                })
+                .collect::<Vec<_>>();
+            let previous_sibling_contexts = previous_siblings
                 .iter()
                 .map(|(element, position)| StyleMatchContext {
                     element,
@@ -488,6 +506,7 @@ impl Document {
                 states.get(&id),
                 position,
                 &ancestor_contexts,
+                &previous_sibling_contexts,
                 self.viewport,
                 if resolve_container_queries {
                     self.parent_container_size(&id)?
@@ -946,28 +965,34 @@ impl Document {
         id: ElementId,
         position: Option<ChildPosition>,
         ancestors: &mut Vec<(ElementId, Option<ChildPosition>)>,
+        previous_siblings: Vec<(ElementId, Option<ChildPosition>)>,
         positions: &mut Vec<(
             ElementId,
             Option<ChildPosition>,
             Vec<(ElementId, Option<ChildPosition>)>,
+            Vec<(ElementId, Option<ChildPosition>)>,
         )>,
     ) -> DocumentResult<()> {
-        positions.push((id.clone(), position, ancestors.clone()));
+        positions.push((id.clone(), position, ancestors.clone(), previous_siblings));
 
         let children = self.children(id)?;
         let sibling_count = children.len();
         let current = positions
             .last()
-            .map(|(id, position, _)| (id.clone(), *position))
+            .map(|(id, position, _, _)| (id.clone(), *position))
             .expect("current style position was just recorded");
         ancestors.push(current);
+        let mut previous_siblings = Vec::new();
         for (index, child) in children.into_iter().enumerate() {
+            let child_position = Some(ChildPosition::new(index, sibling_count));
             self.collect_positions(
-                child,
-                Some(ChildPosition::new(index, sibling_count)),
+                child.clone(),
+                child_position,
                 ancestors,
+                previous_siblings.clone(),
                 positions,
             )?;
+            previous_siblings.push((child, child_position));
         }
         ancestors.pop();
 

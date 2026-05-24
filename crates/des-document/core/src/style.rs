@@ -291,6 +291,8 @@ pub struct CompoundSelector {
 pub enum SelectorCombinator {
     Descendant,
     Child,
+    AdjacentSibling,
+    GeneralSibling,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2276,6 +2278,7 @@ pub(crate) fn resolve_style_with_position(
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
     ancestors: &[StyleMatchContext<'_>],
+    previous_siblings: &[StyleMatchContext<'_>],
     viewport: Size,
     container: Option<Size>,
 ) -> ComputedStyle {
@@ -2284,7 +2287,14 @@ pub(crate) fn resolve_style_with_position(
     for index in stylesheet.index.candidates_for(element) {
         let rule = &stylesheet.rules[index];
         if rule_matches(
-            rule, element, state, position, ancestors, viewport, container,
+            rule,
+            element,
+            state,
+            position,
+            ancestors,
+            previous_siblings,
+            viewport,
+            container,
         ) {
             style.apply(&rule.style);
         }
@@ -2380,6 +2390,7 @@ fn selector_matches(
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
     ancestors: &[StyleMatchContext<'_>],
+    previous_siblings: &[StyleMatchContext<'_>],
 ) -> bool {
     match selector {
         StyleSelector::Element(target) => element.spec.element == *target,
@@ -2413,9 +2424,14 @@ fn selector_matches(
         StyleSelector::Descendant(selectors) => {
             descendant_selector_matches(selectors, element, state, position, ancestors)
         }
-        StyleSelector::Complex(selector) => {
-            complex_selector_matches(selector, element, state, position, ancestors)
-        }
+        StyleSelector::Complex(selector) => complex_selector_matches(
+            selector,
+            element,
+            state,
+            position,
+            ancestors,
+            previous_siblings,
+        ),
     }
 }
 
@@ -2425,12 +2441,20 @@ fn rule_matches(
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
     ancestors: &[StyleMatchContext<'_>],
+    previous_siblings: &[StyleMatchContext<'_>],
     viewport: Size,
     container: Option<Size>,
 ) -> bool {
     rule.condition
         .is_none_or(|condition| condition.matches(viewport, container))
-        && selector_matches(&rule.selector, element, state, position, ancestors)
+        && selector_matches(
+            &rule.selector,
+            element,
+            state,
+            position,
+            ancestors,
+            previous_siblings,
+        )
 }
 
 fn compound_selector_matches(
@@ -2515,6 +2539,7 @@ fn complex_selector_matches(
     state: Option<&ElementState>,
     position: Option<ChildPosition>,
     ancestors: &[StyleMatchContext<'_>],
+    previous_siblings: &[StyleMatchContext<'_>],
 ) -> bool {
     let Some(target) = selector.parts.last() else {
         return false;
@@ -2524,6 +2549,7 @@ fn complex_selector_matches(
     }
 
     let mut ancestor_end = ancestors.len();
+    let mut sibling_end = previous_siblings.len();
     for index in (1..selector.parts.len()).rev() {
         let previous = &selector.parts[index - 1].selector;
         match selector.parts[index].combinator {
@@ -2541,6 +2567,7 @@ fn complex_selector_matches(
                     return false;
                 }
                 ancestor_end = parent_index;
+                sibling_end = 0;
             }
             Some(SelectorCombinator::Descendant) => {
                 let Some(found_index) = (0..ancestor_end).rev().find(|index| {
@@ -2555,6 +2582,36 @@ fn complex_selector_matches(
                     return false;
                 };
                 ancestor_end = found_index;
+                sibling_end = 0;
+            }
+            Some(SelectorCombinator::AdjacentSibling) => {
+                let Some(sibling_index) = sibling_end.checked_sub(1) else {
+                    return false;
+                };
+                let sibling = &previous_siblings[sibling_index];
+                if !compound_selector_matches(
+                    previous,
+                    sibling.element,
+                    sibling.state,
+                    sibling.position,
+                ) {
+                    return false;
+                }
+                sibling_end = sibling_index;
+            }
+            Some(SelectorCombinator::GeneralSibling) => {
+                let Some(found_index) = (0..sibling_end).rev().find(|index| {
+                    let sibling = &previous_siblings[*index];
+                    compound_selector_matches(
+                        previous,
+                        sibling.element,
+                        sibling.state,
+                        sibling.position,
+                    )
+                }) else {
+                    return false;
+                };
+                sibling_end = found_index;
             }
             None => return false,
         }

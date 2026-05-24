@@ -35,6 +35,7 @@ pub(crate) fn update_element_style_animation(
         snap_epsilon,
         None,
         &mut Vec::new(),
+        &[],
         viewport,
         container_size,
     )
@@ -47,11 +48,20 @@ fn update_element_style_animation_at<'a>(
     snap_epsilon: f32,
     position: Option<ChildPosition>,
     ancestors: &mut Vec<(&'a DocumentNode, Option<ChildPosition>)>,
+    previous_siblings: &[(&'a DocumentNode, Option<ChildPosition>)],
     viewport: Size,
     container_size: &dyn Fn(&ElementId) -> Option<Size>,
 ) -> AnimationUpdate {
     let target_style = {
         let ancestor_contexts = ancestors
+            .iter()
+            .map(|(element, position)| StyleMatchContext {
+                element,
+                state: states.get(&element.id),
+                position: *position,
+            })
+            .collect::<Vec<_>>();
+        let previous_sibling_contexts = previous_siblings
             .iter()
             .map(|(element, position)| StyleMatchContext {
                 element,
@@ -65,6 +75,7 @@ fn update_element_style_animation_at<'a>(
             states.get(&element.id),
             position,
             &ancestor_contexts,
+            &previous_sibling_contexts,
             viewport,
             container_size(&element.id),
         )
@@ -89,17 +100,21 @@ fn update_element_style_animation_at<'a>(
     }
 
     ancestors.push((element, position));
+    let mut previous_siblings = Vec::new();
     for (index, child) in element.children.iter().enumerate() {
+        let child_position = Some(ChildPosition::new(index, element.children.len()));
         update += update_element_style_animation_at(
             child,
             stylesheet,
             states,
             snap_epsilon,
-            Some(ChildPosition::new(index, element.children.len())),
+            child_position,
             ancestors,
+            &previous_siblings,
             viewport,
             container_size,
         );
+        previous_siblings.push((child, child_position));
     }
     ancestors.pop();
 
