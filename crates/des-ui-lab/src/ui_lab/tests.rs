@@ -2288,9 +2288,17 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         first_stats.atlas_pages > 0,
         "text paint should create at least one glyph atlas page"
     );
+    assert!(
+        warm_stats.measure_requests == 0,
+        "warm text paint should reuse retained document layout without text measurement requests"
+    );
     assert_eq!(
         warm_stats.rasterizations, 0,
         "warm text paint should reuse the glyph atlas without rasterizing glyphs"
+    );
+    assert_eq!(
+        warm_stats.uploaded_pixels, 0,
+        "warm text paint should not upload new glyph atlas pixels"
     );
     assert_eq!(
         warm_stats.layout_cache_misses, 0,
@@ -2355,8 +2363,16 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
         "scrolled text paint should retain cosmic text buffers"
     );
     assert_eq!(
+        warm_stats.measure_requests, 0,
+        "warm scrolled text paint should reuse retained document layout without text measurement requests"
+    );
+    assert_eq!(
         warm_stats.rasterizations, 0,
         "warm scrolled text paint should reuse the glyph atlas without rasterizing glyphs"
+    );
+    assert_eq!(
+        warm_stats.uploaded_pixels, 0,
+        "warm scrolled text paint should not upload new glyph atlas pixels"
     );
     assert_eq!(
         warm_stats.layout_cache_misses, 0,
