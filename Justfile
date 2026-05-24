@@ -12,6 +12,10 @@ fmt-check:
 check:
     cargo check --workspace
 
+build-mac:
+    cargo build --release -p des-ui-lab --bin des-ui-dev
+    exec ./target/release/des-ui-dev
+
 test:
     cargo nextest run --workspace
 
