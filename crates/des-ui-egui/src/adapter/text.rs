@@ -1,4 +1,4 @@
-use des_ui_document::{
+use des_document::{
     Color, DocumentOutput, Point, Size, TextLayoutRequest, TextLayoutResult, TextMeasurer,
     TextMeasurerKey, TextWrapMode,
 };

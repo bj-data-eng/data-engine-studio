@@ -6,4 +6,4 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-des-ui-document.workspace = true
+des-document.workspace = true

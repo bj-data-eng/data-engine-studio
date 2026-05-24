@@ -5,12 +5,12 @@ use crate::geometry::{
 };
 use crate::state::ElementState;
 use crate::text::TextWrapMode;
-pub use layout_engine::prelude::{
+pub use des_layout::prelude::{
     Display, GridAutoFlow, MaxTrackSizingFunction, MinTrackSizingFunction, RepetitionCount,
     TrackSizingFunction,
 };
 
-pub use layout_engine::floating::{
+pub use des_layout::floating::{
     FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
     FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
     FloatingFlipCrossAxis, FloatingHide, FloatingHideData, FloatingHideStrategy, FloatingInline,
@@ -18,11 +18,11 @@ pub use layout_engine::floating::{
     FloatingSize, FloatingVisibility,
 };
 
-pub type GridPlacement = layout_engine::prelude::GridPlacement<String>;
-pub type GridPlacementLine = layout_engine::geometry::Line<GridPlacement>;
-pub type GridTemplateArea = layout_engine::style::GridTemplateArea<String>;
-pub type GridTemplateComponent = layout_engine::prelude::GridTemplateComponent<String>;
-pub type GridTemplateRepetition = layout_engine::style::GridTemplateRepetition<String>;
+pub type GridPlacement = des_layout::prelude::GridPlacement<String>;
+pub type GridPlacementLine = des_layout::geometry::Line<GridPlacement>;
+pub type GridTemplateArea = des_layout::style::GridTemplateArea<String>;
+pub type GridTemplateComponent = des_layout::prelude::GridTemplateComponent<String>;
+pub type GridTemplateRepetition = des_layout::style::GridTemplateRepetition<String>;
 pub type GridTrack = TrackSizingFunction;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -535,19 +535,19 @@ impl Anchor {
 
 fn legacy_main_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
     match placement.side() {
-        layout_engine::floating::FloatingSide::Top => -offset.y,
-        layout_engine::floating::FloatingSide::Right => offset.x,
-        layout_engine::floating::FloatingSide::Bottom => offset.y,
-        layout_engine::floating::FloatingSide::Left => -offset.x,
+        des_layout::floating::FloatingSide::Top => -offset.y,
+        des_layout::floating::FloatingSide::Right => offset.x,
+        des_layout::floating::FloatingSide::Bottom => offset.y,
+        des_layout::floating::FloatingSide::Left => -offset.x,
     }
 }
 
 fn legacy_cross_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
     match placement.side() {
-        layout_engine::floating::FloatingSide::Top
-        | layout_engine::floating::FloatingSide::Bottom => offset.x,
-        layout_engine::floating::FloatingSide::Right
-        | layout_engine::floating::FloatingSide::Left => offset.y,
+        des_layout::floating::FloatingSide::Top
+        | des_layout::floating::FloatingSide::Bottom => offset.x,
+        des_layout::floating::FloatingSide::Right
+        | des_layout::floating::FloatingSide::Left => offset.y,
     }
 }
 
@@ -1359,7 +1359,7 @@ impl Style {
     pub fn floating_arrow_size(mut self, width: f32, height: f32, padding: f32) -> Self {
         if let Some(anchor) = &mut self.anchor {
             anchor.options.arrow = Some(
-                FloatingArrow::new(layout_engine::geometry::Size { width, height })
+                FloatingArrow::new(des_layout::geometry::Size { width, height })
                     .padding(padding),
             );
         }

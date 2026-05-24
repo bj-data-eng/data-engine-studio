@@ -1,7 +1,7 @@
 use super::*;
-use des_ui_document::Glyph;
+use des_document::Glyph;
 
-pub(super) fn render_topbar(ui: &mut des_ui_document::DocumentBuilder, debug_overlay: bool) {
+pub(super) fn render_topbar(ui: &mut des_document::DocumentBuilder, debug_overlay: bool) {
     ui.element(
         "topbar",
         ElementSpec::new(Element::Div).class("topbar"),
@@ -24,7 +24,7 @@ pub(super) fn render_topbar(ui: &mut des_ui_document::DocumentBuilder, debug_ove
     );
 }
 
-pub(super) fn render_nav(ui: &mut des_ui_document::DocumentBuilder, selected: LabView) {
+pub(super) fn render_nav(ui: &mut des_document::DocumentBuilder, selected: LabView) {
     ui.element(
         "nav",
         ElementSpec::new(Element::Div)
@@ -90,7 +90,7 @@ fn view_hint(view: LabView) -> &'static str {
 }
 
 pub(super) fn render_stage(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
@@ -104,7 +104,7 @@ pub(super) fn render_stage(
     pressed_drag_source: Option<&str>,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    drag_pointer: Option<des_ui_document::Point>,
+    drag_pointer: Option<des_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     shadow_tune: ShadowTuneState,
@@ -149,7 +149,7 @@ pub(super) fn render_stage(
 }
 
 fn render_layout_view(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     _show_optional_card: bool,
     _dense_mode: bool,
 ) {
@@ -375,7 +375,7 @@ fn render_layout_view(
 }
 
 fn box_model_section_label(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
 ) {
@@ -387,9 +387,9 @@ fn box_model_section_label(
 }
 
 fn box_model_row(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
-    add_contents: impl FnOnce(&mut des_ui_document::DocumentBuilder),
+    add_contents: impl FnOnce(&mut des_document::DocumentBuilder),
 ) {
     ui.element(
         id,
@@ -399,7 +399,7 @@ fn box_model_row(
 }
 
 fn box_model_case(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     note: &'static str,
@@ -439,7 +439,7 @@ fn box_model_case(
 }
 
 fn box_model_subject(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     case_id: &'static str,
     subject_class: &'static str,
 ) {
@@ -575,7 +575,7 @@ fn box_model_subject(
     );
 }
 
-fn box_chip(ui: &mut des_ui_document::DocumentBuilder, case_id: &'static str, index: usize) {
+fn box_chip(ui: &mut des_document::DocumentBuilder, case_id: &'static str, index: usize) {
     ui.element(
         format!("{case_id}-chip-{index}"),
         ElementSpec::new(Element::Div).class("box-chip"),
@@ -584,7 +584,7 @@ fn box_chip(ui: &mut des_ui_document::DocumentBuilder, case_id: &'static str, in
 }
 
 fn render_interaction_view(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     checkbox_enabled: bool,
     radio_choice: usize,
     dropdown_open: bool,
@@ -661,14 +661,14 @@ fn render_interaction_view(
 }
 
 fn render_draggable_view(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
     pressed_drag_source: Option<&str>,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    drag_pointer: Option<des_ui_document::Point>,
+    drag_pointer: Option<des_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
@@ -692,7 +692,7 @@ fn render_draggable_view(
     );
 }
 
-fn render_document_update_loop(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_document_update_loop(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "loop-title",
         ElementSpec::new(Element::Text).class("section-title"),
@@ -766,7 +766,7 @@ fn render_document_update_loop(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn loop_result_card(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     box_id: &'static str,
     text_id: &'static str,
     title: &'static str,
@@ -791,14 +791,14 @@ fn loop_result_card(
 }
 
 fn render_drag_drop_lab(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     drag_item_cells: [usize; 3],
     drag_item_order: [usize; 3],
     scroll_list_item_order: [usize; 14],
     pressed_drag_source: Option<&str>,
     active_drag_item: Option<des_ui_widgets::SortableItemId>,
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
-    _drag_pointer: Option<des_ui_document::Point>,
+    _drag_pointer: Option<des_document::Point>,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     scroll_list_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
 ) {
@@ -860,7 +860,7 @@ fn render_drag_drop_lab(
 }
 
 fn render_elevated_scrollable_drag_list(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     title: &'static str,
     scroll_list_item_order: [usize; 14],
     active_scroll_list_drag_item: Option<des_ui_widgets::SortableItemId>,
@@ -893,9 +893,9 @@ fn render_elevated_scrollable_drag_list(
 }
 
 pub(super) fn render_drag_overlay_layer(
-    ui: &mut des_ui_document::DocumentBuilder,
-    drag_pointer: Option<des_ui_document::Point>,
-    drag_visual_clone: Option<&des_ui_document::VisualElementClone>,
+    ui: &mut des_document::DocumentBuilder,
+    drag_pointer: Option<des_document::Point>,
+    drag_visual_clone: Option<&des_document::VisualElementClone>,
 ) {
     if drag_pointer.is_none() {
         drag_overlay_placeholder(ui);
@@ -909,7 +909,7 @@ pub(super) fn render_drag_overlay_layer(
 }
 
 pub(super) fn render_debug_overlay_layer(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     perf: UiLabPerf,
 ) {
     ui.element(
@@ -992,7 +992,7 @@ pub(super) fn render_debug_overlay_layer(
 }
 
 fn debug_metric_row(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     value: String,
@@ -1020,7 +1020,7 @@ fn format_duration(duration: std::time::Duration) -> String {
 }
 
 fn drag_scroll_item(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     item: usize,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
@@ -1061,7 +1061,7 @@ fn drag_scroll_item(
     });
 }
 
-fn drag_scroll_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_space: bool) {
+fn drag_scroll_handle(ui: &mut des_document::DocumentBuilder, item: usize, origin_space: bool) {
     let mut handle_builder = ui
         .button(format!("drag-scroll-handle-{item}"))
         .class("drag-handle")
@@ -1083,7 +1083,7 @@ fn drag_scroll_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, or
 }
 
 fn drag_item(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     item: usize,
     drag_drop_preview: Option<des_ui_widgets::SortableDropPreview>,
     origin_space: bool,
@@ -1123,7 +1123,7 @@ fn drag_item(
     });
 }
 
-fn drag_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_space: bool) {
+fn drag_handle(ui: &mut des_document::DocumentBuilder, item: usize, origin_space: bool) {
     let mut handle_builder = ui
         .button(format!("drag-handle-{item}"))
         .class("drag-handle")
@@ -1144,17 +1144,17 @@ fn drag_handle(ui: &mut des_ui_document::DocumentBuilder, item: usize, origin_sp
 }
 
 fn drag_visual_overlay(
-    ui: &mut des_ui_document::DocumentBuilder,
-    clone: &des_ui_document::VisualElementClone,
+    ui: &mut des_document::DocumentBuilder,
+    clone: &des_document::VisualElementClone,
 ) {
     ui.visual_clone(
         clone,
-        des_ui_document::VisualCloneOptions::new("drag-overlay", "drag-overlay/")
+        des_document::VisualCloneOptions::new("drag-overlay", "drag-overlay/")
             .root_class("drag-overlay"),
     );
 }
 
-fn drag_overlay_placeholder(ui: &mut des_ui_document::DocumentBuilder) {
+fn drag_overlay_placeholder(ui: &mut des_document::DocumentBuilder) {
     ui.div("drag-overlay")
         .class("drag-overlay")
         .class("drag-overlay-idle")
@@ -1162,7 +1162,7 @@ fn drag_overlay_placeholder(ui: &mut des_ui_document::DocumentBuilder) {
         .empty();
 }
 
-fn control_checkbox(ui: &mut des_ui_document::DocumentBuilder, checked: bool) {
+fn control_checkbox(ui: &mut des_document::DocumentBuilder, checked: bool) {
     ui.element(
         "control-checkbox-card",
         ElementSpec::new(Element::Div).class("control-card"),
@@ -1207,7 +1207,7 @@ fn control_checkbox(ui: &mut des_ui_document::DocumentBuilder, checked: bool) {
     );
 }
 
-fn control_radio_group(ui: &mut des_ui_document::DocumentBuilder, choice: usize) {
+fn control_radio_group(ui: &mut des_document::DocumentBuilder, choice: usize) {
     ui.element(
         "control-radio-card",
         ElementSpec::new(Element::Div).class("control-card"),
@@ -1256,7 +1256,7 @@ fn control_radio_group(ui: &mut des_ui_document::DocumentBuilder, choice: usize)
     );
 }
 
-fn control_dropdown(ui: &mut des_ui_document::DocumentBuilder, open: bool, choice: usize) {
+fn control_dropdown(ui: &mut des_document::DocumentBuilder, open: bool, choice: usize) {
     let selected = ["CSV source", "DuckDB table", "Python node"][choice];
     ui.element(
         "control-dropdown-card",
@@ -1333,7 +1333,7 @@ fn control_dropdown(ui: &mut des_ui_document::DocumentBuilder, open: bool, choic
     );
 }
 
-fn control_text_inputs(ui: &mut des_ui_document::DocumentBuilder) {
+fn control_text_inputs(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "control-input-card",
         ElementSpec::new(Element::Div).class("control-card"),
@@ -1371,7 +1371,7 @@ fn control_text_inputs(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn render_styling_view(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     dense_mode: bool,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
@@ -1425,7 +1425,7 @@ fn render_styling_view(
     render_structural_selector_specimens(ui);
 }
 
-fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_shadow_specimens(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "shadow-specimen-title",
         ElementSpec::new(Element::Text).class("section-title"),
@@ -1479,7 +1479,7 @@ fn render_shadow_specimens(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn render_shadow_tuner(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
 ) {
@@ -1526,7 +1526,7 @@ fn render_shadow_tuner(
 }
 
 fn shadow_tune_preview_card(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
 ) {
@@ -1553,7 +1553,7 @@ fn shadow_tune_preview_card(
 }
 
 fn shadow_tune_group(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     target: ShadowTuneTarget,
     state: ShadowTuneState,
 ) {
@@ -1573,7 +1573,7 @@ fn shadow_tune_group(
 }
 
 fn shadow_tune_layer(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     target: ShadowTuneTarget,
     layer_index: usize,
     layer: ShadowTuneLayer,
@@ -1643,7 +1643,7 @@ fn shadow_tune_layer(
 }
 
 fn shadow_tune_control(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     target: ShadowTuneTarget,
     layer_index: usize,
     field: &'static str,
@@ -1673,7 +1673,7 @@ fn shadow_tune_control(
 }
 
 fn shadow_tune_button(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     target: ShadowTuneTarget,
     layer_index: usize,
     field: &'static str,
@@ -1722,7 +1722,7 @@ fn shadow_tune_output(base: ShadowTuneState, hover: ShadowTuneState) -> String {
 }
 
 fn shadow_item(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
@@ -1748,7 +1748,7 @@ fn shadow_item(
 }
 
 fn light_shadow_card(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     raised: bool,
@@ -1777,7 +1777,7 @@ fn light_shadow_card(
 }
 
 fn web_shadow_card(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     raised: bool,
@@ -1805,7 +1805,7 @@ fn web_shadow_card(
     });
 }
 
-fn render_structural_selector_specimens(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_structural_selector_specimens(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "structural-selector-title",
         ElementSpec::new(Element::Text).class("section-title"),
@@ -1881,7 +1881,7 @@ fn render_structural_selector_specimens(ui: &mut des_ui_document::DocumentBuilde
 }
 
 fn structural_item(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
@@ -1905,7 +1905,7 @@ fn structural_item(
 }
 
 fn structural_nested_item(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: String,
     label: &'static str,
     body: &'static str,
@@ -1928,7 +1928,7 @@ fn structural_nested_item(
     );
 }
 
-fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_animation_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "animation-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -2003,7 +2003,7 @@ fn render_animation_view(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn animation_margin_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn animation_margin_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "animation-hover-margin",
         ElementSpec::new(Element::Div).class("animation-specimen"),
@@ -2067,7 +2067,7 @@ fn animation_margin_specimen(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn animation_specimen(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     note: &'static str,
@@ -2138,7 +2138,7 @@ fn animation_specimen(
     );
 }
 
-fn render_scrolling_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_scrolling_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "scroll-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -2147,7 +2147,7 @@ fn render_scrolling_view(ui: &mut des_ui_document::DocumentBuilder) {
     ui.text_element(
         "scroll-copy",
         ElementSpec::new(Element::Text).class("muted"),
-        "Use the wheel or touchpad over each panel. Scroll offsets live in des-ui-document.",
+        "Use the wheel or touchpad over each panel. Scroll offsets live in des-document.",
     );
     ui.text_element(
         "scroll-direct-title",
@@ -2221,7 +2221,7 @@ fn render_scrolling_view(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn render_table_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_table_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "table-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -2258,7 +2258,7 @@ fn render_table_view(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_floating_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "floating-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -2288,7 +2288,7 @@ fn render_floating_view(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_offset_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_offset_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-offset-specimen",
         ElementSpec::new(Element::Div).class("floating-specimen-box"),
@@ -2312,7 +2312,7 @@ fn floating_offset_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_offset_reference(ui: &mut des_ui_document::DocumentBuilder, id: &str, label: &str) {
+fn floating_offset_reference(ui: &mut des_document::DocumentBuilder, id: &str, label: &str) {
     ui.element(
         id,
         ElementSpec::new(Element::Button)
@@ -2328,7 +2328,7 @@ fn floating_offset_reference(ui: &mut des_ui_document::DocumentBuilder, id: &str
     );
 }
 
-fn floating_offset_popover(ui: &mut des_ui_document::DocumentBuilder, id: &str) {
+fn floating_offset_popover(ui: &mut des_document::DocumentBuilder, id: &str) {
     ui.element(
         id,
         ElementSpec::new(Element::Button)
@@ -2344,7 +2344,7 @@ fn floating_offset_popover(ui: &mut des_ui_document::DocumentBuilder, id: &str) 
     );
 }
 
-fn floating_main_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_main_axis_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-main-axis-specimen",
         ElementSpec::new(Element::Div)
@@ -2402,7 +2402,7 @@ fn floating_main_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_main_axis_reference(ui: &mut des_ui_document::DocumentBuilder, id: &str, label: &str) {
+fn floating_main_axis_reference(ui: &mut des_document::DocumentBuilder, id: &str, label: &str) {
     ui.element(
         id,
         ElementSpec::new(Element::Button)
@@ -2419,7 +2419,7 @@ fn floating_main_axis_reference(ui: &mut des_ui_document::DocumentBuilder, id: &
     );
 }
 
-fn floating_cross_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_cross_axis_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-cross-axis-specimen",
         ElementSpec::new(Element::Div)
@@ -2477,7 +2477,7 @@ fn floating_cross_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_alignment_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_alignment_axis_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-alignment-axis-specimen",
         ElementSpec::new(Element::Div)
@@ -2540,7 +2540,7 @@ fn floating_alignment_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn floating_alignment_axis_reference(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &str,
     placement: &str,
     axis: &str,
@@ -2566,7 +2566,7 @@ fn floating_alignment_axis_reference(
     );
 }
 
-fn floating_centered_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_centered_axis_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-centered-axis-specimen",
         ElementSpec::new(Element::Div)
@@ -2590,7 +2590,7 @@ fn floating_centered_axis_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_top_start_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_top_start_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-top-start-specimen",
         ElementSpec::new(Element::Div)
@@ -2614,7 +2614,7 @@ fn floating_top_start_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_scroll_shift_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_scroll_shift_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-scroll-shift-specimen",
         ElementSpec::new(Element::Div)
@@ -2660,7 +2660,7 @@ fn floating_scroll_shift_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_scroll_attach_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_scroll_attach_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-scroll-attach-specimen",
         ElementSpec::new(Element::Div)
@@ -2706,7 +2706,7 @@ fn floating_scroll_attach_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn floating_vertical_scroll_overlap_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_vertical_scroll_overlap_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-vertical-overlap-specimen",
         ElementSpec::new(Element::Div)
@@ -2756,7 +2756,7 @@ fn floating_vertical_scroll_overlap_specimen(ui: &mut des_ui_document::DocumentB
     );
 }
 
-fn floating_vertical_scroll_flip_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_vertical_scroll_flip_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-vertical-flip-specimen",
         ElementSpec::new(Element::Div)
@@ -2788,7 +2788,7 @@ fn floating_vertical_scroll_flip_specimen(ui: &mut des_ui_document::DocumentBuil
     );
 }
 
-fn floating_edge_flip_specimen(ui: &mut des_ui_document::DocumentBuilder) {
+fn floating_edge_flip_specimen(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "floating-edge-flip-specimen",
         ElementSpec::new(Element::Div)
@@ -2834,7 +2834,7 @@ fn floating_edge_flip_specimen(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn render_text_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_text_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "text-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -2888,7 +2888,7 @@ fn render_text_view(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn text_specimen(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &str,
     title: &str,
     rule: &str,
@@ -2945,7 +2945,7 @@ fn sample_table_spec() -> TableSpec {
     .row_height(32.0)
 }
 
-fn table_header(ui: &mut des_ui_document::DocumentBuilder) {
+fn table_header(ui: &mut des_document::DocumentBuilder) {
     ui.element(
         "customer-preview-header",
         ElementSpec::new(Element::Thead).class("table-header-row"),
@@ -2963,7 +2963,7 @@ fn table_header(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn table_row(ui: &mut des_ui_document::DocumentBuilder, index: usize, row: &[&str; 5]) {
+fn table_row(ui: &mut des_document::DocumentBuilder, index: usize, row: &[&str; 5]) {
     ui.element(
         format!("customer-preview-row-{index}"),
         ElementSpec::new(Element::Tr).class("table-row"),
@@ -2992,7 +2992,7 @@ fn sample_table_rows() -> [[&'static str; 5]; 6] {
     ]
 }
 
-fn render_nesting_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_nesting_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "nesting-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -3045,7 +3045,7 @@ fn render_nesting_view(ui: &mut des_ui_document::DocumentBuilder) {
     );
 }
 
-fn render_graph_view(ui: &mut des_ui_document::DocumentBuilder) {
+fn render_graph_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "graph-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -3075,7 +3075,7 @@ fn render_graph_view(ui: &mut des_ui_document::DocumentBuilder) {
 }
 
 fn interactive_labeled_row(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     label: &'static str,
     body: &'static str,
@@ -3102,7 +3102,7 @@ fn interactive_labeled_row(
 }
 
 fn scroll_panel(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     row_count: usize,
@@ -3132,7 +3132,7 @@ fn scroll_panel(
 }
 
 fn nested_scroll_panel(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     title: &'static str,
     row_count: usize,
@@ -3169,7 +3169,7 @@ fn nested_scroll_panel(
 }
 
 fn scroll_rows(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     row_count: usize,
     row_class: &'static str,
@@ -3196,7 +3196,7 @@ fn scroll_rows(
     }
 }
 
-fn scroll_wide_card(ui: &mut des_ui_document::DocumentBuilder, id: &'static str, index: usize) {
+fn scroll_wide_card(ui: &mut des_document::DocumentBuilder, id: &'static str, index: usize) {
     ui.element(
         format!("{id}-row-{index}"),
         ElementSpec::new(Element::Div)

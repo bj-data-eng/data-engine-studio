@@ -720,6 +720,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-document"
+version = "0.1.0"
+dependencies = [
+ "des-layout",
+]
+
+[[package]]
 name = "des-graph-egui"
 version = "0.1.0"
 dependencies = [
@@ -729,7 +736,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "des-layout-engine"
+name = "des-layout"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
@@ -757,18 +764,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "des-ui-document"
-version = "0.1.0"
-dependencies = [
- "des-layout-engine",
-]
-
-[[package]]
 name = "des-ui-egui"
 version = "0.1.0"
 dependencies = [
  "des-core",
- "des-ui-document",
+ "des-document",
  "eframe",
  "egui",
  "iconflow",
@@ -780,8 +780,8 @@ version = "0.1.0"
 dependencies = [
  "des-app",
  "des-core",
+ "des-document",
  "des-graph-egui",
- "des-ui-document",
  "des-ui-egui",
  "des-ui-widgets",
  "eframe",
@@ -795,7 +795,7 @@ dependencies = [
 name = "des-ui-widgets"
 version = "0.1.0"
 dependencies = [
- "des-ui-document",
+ "des-document",
 ]
 
 [[package]]

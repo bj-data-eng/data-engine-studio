@@ -1,4 +1,4 @@
-use des_ui_document::{
+use des_document::{
     AlignItems, Color, CornerRadii, Document, DocumentEngine, DocumentEvent, DocumentEventKind,
     DocumentInput, Element, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
@@ -157,7 +157,7 @@ fn visual_clone_preserves_visual_subtree_with_rewritten_ids() {
                 );
                 ui.element(
                     "card-icon",
-                    ElementSpec::new(Element::Icon).glyph(des_ui_document::Glyph::DragHandle),
+                    ElementSpec::new(Element::Icon).glyph(des_document::Glyph::DragHandle),
                     |_| {},
                 );
             },
@@ -613,7 +613,7 @@ fn container_rule_can_match_width_and_height_ranges() {
             Style::default().size(320.0, 48.0),
         )
         .container_rule(
-            des_ui_document::ContainerQuery::min_width(460.0)
+            des_document::ContainerQuery::min_width(460.0)
                 .with_max_width(500.0)
                 .with_min_height(200.0)
                 .with_max_height(240.0),
@@ -1230,7 +1230,7 @@ fn wrapped_row_layout_rearranges_children_and_expands_container_height() {
         .rule(
             StyleSelector::id("row"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .flex_wrap(FlexWrap::Wrap)
                 .width(Length::Px(120.0))
                 .height(Length::Auto)
@@ -1279,7 +1279,7 @@ fn wrapped_fluid_row_layout_expands_around_variable_height_rows() {
         .rule(
             StyleSelector::id("row"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .flex_wrap(FlexWrap::Wrap)
                 .width(Length::Px(756.0))
                 .height(Length::Auto)
@@ -1911,7 +1911,7 @@ fn border_style_resolves_as_paint_only_property() {
             .size(80.0, 40.0)
             .border(Color::rgba(20, 20, 24, 255))
             .border_width(3.0)
-            .border_style(des_ui_document::BorderStyle::Dashed),
+            .border_style(des_document::BorderStyle::Dashed),
     );
     let mut document = Document::build(Size::new(180.0, 120.0), |ui| {
         ui.element("dashed", ElementSpec::new(Element::Div), |_| {});
@@ -1922,7 +1922,7 @@ fn border_style_resolves_as_paint_only_property() {
 
     assert_eq!(
         dashed.style().border_style,
-        des_ui_document::BorderStyle::Dashed
+        des_document::BorderStyle::Dashed
     );
     assert_eq!(dashed.rect().size, Size::new(80.0, 40.0));
 
@@ -1935,7 +1935,7 @@ fn border_style_resolves_as_paint_only_property() {
                 .size(80.0, 40.0)
                 .border(Color::rgba(20, 20, 24, 255))
                 .border_width(3.0)
-                .border_style(des_ui_document::BorderStyle::Dotted),
+                .border_style(des_document::BorderStyle::Dotted),
         ),
     );
 
@@ -1948,7 +1948,7 @@ fn border_style_resolves_as_paint_only_property() {
             .unwrap()
             .style()
             .border_style,
-        des_ui_document::BorderStyle::Dotted
+        des_document::BorderStyle::Dotted
     );
 }
 
@@ -1992,7 +1992,7 @@ fn row_layout_applies_main_and_cross_axis_alignment() {
         .rule(
             StyleSelector::id("row"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .size(160.0, 80.0)
                 .gap(10.0)
                 .justify_content(JustifyContent::Center)
@@ -2036,7 +2036,7 @@ fn column_layout_applies_main_and_cross_axis_alignment() {
         .rule(
             StyleSelector::id("column"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Column)
+                .flex_direction(des_document::FlexDirection::Column)
                 .size(120.0, 120.0)
                 .gap(5.0)
                 .justify_content(JustifyContent::SpaceBetween)
@@ -2261,9 +2261,9 @@ fn floating_anchor_uses_fallbacks_and_viewport_shift() {
             StyleSelector::id("popover"),
             Style::default()
                 .floating_to("anchor")
-                .floating_placement(des_ui_document::FloatingPlacement::Right)
-                .floating_fallbacks([des_ui_document::FloatingPlacement::Left])
-                .floating_shift(des_ui_document::FloatingShift::main_and_cross_axis())
+                .floating_placement(des_document::FloatingPlacement::Right)
+                .floating_fallbacks([des_document::FloatingPlacement::Left])
+                .floating_shift(des_document::FloatingShift::main_and_cross_axis())
                 .size(34.0, 24.0),
         );
     let mut document = Document::build(Size::new(100.0, 100.0), |ui| {
@@ -2294,14 +2294,14 @@ fn floating_arrow_is_style_opt_in_metadata() {
             StyleSelector::id("plain-popover"),
             Style::default()
                 .floating_to("anchor")
-                .floating_placement(des_ui_document::FloatingPlacement::Bottom)
+                .floating_placement(des_document::FloatingPlacement::Bottom)
                 .size(60.0, 20.0),
         )
         .rule(
             StyleSelector::id("arrow-popover"),
             Style::default()
                 .floating_to("anchor")
-                .floating_placement(des_ui_document::FloatingPlacement::Bottom)
+                .floating_placement(des_document::FloatingPlacement::Bottom)
                 .floating_offset(24.0, 0.0)
                 .floating_arrow_size(12.0, 6.0, 3.0)
                 .size(60.0, 20.0),
@@ -2359,9 +2359,9 @@ fn floating_anchor_can_shift_inside_scroll_container_boundary() {
             Style::default()
                 .size(70.0, 32.0)
                 .floating_to("anchor")
-                .floating_placement(des_ui_document::FloatingPlacement::Bottom)
+                .floating_placement(des_document::FloatingPlacement::Bottom)
                 .floating_boundary_to("scroll-panel")
-                .floating_shift(des_ui_document::FloatingShift::new(false, true)),
+                .floating_shift(des_document::FloatingShift::new(false, true)),
         );
     let mut document = Document::build(Size::new(260.0, 140.0), |ui| {
         ui.element("scroll-panel", ElementSpec::new(Element::Div), |ui| {
@@ -2517,7 +2517,7 @@ fn absolute_viewport_child_escapes_ancestor_overflow_clip() {
             .find("absolute-child")
             .unwrap()
             .clip_rect(),
-        des_ui_document::ClipRect::from_rect(des_ui_document::Rect::new(0.0, 0.0, 320.0, 200.0))
+        des_document::ClipRect::from_rect(des_document::Rect::new(0.0, 0.0, 320.0, 200.0))
     );
     assert_eq!(output.hit_id, Some(ElementId::new("absolute-child")));
     assert!(engine.element_state("absolute-child").unwrap().pressed);
@@ -2801,7 +2801,7 @@ fn horizontal_overflow_scrolls_child_content_on_x_axis() {
         .rule(
             StyleSelector::id("scroll-panel"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .size(80.0, 70.0)
                 .gap(4.0)
                 .overflow_x(Overflow::Scroll),
@@ -3493,7 +3493,7 @@ fn nested_scroll_chrome_is_clipped_by_ancestor_scroll_viewport() {
         .rule(
             StyleSelector::id("horizontal-parent"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .size(120.0, 96.0)
                 .gap(10.0)
                 .overflow_x(Overflow::Scroll)
@@ -3567,7 +3567,7 @@ fn clipped_scroll_chrome_does_not_drive_animation_work() {
         .rule(
             StyleSelector::id("horizontal-parent"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .size(120.0, 96.0)
                 .gap(10.0)
                 .overflow_x(Overflow::Scroll)
@@ -4041,7 +4041,7 @@ fn table_fixture_document() -> Document {
 }
 
 fn table_cell(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     id: &'static str,
     column_id: &'static str,
     text: &'static str,

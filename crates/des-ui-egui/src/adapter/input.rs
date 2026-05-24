@@ -1,4 +1,4 @@
-use des_ui_document::{DocumentInput, Point, PointerInput};
+use des_document::{DocumentInput, Point, PointerInput};
 use eframe::egui;
 pub fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
     ui.input(|input| DocumentInput {

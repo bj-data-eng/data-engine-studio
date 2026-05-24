@@ -12,7 +12,7 @@ use views::{
     render_debug_overlay_layer, render_drag_overlay_layer, render_nav, render_stage, render_topbar,
 };
 
-use des_ui_document::{
+use des_document::{
     Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
     DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector, Length,
     Point, PointerInput, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
@@ -964,7 +964,7 @@ impl UiLabState {
     fn lab_document_output_with_text_measurer_for_test(
         &mut self,
         viewport: Size,
-        text_measurer: &mut dyn des_ui_document::TextMeasurer,
+        text_measurer: &mut dyn des_document::TextMeasurer,
     ) -> DocumentOutput {
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
@@ -1032,7 +1032,7 @@ fn text_context_menu_widget(menu: &TextContextMenu) -> ContextMenu {
 }
 
 fn render_text_context_menu(
-    ui: &mut des_ui_document::DocumentBuilder,
+    ui: &mut des_document::DocumentBuilder,
     menu: Option<&TextContextMenu>,
 ) {
     let Some(menu) = menu else {

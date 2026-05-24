@@ -1,7 +1,7 @@
 use crate::geometry::{ClipRect, Insets, Overflow, Point, Rect, ScrollAxis, Size};
 use crate::state::ResolvedElement;
-use layout_engine::geometry::{Point as LayoutPoint, Rect as LayoutInsets, Size as LayoutSize};
-use layout_engine::scroll::{ScrollAxis as LayoutScrollAxis, ScrollRect};
+use des_layout::geometry::{Point as LayoutPoint, Rect as LayoutInsets, Size as LayoutSize};
+use des_layout::scroll::{ScrollAxis as LayoutScrollAxis, ScrollRect};
 
 pub(crate) fn hit_path(frame: &ResolvedElement, point: Point) -> Option<Vec<&ResolvedElement>> {
     if !frame.clip_rect.contains(point) || frame.clip_rect.is_empty() {

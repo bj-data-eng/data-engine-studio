@@ -1,6 +1,6 @@
-# des-layout-engine Notice
+# des-layout Notice
 
-`des-layout-engine` is maintained as part of Data Engine Studio.
+`des-layout` is maintained as part of Data Engine Studio.
 
 This crate was seeded from Taffy 0.10.1, originally published by the Taffy
 authors:

@@ -1,0 +1,9 @@
+[package]
+name = "des-document"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+des_layout = { package = "des-layout", path = "../layout", version = "=0.1.0", default-features = false, features = ["std", "layout_tree", "flexbox", "grid", "content_size", "calc"] }

@@ -1,4 +1,4 @@
-use des_ui_document::{DocumentEngine, DocumentOutput, Point};
+use des_document::{DocumentEngine, DocumentOutput, Point};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SortableItemId(pub usize);

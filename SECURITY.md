@@ -19,7 +19,7 @@ Python packaging currently has no runtime third-party dependencies. The Python b
 
 Vendored or forked code must keep its provenance visible in the crate metadata and notices. The current tree includes:
 
-- `crates/des-layout-engine`, a vendored layout engine derived from Taffy.
+- `crates/des-layout`, a vendored layout engine derived from Taffy.
 - `crates/des-graph-egui`, a vendored graph interaction crate that was audited before promotion into the workspace.
 - `crates/des-apple-dispatch`, a small local replacement for the external `dispatch` crate, patched through `[patch.crates-io]`.
 

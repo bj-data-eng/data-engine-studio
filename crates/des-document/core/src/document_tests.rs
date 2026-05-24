@@ -8,12 +8,12 @@ use crate::{
     TableTrackSize, TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey,
     TextWrapMode, Transition,
 };
-use layout_engine::prelude::{
+use des_layout::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, Dimension,
     FlexDirection as LayoutFlexDirection, JustifyContent as LayoutJustifyContent,
     LengthPercentageAuto, Size as LayoutSize, fr, length, line, percent,
 };
-use layout_engine::style::Overflow as LayoutOverflow;
+use des_layout::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -213,7 +213,7 @@ fn document_applies_document_style_to_existing_layout_node() {
     assert_eq!(layout_style.flex_direction, LayoutFlexDirection::Row);
     assert_eq!(
         layout_style.flex_wrap,
-        layout_engine::prelude::FlexWrap::Wrap
+        des_layout::prelude::FlexWrap::Wrap
     );
     assert_eq!(layout_style.flex_basis, length::<_, Dimension>(88.0));
     assert_eq!(layout_style.flex_grow, 2.0);
@@ -258,7 +258,7 @@ fn document_applies_document_style_to_existing_layout_node() {
     assert_eq!(layout_style.grid_column, style.grid_column);
     assert_eq!(
         layout_style.margin,
-        layout_engine::prelude::Rect {
+        des_layout::prelude::Rect {
             left: length::<_, LengthPercentageAuto>(8.0),
             right: length::<_, LengthPercentageAuto>(8.0),
             top: length::<_, LengthPercentageAuto>(4.0),
@@ -267,7 +267,7 @@ fn document_applies_document_style_to_existing_layout_node() {
     );
     assert_eq!(
         layout_style.padding,
-        layout_engine::prelude::Rect::length(6.0)
+        des_layout::prelude::Rect::length(6.0)
     );
     assert_eq!(
         layout_style.size,

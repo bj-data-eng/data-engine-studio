@@ -1,4 +1,4 @@
-use des_ui_document::{
+use des_document::{
     DocumentEngine, DocumentOutput, ElementId, Point, Rect, ScrollAxis, ScrollChrome,
 };
 
@@ -235,7 +235,7 @@ fn scroll_position(chrome: &ScrollChrome) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_ui_document::{
+    use des_document::{
         Document, Element, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
     };
 

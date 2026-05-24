@@ -3,7 +3,7 @@ use crate::graphics_testing::{
     TEST_HEIGHT, TEST_WIDTH, assert_exact_image_match, compare_images, image_stats, render_harness,
     test_harness,
 };
-use des_ui_document::{
+use des_document::{
     DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, Insets, Length, Point,
     PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style, StyleSelector, StyleSheet,
     TextWrapMode,
@@ -23,16 +23,16 @@ fn lab_image(initial_view: &str) -> image::RgbaImage {
     render_harness(&mut lab_harness(initial_view))
 }
 
-fn lab_rect(id: &str) -> des_ui_document::Rect {
+fn lab_rect(id: &str) -> des_document::Rect {
     lab_rect_in("layout", id)
 }
 
-fn lab_rect_in(initial_view: &str, id: &str) -> des_ui_document::Rect {
+fn lab_rect_in(initial_view: &str, id: &str) -> des_document::Rect {
     let state = UiLabState::new(Some(initial_view));
     state_rect(&state, id)
 }
 
-fn state_rect(state: &UiLabState, id: &str) -> des_ui_document::Rect {
+fn state_rect(state: &UiLabState, id: &str) -> des_document::Rect {
     let output = state_output(state);
     find_frame(&output.layout, id)
         .unwrap_or_else(|| panic!("expected layout frame for {id}"))
@@ -85,7 +85,7 @@ fn state_rect_with_egui_text(
     state: &UiLabState,
     ctx: &egui::Context,
     id: &str,
-) -> des_ui_document::Rect {
+) -> des_document::Rect {
     let output = state_output_with_egui_text(state, ctx);
     find_frame(&output.layout, id)
         .unwrap_or_else(|| panic!("expected layout frame for {id}"))
@@ -131,7 +131,7 @@ fn length_px(actual: Length) -> f32 {
     }
 }
 
-fn center(rect: des_ui_document::Rect) -> egui::Pos2 {
+fn center(rect: des_document::Rect) -> egui::Pos2 {
     egui::pos2(
         rect.origin.x + rect.size.width / 2.0,
         rect.origin.y + rect.size.height / 2.0,
@@ -836,7 +836,7 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow() {
     assert!(top_popover.interactive);
     assert_eq!(
         zero_reference.style.border_style,
-        des_ui_document::BorderStyle::Dashed
+        des_document::BorderStyle::Dashed
     );
     assert_close(zero_popover.rect.origin.y, zero_reference.rect.bottom());
     assert_close(
@@ -2511,7 +2511,7 @@ fn external_style_contract_can_drive_document_without_ui_lab_internals() {
         .rule(
             StyleSelector::class("row"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .width(Length::Auto)
                 .height(Length::Auto)
                 .gap(4.0),

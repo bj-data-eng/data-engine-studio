@@ -1,4 +1,4 @@
-use des_layout_engine::floating::{
+use des_layout::floating::{
     compute_floating_position, detect_overflow, FloatingAlignment, FloatingArrow,
     FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary, FloatingFallbackAxisSideDirection,
     FloatingFallbackStrategy, FloatingFlip, FloatingFlipCrossAxis, FloatingHide,
@@ -6,7 +6,7 @@ use des_layout_engine::floating::{
     FloatingRect, FloatingShift, FloatingShiftLimiter, FloatingSide, FloatingSize,
     FloatingVisibility,
 };
-use des_layout_engine::geometry::{Point, Size};
+use des_layout::geometry::{Point, Size};
 
 fn rect(x: f32, y: f32, width: f32, height: f32) -> FloatingRect {
     FloatingRect::new(Point { x, y }, Size { width, height })

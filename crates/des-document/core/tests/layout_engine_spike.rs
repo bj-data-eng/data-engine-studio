@@ -1,4 +1,4 @@
-use layout_engine::prelude::{
+use des_layout::prelude::{
     AvailableSpace, Display, FlexDirection, LayoutMaxContent, LayoutTree, Size as LayoutSize,
     Style, auto, length, percent,
 };
@@ -10,7 +10,7 @@ struct TextProbe {
 }
 
 #[test]
-fn layout_engine_can_layout_a_viewport_sized_flex_shell() {
+fn des_layout_can_layout_a_viewport_sized_flex_shell() {
     let mut tree: LayoutTree<()> = LayoutTree::new();
 
     let nav = tree
@@ -58,7 +58,7 @@ fn layout_engine_can_layout_a_viewport_sized_flex_shell() {
 }
 
 #[test]
-fn layout_engine_can_measure_text_with_available_width() {
+fn des_layout_can_measure_text_with_available_width() {
     let mut tree: LayoutTree<TextProbe> = LayoutTree::new();
 
     let text = tree

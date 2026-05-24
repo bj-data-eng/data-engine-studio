@@ -3,10 +3,10 @@ members = [
     "crates/des-app",
     "crates/des-core",
     "crates/des-graph-egui",
-    "crates/des-layout-engine",
+    "crates/des-document/layout",
     "crates/des-python",
     "crates/des-template",
-    "crates/des-ui-document",
+    "crates/des-document/core",
     "crates/des-ui-egui",
     "crates/des-ui-lab",
     "crates/des-ui-widgets",
@@ -24,9 +24,9 @@ repository = "https://github.com/bj-data-eng/data-engine-studio"
 des-app = { path = "crates/des-app", version = "=0.1.0" }
 des-core = { path = "crates/des-core", version = "=0.1.0" }
 des-graph-egui = { path = "crates/des-graph-egui", version = "=0.1.0" }
-des-layout-engine = { path = "crates/des-layout-engine", version = "=0.1.0" }
+des-layout = { path = "crates/des-document/layout", version = "=0.1.0" }
 des-template = { path = "crates/des-template", version = "=0.1.0" }
-des-ui-document = { path = "crates/des-ui-document", version = "=0.1.0" }
+des-document = { path = "crates/des-document/core", version = "=0.1.0" }
 des-ui-egui = { path = "crates/des-ui-egui", version = "=0.1.0" }
 des-ui-lab = { path = "crates/des-ui-lab", version = "=0.1.0" }
 des-ui-widgets = { path = "crates/des-ui-widgets", version = "=0.1.0" }

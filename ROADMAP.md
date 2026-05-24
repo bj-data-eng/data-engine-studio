@@ -10,7 +10,7 @@ This roadmap is intentionally architecture-first. The core product requirement i
 - Prefer typed commands, events, snapshots, and reports over shared mutable structures.
 - Keep graph, project, validation, query, and execution logic independent from `egui` and Python.
 - Keep Python as packaging and process entry only.
-- Keep `egui` as a host adapter. Product layout, hit testing, z-order, retained UI state, and input routing should move toward `des-ui-document`.
+- Keep `egui` as a host adapter. Product layout, hit testing, z-order, retained UI state, and input routing should move toward `des-document`.
 - Keep Studio as the app; a selected workspace must not become the application identity.
 - Make runtime truth explicit through snapshots and events; logs are history, not the control plane.
 - Design for unit tests at crate boundaries before integration tests across the full app.
@@ -31,7 +31,7 @@ Initial crates:
 - `des-artifacts`: previews, profiling outputs, debug artifacts, schema snapshots, parquet/json metadata, and artifact indexing.
 - `des-duckdb`: DuckDB connection management, SQL lowering, query execution, and result materialization.
 - `des-polars`: Polars LazyFrame/DataFrame support, previews, profiling, and local transform lowering.
-- `des-ui-document`: standalone-style UI document and style model with DOM-like element trees, deterministic CSS-like style sheets, resolved elements, retained interaction state, z-order, hit testing, and input routing.
+- `des-document`: standalone-style UI document and style model with DOM-like element trees, deterministic CSS-like style sheets, resolved elements, retained interaction state, z-order, hit testing, and input routing.
 - `des-ui-egui`: egui host adapter, document paint/input integration, text measurement, and host defaults.
 - `des-ui-lab`: current document-engine-backed lab app, screenshot harness, lab styles, and lab regression suite.
 - `des-app`: application orchestration, command handling, undo/redo, document lifecycle, validation/runtime wiring.
@@ -45,7 +45,7 @@ python package
     -> des-ui-lab
       -> des-app
       -> des-ui-egui
-        -> des-ui-document
+        -> des-document
       -> des-project
       -> des-validation
       -> des-runtime
@@ -68,7 +68,7 @@ Examples:
 - `des-project`: `ProjectDocument`, `ProjectCommand`, `ProjectChangeSet`, `ProjectLoadResult`, `ProjectSaveResult`.
 - `des-graph`: `GraphDocument`, `GraphCommand`, `GraphChangeSet`, `NodeId`, `PortId`, `EdgeId`.
 - `des-nodes`: `NodeDefinition`, `NodeRegistry`, `NodeKind`, `PortDefinition`, `ConfigSchema`.
-- `des-ui-document`: `Document`, `ElementSpec`, `StyleSheet`, `StyleSelector`, `DocumentEngine`, `DocumentInput`, `DocumentOutput`, `ResolvedElement`.
+- `des-document`: `Document`, `ElementSpec`, `StyleSheet`, `StyleSelector`, `DocumentEngine`, `DocumentInput`, `DocumentOutput`, `ResolvedElement`.
 
 Internal modules can change freely, but public API types should be deliberate and tested.
 
@@ -332,7 +332,7 @@ Lessons carried forward from `data-engine`:
 - Keep `des-ui-egui` adapter-only; promote real product surfaces out of `des-ui-lab` into focused app/UI crates as they become real.
 - Implement selection, panning, zooming, adding nodes, moving nodes, and connecting ports.
 - Keep UI state out of graph/project state.
-- Begin migrating reusable layout/interaction behavior into `des-ui-document`.
+- Begin migrating reusable layout/interaction behavior into `des-document`.
 - Keep egui-specific code focused on hosting, painting, font access, and platform input.
 
 ### Milestone 6: Query And Backend Foundations

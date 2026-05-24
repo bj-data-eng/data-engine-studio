@@ -10,7 +10,7 @@ ui-screenshot = ["eframe/__screenshot", "eframe/glow"]
 
 [dependencies]
 des-core.workspace = true
-des-ui-document.workspace = true
+des-document.workspace = true
 eframe.workspace = true
 egui.workspace = true
 iconflow = { workspace = true, features = ["pack-lucide"] }

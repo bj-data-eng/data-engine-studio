@@ -16,17 +16,17 @@ use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 #[cfg(test)]
 use crate::text::FallbackTextMeasurer;
 use crate::text::{TextLayoutRequest, TextMeasurer, TextWrapMode};
-use layout_engine::floating::{FloatingBoundary, FloatingRect, compute_floating_position};
-use layout_engine::geometry::{Point as LayoutPoint, Size as FloatingSize};
-use layout_engine::prelude::{
+use des_layout::floating::{FloatingBoundary, FloatingRect, compute_floating_position};
+use des_layout::geometry::{Point as LayoutPoint, Size as FloatingSize};
+use des_layout::prelude::{
     AlignContent as LayoutAlignContent, AlignItems as LayoutAlignItems, AvailableSpace, Dimension,
     Display, FlexDirection as LayoutFlexDirection, FlexWrap as LayoutFlexWrap, GridPlacement,
     GridTemplateComponent, JustifyContent as LayoutJustifyContent, LayoutTree, LengthPercentage,
     LengthPercentageAuto, NodeId, Position as LayoutPosition, Rect as LayoutRect,
     Size as LayoutSize, Style as LayoutStyle, fr, length, percent,
 };
-use layout_engine::scroll as layout_scroll;
-use layout_engine::style::Overflow as LayoutOverflow;
+use des_layout::scroll as layout_scroll;
+use des_layout::style::Overflow as LayoutOverflow;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -631,7 +631,7 @@ impl Document {
             let content_size = self.scroll_content_size(element)?;
             let max_scroll = layout_scroll::scroll_limits(
                 to_layout_size(content_size),
-                layout_engine::geometry::Size {
+                des_layout::geometry::Size {
                     width: layout.size.width,
                     height: layout.size.height,
                 },
@@ -1039,7 +1039,7 @@ impl Document {
                 };
                 let child_node = child.layout_node;
                 let mut child_style = self.layout.style(child_node).map_err(layout_error)?.clone();
-                child_style.grid_column = layout_engine::geometry::Line {
+                child_style.grid_column = des_layout::geometry::Line {
                     start: GridPlacement::Line((column_index + 1).into()),
                     end: GridPlacement::Line((column_index + 2).into()),
                 };
@@ -1707,8 +1707,8 @@ fn layout_rect(insets: Insets) -> LayoutRect<LengthPercentage> {
     }
 }
 
-fn layout_overflow(x: Overflow, y: Overflow) -> layout_engine::geometry::Point<LayoutOverflow> {
-    layout_engine::geometry::Point {
+fn layout_overflow(x: Overflow, y: Overflow) -> des_layout::geometry::Point<LayoutOverflow> {
+    des_layout::geometry::Point {
         x: match x {
             Overflow::Visible => LayoutOverflow::Visible,
             Overflow::Clip => LayoutOverflow::Clip,
@@ -1790,6 +1790,6 @@ fn layout_flex_wrap(flex_wrap: FlexWrap) -> LayoutFlexWrap {
     }
 }
 
-fn layout_error(error: layout_engine::LayoutError) -> DocumentError {
+fn layout_error(error: des_layout::LayoutError) -> DocumentError {
     DocumentError::Layout(error.to_string())
 }

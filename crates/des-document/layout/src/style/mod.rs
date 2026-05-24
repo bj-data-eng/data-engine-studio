@@ -1331,11 +1331,11 @@ mod tests {
 
         fn assert_type_size<T>(expected_size: usize) {
             let name = ::core::any::type_name::<T>();
-            let name = name.replace("des_layout_engine::geometry::", "");
-            let name = name.replace("des_layout_engine::style::dimension::", "");
-            let name = name.replace("des_layout_engine::style::alignment::", "");
-            let name = name.replace("des_layout_engine::style::flex::", "");
-            let name = name.replace("des_layout_engine::style::grid::", "");
+            let name = name.replace("des_layout::geometry::", "");
+            let name = name.replace("des_layout::style::dimension::", "");
+            let name = name.replace("des_layout::style::alignment::", "");
+            let name = name.replace("des_layout::style::flex::", "");
+            let name = name.replace("des_layout::style::grid::", "");
 
             assert_eq!(
                 ::core::mem::size_of::<T>(),

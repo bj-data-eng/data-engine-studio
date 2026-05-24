@@ -2,7 +2,7 @@ use crate::element::ElementId;
 use crate::geometry::{ClipRect, Rect, ScrollAxis, Size};
 use crate::layout::{from_scroll_rect, to_layout_insets, to_scroll_axis, to_scroll_rect};
 use crate::state::{ElementState, ResolvedElement, ScrollChrome};
-use layout_engine::scroll::{self as layout_scroll, ScrollbarGeometryInput};
+use des_layout::scroll::{self as layout_scroll, ScrollbarGeometryInput};
 use std::collections::HashMap;
 
 pub(crate) fn scroll_chrome(

@@ -1,4 +1,4 @@
-use des_ui_document::{
+use des_document::{
     DocumentBuilder, Element, ElementId, ElementSpec, FloatingPlacement, FloatingShift, Insets,
     Length, Point, Style, StyleSelector, StyleSheet,
 };
@@ -248,7 +248,7 @@ pub fn context_menu_surface_style() -> Style {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_ui_document::{Document, DocumentEngine, FloatingPlacement, Size, StyleSheet};
+    use des_document::{Document, DocumentEngine, FloatingPlacement, Size, StyleSheet};
 
     #[test]
     fn context_menu_renders_menu_items_and_separators() {

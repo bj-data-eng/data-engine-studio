@@ -1,5 +1,5 @@
 [package]
-name = "des-layout-engine"
+name = "des-layout"
 version.workspace = true
 edition = "2021"
 rust-version = "1.71"

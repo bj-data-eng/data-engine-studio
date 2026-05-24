@@ -6,7 +6,7 @@ use super::{
     SUCCESS_CONTAINER, SURFACE_CONTAINER, SURFACE_CONTAINER_HIGH, TERTIARY_CONTAINER, TEXT,
     TEXT_ACCENT, TEXT_MUTED, WARNING_CONTAINER,
 };
-use des_ui_document::{
+use des_document::{
     AlignItems, BorderStyle, Color, Element, ElementStateSelector, FlexDirection, FlexWrap,
     FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, JustifyContent, Length, Overflow,
     Point, Shadow, Style, StyleSelector, StyleSheet, TextWrapMode, Transition, ViewportQuery,
@@ -485,7 +485,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("nav-item"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(64.0))
+                .height(des_document::Length::Px(64.0))
                 .padding(Insets::all(12.0))
                 .gap(5.0)
                 .background(CARD)
@@ -1513,7 +1513,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("scroll-list"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(250.0))
+                .height(des_document::Length::Px(250.0))
                 .padding(Insets::symmetric(4.0, 4.0))
                 .gap(7.0)
                 .overflow_y(Overflow::Scroll)
@@ -1524,7 +1524,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             Style::default()
                 .flex_direction(FlexDirection::Row)
                 .width_fill()
-                .height(des_ui_document::Length::Px(250.0))
+                .height(des_document::Length::Px(250.0))
                 .padding(Insets::symmetric(4.0, 4.0))
                 .gap(7.0)
                 .overflow_x(Overflow::Scroll)
@@ -1535,7 +1535,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("scroll-list-two-axis"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(250.0))
+                .height(des_document::Length::Px(250.0))
                 .padding(Insets::symmetric(4.0, 4.0))
                 .gap(7.0)
                 .overflow(Overflow::Scroll)
@@ -1543,13 +1543,13 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("scroll-list-nested"),
-            Style::default().height(des_ui_document::Length::Px(222.0)),
+            Style::default().height(des_document::Length::Px(222.0)),
         )
         .rule(
             StyleSelector::class("scroll-nested-shell"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(250.0))
+                .height(des_document::Length::Px(250.0))
                 .padding(Insets::all(12.0))
                 .background(PANEL)
                 .border(STROKE)
@@ -1567,7 +1567,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("scroll-row-card"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(34.0))
+                .height(des_document::Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 7.0))
                 .background(CARD)
                 .border(STROKE)
@@ -1587,7 +1587,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("scroll-mini-list"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(158.0))
+                .height(des_document::Length::Px(158.0))
                 .padding(Insets::symmetric(3.0, 3.0))
                 .gap(4.0)
                 .background(SURFACE_CONTAINER)
@@ -1600,7 +1600,7 @@ pub(super) fn stylesheet() -> StyleSheet {
             StyleSelector::class("scroll-mini-row"),
             Style::default()
                 .width_fill()
-                .height(des_ui_document::Length::Px(24.0))
+                .height(des_document::Length::Px(24.0))
                 .padding(Insets::symmetric(6.0, 4.0))
                 .background(SURFACE_CONTAINER_HIGH)
                 .border(STROKE)
@@ -1609,8 +1609,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("scroll-xy-row-card"),
             Style::default()
-                .width(des_ui_document::Length::Px(430.0))
-                .height(des_ui_document::Length::Px(34.0))
+                .width(des_document::Length::Px(430.0))
+                .height(des_document::Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 7.0))
                 .background(CARD)
                 .border(STROKE)
@@ -2196,7 +2196,7 @@ pub(super) fn stylesheet() -> StyleSheet {
     stylesheet
 }
 
-fn styled_scrollbar_selector() -> des_ui_document::CompoundSelector {
+fn styled_scrollbar_selector() -> des_document::CompoundSelector {
     StyleSelector::compound().class("styled-scrollbar")
 }
 

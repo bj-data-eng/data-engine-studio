@@ -1,5 +1,5 @@
 use super::text::{layout_job, paint_document_text_selection};
-use des_ui_document::{
+use des_document::{
     BorderStyle, ClipRect, Color, CornerRadii, DocumentTextSelection, FloatingPlacement, Glyph,
     Insets, Rect, ResolvedElement, ScrollChrome, Shadow, TextLayoutRequest, TextWrapMode,
 };

@@ -307,12 +307,12 @@ impl DocumentEngine {
             return false;
         };
 
-        let scroll = layout_engine::scroll::clamp_scroll_offset(
+        let scroll = des_layout::scroll::clamp_scroll_offset(
             to_layout_point(Point::new(
                 state.scroll_x + delta.x,
                 state.scroll_y + delta.y,
             )),
-            layout_engine::geometry::Size {
+            des_layout::geometry::Size {
                 width: max_scroll.width,
                 height: max_scroll.height,
             },
@@ -333,9 +333,9 @@ impl DocumentEngine {
             return false;
         };
 
-        let scroll = layout_engine::scroll::clamp_scroll_offset(
+        let scroll = des_layout::scroll::clamp_scroll_offset(
             to_layout_point(scroll),
-            layout_engine::geometry::Size {
+            des_layout::geometry::Size {
                 width: max_scroll.width,
                 height: max_scroll.height,
             },
@@ -517,14 +517,14 @@ impl DocumentEngine {
                 .copied()
                 .unwrap_or_default();
             if scroll_frame.style.overflow_x.is_scrollable() {
-                let scroll_x = layout_engine::scroll::clamp_scroll_value(
+                let scroll_x = des_layout::scroll::clamp_scroll_value(
                     state.scroll_x - input.scroll_delta.x,
                     max_scroll.width,
                 );
                 update.changed |= set_f32(&mut state.scroll_x, scroll_x);
             }
             if scroll_frame.style.overflow_y.is_scrollable() {
-                let scroll_y = layout_engine::scroll::clamp_scroll_value(
+                let scroll_y = des_layout::scroll::clamp_scroll_value(
                     state.scroll_y - input.scroll_delta.y,
                     max_scroll.height,
                 );
@@ -820,7 +820,7 @@ impl DocumentEngine {
         let Some(drag) = &self.active_scroll_drag else {
             return changed;
         };
-        let scroll_offset = layout_engine::scroll::scroll_offset_from_handle_drag(
+        let scroll_offset = des_layout::scroll::scroll_offset_from_handle_drag(
             to_scroll_axis(chrome.axis),
             to_scroll_rect(chrome.track_rect),
             to_scroll_rect(chrome.handle_rect),
@@ -845,9 +845,9 @@ impl DocumentEngine {
         let mut changed = false;
         for (id, state) in &mut self.states {
             let max_scroll = self.scroll_limits.get(id).copied().unwrap_or_default();
-            let scroll = layout_engine::scroll::clamp_scroll_offset(
+            let scroll = des_layout::scroll::clamp_scroll_offset(
                 to_layout_point(Point::new(state.scroll_x, state.scroll_y)),
-                layout_engine::geometry::Size {
+                des_layout::geometry::Size {
                     width: max_scroll.width,
                     height: max_scroll.height,
                 },

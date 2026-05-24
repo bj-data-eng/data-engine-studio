@@ -1,5 +1,5 @@
 use super::super::{CARD, PANEL_ALT, SHADOW_COLOR, STROKE, STROKE_SELECTED, TEXT_MUTED};
-use des_ui_document::{
+use des_document::{
     AlignItems, Color, ElementStateSelector, Insets, JustifyContent, Length, Overflow, Point,
     Shadow, Style, StyleSelector, StyleSheet, Transition,
 };
@@ -13,7 +13,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("drag-item"),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .width_fill()
                 .height(Length::Px(34.0))
                 .padding(Insets::symmetric(9.0, 6.0))
@@ -63,7 +63,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class_state(
                 "drag-handle",
-                des_ui_document::ElementStateSelector::Hovered,
+                des_document::ElementStateSelector::Hovered,
             ),
             Style::default().background(Color::rgba(103, 80, 164, 20)),
         )
@@ -79,13 +79,13 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .text_color(Color::rgba(0, 0, 0, 0)),
         )
         .rule(
-            StyleSelector::class_state("drag-item", des_ui_document::ElementStateSelector::Hovered),
+            StyleSelector::class_state("drag-item", des_document::ElementStateSelector::Hovered),
             Style::default()
                 .background(CARD)
                 .shadows(drag_hover_shadow()),
         )
         .rule(
-            StyleSelector::class_state("drag-item", des_ui_document::ElementStateSelector::Pressed),
+            StyleSelector::class_state("drag-item", des_document::ElementStateSelector::Pressed),
             Style::default()
                 .background(CARD)
                 .shadows(drag_hover_shadow()),
@@ -99,14 +99,14 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class_state(
                 "drag-origin-space",
-                des_ui_document::ElementStateSelector::Hovered,
+                des_document::ElementStateSelector::Hovered,
             ),
             transparent_surface(),
         )
         .rule(
             StyleSelector::class_state(
                 "drag-origin-space",
-                des_ui_document::ElementStateSelector::Pressed,
+                des_document::ElementStateSelector::Pressed,
             ),
             transparent_surface(),
         )
@@ -204,7 +204,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class(CONTEXT_MENU_ITEM_CLASS),
             Style::default()
-                .flex_direction(des_ui_document::FlexDirection::Row)
+                .flex_direction(des_document::FlexDirection::Row)
                 .width_fill()
                 .height(Length::Px(30.0))
                 .padding(Insets::symmetric(8.0, 6.0))

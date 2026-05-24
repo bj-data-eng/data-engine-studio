@@ -1,6 +1,6 @@
 //! Retained document and style primitives for host-rendered user interfaces.
 //!
-//! `des-ui-document` owns the retained document tree, deterministic style
+//! `des-document` owns the retained document tree, deterministic style
 //! resolution, retained element state, resolved layout output, and input
 //! routing. Rendering hosts such as egui translate platform input into
 //! [`DocumentInput`] and paint [`DocumentOutput::layout`].

@@ -27,7 +27,7 @@ impl StudioLabApp {
             ui_lab: match options.initial_lab_scroll {
                 Some(scroll) => UiLabState::new_with_stage_scroll(
                     options.initial_lab_view.as_deref(),
-                    Some(des_ui_document::Point::new(scroll[0], scroll[1])),
+                    Some(des_document::Point::new(scroll[0], scroll[1])),
                 ),
                 None => UiLabState::new(options.initial_lab_view.as_deref()),
             },
