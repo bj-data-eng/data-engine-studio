@@ -5,7 +5,7 @@ members = [
     "crates/des-graph-egui",
     "crates/des-document/layout",
     "crates/des-python",
-    "crates/des-template",
+    "crates/des-document/template",
     "crates/des-document/core",
     "crates/des-document/egui",
     "crates/des-ui-lab",
@@ -25,7 +25,7 @@ des-app = { path = "crates/des-app", version = "=0.1.0" }
 des-core = { path = "crates/des-core", version = "=0.1.0" }
 des-graph-egui = { path = "crates/des-graph-egui", version = "=0.1.0" }
 des-layout = { path = "crates/des-document/layout", version = "=0.1.0" }
-des-template = { path = "crates/des-template", version = "=0.1.0" }
+des-template = { path = "crates/des-document/template", version = "=0.1.0" }
 des-document = { path = "crates/des-document/core", version = "=0.1.0" }
 des-egui = { path = "crates/des-document/egui", version = "=0.1.0" }
 des-ui-lab = { path = "crates/des-ui-lab", version = "=0.1.0" }

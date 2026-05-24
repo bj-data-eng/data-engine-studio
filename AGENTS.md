@@ -28,9 +28,11 @@ Craft standard:
 - `egui` is the native host, not the owner of product layout semantics.
 - `crates/des-core`: tiny shared primitives, identity, diagnostics, errors.
 - `crates/des-app`: app state, commands, snapshots, orchestration.
-- `crates/des-document`: egui-free document tree, style model, layout, input, retained state.
-- `crates/des-widgets`: egui-free reusable widget behavior over document contracts.
-- `crates/des-egui`: egui adapter for document input, painting, text measurement, and host defaults.
+- `crates/des-document/core`: egui-free document tree, style model, layout, input, retained state.
+- `crates/des-document/layout`: vendored layout engine derived from Taffy.
+- `crates/des-document/template`: runtime and compiled document markup templates.
+- `crates/des-document/widgets`: egui-free reusable widget behavior over document contracts.
+- `crates/des-document/egui`: egui adapter for document input, painting, text measurement, and host defaults.
 - `crates/des-ui-lab`: UI lab app, dev/screenshot binaries, lab styles, and lab regression tests.
 - `crates/des-graph-egui`: vendored graph interaction crate while graph UX is explored.
 - `crates/des-python` and `python/data_engine_studio`: thin Python launcher/native wrapper.
@@ -52,7 +54,8 @@ Dependency direction:
 
 ```text
 python -> des-python -> des-ui-lab -> des-app -> domain/service crates -> des-core
-                          \-> des-egui -> des-widgets -> des-document
+                          \-> des-egui -> des-widgets -> des-document -> des-layout
+                          \-> des-template
 ```
 
 ## UI Toolkit Rules

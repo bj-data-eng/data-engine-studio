@@ -211,10 +211,7 @@ fn document_applies_document_style_to_existing_layout_node() {
     let layout_style = document.layout_style("panel").unwrap();
     assert_eq!(layout_style.display, Display::Grid);
     assert_eq!(layout_style.flex_direction, LayoutFlexDirection::Row);
-    assert_eq!(
-        layout_style.flex_wrap,
-        des_layout::prelude::FlexWrap::Wrap
-    );
+    assert_eq!(layout_style.flex_wrap, des_layout::prelude::FlexWrap::Wrap);
     assert_eq!(layout_style.flex_basis, length::<_, Dimension>(88.0));
     assert_eq!(layout_style.flex_grow, 2.0);
     assert_eq!(layout_style.flex_shrink, 0.5);
@@ -265,10 +262,7 @@ fn document_applies_document_style_to_existing_layout_node() {
             bottom: length::<_, LengthPercentageAuto>(4.0),
         }
     );
-    assert_eq!(
-        layout_style.padding,
-        des_layout::prelude::Rect::length(6.0)
-    );
+    assert_eq!(layout_style.padding, des_layout::prelude::Rect::length(6.0));
     assert_eq!(
         layout_style.size,
         LayoutSize {

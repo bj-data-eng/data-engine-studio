@@ -883,8 +883,7 @@ fn render_elevated_scrollable_drag_list(
                             ui,
                             item,
                             scroll_list_drop_preview,
-                            active_scroll_list_drag_item
-                                == Some(des_widgets::SortableItemId(item)),
+                            active_scroll_list_drag_item == Some(des_widgets::SortableItemId(item)),
                             pressed_drag_source,
                         );
                     }
@@ -908,10 +907,7 @@ pub(super) fn render_drag_overlay_layer(
     }
 }
 
-pub(super) fn render_debug_overlay_layer(
-    ui: &mut des_document::DocumentBuilder,
-    perf: UiLabPerf,
-) {
+pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder, perf: UiLabPerf) {
     ui.element(
         "debug-overlay",
         ElementSpec::new(Element::Div).class("debug-overlay"),

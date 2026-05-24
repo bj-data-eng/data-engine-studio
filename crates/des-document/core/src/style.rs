@@ -544,10 +544,12 @@ fn legacy_main_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
 
 fn legacy_cross_axis_offset(placement: AnchorPlacement, offset: Point) -> f32 {
     match placement.side() {
-        des_layout::floating::FloatingSide::Top
-        | des_layout::floating::FloatingSide::Bottom => offset.x,
-        des_layout::floating::FloatingSide::Right
-        | des_layout::floating::FloatingSide::Left => offset.y,
+        des_layout::floating::FloatingSide::Top | des_layout::floating::FloatingSide::Bottom => {
+            offset.x
+        }
+        des_layout::floating::FloatingSide::Right | des_layout::floating::FloatingSide::Left => {
+            offset.y
+        }
     }
 }
 
@@ -1359,8 +1361,7 @@ impl Style {
     pub fn floating_arrow_size(mut self, width: f32, height: f32, padding: f32) -> Self {
         if let Some(anchor) = &mut self.anchor {
             anchor.options.arrow = Some(
-                FloatingArrow::new(des_layout::geometry::Size { width, height })
-                    .padding(padding),
+                FloatingArrow::new(des_layout::geometry::Size { width, height }).padding(padding),
             );
         }
         self

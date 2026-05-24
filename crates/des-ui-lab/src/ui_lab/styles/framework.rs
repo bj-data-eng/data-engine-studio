@@ -61,10 +61,7 @@ pub(super) fn stylesheet() -> StyleSheet {
                 .transition(Transition::ease_out(0.1)),
         )
         .rule(
-            StyleSelector::class_state(
-                "drag-handle",
-                des_document::ElementStateSelector::Hovered,
-            ),
+            StyleSelector::class_state("drag-handle", des_document::ElementStateSelector::Hovered),
             Style::default().background(Color::rgba(103, 80, 164, 20)),
         )
         .rule(

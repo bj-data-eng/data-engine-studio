@@ -31,8 +31,12 @@ Initial crates:
 - `des-artifacts`: previews, profiling outputs, debug artifacts, schema snapshots, parquet/json metadata, and artifact indexing.
 - `des-duckdb`: DuckDB connection management, SQL lowering, query execution, and result materialization.
 - `des-polars`: Polars LazyFrame/DataFrame support, previews, profiling, and local transform lowering.
-- `des-document`: standalone-style UI document and style model with DOM-like element trees, deterministic CSS-like style sheets, resolved elements, retained interaction state, z-order, hit testing, and input routing.
-- `des-egui`: egui host adapter, document paint/input integration, text measurement, and host defaults.
+- `des-document`: product crate group under `crates/des-document/`, containing the document core, vendored layout engine, template language, reusable widgets, and egui adapter.
+- `des-document/core`: standalone-style UI document and style model with DOM-like element trees, deterministic CSS-like style sheets, resolved elements, retained interaction state, z-order, hit testing, and input routing.
+- `des-document/layout`: vendored layout engine derived from Taffy.
+- `des-document/template`: runtime and compiled document markup templates.
+- `des-document/widgets`: reusable egui-free widget behavior over document contracts.
+- `des-document/egui`: egui host adapter, document paint/input integration, text measurement, and host defaults.
 - `des-ui-lab`: current document-engine-backed lab app, screenshot harness, lab styles, and lab regression suite.
 - `des-app`: application orchestration, command handling, undo/redo, document lifecycle, validation/runtime wiring.
 - `des-python`: PyO3 extension module exposing the native app launcher to Python.
@@ -45,7 +49,10 @@ python package
     -> des-ui-lab
       -> des-app
       -> des-egui
-        -> des-document
+        -> des-widgets
+          -> des-document
+            -> des-layout
+      -> des-template
       -> des-project
       -> des-validation
       -> des-runtime
