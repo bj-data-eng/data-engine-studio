@@ -106,3 +106,205 @@ text {
   overflow-y: scroll;
   scrollbar-width: 2px;
 }
+
+.box-model-grid {
+  width: 100%;
+  gap: 10px;
+  background: #faf4fc;
+}
+
+.box-model-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  gap: 10px;
+  background: #faf4fc;
+}
+
+.box-model-case {
+  width: 318px;
+  height: auto;
+  padding: 8px;
+  gap: 3px;
+  background: #f3edf7;
+  border: 1px solid #cac4d0;
+  border-radius: 5px;
+}
+
+.box-section-label {
+  font-size: 14px;
+  color: #6750a4;
+  height: 18px;
+}
+
+.box-label {
+  font-size: 13px;
+  color: #1d1b20;
+  height: 16px;
+}
+
+.box-note {
+  font-size: 11px;
+  color: #625b71;
+  height: 14px;
+}
+
+.box-rule {
+  font-size: 10px;
+  color: #6750a4;
+  height: 12px;
+}
+
+.box-subject-frame {
+  width: 100%;
+  height: auto;
+  min-width: 0px;
+  min-height: 86px;
+  background: #fffbfe;
+  border: 1px solid #cac4d0;
+  overflow-y: visible;
+}
+
+.box-subject {
+  width: 32px;
+  height: 32px;
+  gap: 0px;
+  padding: 0px;
+  background: #d2e4fa;
+}
+
+.box-chip {
+  width: 12px;
+  height: 12px;
+  background: #cdefdd;
+}
+
+.box-overflow-child {
+  width: 112px;
+  height: 112px;
+  background: #ffdcaa;
+}
+
+.box-subject-auto {
+  width: auto;
+  height: auto;
+}
+
+.box-subject-px {
+  width: 96px;
+  height: 44px;
+}
+
+.box-subject-min {
+  width: auto;
+  height: auto;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.box-subject-max {
+  width: auto;
+  height: auto;
+  max-width: 52px;
+  max-height: 34px;
+}
+
+.box-max-wide-child {
+  width: 88px;
+  height: 48px;
+  background: #cdefdd;
+}
+
+.box-subject-fill {
+  width: 100%;
+  height: 28px;
+}
+
+.box-subject-percent {
+  width: 50%;
+  height: 28px;
+}
+
+.box-subject-height-fill {
+  width: 64px;
+  height: 100%;
+}
+
+.box-subject-margin {
+  width: 32px;
+  height: 32px;
+  margin: 12px;
+}
+
+.box-subject-padding {
+  width: auto;
+  height: auto;
+  padding: 12px;
+}
+
+.box-subject-border {
+  width: 44px;
+  height: 44px;
+  border: 5px solid #6750a4;
+}
+
+.box-subject-row-gap {
+  flex-direction: row;
+  width: auto;
+  height: auto;
+  gap: 10px;
+}
+
+.box-subject-column-gap {
+  flex-direction: column;
+  width: auto;
+  height: auto;
+  gap: 6px;
+}
+
+.box-subject-row-align {
+  flex-direction: row;
+  width: 96px;
+  height: 54px;
+  gap: 8px;
+  justify-content: center;
+  align-items: end;
+}
+
+.box-subject-column-align {
+  flex-direction: column;
+  width: 80px;
+  height: 92px;
+  gap: 4px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.box-subject-visible-overflow {
+  width: 44px;
+  height: 44px;
+  overflow-y: visible;
+}
+
+.box-subject-scroll-overflow {
+  width: 44px;
+  height: 44px;
+  overflow-y: scroll;
+  scrollbar-width: 2px;
+}
+
+.box-subject-scroll-x-overflow {
+  width: 44px;
+  height: 44px;
+  overflow-x: scroll;
+  overflow-y: visible;
+  scrollbar-width: 2px;
+}
+
+.box-subject-scroll-xy-overflow {
+  width: 44px;
+  height: 44px;
+  overflow: scroll;
+  scrollbar-width: 2px;
+}
