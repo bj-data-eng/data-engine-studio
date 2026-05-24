@@ -507,6 +507,15 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
             text-selection-color: #fffbfe;
             box-shadow: 0px 4px 10px 0px #0000003a, 0px 1px 2px rgba(103, 80, 164, 0.4);
             transition: all 0.24s ease-out;
+            scrollbar-expanded-width: 10px;
+            scrollbar-handle-color: rgba(103, 80, 164, 0.46);
+            scrollbar-track-color: rgba(103, 80, 164, 0.11);
+            scrollbar-hover-track-color: rgba(103, 80, 164, 0.11);
+            scrollbar-pressed-track-color: rgba(103, 80, 164, 0.11);
+            scrollbar-pressed-handle-color: rgba(103, 80, 164, 0.69);
+            scrollbar-pressed-handle-border-color: rgba(255, 251, 254, 0.71);
+            scrollbar-pressed-handle-border-width: 1px;
+            scrollbar-radius: 6px;
             padding: 4px 8px;
         }
 
@@ -564,6 +573,29 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
         ]
     );
     assert_eq!(title.style.transition, Some(Transition::ease_out(0.24)));
+    assert_eq!(title.style.scrollbar_expanded_width, 10.0);
+    assert_eq!(
+        title.style.scrollbar_handle_color,
+        Color::rgba(103, 80, 164, 117)
+    );
+    assert_eq!(
+        title.style.scrollbar_track_color,
+        Some(Color::rgba(103, 80, 164, 28))
+    );
+    assert_eq!(
+        title.style.scrollbar_hover_track_color,
+        Some(Color::rgba(103, 80, 164, 28))
+    );
+    assert_eq!(
+        title.style.scrollbar_pressed_handle_color,
+        Some(Color::rgba(103, 80, 164, 176))
+    );
+    assert_eq!(
+        title.style.scrollbar_pressed_handle_border_color,
+        Some(Color::rgba(255, 251, 254, 181))
+    );
+    assert_eq!(title.style.scrollbar_pressed_handle_border_width, Some(1.0));
+    assert_eq!(title.style.scrollbar_radius, 6.0);
     assert_eq!(title.style.background, Some(Color::rgb(238, 229, 255)));
     assert_eq!(title.style.border, Some(Color::rgb(103, 80, 164)));
     assert_eq!(title.style.border_width.top, 1.0);

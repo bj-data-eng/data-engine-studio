@@ -1955,3 +1955,17 @@ text {
   background: #e8def8;
   border-color: #6750a4;
 }
+
+.styled-scrollbar {
+  scrollbar-width: 2px;
+  scrollbar-expanded-width: 10px;
+  scrollbar-handle-color: #6750a476;
+  scrollbar-track-color: #6750a41c;
+  scrollbar-hover-track-color: #6750a41c;
+  scrollbar-pressed-track-color: #6750a41c;
+  scrollbar-pressed-handle-color: #6750a4b0;
+  scrollbar-pressed-handle-border-color: #fffbfeb4;
+  scrollbar-pressed-handle-border-width: 1px;
+  scrollbar-radius: 6px;
+  transition: all 0.14s ease-out;
+}

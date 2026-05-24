@@ -2,8 +2,8 @@ mod framework;
 
 use super::{PANEL, STROKE_SELECTED};
 use des_document::{
-    Color, FlexDirection, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, Length,
-    Style, StyleSelector, StyleSheet, Transition, ViewportQuery,
+    FlexDirection, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets, Length, Style,
+    StyleSelector, StyleSheet, ViewportQuery,
 };
 
 const DRAGGABLE_STACK_VIEWPORT_WIDTH: f32 = 1268.0;
@@ -34,10 +34,6 @@ fn lab_stylesheet() -> StyleSheet {
             .top_right_radius(0.0)
             .bottom_left_radius(5.0)
             .bottom_right_radius(5.0),
-    );
-    stylesheet.push_rule(
-        styled_scrollbar_selector().selector(),
-        styled_scrollbar_style(),
     );
     stylesheet.push_rule(
         StyleSelector::id("floating-offset-zero-popover"),
@@ -205,23 +201,4 @@ fn push_responsive_styles(stylesheet: &mut StyleSheet) {
             .flex_basis(Length::Auto)
             .flex_grow(0.0),
     );
-}
-
-fn styled_scrollbar_selector() -> des_document::CompoundSelector {
-    StyleSelector::compound().class("styled-scrollbar")
-}
-
-fn styled_scrollbar_style() -> Style {
-    Style::default()
-        .scrollbar_handle_color(Color::rgba(103, 80, 164, 118))
-        .scrollbar_track_color(Color::rgba(103, 80, 164, 28))
-        .scrollbar_width(2.0)
-        .scrollbar_expanded_width(10.0)
-        .scrollbar_hover_track_color(Color::rgba(103, 80, 164, 28))
-        .scrollbar_pressed_track_color(Color::rgba(103, 80, 164, 28))
-        .scrollbar_pressed_handle_color(Color::rgba(103, 80, 164, 176))
-        .scrollbar_pressed_handle_border_color(Color::rgba(255, 251, 254, 180))
-        .scrollbar_pressed_handle_border_width(1.0)
-        .scrollbar_radius(6.0)
-        .transition(Transition::ease_out(0.14))
 }

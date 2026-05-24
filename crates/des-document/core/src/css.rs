@@ -435,6 +435,42 @@ fn apply_declaration(style: &mut Style, name: &str, value: &str) -> Result<(), C
         "overflow-x" => style.overflow_x = Some(parse_overflow(value)?),
         "overflow-y" => style.overflow_y = Some(parse_overflow(value)?),
         "scrollbar-width" => style.scrollbar_width = Some(parse_px(value)?.max(0.0)),
+        "scrollbar-expanded-width" => {
+            style.scrollbar_expanded_width = Some(parse_px(value)?.max(0.0));
+        }
+        "scrollbar-handle-color" => style.scrollbar_handle_color = Some(parse_color(value)?),
+        "scrollbar-track-color" => style.scrollbar_track_color = Some(parse_color(value)?),
+        "scrollbar-handle-border-color" => {
+            style.scrollbar_handle_border_color = Some(parse_color(value)?);
+        }
+        "scrollbar-handle-border-width" => {
+            style.scrollbar_handle_border_width = Some(parse_px(value)?.max(0.0));
+        }
+        "scrollbar-hover-handle-color" => {
+            style.scrollbar_hover_handle_color = Some(parse_color(value)?);
+        }
+        "scrollbar-hover-track-color" => {
+            style.scrollbar_hover_track_color = Some(parse_color(value)?);
+        }
+        "scrollbar-hover-handle-border-color" => {
+            style.scrollbar_hover_handle_border_color = Some(parse_color(value)?);
+        }
+        "scrollbar-hover-handle-border-width" => {
+            style.scrollbar_hover_handle_border_width = Some(parse_px(value)?.max(0.0));
+        }
+        "scrollbar-pressed-handle-color" => {
+            style.scrollbar_pressed_handle_color = Some(parse_color(value)?);
+        }
+        "scrollbar-pressed-track-color" => {
+            style.scrollbar_pressed_track_color = Some(parse_color(value)?);
+        }
+        "scrollbar-pressed-handle-border-color" => {
+            style.scrollbar_pressed_handle_border_color = Some(parse_color(value)?);
+        }
+        "scrollbar-pressed-handle-border-width" => {
+            style.scrollbar_pressed_handle_border_width = Some(parse_px(value)?.max(0.0));
+        }
+        "scrollbar-radius" => style.scrollbar_radius = Some(parse_px(value)?.max(0.0)),
         "scrollbar-visible" => style.scrollbar_visible = Some(parse_bool(value)?),
         "position" => style.position = Some(parse_position(value)?),
         "top" => style.inset.top = Some(parse_length(value)?),
