@@ -961,6 +961,17 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
             );
             debug_metric_row(
                 ui,
+                "debug-text-layout-cache",
+                "text layout",
+                format!(
+                    "{} hit / {} miss / {} cached",
+                    perf.text_paint.layout_cache_hits,
+                    perf.text_paint.layout_cache_misses,
+                    perf.text_paint.layout_cache_entries
+                ),
+            );
+            debug_metric_row(
+                ui,
                 "debug-text-pixels",
                 "text upload px",
                 perf.text_paint.uploaded_pixels.to_string(),

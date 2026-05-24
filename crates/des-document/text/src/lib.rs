@@ -1,12 +1,13 @@
 use cosmic_text::{
     Align, Attrs, Buffer, CacheKey, Color as CosmicColor, Ellipsize, EllipsizeHeightLimit, Family,
-    FontSystem, Metrics, Shaping, Style, SwashCache, SwashContent, Weight, Wrap,
+    FontSystem, Metrics, PhysicalGlyph, Renderer, Shaping, Style, SwashCache, SwashContent,
+    UnderlineStyle, Weight, Wrap, render_decoration,
 };
 use des_document::{
     Color, Direction, FontStyle, InlineTextStyle, Point, Rect, Size, TextAlign, TextLayoutLine,
     TextLayoutRequest, TextLayoutResult, TextMeasurer, TextMeasurerKey, TextOverflow, TextWrapMode,
 };
-use std::sync::Arc;
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 pub const INTER_FAMILY: &str = "Inter";
 pub const JETBRAINS_MONO_FAMILY: &str = "JetBrains Mono";
@@ -57,6 +58,8 @@ pub struct RasterizedText {
 pub struct TextGlyphRun {
     pub layout: TextLayoutResult,
     pub glyphs: Vec<TextGlyph>,
+    pub backgrounds: Vec<TextGlyphRect>,
+    pub decorations: Vec<TextGlyphRect>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -83,6 +86,15 @@ pub struct TextGlyph {
     pub color: Color,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextGlyphRect {
+    pub x_px: i32,
+    pub y_px: i32,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub color: Color,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextDiagnostics {
     pub backend: &'static str,
@@ -97,6 +109,16 @@ pub struct TextDiagnostics {
 pub struct CosmicTextRenderer {
     font_system: FontSystem,
     swash_cache: SwashCache,
+    buffers: HashMap<TextBufferKey, Buffer>,
+    buffer_cache_hits: usize,
+    buffer_cache_misses: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TextBufferStats {
+    pub cache_entries: usize,
+    pub cache_hits: usize,
+    pub cache_misses: usize,
 }
 
 impl CosmicTextRenderer {
@@ -122,6 +144,22 @@ impl CosmicTextRenderer {
         Self {
             font_system: FontSystem::new_with_locale_and_db(locale, db),
             swash_cache: SwashCache::new(),
+            buffers: HashMap::new(),
+            buffer_cache_hits: 0,
+            buffer_cache_misses: 0,
+        }
+    }
+
+    pub fn begin_frame(&mut self) {
+        self.buffer_cache_hits = 0;
+        self.buffer_cache_misses = 0;
+    }
+
+    pub fn buffer_stats(&self) -> TextBufferStats {
+        TextBufferStats {
+            cache_entries: self.buffers.len(),
+            cache_hits: self.buffer_cache_hits,
+            cache_misses: self.buffer_cache_misses,
         }
     }
 
@@ -195,41 +233,58 @@ impl CosmicTextRenderer {
         visible_rect: Option<Rect>,
     ) -> TextGlyphRun {
         let scale = pixels_per_point.max(1.0);
-        let (layout, glyphs) = self.with_buffer(request.clone(), scale, |buffer, _| {
-            let layout = layout_result(&request, buffer);
-            let mut glyphs = Vec::new();
-            for run in buffer.layout_runs() {
-                for glyph in run.glyphs {
-                    let physical = glyph.physical((0.0, run.line_y), 1.0);
-                    let x = physical.x as f32 / scale;
-                    let y = physical.y as f32 / scale;
-                    let margin = glyph.font_size * 2.0;
-                    if let Some(visible) = visible_rect
-                        && (x > visible.right() + margin
-                            || y > visible.bottom() + margin
-                            || x < visible.origin.x - margin
-                            || y < visible.origin.y - margin)
-                    {
-                        continue;
+        let (layout, glyphs, backgrounds, decorations) =
+            self.with_buffer(request.clone(), scale, |buffer, _| {
+                let layout = layout_result(&request, buffer);
+                let mut glyphs = Vec::new();
+                let mut backgrounds = Vec::new();
+                let mut decorations = Vec::new();
+                let run_backgrounds = run_backgrounds(request.text);
+                for run in buffer.layout_runs() {
+                    collect_run_backgrounds(
+                        run.glyphs,
+                        run.line_top,
+                        run.line_height,
+                        &run_backgrounds,
+                        &mut backgrounds,
+                    );
+                    for glyph in run.glyphs {
+                        let physical = glyph.physical((0.0, run.line_y), 1.0);
+                        let x = physical.x as f32 / scale;
+                        let y = physical.y as f32 / scale;
+                        let margin = glyph.font_size * 2.0;
+                        if let Some(visible) = visible_rect
+                            && (x > visible.right() + margin
+                                || y > visible.bottom() + margin
+                                || x < visible.origin.x - margin
+                                || y < visible.origin.y - margin)
+                        {
+                            continue;
+                        }
+                        glyphs.push(TextGlyph {
+                            cache_key: physical.cache_key,
+                            x_px: physical.x,
+                            y_px: physical.y,
+                            color: glyph
+                                .color_opt
+                                .map_or(request.color, cosmic_to_document_color),
+                        });
                     }
-                    glyphs.push(TextGlyph {
-                        cache_key: physical.cache_key,
-                        x_px: physical.x,
-                        y_px: physical.y,
-                        color: glyph
-                            .color_opt
-                            .map_or(request.color, cosmic_to_document_color),
-                    });
+                    let mut collector = DecorationCollector {
+                        rects: &mut decorations,
+                    };
+                    render_decoration(&mut collector, &run, cosmic_color(request.color));
                 }
-            }
-            (layout, glyphs)
-        });
+                (layout, glyphs, backgrounds, decorations)
+            });
         TextGlyphRun {
             layout: TextLayoutResult {
                 size: Size::new(layout.size.width / scale, layout.size.height / scale),
                 ..layout.scale_lines(1.0 / scale)
             },
             glyphs,
+            backgrounds,
+            decorations,
         }
     }
 
@@ -278,68 +333,24 @@ impl CosmicTextRenderer {
         scale: f32,
         f: impl FnOnce(&mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>, &mut SwashCache) -> R,
     ) -> R {
-        let metrics = Metrics::new(
-            request.font_size.max(1.0) * scale,
-            request
-                .line_height
-                .unwrap_or(request.font_size * 1.2)
-                .max(1.0)
-                * scale,
-        );
-        let wrap_width = match request.layout_style.text_wrap_mode {
-            TextWrapMode::NoWrap => None,
-            TextWrapMode::Wrap if request.wrap_width.is_finite() && request.wrap_width > 1.0 => {
-                Some((request.wrap_width * scale).max(1.0))
-            }
-            TextWrapMode::Wrap => None,
-        };
-        let height = request
-            .layout_style
-            .max_lines
-            .map(|lines| lines.max(1) as f32 * metrics.line_height);
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
-        let mut buffer = buffer.borrow_with(&mut self.font_system);
-        buffer.set_wrap(cosmic_wrap(&request));
-        buffer.set_size(wrap_width, height);
-        if request.layout_style.text_overflow == TextOverflow::Ellipsis {
-            let limit = request
-                .layout_style
-                .max_lines
-                .map(|lines| EllipsizeHeightLimit::Lines(lines.max(1)))
-                .or(height.map(EllipsizeHeightLimit::Height))
-                .unwrap_or(EllipsizeHeightLimit::Lines(1));
-            buffer.set_ellipsize(Ellipsize::End(limit));
+        let key = TextBufferKey::new(&request, scale);
+        if self.buffers.len() > 512 && !self.buffers.contains_key(&key) {
+            self.buffers.clear();
         }
-
-        let default_attrs = cosmic_attrs(
-            &InlineTextStyle::default(),
-            request.font_size,
-            request.color,
-            request.line_height,
-            scale,
-        );
-        let spans = request.text.runs().iter().map(|run| {
-            (
-                run.text.as_str(),
-                cosmic_attrs(
-                    &run.style,
-                    request.font_size,
-                    request.color,
-                    request.line_height,
-                    scale,
-                ),
-            )
+        if self.buffers.contains_key(&key) {
+            self.buffer_cache_hits += 1;
+        } else {
+            self.buffer_cache_misses += 1;
+        }
+        let font_system = &mut self.font_system;
+        let buffer = self.buffers.entry(key).or_insert_with(|| {
+            let metrics = buffer_metrics(&request, scale);
+            let mut buffer = Buffer::new_empty(metrics);
+            let mut borrowed = buffer.borrow_with(font_system);
+            configure_buffer(&mut borrowed, &request, scale);
+            buffer
         });
-        buffer.set_rich_text(
-            spans,
-            &default_attrs,
-            shaping_for(&request),
-            Some(cosmic_align(
-                request.layout_style.text_align,
-                request.direction,
-            )),
-        );
-
+        let mut buffer = buffer.borrow_with(font_system);
         f(&mut buffer, &mut self.swash_cache)
     }
 }
@@ -372,6 +383,400 @@ impl ScaleTextLayoutResult for TextLayoutResult {
         }
         self
     }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct TextBufferKey {
+    layout_text: String,
+    font_size: u32,
+    color: [u8; 4],
+    direction: DirectionKey,
+    wrap_width: u32,
+    layout_style: TextLayoutStyleKey,
+    line_height: Option<u32>,
+    scale: u32,
+    runs: Vec<TextRunKey>,
+}
+
+impl TextBufferKey {
+    fn new(request: &TextLayoutRequest<'_>, scale: f32) -> Self {
+        Self {
+            layout_text: request.text.layout_text().to_string(),
+            font_size: f32_key(request.font_size),
+            color: color_key(request.color),
+            direction: DirectionKey::from(request.direction),
+            wrap_width: f32_key(request.wrap_width),
+            layout_style: TextLayoutStyleKey::from(request.layout_style),
+            line_height: request.line_height.map(f32_key),
+            scale: f32_key(scale),
+            runs: request
+                .text
+                .runs()
+                .iter()
+                .map(|run| TextRunKey {
+                    text: run.text.clone(),
+                    style: InlineStyleKey::from(&run.style),
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum DirectionKey {
+    Ltr,
+    Rtl,
+}
+
+impl From<Direction> for DirectionKey {
+    fn from(direction: Direction) -> Self {
+        match direction {
+            Direction::Ltr => Self::Ltr,
+            Direction::Rtl => Self::Rtl,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct TextRunKey {
+    text: String,
+    style: InlineStyleKey,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct InlineStyleKey {
+    color: Option<[u8; 4]>,
+    font_size: Option<u32>,
+    line_height: Option<u32>,
+    letter_spacing: Option<u32>,
+    font_family: Option<String>,
+    font_weight: Option<u16>,
+    font_stretch: Option<u32>,
+    font_style: Option<FontStyleKey>,
+    text_decoration: Option<TextDecorationKey>,
+    vertical_align: Option<TextVerticalAlignKey>,
+    background: Option<[u8; 4]>,
+}
+
+impl From<&InlineTextStyle> for InlineStyleKey {
+    fn from(style: &InlineTextStyle) -> Self {
+        Self {
+            color: style.color.map(color_key),
+            font_size: style.font_size.map(f32_key),
+            line_height: style.line_height.map(f32_key),
+            letter_spacing: style.letter_spacing.map(f32_key),
+            font_family: style.font_family.clone(),
+            font_weight: style.font_weight.map(|weight| weight.value()),
+            font_stretch: style.font_stretch.map(|stretch| f32_key(stretch.value())),
+            font_style: style.font_style.map(FontStyleKey::from),
+            text_decoration: style.text_decoration.map(TextDecorationKey::from),
+            vertical_align: style.vertical_align.map(TextVerticalAlignKey::from),
+            background: style.background.map(color_key),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum FontStyleKey {
+    Normal,
+    Italic,
+    Oblique,
+}
+
+impl From<FontStyle> for FontStyleKey {
+    fn from(style: FontStyle) -> Self {
+        match style {
+            FontStyle::Normal => Self::Normal,
+            FontStyle::Italic => Self::Italic,
+            FontStyle::Oblique => Self::Oblique,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct TextDecorationKey {
+    underline: bool,
+    overline: bool,
+    line_through: bool,
+    color: Option<[u8; 4]>,
+    thickness: Option<u32>,
+}
+
+impl From<des_document::TextDecoration> for TextDecorationKey {
+    fn from(decoration: des_document::TextDecoration) -> Self {
+        Self {
+            underline: decoration.underline,
+            overline: decoration.overline,
+            line_through: decoration.line_through,
+            color: decoration.color.map(color_key),
+            thickness: decoration.thickness.map(f32_key),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum TextVerticalAlignKey {
+    Baseline,
+    Top,
+    Middle,
+    Bottom,
+    Sub,
+    Super,
+}
+
+impl From<des_document::TextVerticalAlign> for TextVerticalAlignKey {
+    fn from(align: des_document::TextVerticalAlign) -> Self {
+        match align {
+            des_document::TextVerticalAlign::Baseline => Self::Baseline,
+            des_document::TextVerticalAlign::Top => Self::Top,
+            des_document::TextVerticalAlign::Middle => Self::Middle,
+            des_document::TextVerticalAlign::Bottom => Self::Bottom,
+            des_document::TextVerticalAlign::Sub => Self::Sub,
+            des_document::TextVerticalAlign::Super => Self::Super,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct TextLayoutStyleKey {
+    white_space_collapse: WhiteSpaceCollapseKey,
+    text_wrap_mode: TextWrapModeKey,
+    overflow_wrap: OverflowWrapKey,
+    word_break: WordBreakKey,
+    text_align: TextAlignKey,
+    text_overflow: TextOverflowKey,
+    text_transform: TextTransformKey,
+    tab_size: u16,
+    max_lines: Option<usize>,
+}
+
+impl From<des_document::TextLayoutStyle> for TextLayoutStyleKey {
+    fn from(style: des_document::TextLayoutStyle) -> Self {
+        Self {
+            white_space_collapse: WhiteSpaceCollapseKey::from(style.white_space_collapse),
+            text_wrap_mode: TextWrapModeKey::from(style.text_wrap_mode),
+            overflow_wrap: OverflowWrapKey::from(style.overflow_wrap),
+            word_break: WordBreakKey::from(style.word_break),
+            text_align: TextAlignKey::from(style.text_align),
+            text_overflow: TextOverflowKey::from(style.text_overflow),
+            text_transform: TextTransformKey::from(style.text_transform),
+            tab_size: style.tab_size,
+            max_lines: style.max_lines,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum WhiteSpaceCollapseKey {
+    Collapse,
+    Preserve,
+    PreserveBreaks,
+    BreakSpaces,
+}
+
+impl From<des_document::WhiteSpaceCollapse> for WhiteSpaceCollapseKey {
+    fn from(value: des_document::WhiteSpaceCollapse) -> Self {
+        match value {
+            des_document::WhiteSpaceCollapse::Collapse => Self::Collapse,
+            des_document::WhiteSpaceCollapse::Preserve => Self::Preserve,
+            des_document::WhiteSpaceCollapse::PreserveBreaks => Self::PreserveBreaks,
+            des_document::WhiteSpaceCollapse::BreakSpaces => Self::BreakSpaces,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum TextWrapModeKey {
+    Wrap,
+    NoWrap,
+}
+
+impl From<TextWrapMode> for TextWrapModeKey {
+    fn from(value: TextWrapMode) -> Self {
+        match value {
+            TextWrapMode::Wrap => Self::Wrap,
+            TextWrapMode::NoWrap => Self::NoWrap,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum OverflowWrapKey {
+    Normal,
+    Anywhere,
+    BreakWord,
+}
+
+impl From<des_document::OverflowWrap> for OverflowWrapKey {
+    fn from(value: des_document::OverflowWrap) -> Self {
+        match value {
+            des_document::OverflowWrap::Normal => Self::Normal,
+            des_document::OverflowWrap::Anywhere => Self::Anywhere,
+            des_document::OverflowWrap::BreakWord => Self::BreakWord,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum WordBreakKey {
+    Normal,
+    BreakAll,
+    KeepAll,
+}
+
+impl From<des_document::WordBreak> for WordBreakKey {
+    fn from(value: des_document::WordBreak) -> Self {
+        match value {
+            des_document::WordBreak::Normal => Self::Normal,
+            des_document::WordBreak::BreakAll => Self::BreakAll,
+            des_document::WordBreak::KeepAll => Self::KeepAll,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum TextAlignKey {
+    Start,
+    Center,
+    End,
+    Justify,
+}
+
+impl From<TextAlign> for TextAlignKey {
+    fn from(value: TextAlign) -> Self {
+        match value {
+            TextAlign::Start => Self::Start,
+            TextAlign::Center => Self::Center,
+            TextAlign::End => Self::End,
+            TextAlign::Justify => Self::Justify,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum TextOverflowKey {
+    Clip,
+    Ellipsis,
+}
+
+impl From<TextOverflow> for TextOverflowKey {
+    fn from(value: TextOverflow) -> Self {
+        match value {
+            TextOverflow::Clip => Self::Clip,
+            TextOverflow::Ellipsis => Self::Ellipsis,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum TextTransformKey {
+    None,
+    Uppercase,
+    Lowercase,
+    Capitalize,
+}
+
+impl From<des_document::TextTransform> for TextTransformKey {
+    fn from(value: des_document::TextTransform) -> Self {
+        match value {
+            des_document::TextTransform::None => Self::None,
+            des_document::TextTransform::Uppercase => Self::Uppercase,
+            des_document::TextTransform::Lowercase => Self::Lowercase,
+            des_document::TextTransform::Capitalize => Self::Capitalize,
+        }
+    }
+}
+
+fn f32_key(value: f32) -> u32 {
+    if value == 0.0 {
+        0.0_f32.to_bits()
+    } else {
+        value.to_bits()
+    }
+}
+
+fn color_key(color: Color) -> [u8; 4] {
+    [color.r, color.g, color.b, color.a]
+}
+
+fn buffer_metrics(request: &TextLayoutRequest<'_>, scale: f32) -> Metrics {
+    Metrics::new(
+        request.font_size.max(1.0) * scale,
+        request
+            .line_height
+            .unwrap_or(request.font_size * 1.2)
+            .max(1.0)
+            * scale,
+    )
+}
+
+fn configure_buffer(
+    buffer: &mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>,
+    request: &TextLayoutRequest<'_>,
+    scale: f32,
+) {
+    let metrics = buffer_metrics(request, scale);
+    buffer.set_metrics(metrics);
+    buffer.set_wrap(cosmic_wrap(request));
+    buffer.set_size(wrap_width(request, scale), height_limit(request, metrics));
+    if request.layout_style.text_overflow == TextOverflow::Ellipsis {
+        let height = height_limit(request, metrics);
+        let limit = request
+            .layout_style
+            .max_lines
+            .map(|lines| EllipsizeHeightLimit::Lines(lines.max(1)))
+            .or(height.map(EllipsizeHeightLimit::Height))
+            .unwrap_or(EllipsizeHeightLimit::Lines(1));
+        buffer.set_ellipsize(Ellipsize::End(limit));
+    }
+
+    let default_attrs = cosmic_attrs(
+        &InlineTextStyle::default(),
+        request.font_size,
+        request.color,
+        request.line_height,
+        scale,
+        0,
+    );
+    let spans = request.text.runs().iter().enumerate().map(|(index, run)| {
+        (
+            run.text.as_str(),
+            cosmic_attrs(
+                &run.style,
+                request.font_size,
+                request.color,
+                request.line_height,
+                scale,
+                index + 1,
+            ),
+        )
+    });
+    buffer.set_rich_text(
+        spans,
+        &default_attrs,
+        shaping_for(request),
+        Some(cosmic_align(
+            request.layout_style.text_align,
+            request.direction,
+        )),
+    );
+}
+
+fn wrap_width(request: &TextLayoutRequest<'_>, scale: f32) -> Option<f32> {
+    match request.layout_style.text_wrap_mode {
+        TextWrapMode::NoWrap => None,
+        TextWrapMode::Wrap if request.wrap_width.is_finite() && request.wrap_width > 1.0 => {
+            Some((request.wrap_width * scale).max(1.0))
+        }
+        TextWrapMode::Wrap => None,
+    }
+}
+
+fn height_limit(request: &TextLayoutRequest<'_>, metrics: Metrics) -> Option<f32> {
+    request
+        .layout_style
+        .max_lines
+        .map(|lines| lines.max(1) as f32 * metrics.line_height)
 }
 
 fn layout_result(
@@ -493,6 +898,7 @@ fn cosmic_attrs(
     inherited_color: Color,
     inherited_line_height: Option<f32>,
     scale: f32,
+    metadata: usize,
 ) -> Attrs<'static> {
     let color = style.color.unwrap_or(inherited_color);
     let font_size = style.font_size.unwrap_or(inherited_font_size).max(1.0) * scale;
@@ -512,6 +918,7 @@ fn cosmic_attrs(
     let mut attrs = Attrs::new()
         .family(family)
         .metrics(Metrics::new(font_size, line_height))
+        .metadata(metadata)
         .color(cosmic_color(color));
     if let Some(weight) = style.font_weight {
         attrs = attrs.weight(Weight(weight.value()));
@@ -525,7 +932,119 @@ fn cosmic_attrs(
     if let Some(letter_spacing) = style.letter_spacing {
         attrs = attrs.letter_spacing((letter_spacing / font_size).max(0.0));
     }
+    if let Some(decoration) = style.text_decoration {
+        let decoration_color = cosmic_color(decoration.stroke_color(color));
+        if decoration.underline {
+            attrs = attrs
+                .underline(UnderlineStyle::Single)
+                .underline_color(decoration_color);
+        }
+        if decoration.overline {
+            attrs = attrs.overline().overline_color(decoration_color);
+        }
+        if decoration.line_through {
+            attrs = attrs.strikethrough().strikethrough_color(decoration_color);
+        }
+    }
     attrs
+}
+
+fn run_backgrounds(text: &des_document::NormalizedText) -> Vec<Option<Color>> {
+    let mut backgrounds = Vec::with_capacity(text.runs().len() + 1);
+    backgrounds.push(None);
+    backgrounds.extend(text.runs().iter().map(|run| run.style.background));
+    backgrounds
+}
+
+fn collect_run_backgrounds(
+    glyphs: &[cosmic_text::LayoutGlyph],
+    line_top: f32,
+    line_height: f32,
+    backgrounds: &[Option<Color>],
+    output: &mut Vec<TextGlyphRect>,
+) {
+    let mut active: Option<(usize, f32, f32, Color)> = None;
+    for glyph in glyphs {
+        let color = backgrounds
+            .get(glyph.metadata)
+            .and_then(|background| *background);
+        match (active, color) {
+            (Some((metadata, min_x, max_x, active_color)), Some(color))
+                if metadata == glyph.metadata && active_color == color =>
+            {
+                active = Some((
+                    metadata,
+                    min_x.min(glyph.x),
+                    max_x.max(glyph.x + glyph.w),
+                    color,
+                ));
+            }
+            (Some((_, min_x, max_x, active_color)), next_color) => {
+                push_text_rect(
+                    output,
+                    min_x,
+                    line_top,
+                    max_x - min_x,
+                    line_height,
+                    active_color,
+                );
+                active =
+                    next_color.map(|color| (glyph.metadata, glyph.x, glyph.x + glyph.w, color));
+            }
+            (None, Some(color)) => {
+                active = Some((glyph.metadata, glyph.x, glyph.x + glyph.w, color));
+            }
+            (None, None) => {}
+        }
+    }
+    if let Some((_, min_x, max_x, color)) = active {
+        push_text_rect(output, min_x, line_top, max_x - min_x, line_height, color);
+    }
+}
+
+fn push_text_rect(
+    output: &mut Vec<TextGlyphRect>,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    color: Color,
+) {
+    let x_px = x.floor() as i32;
+    let y_px = y.floor() as i32;
+    let right_px = (x + width).ceil() as i32;
+    let bottom_px = (y + height).ceil() as i32;
+    let width_px = (right_px - x_px).max(0) as u32;
+    let height_px = (bottom_px - y_px).max(0) as u32;
+    if width_px > 0 && height_px > 0 {
+        output.push(TextGlyphRect {
+            x_px,
+            y_px,
+            width_px,
+            height_px,
+            color,
+        });
+    }
+}
+
+struct DecorationCollector<'a> {
+    rects: &'a mut Vec<TextGlyphRect>,
+}
+
+impl Renderer for DecorationCollector<'_> {
+    fn rectangle(&mut self, x: i32, y: i32, w: u32, h: u32, color: CosmicColor) {
+        if w > 0 && h > 0 {
+            self.rects.push(TextGlyphRect {
+                x_px: x,
+                y_px: y,
+                width_px: w,
+                height_px: h,
+                color: cosmic_to_document_color(color),
+            });
+        }
+    }
+
+    fn glyph(&mut self, _physical_glyph: PhysicalGlyph, _color: CosmicColor) {}
 }
 
 fn cosmic_color(color: Color) -> CosmicColor {
@@ -675,7 +1194,7 @@ fn alpha_blend(dst: &mut [u8], src: [u8; 4]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_document::{NormalizedText, TextContent, TextLayoutStyle};
+    use des_document::{NormalizedText, TextContent, TextDecoration, TextLayoutStyle, TextRun};
 
     const INTER: &[u8] = include_bytes!("../../egui/assets/fonts/inter/InterVariable.ttf");
     const JETBRAINS_MONO: &[u8] =
@@ -732,6 +1251,24 @@ mod tests {
     }
 
     #[test]
+    fn reuses_retained_buffers_for_matching_layout_requests() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Alpha beta gamma delta");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let text_request = request(&normalized, 16.0, 90.0);
+
+        renderer.begin_frame();
+        let first = renderer.measure_text(text_request.clone());
+        let second = renderer.measure_text(text_request);
+        let stats = renderer.buffer_stats();
+
+        assert_eq!(first, second);
+        assert_eq!(stats.cache_entries, 1);
+        assert_eq!(stats.cache_misses, 1);
+        assert_eq!(stats.cache_hits, 1);
+    }
+
+    #[test]
     fn hit_testing_returns_interior_text_indices() {
         let mut renderer = renderer();
         let content = TextContent::plain("Alpha beta");
@@ -768,6 +1305,46 @@ mod tests {
         assert_eq!(
             image.rgba.len(),
             image.width_px as usize * image.height_px as usize * 4
+        );
+    }
+
+    #[test]
+    fn exposes_inline_backgrounds_and_decorations_for_atlas_rendering() {
+        let mut renderer = renderer();
+        let highlight = Color::rgba(234, 221, 255, 180);
+        let underline = Color::rgb(103, 80, 164);
+        let content = TextContent::new(vec![
+            TextRun::styled(
+                "under ",
+                InlineTextStyle {
+                    text_decoration: Some(TextDecoration::UNDERLINE.color(underline)),
+                    ..InlineTextStyle::default()
+                },
+            ),
+            TextRun::styled(
+                "marked",
+                InlineTextStyle {
+                    background: Some(highlight),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let glyph_run = renderer.glyphs(request(&normalized, 24.0, 400.0), 2.0, None);
+
+        assert!(
+            glyph_run
+                .backgrounds
+                .iter()
+                .any(|rect| rect.color == highlight && rect.width_px > 0 && rect.height_px > 0),
+            "inline background runs should become paintable rectangles"
+        );
+        assert!(
+            glyph_run
+                .decorations
+                .iter()
+                .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px > 0),
+            "underline runs should become paintable decoration rectangles"
         );
     }
 }

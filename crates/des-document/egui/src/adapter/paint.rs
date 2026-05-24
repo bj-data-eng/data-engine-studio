@@ -6,6 +6,7 @@ use des_document::{
 };
 use des_text::{
     CosmicTextRenderer, TextGlyph, TextGlyphCacheKey, TextGlyphImage, TextGlyphImageContent,
+    TextGlyphRect,
 };
 use eframe::egui;
 use std::collections::HashMap;
@@ -40,6 +41,9 @@ pub struct TextPaintStats {
     pub rasterizations: usize,
     pub cached_glyphs: usize,
     pub uploaded_pixels: u64,
+    pub layout_cache_hits: usize,
+    pub layout_cache_misses: usize,
+    pub layout_cache_entries: usize,
 }
 
 impl CosmicTextPaintResources {
@@ -52,15 +56,21 @@ impl CosmicTextPaintResources {
     }
 
     pub fn begin_frame(&mut self) {
+        self.renderer.begin_frame();
         self.stats = TextPaintStats {
             cached_glyphs: self.atlas.entries.len(),
+            layout_cache_entries: self.renderer.buffer_stats().cache_entries,
             ..TextPaintStats::default()
         };
     }
 
     pub fn stats(&self) -> TextPaintStats {
+        let layout_stats = self.renderer.buffer_stats();
         TextPaintStats {
             cached_glyphs: self.atlas.entries.len(),
+            layout_cache_hits: layout_stats.cache_hits,
+            layout_cache_misses: layout_stats.cache_misses,
+            layout_cache_entries: layout_stats.cache_entries,
             ..self.stats
         }
     }
@@ -369,12 +379,18 @@ fn paint_atlas_text(
                 .id()
         }
     };
+    for background in &glyph_run.backgrounds {
+        paint_text_rect(painter, position, *background, scale);
+    }
     for glyph in glyph_run.glyphs {
         let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
             continue;
         };
         stats.glyphs_painted += 1;
         paint_glyph_atlas_entry(painter, position, texture_id, glyph, entry, scale);
+    }
+    for decoration in &glyph_run.decorations {
+        paint_text_rect(painter, position, *decoration, scale);
     }
 }
 
@@ -416,6 +432,24 @@ fn paint_glyph_atlas_entry(
         egui::Rect::from_min_size(min, size),
         entry.uv,
         tint,
+    );
+}
+
+fn paint_text_rect(
+    painter: &egui::Painter,
+    text_position: egui::Pos2,
+    rect: TextGlyphRect,
+    scale: f32,
+) {
+    let min = egui::pos2(
+        text_position.x + rect.x_px as f32 / scale,
+        text_position.y + rect.y_px as f32 / scale,
+    );
+    let size = egui::vec2(rect.width_px as f32 / scale, rect.height_px as f32 / scale);
+    painter.rect_filled(
+        egui::Rect::from_min_size(min, size),
+        0.0,
+        to_egui_color(rect.color),
     );
 }
 

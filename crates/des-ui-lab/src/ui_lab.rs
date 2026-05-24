@@ -252,6 +252,7 @@ impl UiLabState {
         let document_start = Instant::now();
         let mut retained = self.take_lab_document(viewport_size, debug_overlay);
         let document_time = document_start.elapsed();
+        self.text_paint_resources.begin_frame();
 
         if let Some(scroll) = self.pending_stage_scroll.take() {
             self.document_engine
@@ -313,7 +314,6 @@ impl UiLabState {
         apply_cursor_icon(ui, &output);
 
         let paint_start = Instant::now();
-        self.text_paint_resources.begin_frame();
         paint_frame_with_text_resources(
             ui,
             origin,

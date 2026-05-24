@@ -2166,6 +2166,14 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
         warm_stats.rasterizations, 0,
         "warm text paint should reuse the glyph atlas without rasterizing glyphs"
     );
+    assert_eq!(
+        warm_stats.layout_cache_misses, 0,
+        "warm text paint should reuse retained cosmic text buffers without reshaping misses"
+    );
+    assert!(
+        warm_stats.layout_cache_hits > 0,
+        "warm text paint should hit retained cosmic text buffers"
+    );
     assert!(
         warm_stats.glyph_cache_hits > 0,
         "warm text paint should hit cached atlas glyphs"
@@ -2204,9 +2212,21 @@ fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
         populated_stats.cached_glyphs > 0,
         "scrolled text paint should populate or reuse atlas glyphs"
     );
+    assert!(
+        populated_stats.layout_cache_entries > 0,
+        "scrolled text paint should retain cosmic text buffers"
+    );
     assert_eq!(
         warm_stats.rasterizations, 0,
         "warm scrolled text paint should reuse the glyph atlas without rasterizing glyphs"
+    );
+    assert_eq!(
+        warm_stats.layout_cache_misses, 0,
+        "warm scrolled text paint should reuse retained cosmic text buffers without reshaping misses"
+    );
+    assert!(
+        warm_stats.layout_cache_hits > 0,
+        "warm scrolled text paint should hit retained cosmic text buffers"
     );
     assert!(
         warm_stats.glyph_cache_hits > 0,
