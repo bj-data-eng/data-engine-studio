@@ -321,7 +321,7 @@ impl UiLabState {
             output.text_selection.as_ref(),
             &mut self.text_paint_resources,
         );
-        if self.view == LabView::Text {
+        if debug_overlay && self.view == LabView::Text {
             paint_legacy_text_path_comparison(ui, origin, &output);
         }
         paint_scroll_chrome(ui, origin, &output.scroll_chrome);
