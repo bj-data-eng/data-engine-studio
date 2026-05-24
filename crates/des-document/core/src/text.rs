@@ -414,59 +414,60 @@ fn is_css_space(ch: char) -> bool {
 
 fn fallback_measure_text(request: TextLayoutRequest<'_>) -> TextLayoutResult {
     let line_height = fallback_line_height(&request);
-    let paragraphs = fallback_paragraphs(&request);
-    if request.layout_style.text_wrap_mode == TextWrapMode::NoWrap
-        || !request.wrap_width.is_finite()
-    {
-        let line_count = paragraphs.len().max(1);
-        let unwrapped_width = paragraphs
-            .iter()
-            .map(|paragraph| paragraph.iter().map(|ch| ch.width).sum::<f32>())
-            .fold(0.0, f32::max);
-        return TextLayoutResult {
-            size: Size::new(unwrapped_width, line_height * line_count as f32),
-            line_count,
-            elided: false,
-        };
-    }
-
-    let max_width = request.wrap_width.max(1.0);
+    let max_width = fallback_wrap_width(&request);
+    let lines = fallback_layout_lines(&request);
     let max_lines = request.layout_style.max_lines.unwrap_or(usize::MAX).max(1);
-    let mut line_count = 0usize;
-    let mut max_line_width: f32 = 0.0;
-    let mut elided = false;
-    for paragraph in paragraphs {
-        let lines = wrap_paragraph(
-            &paragraph,
-            max_width,
-            request.layout_style.overflow_wrap,
-            request.layout_style.word_break,
-        );
-        for line_width in lines {
-            if line_count >= max_lines {
-                elided = true;
-                break;
-            }
-            max_line_width = max_line_width.max(line_width);
-            line_count += 1;
-        }
-        if elided {
-            break;
-        }
-    }
-
-    if line_count == 0 {
-        line_count = 1;
-    }
+    let visible_lines = lines.len().min(max_lines).max(1);
+    let max_line_width = lines
+        .iter()
+        .take(visible_lines)
+        .map(|line| line.width)
+        .fold(0.0, f32::max);
+    let elided = lines.len() > visible_lines;
 
     TextLayoutResult {
         size: Size::new(
             max_line_width.min(max_width),
-            line_height * line_count as f32,
+            line_height * visible_lines as f32,
         ),
-        line_count,
+        line_count: visible_lines,
         elided,
     }
+}
+
+fn fallback_wrap_width(request: &TextLayoutRequest<'_>) -> f32 {
+    if request.layout_style.text_wrap_mode == TextWrapMode::NoWrap
+        || !request.wrap_width.is_finite()
+    {
+        f32::INFINITY
+    } else {
+        request.wrap_width.max(1.0)
+    }
+}
+
+fn fallback_layout_lines(request: &TextLayoutRequest<'_>) -> Vec<FallbackLayoutLine> {
+    let paragraphs = fallback_paragraphs(request);
+    if request.layout_style.text_wrap_mode == TextWrapMode::NoWrap
+        || !request.wrap_width.is_finite()
+    {
+        return paragraphs
+            .into_iter()
+            .map(FallbackLayoutLine::from)
+            .collect();
+    }
+
+    let max_width = fallback_wrap_width(request);
+    paragraphs
+        .into_iter()
+        .flat_map(|paragraph| {
+            wrap_paragraph(
+                &paragraph,
+                max_width,
+                request.layout_style.overflow_wrap,
+                request.layout_style.word_break,
+            )
+        })
+        .collect()
 }
 
 fn wrap_paragraph(
@@ -474,9 +475,9 @@ fn wrap_paragraph(
     max_width: f32,
     overflow_wrap: OverflowWrap,
     word_break: WordBreak,
-) -> Vec<f32> {
+) -> Vec<FallbackLayoutLine> {
     if text.is_empty() {
-        return vec![0.0];
+        return vec![FallbackLayoutLine::default()];
     }
 
     if overflow_wrap == OverflowWrap::Anywhere || word_break == WordBreak::BreakAll {
@@ -484,9 +485,10 @@ fn wrap_paragraph(
     }
 
     let mut rows = Vec::new();
+    let mut current = Vec::new();
     let mut current_width = 0.0;
     let mut saw_word = false;
-    let mut words = text.split(|ch| ch.value == ' ').peekable();
+    let mut words = text.split(|ch| ch.value == ' ');
     while let Some(word) = words.next() {
         let word_width = word.iter().map(|ch| ch.width).sum::<f32>();
         let next_width = if !saw_word {
@@ -497,9 +499,15 @@ fn wrap_paragraph(
             current_width + space_width + word_width
         };
         if current_width > f32::EPSILON && next_width > max_width {
-            rows.push(current_width);
+            rows.push(FallbackLayoutLine::from(std::mem::take(&mut current)));
             current_width = word_width;
+            current.extend_from_slice(word);
         } else {
+            if saw_word {
+                let space = fallback_space_before(word, text);
+                current.push(space);
+            }
+            current.extend_from_slice(word);
             current_width = next_width;
         }
         saw_word = true;
@@ -507,23 +515,44 @@ fn wrap_paragraph(
     if overflow_wrap == OverflowWrap::BreakWord && current_width > max_width {
         rows.extend(wrap_anywhere(text, max_width));
     } else {
-        rows.push(current_width);
+        rows.push(FallbackLayoutLine::from(current));
     }
     rows
 }
 
-fn wrap_anywhere(text: &[FallbackLayoutChar], max_width: f32) -> Vec<f32> {
+fn fallback_space_before(
+    word: &[FallbackLayoutChar],
+    paragraph: &[FallbackLayoutChar],
+) -> FallbackLayoutChar {
+    let font_size = word
+        .first()
+        .or_else(|| paragraph.first())
+        .map_or(13.0, |ch| ch.font_size);
+    let layout_index = word
+        .first()
+        .map_or(0, |ch| ch.layout_index.saturating_sub(1));
+    FallbackLayoutChar {
+        value: ' ',
+        width: fallback_char_width(' ', font_size),
+        font_size,
+        layout_index,
+    }
+}
+
+fn wrap_anywhere(text: &[FallbackLayoutChar], max_width: f32) -> Vec<FallbackLayoutLine> {
     let mut rows = Vec::new();
+    let mut current_chars = Vec::new();
     let mut current = 0.0;
     for ch in text {
         if current > f32::EPSILON && current + ch.width > max_width {
-            rows.push(current);
+            rows.push(FallbackLayoutLine::from(std::mem::take(&mut current_chars)));
             current = 0.0;
         }
+        current_chars.push(*ch);
         current += ch.width;
     }
     if current > f32::EPSILON || rows.is_empty() {
-        rows.push(current);
+        rows.push(FallbackLayoutLine::from(current_chars));
     }
     rows
 }
@@ -533,15 +562,31 @@ struct FallbackLayoutChar {
     value: char,
     width: f32,
     font_size: f32,
+    layout_index: usize,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct FallbackLayoutLine {
+    chars: Vec<FallbackLayoutChar>,
+    width: f32,
+}
+
+impl From<Vec<FallbackLayoutChar>> for FallbackLayoutLine {
+    fn from(chars: Vec<FallbackLayoutChar>) -> Self {
+        let width = chars.iter().map(|ch| ch.width).sum();
+        Self { chars, width }
+    }
 }
 
 fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayoutChar>> {
     let mut paragraphs = vec![Vec::new()];
+    let mut layout_index = 0usize;
     for run in request.text.runs() {
         let font_size = run.style.font_size.unwrap_or(request.font_size).max(1.0);
         for ch in run.text.chars() {
             if ch == '\n' {
                 paragraphs.push(Vec::new());
+                layout_index += 1;
             } else {
                 paragraphs
                     .last_mut()
@@ -550,7 +595,9 @@ fn fallback_paragraphs(request: &TextLayoutRequest<'_>) -> Vec<Vec<FallbackLayou
                         value: ch,
                         width: fallback_char_width(ch, font_size),
                         font_size,
+                        layout_index,
                     });
+                layout_index += 1;
             }
         }
     }
@@ -586,29 +633,30 @@ fn fallback_char_width(ch: char, font_size: f32) -> f32 {
 }
 
 fn fallback_text_index_at(request: TextLayoutRequest<'_>, point: Point) -> usize {
-    let char_width = (request.font_size * (7.5 / 13.0)).max(1.0);
-    let line_height = request
-        .line_height
-        .unwrap_or_else(|| (request.font_size * 1.25).max(18.0))
-        .max(1.0);
+    let line_height = fallback_line_height(&request);
     let target_line = (point.y / line_height).floor().max(0.0) as usize;
-    let target_column = (point.x / char_width).round().max(0.0) as usize;
-    let mut line = 0usize;
-    let mut layout_index = 0usize;
+    let lines = fallback_layout_lines(&request);
+    let Some(line) = lines.get(target_line).or_else(|| lines.last()) else {
+        return 0;
+    };
 
-    for segment in request.text.layout_text().split_inclusive('\n') {
-        let line_text = segment.strip_suffix('\n').unwrap_or(segment);
-        let line_len = line_text.chars().count();
-        if line == target_line {
-            return request
-                .text
-                .layout_to_semantic_index(layout_index + target_column.min(line_len));
-        }
-        layout_index += segment.chars().count();
-        line += 1;
+    if line.chars.is_empty() {
+        return request.text.semantic_text().chars().count();
     }
 
-    request.text.semantic_text().chars().count()
+    let mut cursor_x = 0.0;
+    for ch in &line.chars {
+        let midpoint = cursor_x + (ch.width / 2.0);
+        if point.x <= midpoint {
+            return request.text.layout_to_semantic_index(ch.layout_index);
+        }
+        cursor_x += ch.width;
+    }
+
+    line.chars
+        .last()
+        .map(|ch| request.text.layout_to_semantic_index(ch.layout_index + 1))
+        .unwrap_or_else(|| request.text.semantic_text().chars().count())
 }
 
 fn layout_slice_by_chars(value: &str, start: usize, end: usize) -> String {
@@ -758,5 +806,56 @@ mod tests {
 
         assert!(rich.size.width > small.size.width);
         assert!(rich.size.height > small.size.height);
+    }
+
+    #[test]
+    fn fallback_hit_testing_uses_inline_run_font_sizes() {
+        let rich = TextContent::new(vec![
+            TextRun::plain("AA"),
+            TextRun::styled(
+                "BB",
+                InlineTextStyle {
+                    font_size: Some(26.0),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized = NormalizedText::from_content(&rich, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let index = measurer.text_index_at(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 13.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: f32::INFINITY,
+                layout_style: TextLayoutStyle::white_space(WhiteSpace::Pre),
+                line_height: None,
+            },
+            Point::new(24.0, 0.0),
+        );
+
+        assert_eq!(index, 3);
+    }
+
+    #[test]
+    fn fallback_hit_testing_maps_collapsed_layout_indices_to_semantic_text() {
+        let content = TextContent::plain("a   b");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let mut measurer = FallbackTextMeasurer;
+
+        let index = measurer.text_index_at(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 13.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: f32::INFINITY,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            Point::new(16.0, 0.0),
+        );
+
+        assert_eq!(index, 4);
     }
 }
