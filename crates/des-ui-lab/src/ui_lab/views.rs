@@ -1604,7 +1604,9 @@ fn render_shadow_tuner(
     );
     ui.text_element(
         "shadow-tune-copy",
-        ElementSpec::new(Element::Text).class("muted"),
+        ElementSpec::new(Element::Text)
+            .class("muted")
+            .class("param-description"),
         "Tune base and hover shadows by eye, then copy the numbers into the elevation recipe.",
     );
     ui.element(

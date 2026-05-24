@@ -863,7 +863,23 @@ pub(super) fn stylesheet() -> StyleSheet {
         )
         .rule(
             StyleSelector::class("text-copy"),
-            Style::default().text_wrap_mode(TextWrapMode::Wrap),
+            Style::default()
+                .width_fill()
+                .height(Length::Auto)
+                .text_wrap_mode(TextWrapMode::Wrap),
+        )
+        .rule(
+            StyleSelector::class("param-description"),
+            Style::default()
+                .width_percent(1.0)
+                .height(Length::Auto)
+                .text_wrap_mode(TextWrapMode::Wrap),
+        )
+        .rule(
+            StyleSelector::class("specimen-description"),
+            Style::default()
+                .height(Length::Auto)
+                .text_wrap_mode(TextWrapMode::Wrap),
         )
         .rule(
             StyleSelector::class("text-antialias-panel"),
@@ -893,6 +909,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-diagnostics"),
             Style::default()
+                .height(Length::Auto)
                 .font_size(11.0)
                 .line_height(15.0)
                 .text_wrap_mode(TextWrapMode::Wrap),
@@ -967,6 +984,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-tone-line"),
             Style::default()
+                .height(Length::Auto)
                 .white_space(WhiteSpace::Pre)
                 .font_size(17.0)
                 .line_height(25.0)
@@ -1017,6 +1035,8 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-rule"),
             Style::default()
+                .width_fill()
+                .height(Length::Auto)
                 .font_size(11.0)
                 .text_color(TEXT_ACCENT)
                 .text_wrap_mode(TextWrapMode::Wrap),
@@ -1024,7 +1044,7 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("text-box"),
             Style::default()
-                .width(Length::Px(220.0))
+                .width_fill()
                 .height(Length::Auto)
                 .padding(Insets::all(8.0))
                 .font_size(13.0)
@@ -2321,9 +2341,11 @@ pub(super) fn stylesheet() -> StyleSheet {
         .rule(
             StyleSelector::class("card-title"),
             Style::default()
+                .width_fill()
+                .height(Length::Auto)
                 .font_size(16.0)
                 .line_height(18.0)
-                .height(Length::Px(18.0))
+                .text_wrap_mode(TextWrapMode::Wrap)
                 .text_color(TEXT),
         )
         .rule(

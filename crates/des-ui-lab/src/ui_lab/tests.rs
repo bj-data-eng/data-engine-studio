@@ -993,6 +993,9 @@ fn styling_view_renders_structural_selector_specimens() {
         frame(&output, "shadow-negative-spread").style.shadows[0].spread,
         0.0,
     );
+    let shadow_tune_copy = frame(&output, "shadow-tune-copy");
+    assert_eq!(shadow_tune_copy.style.width, Length::Percent(1.0));
+    assert_eq!(shadow_tune_copy.style.height, Length::Auto);
 }
 
 #[test]
@@ -2142,12 +2145,33 @@ fn table_view_renders_document_table_elements_and_shared_tracks() {
 fn text_view_renders_wrapped_and_truncated_specimens() {
     let output = lab_output("text");
     let wrapped = frame(&output, "text-wrap-body");
+    let wrapped_card = frame(&output, "text-wrap");
+    let wrapped_title = frame(&output, "text-wrap-title");
+    let wrapped_rule = frame(&output, "text-wrap-rule");
     let break_word = frame(&output, "text-break-word-body");
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
     let pre = frame(&output, "text-pre-body");
     let break_spaces = frame(&output, "text-break-spaces-body");
     let rtl = frame(&output, "text-rtl-start-body");
+    let intro_copy = frame(&output, "text-copy");
+
+    assert_eq!(intro_copy.style.width, Length::Fill);
+    assert_eq!(intro_copy.style.height, Length::Auto);
+    assert_eq!(wrapped_title.style.width, Length::Fill);
+    assert_eq!(wrapped_title.style.height, Length::Auto);
+    assert_eq!(wrapped_rule.style.width, Length::Fill);
+    assert_eq!(wrapped_rule.style.height, Length::Auto);
+    assert_eq!(wrapped.style.width, Length::Fill);
+    assert_eq!(wrapped.style.height, Length::Auto);
+    assert!(
+        wrapped.rect.size.width > 240.0,
+        "standalone specimen boxes should fill the card row instead of keeping the old narrow fixed width"
+    );
+    assert!(
+        wrapped.rect.size.width < wrapped_card.rect.size.width,
+        "filled specimen boxes should still respect card padding and border"
+    );
 
     assert_eq!(wrapped.style.text_layout.text_wrap_mode, TextWrapMode::Wrap);
     assert!(
