@@ -35,7 +35,7 @@ struct TextGlyphAtlasEntry {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TextPaintStats {
-    pub cache_hits: usize,
+    pub glyphs_painted: usize,
     pub glyph_cache_hits: usize,
     pub rasterizations: usize,
     pub cached_glyphs: usize,
@@ -373,7 +373,7 @@ fn paint_atlas_text(
         let Some(entry) = atlas.entry(painter.ctx(), renderer, glyph.cache_key, stats) else {
             continue;
         };
-        stats.cache_hits += 1;
+        stats.glyphs_painted += 1;
         paint_glyph_atlas_entry(painter, position, texture_id, glyph, entry, scale);
     }
 }

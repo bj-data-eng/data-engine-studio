@@ -751,4 +751,23 @@ mod tests {
         );
         assert_eq!(end, content.semantic_text().chars().count());
     }
+
+    #[test]
+    fn exposes_cacheable_glyph_images_for_atlas_rendering() {
+        let mut renderer = renderer();
+        let content = TextContent::plain("Atlas");
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let glyph_run = renderer.glyphs(request(&normalized, 24.0, 400.0), 2.0, None);
+
+        assert!(!glyph_run.glyphs.is_empty());
+        let image = renderer
+            .glyph_image(glyph_run.glyphs[0].cache_key)
+            .expect("glyph cache key should resolve to a swash image");
+        assert!(image.width_px > 0);
+        assert!(image.height_px > 0);
+        assert_eq!(
+            image.rgba.len(),
+            image.width_px as usize * image.height_px as usize * 4
+        );
+    }
 }

@@ -2173,6 +2173,48 @@ fn text_view_uses_glyph_atlas_on_warm_paint() {
 }
 
 #[test]
+fn text_view_uses_glyph_atlas_on_warm_scrolled_paint() {
+    let mut harness = lab_harness("text");
+    let initial = render_harness(&mut harness);
+    harness
+        .state_mut()
+        .document_engine
+        .element_state_mut("stage")
+        .expect("text view has stage scroll state")
+        .scroll_y = 650.0;
+    let scrolled = render_harness(&mut harness);
+    let populated_stats = harness.state().last_perf.text_paint;
+    let warm_scrolled = render_harness(&mut harness);
+    let warm_stats = harness.state().last_perf.text_paint;
+
+    assert!(
+        image_stats(&initial).non_transparent_pixels > 20_000,
+        "initial text view should render visible specimen output"
+    );
+    assert!(
+        image_stats(&scrolled).non_transparent_pixels > 20_000,
+        "scrolled text view should render visible specimen output"
+    );
+    assert!(
+        compare_images(&initial, &scrolled).differing_pixels > 10_000,
+        "test should actually exercise a different scrolled text viewport"
+    );
+    assert_exact_image_match(&scrolled, &warm_scrolled);
+    assert!(
+        populated_stats.cached_glyphs > 0,
+        "scrolled text paint should populate or reuse atlas glyphs"
+    );
+    assert_eq!(
+        warm_stats.rasterizations, 0,
+        "warm scrolled text paint should reuse the glyph atlas without rasterizing glyphs"
+    );
+    assert!(
+        warm_stats.glyph_cache_hits > 0,
+        "warm scrolled text paint should hit cached atlas glyphs"
+    );
+}
+
+#[test]
 fn text_view_allows_pointer_selection_on_selectable_text() {
     let mut harness = lab_harness("text");
     let rect = state_rect_with_egui_text(harness.state(), &harness.ctx, "text-wrap-body");

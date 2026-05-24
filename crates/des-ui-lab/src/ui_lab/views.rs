@@ -953,7 +953,7 @@ pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder,
                 "text cache",
                 format!(
                     "{} text / {} glyph / {} new / {} cached",
-                    perf.text_paint.cache_hits,
+                    perf.text_paint.glyphs_painted,
                     perf.text_paint.glyph_cache_hits,
                     perf.text_paint.rasterizations,
                     perf.text_paint.cached_glyphs
