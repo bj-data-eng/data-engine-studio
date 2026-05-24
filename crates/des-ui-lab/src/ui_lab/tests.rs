@@ -2148,6 +2148,7 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let wrapped_card = frame(&output, "text-wrap");
     let wrapped_title = frame(&output, "text-wrap-title");
     let wrapped_rule = frame(&output, "text-wrap-rule");
+    let rich_title = frame(&output, "text-rich-title");
     let break_word = frame(&output, "text-break-word-body");
     let truncated = frame(&output, "text-truncate-body");
     let max_lines = frame(&output, "text-max-lines-body");
@@ -2160,6 +2161,8 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     assert_eq!(intro_copy.style.height, Length::Auto);
     assert_eq!(wrapped_title.style.width, Length::Fill);
     assert_eq!(wrapped_title.style.height, Length::Auto);
+    assert_eq!(rich_title.style.width, Length::Fill);
+    assert_eq!(rich_title.style.height, Length::Auto);
     assert_eq!(wrapped_rule.style.width, Length::Fill);
     assert_eq!(wrapped_rule.style.height, Length::Auto);
     assert_eq!(wrapped.style.width, Length::Fill);
