@@ -62,6 +62,13 @@ pub struct TextGlyphRun {
     pub decorations: Vec<TextGlyphRect>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TextPaintGlyphRun {
+    pub glyphs: Vec<TextGlyph>,
+    pub backgrounds: Vec<TextGlyphRect>,
+    pub decorations: Vec<TextGlyphRect>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextGlyphImageContent {
     Mask,
@@ -236,74 +243,32 @@ impl CosmicTextRenderer {
         visible_rect: Option<Rect>,
     ) -> TextGlyphRun {
         let scale = pixels_per_point.max(1.0);
-        let (layout, glyphs, backgrounds, decorations) =
-            self.with_buffer(request.clone(), scale, |buffer, _| {
-                let layout = layout_result(&request, buffer, scale);
-                let mut glyphs = Vec::new();
-                let mut backgrounds = Vec::new();
-                let mut decorations = Vec::new();
-                let run_backgrounds = run_backgrounds(request.text);
-                let baseline_shifts = run_baseline_shifts(request.text, request.font_size, scale);
-                for run in buffer.layout_runs() {
-                    collect_run_backgrounds(
-                        run.glyphs,
-                        run.line_top,
-                        run.line_height,
-                        &run_backgrounds,
-                        &baseline_shifts,
-                        &mut backgrounds,
-                    );
-                    for glyph in run.glyphs {
-                        let baseline_shift =
-                            baseline_shifts.get(glyph.metadata).copied().unwrap_or(0.0);
-                        let physical = glyph.physical((0.0, run.line_y - baseline_shift), 1.0);
-                        let x = physical.x as f32 / scale;
-                        let y = physical.y as f32 / scale;
-                        let margin = glyph.font_size * 2.0;
-                        if let Some(visible) = visible_rect
-                            && (x > visible.right() + margin
-                                || y > visible.bottom() + margin
-                                || x < visible.origin.x - margin
-                                || y < visible.origin.y - margin)
-                        {
-                            continue;
-                        }
-                        glyphs.push(TextGlyph {
-                            cache_key: physical.cache_key,
-                            x_px: physical.x,
-                            y_px: physical.y,
-                            color: glyph
-                                .color_opt
-                                .map_or(request.color, cosmic_to_document_color),
-                            run_index: glyph.metadata.saturating_sub(1),
-                            layout_start: line_byte_to_layout_index(
-                                request.text.layout_text(),
-                                run.line_i,
-                                glyph.start,
-                            ),
-                            layout_end: line_byte_to_layout_index(
-                                request.text.layout_text(),
-                                run.line_i,
-                                glyph.end,
-                            ),
-                        });
-                    }
-                    let mut collector = DecorationCollector {
-                        rects: &mut decorations,
-                    };
-                    render_decoration(&mut collector, &run, cosmic_color(request.color));
-                }
-                (layout, glyphs, backgrounds, decorations)
-            });
+        let (layout, paint_run) = self.with_buffer(request.clone(), scale, |buffer, _| {
+            let layout = layout_result(&request, buffer, scale);
+            let paint_run = collect_text_paint_glyph_run(&request, buffer, scale, visible_rect);
+            (layout, paint_run)
+        });
         TextGlyphRun {
             layout: TextLayoutResult {
                 size: Size::new(layout.size.width / scale, layout.size.height / scale),
                 ..layout.scale_lines(1.0 / scale)
             },
-            glyphs,
-            backgrounds,
-            decorations,
+            glyphs: paint_run.glyphs,
+            backgrounds: paint_run.backgrounds,
+            decorations: paint_run.decorations,
         }
+    }
+
+    pub fn paint_glyphs(
+        &mut self,
+        request: TextLayoutRequest<'_>,
+        pixels_per_point: f32,
+        visible_rect: Option<Rect>,
+    ) -> TextPaintGlyphRun {
+        let scale = pixels_per_point.max(1.0);
+        self.with_buffer(request.clone(), scale, |buffer, _| {
+            collect_text_paint_glyph_run(&request, buffer, scale, visible_rect)
+        })
     }
 
     pub fn selection_rects(
@@ -1136,6 +1101,72 @@ fn run_baseline_shifts(
     shifts
 }
 
+fn collect_text_paint_glyph_run(
+    request: &TextLayoutRequest<'_>,
+    buffer: &mut cosmic_text::BorrowedWithFontSystem<'_, Buffer>,
+    scale: f32,
+    visible_rect: Option<Rect>,
+) -> TextPaintGlyphRun {
+    let mut glyphs = Vec::new();
+    let mut backgrounds = Vec::new();
+    let mut decorations = Vec::new();
+    let run_backgrounds = run_backgrounds(request.text);
+    let baseline_shifts = run_baseline_shifts(request.text, request.font_size, scale);
+    for run in buffer.layout_runs() {
+        collect_run_backgrounds(
+            run.glyphs,
+            run.line_top,
+            run.line_height,
+            &run_backgrounds,
+            &baseline_shifts,
+            &mut backgrounds,
+        );
+        for glyph in run.glyphs {
+            let baseline_shift = baseline_shifts.get(glyph.metadata).copied().unwrap_or(0.0);
+            let physical = glyph.physical((0.0, run.line_y - baseline_shift), 1.0);
+            let x = physical.x as f32 / scale;
+            let y = physical.y as f32 / scale;
+            let margin = glyph.font_size * 2.0;
+            if let Some(visible) = visible_rect
+                && (x > visible.right() + margin
+                    || y > visible.bottom() + margin
+                    || x < visible.origin.x - margin
+                    || y < visible.origin.y - margin)
+            {
+                continue;
+            }
+            glyphs.push(TextGlyph {
+                cache_key: physical.cache_key,
+                x_px: physical.x,
+                y_px: physical.y,
+                color: glyph
+                    .color_opt
+                    .map_or(request.color, cosmic_to_document_color),
+                run_index: glyph.metadata.saturating_sub(1),
+                layout_start: line_byte_to_layout_index(
+                    request.text.layout_text(),
+                    run.line_i,
+                    glyph.start,
+                ),
+                layout_end: line_byte_to_layout_index(
+                    request.text.layout_text(),
+                    run.line_i,
+                    glyph.end,
+                ),
+            });
+        }
+        let mut collector = DecorationCollector {
+            rects: &mut decorations,
+        };
+        render_decoration(&mut collector, &run, cosmic_color(request.color));
+    }
+    TextPaintGlyphRun {
+        glyphs,
+        backgrounds,
+        decorations,
+    }
+}
+
 fn collect_run_backgrounds(
     glyphs: &[cosmic_text::LayoutGlyph],
     line_top: f32,
@@ -1776,6 +1807,37 @@ mod tests {
                 .iter()
                 .any(|rect| rect.color == underline && rect.width_px > 0 && rect.height_px > 0),
             "underline runs should become paintable decoration rectangles"
+        );
+    }
+
+    #[test]
+    fn paint_glyphs_match_full_glyph_run_without_rebuilding_layout() {
+        let mut renderer = renderer();
+        let highlight = Color::rgba(234, 221, 255, 180);
+        let content = TextContent::new(vec![
+            TextRun::plain("Paint "),
+            TextRun::styled(
+                "glyphs",
+                InlineTextStyle {
+                    background: Some(highlight),
+                    ..InlineTextStyle::default()
+                },
+            ),
+        ]);
+        let normalized = NormalizedText::from_content(&content, TextLayoutStyle::default());
+        let request = request(&normalized, 24.0, 400.0);
+        let full_run = renderer.glyphs(request.clone(), 2.0, None);
+        let paint_run = renderer.paint_glyphs(request, 2.0, None);
+
+        assert_eq!(paint_run.glyphs, full_run.glyphs);
+        assert_eq!(paint_run.backgrounds, full_run.backgrounds);
+        assert_eq!(paint_run.decorations, full_run.decorations);
+        assert!(
+            paint_run
+                .backgrounds
+                .iter()
+                .any(|rect| rect.color == highlight && rect.width_px > 0 && rect.height_px > 0),
+            "paint-only glyph runs should preserve inline background output"
         );
     }
 

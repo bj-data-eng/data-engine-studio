@@ -477,7 +477,7 @@ fn paint_atlas_text(
 ) {
     stats.paint_text_requests += 1;
     let glyph_run_start = Instant::now();
-    let glyph_run = renderer.glyphs(request.clone(), pixels_per_point, Some(visible_rect));
+    let glyph_run = renderer.paint_glyphs(request.clone(), pixels_per_point, Some(visible_rect));
     stats.glyph_run_time += glyph_run_start.elapsed();
     let scale = pixels_per_point.max(1.0);
     if glyph_run.glyphs.is_empty() {
