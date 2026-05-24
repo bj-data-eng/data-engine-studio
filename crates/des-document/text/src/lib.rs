@@ -2518,6 +2518,95 @@ mod tests {
     }
 
     #[test]
+    fn inline_paint_changes_reuse_layout_buffer_but_refresh_paint_outputs() {
+        let mut renderer = renderer();
+        let first_color = Color::rgb(32, 50, 78);
+        let second_color = Color::rgb(202, 58, 80);
+        let first_background = Color::rgba(224, 236, 255, 180);
+        let second_background = Color::rgba(255, 228, 214, 180);
+        let first_decoration = Color::rgb(21, 94, 117);
+        let second_decoration = Color::rgb(156, 54, 181);
+        let first_content = TextContent::new(vec![TextRun::styled(
+            "inline paint only",
+            InlineTextStyle {
+                color: Some(first_color),
+                background: Some(first_background),
+                text_decoration: Some(
+                    TextDecoration::lines(true, false, false).color(first_decoration),
+                ),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let second_content = TextContent::new(vec![TextRun::styled(
+            "inline paint only",
+            InlineTextStyle {
+                color: Some(second_color),
+                background: Some(second_background),
+                text_decoration: Some(
+                    TextDecoration::lines(true, false, false).color(second_decoration),
+                ),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let first = NormalizedText::from_content(&first_content, TextLayoutStyle::default());
+        let second = NormalizedText::from_content(&second_content, TextLayoutStyle::default());
+
+        let first_paint = renderer.paint_glyphs(request(&first, 24.0, 420.0), 2.0, None);
+        assert!(!first_paint.glyphs.is_empty());
+        assert!(
+            first_paint
+                .glyphs
+                .iter()
+                .all(|glyph| glyph.color == first_color)
+        );
+        assert!(
+            first_paint
+                .backgrounds
+                .iter()
+                .any(|background| background.color == first_background)
+        );
+        assert!(
+            first_paint
+                .decorations
+                .iter()
+                .any(|decoration| decoration.color == first_decoration)
+        );
+
+        renderer.begin_frame();
+        let second_paint = renderer.paint_glyphs(request(&second, 24.0, 420.0), 2.0, None);
+        let stats = renderer.buffer_stats();
+
+        assert_eq!(
+            stats.cache_hits, 1,
+            "inline paint-only changes should reuse the retained cosmic layout buffer"
+        );
+        assert_eq!(stats.cache_misses, 0);
+        assert_eq!(
+            stats.paint_run_cache_misses, 1,
+            "inline paint-only changes should rebuild the document paint run"
+        );
+        assert!(
+            second_paint
+                .glyphs
+                .iter()
+                .all(|glyph| glyph.color == second_color)
+        );
+        assert!(
+            second_paint
+                .backgrounds
+                .iter()
+                .any(|background| background.color == second_background)
+        );
+        assert!(
+            second_paint
+                .decorations
+                .iter()
+                .any(|decoration| decoration.color == second_decoration)
+        );
+        assert_ne!(first_paint, second_paint);
+    }
+
+    #[test]
     fn text_buffer_cache_key_distinguishes_run_boundaries_without_storing_run_text() {
         let mut renderer = renderer();
         let first_content = TextContent::new(vec![TextRun::plain("ab"), TextRun::plain("c")]);
