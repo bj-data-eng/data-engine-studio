@@ -753,8 +753,9 @@ fn configure_buffer(
         buffer.set_ellipsize(Ellipsize::End(limit));
     }
 
+    let default_style = InlineTextStyle::default();
     let default_attrs = cosmic_attrs(
-        &InlineTextStyle::default(),
+        &default_style,
         request.font_size,
         request.color,
         request.line_height,
@@ -983,14 +984,14 @@ fn shaping_for(request: &TextLayoutRequest<'_>) -> Shaping {
     }
 }
 
-fn cosmic_attrs(
-    style: &InlineTextStyle,
+fn cosmic_attrs<'a>(
+    style: &'a InlineTextStyle,
     inherited_font_size: f32,
     inherited_color: Color,
     inherited_line_height: Option<f32>,
     scale: f32,
     metadata: usize,
-) -> Attrs<'static> {
+) -> Attrs<'a> {
     let color = style.color.unwrap_or(inherited_color);
     let font_size = style.font_size.unwrap_or(inherited_font_size).max(1.0) * scale;
     let line_height = style
@@ -999,13 +1000,7 @@ fn cosmic_attrs(
         .unwrap_or(font_size / scale * 1.2)
         .max(1.0)
         * scale;
-    let family = match style.font_family.as_deref() {
-        Some("monospace") | Some("mono") | Some(JETBRAINS_MONO_FAMILY) => {
-            Family::Name(JETBRAINS_MONO_FAMILY)
-        }
-        Some(INTER_FAMILY) | None => Family::Name(INTER_FAMILY),
-        Some(_) => Family::SansSerif,
-    };
+    let family = cosmic_family(style.font_family.as_deref());
     let mut attrs = Attrs::new()
         .family(family)
         .metrics(Metrics::new(font_size, line_height))
@@ -1041,6 +1036,20 @@ fn cosmic_attrs(
         }
     }
     attrs
+}
+
+fn cosmic_family(family: Option<&str>) -> Family<'_> {
+    match family {
+        Some("monospace") | Some("mono") | Some(JETBRAINS_MONO_FAMILY) => {
+            Family::Name(JETBRAINS_MONO_FAMILY)
+        }
+        Some("serif") => Family::Serif,
+        Some("sans-serif") => Family::SansSerif,
+        Some("cursive") => Family::Cursive,
+        Some("fantasy") => Family::Fantasy,
+        Some(INTER_FAMILY) | None => Family::Name(INTER_FAMILY),
+        Some(family) => Family::Name(family),
+    }
 }
 
 fn cosmic_stretch(percent: f32) -> Stretch {
@@ -1925,19 +1934,35 @@ mod tests {
 
     #[test]
     fn applies_font_stretch_to_cosmic_attrs() {
-        let attrs = cosmic_attrs(
-            &InlineTextStyle {
-                font_stretch: Some(des_document::FontStretch::EXPANDED),
-                ..InlineTextStyle::default()
-            },
-            16.0,
-            Color::rgb(1, 2, 3),
-            None,
-            1.0,
-            0,
-        );
+        let style = InlineTextStyle {
+            font_stretch: Some(des_document::FontStretch::EXPANDED),
+            ..InlineTextStyle::default()
+        };
+        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0);
 
         assert_eq!(attrs.stretch, Stretch::Expanded);
+    }
+
+    #[test]
+    fn maps_css_font_family_names_to_cosmic_attrs() {
+        let declared_family = "Aptos";
+        assert_eq!(cosmic_family(Some(declared_family)), Family::Name("Aptos"));
+        assert_eq!(cosmic_family(Some("serif")), Family::Serif);
+        assert_eq!(cosmic_family(Some("sans-serif")), Family::SansSerif);
+        assert_eq!(cosmic_family(Some("cursive")), Family::Cursive);
+        assert_eq!(cosmic_family(Some("fantasy")), Family::Fantasy);
+        assert_eq!(
+            cosmic_family(Some("monospace")),
+            Family::Name(JETBRAINS_MONO_FAMILY)
+        );
+
+        let style = InlineTextStyle {
+            font_family: Some(declared_family.to_string()),
+            ..InlineTextStyle::default()
+        };
+        let attrs = cosmic_attrs(&style, 16.0, Color::rgb(1, 2, 3), None, 1.0, 0);
+
+        assert_eq!(attrs.family, Family::Name("Aptos"));
     }
 
     #[test]

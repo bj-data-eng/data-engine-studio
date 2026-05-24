@@ -2168,10 +2168,22 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     let legacy_pane = frame(&output, "text-legacy-100-pane");
     let diagnostics = frame_text(&output, "text-cosmic-diagnostics").unwrap();
     let rich_sample = frame(&output, "text-rich-100-sample");
+    let rich_family = frame(&output, "text-rich-family");
     assert_eq!(rich_sample.style.font_size, 100.0);
     assert_eq!(
         rich_sample.text.as_ref().unwrap().semantic_text(),
         "Ag 100px"
+    );
+    let family_runs = rich_family
+        .normalized_text
+        .as_ref()
+        .expect("rich family specimen should retain normalized text")
+        .runs();
+    assert_eq!(family_runs[0].style.font_family.as_deref(), Some("Aptos"));
+    assert_eq!(family_runs[1].style.font_family.as_deref(), Some("serif"));
+    assert_eq!(
+        family_runs[2].style.font_family.as_deref(),
+        Some("monospace")
     );
     assert!(diagnostics.contains("cosmic-text + Swash raster"));
     assert!(diagnostics.contains("JetBrains Mono Variable"));

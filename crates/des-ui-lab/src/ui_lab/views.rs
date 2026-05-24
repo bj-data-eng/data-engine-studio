@@ -3005,6 +3005,13 @@ fn render_text_view(ui: &mut des_document::DocumentBuilder) {
                 rich_decoration_specimen(),
             );
             ui.text_element(
+                "text-rich-family",
+                ElementSpec::new(Element::Text)
+                    .class("text-rich-line")
+                    .selectable_text(),
+                rich_family_specimen(),
+            );
+            ui.text_element(
                 "text-rich-baseline",
                 ElementSpec::new(Element::Text)
                     .class("text-rich-line")
@@ -3262,6 +3269,32 @@ fn rich_decoration_specimen() -> TextContent {
             InlineTextStyle {
                 background: Some(Color::rgba(234, 221, 255, 180)),
                 color: Some(Color::rgb(29, 27, 32)),
+                ..InlineTextStyle::default()
+            },
+        ),
+    ])
+}
+
+fn rich_family_specimen() -> TextContent {
+    TextContent::new(vec![
+        TextRun::styled(
+            "declared Aptos ",
+            InlineTextStyle {
+                font_family: Some("Aptos".to_string()),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "generic serif ",
+            InlineTextStyle {
+                font_family: Some("serif".to_string()),
+                ..InlineTextStyle::default()
+            },
+        ),
+        TextRun::styled(
+            "bundled mono",
+            InlineTextStyle {
+                font_family: Some("monospace".to_string()),
                 ..InlineTextStyle::default()
             },
         ),
