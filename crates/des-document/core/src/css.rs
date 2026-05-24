@@ -1,9 +1,9 @@
 use crate::{
-    AlignContent, AlignItems, Color, Direction, Display, Easing, Element, ElementStateSelector,
-    FlexDirection, FlexWrap, FloatingAxisOffset, FloatingPlacement, FloatingShift, Insets,
-    JustifyContent, Length, Overflow, OverflowWrap, Point, Position, Shadow, Style, StyleCondition,
-    StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform, TextWrapMode, Transition,
-    ViewportQuery, WhiteSpace,
+    AlignContent, AlignItems, Color, ContainerQuery, Direction, Display, Easing, Element,
+    ElementStateSelector, FlexDirection, FlexWrap, FloatingAxisOffset, FloatingPlacement,
+    FloatingShift, Insets, JustifyContent, Length, Overflow, OverflowWrap, Point, Position, Shadow,
+    Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform,
+    TextWrapMode, Transition, ViewportQuery, WhiteSpace,
 };
 use std::error::Error;
 use std::fmt;
@@ -74,6 +74,13 @@ fn parse_rules_into(
         if let Some(query) = prelude.strip_prefix("@media") {
             let media_condition = parse_media_query(query.trim())?;
             let condition = merge_conditions(condition, media_condition)?;
+            parse_rules_into(sheet, block, Some(condition))?;
+            continue;
+        }
+
+        if let Some(query) = prelude.strip_prefix("@container") {
+            let container_condition = parse_container_query(query.trim())?;
+            let condition = merge_conditions(condition, container_condition)?;
             parse_rules_into(sheet, block, Some(condition))?;
             continue;
         }
@@ -155,6 +162,40 @@ fn parse_media_query(input: &str) -> Result<StyleCondition, CssParseError> {
     Ok(StyleCondition::viewport(query))
 }
 
+fn parse_container_query(input: &str) -> Result<StyleCondition, CssParseError> {
+    let mut query = ContainerQuery::new();
+    let mut saw_feature = false;
+    let mut rest = input.trim();
+
+    while !rest.is_empty() {
+        if !rest.starts_with('(') {
+            return Err(CssParseError::new(format!(
+                "unsupported @container query `{input}`"
+            )));
+        }
+        let Some(end) = rest.find(')') else {
+            return Err(CssParseError::new("@container feature is missing `)`"));
+        };
+        let feature = rest[1..end].trim();
+        apply_container_feature(&mut query, feature)?;
+        saw_feature = true;
+
+        rest = rest[end + 1..].trim_start();
+        if let Some(after_and) = rest.strip_prefix("and") {
+            rest = after_and.trim_start();
+        } else if !rest.is_empty() {
+            return Err(CssParseError::new(format!(
+                "unsupported @container query `{input}`"
+            )));
+        }
+    }
+
+    if !saw_feature {
+        return Err(CssParseError::new("@container query is missing a feature"));
+    }
+    Ok(StyleCondition::container(query))
+}
+
 fn apply_media_feature(query: &mut ViewportQuery, input: &str) -> Result<(), CssParseError> {
     let Some((name, value)) = input.split_once(':') else {
         return Err(CssParseError::new(format!(
@@ -177,6 +218,28 @@ fn apply_media_feature(query: &mut ViewportQuery, input: &str) -> Result<(), Css
     Ok(())
 }
 
+fn apply_container_feature(query: &mut ContainerQuery, input: &str) -> Result<(), CssParseError> {
+    let Some((name, value)) = input.split_once(':') else {
+        return Err(CssParseError::new(format!(
+            "@container feature `{input}` is missing `:`"
+        )));
+    };
+    let value = parse_px(value.trim())?;
+    match name.trim() {
+        "min-width" => query.min_width = Some(value),
+        "max-width" => query.max_width = Some(value),
+        "min-height" => query.min_height = Some(value),
+        "max-height" => query.max_height = Some(value),
+        _ => {
+            return Err(CssParseError::new(format!(
+                "unsupported @container feature `{}`",
+                name.trim()
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn merge_conditions(
     existing: Option<StyleCondition>,
     next: StyleCondition,
@@ -190,8 +253,15 @@ fn merge_conditions(
             existing.max_height = min_optional(existing.max_height, next.max_height);
             Ok(StyleCondition::viewport(existing))
         }
+        (Some(StyleCondition::Container(mut existing)), StyleCondition::Container(next)) => {
+            existing.min_width = max_optional(existing.min_width, next.min_width);
+            existing.max_width = min_optional(existing.max_width, next.max_width);
+            existing.min_height = max_optional(existing.min_height, next.min_height);
+            existing.max_height = min_optional(existing.max_height, next.max_height);
+            Ok(StyleCondition::container(existing))
+        }
         _ => Err(CssParseError::new(
-            "CSS @media rules can only be nested with viewport media rules",
+            "CSS conditional rules can only be nested with matching condition types",
         )),
     }
 }

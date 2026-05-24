@@ -899,6 +899,52 @@ fn css_stylesheet_parser_resolves_media_rules_and_universal_selectors() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_container_rules() {
+    let stylesheet = StyleSheet::parse_css(
+        r#"
+        .parent {
+            width: 300px;
+            height: 80px;
+        }
+
+        .child {
+            width: 80px;
+            height: 24px;
+        }
+
+        @container (max-width: 350px) and (min-height: 40px) {
+            .child {
+                width: 180px;
+                background: #cdf0dd;
+            }
+        }
+        "#,
+    )
+    .unwrap();
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "parent",
+            ElementSpec::new(Element::Div).class("parent"),
+        )
+        .unwrap();
+    document
+        .append_element(
+            "parent",
+            "child",
+            ElementSpec::new(Element::Div).class("child"),
+        )
+        .unwrap();
+
+    let output = DocumentEngine::default().update(&mut document, &stylesheet);
+    let child = output.layout.find("child").unwrap();
+    assert_eq!(stylesheet.rule_count(), 3);
+    assert_eq!(child.rect.size, Size::new(180.0, 24.0));
+    assert_eq!(child.style.background, Some(Color::rgb(205, 240, 221)));
+}
+
+#[test]
 fn css_stylesheet_parser_reports_unclosed_comments_and_blocks() {
     assert!(StyleSheet::parse_css("/* unclosed").is_err());
     assert!(StyleSheet::parse_css(".panel { width: 100px;").is_err());
