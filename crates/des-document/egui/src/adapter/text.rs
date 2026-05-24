@@ -226,15 +226,10 @@ fn text_format(
         .as_ref()
         .map(|family| egui::FontFamily::Name(family.clone().into()))
         .unwrap_or(egui::FontFamily::Proportional);
-    let coords = match style.font_weight {
-        Some(des_document::FontWeight::Bold) => {
-            egui::epaint::text::VariationCoords::new([(b"wght", 700.0)])
-        }
-        Some(des_document::FontWeight::Normal) => {
-            egui::epaint::text::VariationCoords::new([(b"wght", 400.0)])
-        }
-        None => egui::epaint::text::VariationCoords::default(),
-    };
+    let coords = style
+        .font_weight
+        .map(|weight| egui::epaint::text::VariationCoords::new([(b"wght", weight.value() as f32)]))
+        .unwrap_or_default();
     egui::TextFormat {
         font_id: egui::FontId::new(style.font_size.unwrap_or(inherited_font_size), family),
         color: to_egui_color(color),
@@ -328,7 +323,7 @@ mod tests {
                 InlineTextStyle {
                     color: Some(Color::rgb(255, 0, 0)),
                     font_size: Some(18.0),
-                    font_weight: Some(FontWeight::Bold),
+                    font_weight: Some(FontWeight::BOLD),
                     italic: Some(true),
                     underline: Some(true),
                     strikethrough: Some(true),
@@ -362,6 +357,35 @@ mod tests {
         assert_eq!(
             format.coords.as_ref(),
             &[(egui::epaint::text::Tag::new(b"wght"), 700.0)]
+        );
+    }
+
+    #[test]
+    fn layout_job_maps_numeric_font_weight_to_variation_axis() {
+        let text = TextContent::new(vec![TextRun::styled(
+            "weighted",
+            InlineTextStyle {
+                font_weight: Some(FontWeight::new(525)),
+                ..InlineTextStyle::default()
+            },
+        )]);
+        let normalized = NormalizedText::from_content(&text, TextLayoutStyle::default());
+
+        let job = layout_job(
+            TextLayoutRequest {
+                text: &normalized,
+                font_size: 14.0,
+                color: Color::rgb(255, 255, 255),
+                wrap_width: 240.0,
+                layout_style: TextLayoutStyle::default(),
+                line_height: None,
+            },
+            egui::Color32::WHITE,
+        );
+
+        assert_eq!(
+            job.sections[0].format.coords.as_ref(),
+            &[(egui::epaint::text::Tag::new(b"wght"), 525.0)]
         );
     }
 

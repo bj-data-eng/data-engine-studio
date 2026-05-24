@@ -98,9 +98,27 @@ pub struct InlineTextStyle {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum FontWeight {
-    Normal,
-    Bold,
+pub struct FontWeight(u16);
+
+impl FontWeight {
+    pub const MIN: u16 = 1;
+    pub const MAX: u16 = 1000;
+    pub const NORMAL: Self = Self(400);
+    pub const BOLD: Self = Self(700);
+
+    pub const fn new(value: u16) -> Self {
+        if value < Self::MIN {
+            Self(Self::MIN)
+        } else if value > Self::MAX {
+            Self(Self::MAX)
+        } else {
+            Self(value)
+        }
+    }
+
+    pub const fn value(self) -> u16 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -770,7 +788,7 @@ mod tests {
             TextRun::styled(
                 " world",
                 InlineTextStyle {
-                    font_weight: Some(FontWeight::Bold),
+                    font_weight: Some(FontWeight::BOLD),
                     ..InlineTextStyle::default()
                 },
             ),
@@ -782,8 +800,17 @@ mod tests {
         assert_eq!(normalized.runs().len(), 2);
         assert_eq!(
             normalized.runs()[1].style.font_weight,
-            Some(FontWeight::Bold)
+            Some(FontWeight::BOLD)
         );
+    }
+
+    #[test]
+    fn font_weight_accepts_css_like_numeric_values() {
+        assert_eq!(FontWeight::NORMAL.value(), 400);
+        assert_eq!(FontWeight::BOLD.value(), 700);
+        assert_eq!(FontWeight::new(50).value(), 50);
+        assert_eq!(FontWeight::new(0).value(), FontWeight::MIN);
+        assert_eq!(FontWeight::new(1200).value(), FontWeight::MAX);
     }
 
     #[test]
