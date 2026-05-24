@@ -536,6 +536,119 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
 }
 
 #[test]
+fn css_stylesheet_parser_resolves_media_rules_and_universal_selectors() {
+    let css = r#"
+        * {
+            color: #111111;
+        }
+
+        .panel {
+            width: 320px;
+            height: 48px;
+        }
+
+        @media screen and (max-width: 700px) {
+            .panel {
+                width: 180px;
+                background: #cdf0dd;
+            }
+
+            @media (min-height: 400px) {
+                #panel {
+                    height: 72px;
+                }
+            }
+        }
+    "#;
+    let stylesheet = StyleSheet::parse_css(css).unwrap();
+    let mut narrow_document = Document::new(Size::new(640.0, 480.0));
+    narrow_document
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+    narrow_document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    narrow_document.compute_layout().unwrap();
+
+    let narrow_layout = narrow_document.resolved_layout().unwrap();
+    let panel = narrow_layout.find("panel").unwrap();
+    assert_eq!(stylesheet.rule_count(), 4);
+    assert_eq!(panel.style.text_color, Color::rgb(17, 17, 17));
+    assert_eq!(panel.style.background, Some(Color::rgb(205, 240, 221)));
+    assert_eq!(
+        narrow_document.layout_rect("panel").unwrap().size,
+        Size::new(180.0, 72.0)
+    );
+
+    let mut wide_document = Document::new(Size::new(900.0, 480.0));
+    wide_document
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+    wide_document
+        .apply_stylesheet(&stylesheet, &HashMap::new())
+        .unwrap();
+    wide_document.compute_layout().unwrap();
+
+    let wide_layout = wide_document.resolved_layout().unwrap();
+    let panel = wide_layout.find("panel").unwrap();
+    assert_eq!(panel.style.text_color, Color::rgb(17, 17, 17));
+    assert_eq!(panel.style.background, None);
+    assert_eq!(
+        wide_document.layout_rect("panel").unwrap().size,
+        Size::new(320.0, 48.0)
+    );
+}
+
+#[test]
+fn css_stylesheet_parser_reports_unclosed_comments_and_blocks() {
+    assert!(StyleSheet::parse_css("/* unclosed").is_err());
+    assert!(StyleSheet::parse_css(".panel { width: 100px;").is_err());
+    assert!(StyleSheet::parse_css("@media (max-width: 700px) { .panel { width: 100px; }").is_err());
+}
+
+#[test]
+fn document_engine_invalidates_cached_layout_when_stylesheet_key_changes() {
+    let mut document = Document::new(Size::new(800.0, 600.0));
+    document
+        .append_element(
+            "root",
+            "panel",
+            ElementSpec::new(Element::Div).class("panel"),
+        )
+        .unwrap();
+    let mut stylesheet = StyleSheet::parse_css(".panel { width: 120px; height: 40px; }").unwrap();
+    let mut engine = DocumentEngine::default();
+
+    let first = engine.update(&mut document, &stylesheet);
+    let warm = engine.update(&mut document, &stylesheet);
+
+    assert!(first.metrics.style_nodes_visited > 0);
+    assert!(warm.metrics.reused_cached_layout);
+    assert_eq!(warm.metrics.style_nodes_visited, 0);
+
+    stylesheet.push_rule(
+        StyleSelector::id("panel"),
+        Style::default().width(Length::Px(220.0)),
+    );
+    let changed = engine.update(&mut document, &stylesheet);
+
+    assert!(!changed.metrics.reused_cached_layout);
+    assert!(changed.metrics.style_nodes_visited > 0);
+    assert_eq!(
+        changed.layout.find("panel").unwrap().rect.size,
+        Size::new(220.0, 40.0)
+    );
+}
+
+#[test]
 fn css_stylesheet_scales_to_many_rules_on_default_stack() {
     let mut css = String::new();
     for index in 0..10_000 {

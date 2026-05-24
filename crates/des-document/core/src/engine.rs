@@ -9,7 +9,7 @@ use crate::state::{
     DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
     TextSelectionGranularity,
 };
-use crate::style::StyleSheet;
+use crate::style::{StyleSheet, StyleSheetKey};
 use crate::text::{FallbackTextMeasurer, TextLayoutRequest, TextMeasurer, TextMeasurerKey};
 use std::collections::{BTreeSet, HashMap};
 
@@ -98,7 +98,7 @@ pub struct DocumentEngine {
     cached_layout: Option<ResolvedElement>,
     cached_document_instance_id: Option<u64>,
     cached_document_revision: Option<u64>,
-    cached_document_stylesheet: Option<StyleSheet>,
+    cached_document_stylesheet_key: Option<StyleSheetKey>,
     cached_text_measurer_key: Option<TextMeasurerKey>,
 }
 
@@ -235,7 +235,7 @@ impl DocumentEngine {
         self.cached_layout = Some(layout.clone());
         self.cached_document_instance_id = Some(document.instance_id());
         self.cached_document_revision = Some(document.revision());
-        self.cached_document_stylesheet = Some(stylesheet.clone());
+        self.cached_document_stylesheet_key = Some(stylesheet.key());
         self.cached_text_measurer_key = Some(text_measurer_key);
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
@@ -358,7 +358,7 @@ impl DocumentEngine {
         self.cached_layout.is_some()
             && self.cached_document_instance_id == Some(document.instance_id())
             && self.cached_document_revision == Some(document.revision())
-            && self.cached_document_stylesheet.as_ref() == Some(stylesheet)
+            && self.cached_document_stylesheet_key == Some(stylesheet.key())
             && self.cached_text_measurer_key == Some(text_measurer_key)
     }
 

@@ -1,8 +1,8 @@
 use crate::{
     AlignContent, AlignItems, Color, Direction, Display, Element, ElementStateSelector,
     FlexDirection, FlexWrap, Insets, JustifyContent, Length, Overflow, OverflowWrap, Position,
-    Style, StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform, TextWrapMode,
-    WhiteSpace,
+    Style, StyleCondition, StyleSelector, StyleSheet, TextAlign, TextOverflow, TextTransform,
+    TextWrapMode, ViewportQuery, WhiteSpace,
 };
 use std::error::Error;
 use std::fmt;
@@ -29,50 +29,186 @@ impl fmt::Display for CssParseError {
 impl Error for CssParseError {}
 
 pub(crate) fn parse_stylesheet(input: &str) -> Result<StyleSheet, CssParseError> {
-    let input = strip_comments(input);
+    let input = strip_comments(input)?;
     let mut sheet = StyleSheet::new();
-    let mut rest = input.as_str();
-
-    while let Some(start) = rest.find('{') {
-        let selector_text = rest[..start].trim();
-        let after_start = &rest[start + 1..];
-        let Some(end) = after_start.find('}') else {
-            return Err(CssParseError::new("CSS rule is missing closing `}`"));
-        };
-        let declaration_text = &after_start[..end];
-        rest = &after_start[end + 1..];
-
-        if selector_text.is_empty() {
-            return Err(CssParseError::new("CSS rule is missing a selector"));
-        }
-        let style = parse_declarations(declaration_text)?;
-        for selector in selector_text.split(',') {
-            sheet.push_rule(parse_selector(selector.trim())?, style.clone());
-        }
-    }
-
-    if !rest.trim().is_empty() {
-        return Err(CssParseError::new(
-            "CSS contains trailing text outside a rule",
-        ));
-    }
-
+    parse_rules_into(&mut sheet, input.as_str(), None)?;
     Ok(sheet)
 }
 
-fn strip_comments(input: &str) -> String {
+fn strip_comments(input: &str) -> Result<String, CssParseError> {
     let mut output = String::with_capacity(input.len());
     let mut rest = input;
     while let Some(start) = rest.find("/*") {
         output.push_str(&rest[..start]);
         let after_start = &rest[start + 2..];
         let Some(end) = after_start.find("*/") else {
-            break;
+            return Err(CssParseError::new("CSS comment is missing closing `*/`"));
         };
         rest = &after_start[end + 2..];
     }
     output.push_str(rest);
-    output
+    Ok(output)
+}
+
+fn parse_rules_into(
+    sheet: &mut StyleSheet,
+    input: &str,
+    condition: Option<StyleCondition>,
+) -> Result<(), CssParseError> {
+    let mut rest = input.trim_start();
+    while !rest.is_empty() {
+        let Some(start) = rest.find('{') else {
+            return Err(CssParseError::new(
+                "CSS contains trailing text outside a rule",
+            ));
+        };
+        let prelude = rest[..start].trim();
+        if prelude.is_empty() {
+            return Err(CssParseError::new("CSS rule is missing a selector"));
+        }
+        let end = matching_block_end(rest, start)?;
+        let block = &rest[start + 1..end];
+        rest = rest[end + 1..].trim_start();
+
+        if let Some(query) = prelude.strip_prefix("@media") {
+            let media_condition = parse_media_query(query.trim())?;
+            let condition = merge_conditions(condition, media_condition)?;
+            parse_rules_into(sheet, block, Some(condition))?;
+            continue;
+        }
+
+        if prelude.starts_with('@') {
+            return Err(CssParseError::new(format!(
+                "unsupported CSS at-rule `{prelude}`"
+            )));
+        }
+
+        let style = parse_declarations(block)?;
+        for selector in prelude.split(',') {
+            let selector = parse_selector(selector.trim())?;
+            if let Some(condition) = condition {
+                sheet.push_conditional_rule(condition, selector, style.clone());
+            } else {
+                sheet.push_rule(selector, style.clone());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn matching_block_end(input: &str, open: usize) -> Result<usize, CssParseError> {
+    let mut depth = 0usize;
+    for (index, ch) in input[open..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Ok(open + index);
+                }
+            }
+            _ => {}
+        }
+    }
+    Err(CssParseError::new("CSS block is missing closing `}`"))
+}
+
+fn parse_media_query(input: &str) -> Result<StyleCondition, CssParseError> {
+    let mut query = ViewportQuery::new();
+    let mut saw_feature = false;
+    let mut rest = input.trim();
+
+    if let Some(after_screen) = rest.strip_prefix("screen") {
+        rest = after_screen.trim_start();
+        if let Some(after_and) = rest.strip_prefix("and") {
+            rest = after_and.trim_start();
+        }
+    }
+
+    while !rest.is_empty() {
+        if !rest.starts_with('(') {
+            return Err(CssParseError::new(format!(
+                "unsupported @media query `{input}`"
+            )));
+        }
+        let Some(end) = rest.find(')') else {
+            return Err(CssParseError::new("@media feature is missing `)`"));
+        };
+        let feature = rest[1..end].trim();
+        apply_media_feature(&mut query, feature)?;
+        saw_feature = true;
+
+        rest = rest[end + 1..].trim_start();
+        if let Some(after_and) = rest.strip_prefix("and") {
+            rest = after_and.trim_start();
+        } else if !rest.is_empty() {
+            return Err(CssParseError::new(format!(
+                "unsupported @media query `{input}`"
+            )));
+        }
+    }
+
+    if !saw_feature {
+        return Err(CssParseError::new("@media query is missing a feature"));
+    }
+    Ok(StyleCondition::viewport(query))
+}
+
+fn apply_media_feature(query: &mut ViewportQuery, input: &str) -> Result<(), CssParseError> {
+    let Some((name, value)) = input.split_once(':') else {
+        return Err(CssParseError::new(format!(
+            "@media feature `{input}` is missing `:`"
+        )));
+    };
+    let value = parse_px(value.trim())?;
+    match name.trim() {
+        "min-width" => query.min_width = Some(value),
+        "max-width" => query.max_width = Some(value),
+        "min-height" => query.min_height = Some(value),
+        "max-height" => query.max_height = Some(value),
+        _ => {
+            return Err(CssParseError::new(format!(
+                "unsupported @media feature `{}`",
+                name.trim()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn merge_conditions(
+    existing: Option<StyleCondition>,
+    next: StyleCondition,
+) -> Result<StyleCondition, CssParseError> {
+    match (existing, next) {
+        (None, condition) => Ok(condition),
+        (Some(StyleCondition::Viewport(mut existing)), StyleCondition::Viewport(next)) => {
+            existing.min_width = max_optional(existing.min_width, next.min_width);
+            existing.max_width = min_optional(existing.max_width, next.max_width);
+            existing.min_height = max_optional(existing.min_height, next.min_height);
+            existing.max_height = min_optional(existing.max_height, next.max_height);
+            Ok(StyleCondition::viewport(existing))
+        }
+        _ => Err(CssParseError::new(
+            "CSS @media rules can only be nested with viewport media rules",
+        )),
+    }
+}
+
+fn max_optional(left: Option<f32>, right: Option<f32>) -> Option<f32> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.max(right)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    }
+}
+
+fn min_optional(left: Option<f32>, right: Option<f32>) -> Option<f32> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.min(right)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    }
 }
 
 fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
@@ -83,7 +219,9 @@ fn parse_selector(input: &str) -> Result<StyleSelector, CssParseError> {
     let mut cursor = 0;
     let chars: Vec<char> = input.chars().collect();
 
-    if chars[cursor].is_ascii_alphabetic() {
+    if chars[cursor] == '*' {
+        cursor += 1;
+    } else if chars[cursor].is_ascii_alphabetic() {
         let start = cursor;
         while cursor < chars.len() && is_ident_char(chars[cursor]) {
             cursor += 1;

@@ -14,6 +14,7 @@ pub use des_layout::prelude::{
 };
 pub use des_layout::style::Direction;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use des_layout::floating::{
     FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
@@ -1940,10 +1941,48 @@ impl StyleRule {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+static NEXT_STYLESHEET_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct StyleSheetKey {
+    id: u64,
+    revision: u64,
+}
+
+impl StyleSheetKey {
+    fn new() -> Self {
+        Self {
+            id: NEXT_STYLESHEET_ID.fetch_add(1, Ordering::Relaxed),
+            revision: 0,
+        }
+    }
+
+    fn bump(&mut self) {
+        self.revision = self.revision.wrapping_add(1);
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct StyleSheet {
     pub(crate) rules: Vec<StyleRule>,
     index: StyleRuleIndex,
+    key: StyleSheetKey,
+}
+
+impl Default for StyleSheet {
+    fn default() -> Self {
+        Self {
+            rules: Vec::new(),
+            index: StyleRuleIndex::default(),
+            key: StyleSheetKey::new(),
+        }
+    }
+}
+
+impl PartialEq for StyleSheet {
+    fn eq(&self, other: &Self) -> bool {
+        self.rules == other.rules && self.index == other.index
+    }
 }
 
 impl StyleSheet {
@@ -2067,10 +2106,15 @@ impl StyleSheet {
         self.rules.len()
     }
 
+    pub(crate) fn key(&self) -> StyleSheetKey {
+        self.key
+    }
+
     fn push_style_rule(&mut self, rule: StyleRule) {
         let index = self.rules.len();
         self.index.insert(index, &rule.selector);
         self.rules.push(rule);
+        self.key.bump();
     }
 
     pub(crate) fn has_container_rules(&self) -> bool {
