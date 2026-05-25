@@ -1631,6 +1631,174 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
             .update_with_input_and_dispatch(input, handler))
     }
 
+    /// Builds this widget with strict CSS, resolves it, collects actions, and dispatches them.
+    fn update_and_dispatch_with_css(
+        &self,
+        viewport: Size,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> Result<
+        (
+            crate::DocumentActionFrame<Action>,
+            DocumentCommandDispatchReport,
+        ),
+        crate::CssParseError,
+    >
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .action_surface_with_css(viewport, css)?
+            .update_and_dispatch(handler))
+    }
+
+    /// Builds this widget with strict CSS, resolves it, and returns authoring errors explicitly.
+    fn try_update_and_dispatch_with_css(
+        &self,
+        viewport: Size,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentAuthoringResult<(
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface_with_css(viewport, css)?
+            .update_and_dispatch(handler))
+    }
+
+    /// Builds this widget with forgiving CSS, resolves it, collects actions, and dispatches them.
+    fn update_and_dispatch_with_css_forgiving(
+        &self,
+        viewport: Size,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> Result<
+        (
+            crate::DocumentActionFrame<Action>,
+            DocumentCommandDispatchReport,
+        ),
+        crate::CssParseError,
+    >
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .action_surface_with_css_forgiving(viewport, css)?
+            .update_and_dispatch(handler))
+    }
+
+    /// Builds this widget with forgiving CSS, resolves it, and returns authoring errors explicitly.
+    fn try_update_and_dispatch_with_css_forgiving(
+        &self,
+        viewport: Size,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentAuthoringResult<(
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface_with_css_forgiving(viewport, css)?
+            .update_and_dispatch(handler))
+    }
+
+    /// Builds this widget with strict CSS, routes input, collects actions, and dispatches them.
+    fn update_with_input_and_css_and_dispatch(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> Result<
+        (
+            crate::DocumentActionFrame<Action>,
+            DocumentCommandDispatchReport,
+        ),
+        crate::CssParseError,
+    >
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .action_surface_with_css(viewport, css)?
+            .update_with_input_and_dispatch(input, handler))
+    }
+
+    /// Builds this widget with strict CSS, routes input, and returns authoring errors explicitly.
+    fn try_update_with_input_and_css_and_dispatch(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentAuthoringResult<(
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface_with_css(viewport, css)?
+            .update_with_input_and_dispatch(input, handler))
+    }
+
+    /// Builds this widget with forgiving CSS, routes input, collects actions, and dispatches them.
+    fn update_with_input_and_css_forgiving_and_dispatch(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> Result<
+        (
+            crate::DocumentActionFrame<Action>,
+            DocumentCommandDispatchReport,
+        ),
+        crate::CssParseError,
+    >
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .action_surface_with_css_forgiving(viewport, css)?
+            .update_with_input_and_dispatch(input, handler))
+    }
+
+    /// Builds this widget with forgiving CSS, routes input, and returns authoring errors explicitly.
+    fn try_update_with_input_and_css_forgiving_and_dispatch(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentAuthoringResult<(
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface_with_css_forgiving(viewport, css)?
+            .update_with_input_and_dispatch(input, handler))
+    }
+
     /// Creates a ready-to-update action surface containing this widget.
     fn action_surface(&self, viewport: Size) -> crate::DocumentActionSurface<Action>
     where

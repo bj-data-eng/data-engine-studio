@@ -3702,6 +3702,41 @@ fn document_widgets_can_declare_typed_command_bindings() {
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
         |command| dispatched_actions.push(*command.action()),
     );
+    let mut css_dispatched_actions = Vec::new();
+    let (css_dispatch_frame, css_dispatch_report) = toggle
+        .update_with_input_and_css_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".toggle { background: rgb(232, 242, 255); }",
+            |command| css_dispatched_actions.push(*command.action()),
+        )
+        .expect("widget should dispatch directly with strict CSS");
+    let mut try_css_dispatched_actions = Vec::new();
+    let (try_css_dispatch_frame, try_css_dispatch_report) = toggle
+        .try_update_with_input_and_css_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".toggle { background: rgb(226, 240, 252); }",
+            |command| try_css_dispatched_actions.push(*command.action()),
+        )
+        .expect("widget should dispatch directly with strict CSS and explicit errors");
+    let mut forgiving_dispatch_actions = Vec::new();
+    let (forgiving_dispatch_frame, forgiving_dispatch_report) = toggle
+        .update_and_dispatch_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 238, 255); }",
+            |command| forgiving_dispatch_actions.push(*command.action()),
+        )
+        .expect("widget should dispatch directly with forgiving CSS");
+    let mut forgiving_input_dispatch_actions = Vec::new();
+    let (forgiving_input_dispatch_frame, forgiving_input_dispatch_report) = toggle
+        .try_update_with_input_and_css_forgiving_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 252); }",
+            |command| forgiving_input_dispatch_actions.push(*command.action()),
+        )
+        .expect("widget should dispatch input directly with forgiving CSS and explicit errors");
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
@@ -3805,6 +3840,70 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(direct_dispatch_report.command_count(), 1);
     assert_eq!(direct_dispatch_report.handled_count(), 1);
     assert_eq!(dispatched_actions, vec![WidgetAction::Toggle]);
+    assert!(css_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        css_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(css_dispatched_actions, vec![WidgetAction::Toggle]);
+    assert_eq!(
+        css_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(232, 242, 255))
+    );
+    assert!(try_css_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        try_css_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(try_css_dispatched_actions, vec![WidgetAction::Toggle]);
+    assert_eq!(
+        try_css_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(226, 240, 252))
+    );
+    assert!(forgiving_dispatch_frame.is_empty());
+    assert_eq!(
+        forgiving_dispatch_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(forgiving_dispatch_actions.is_empty());
+    assert_eq!(
+        forgiving_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(240, 238, 255))
+    );
+    assert!(forgiving_input_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        forgiving_input_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(forgiving_input_dispatch_actions, vec![WidgetAction::Toggle]);
+    assert_eq!(
+        forgiving_input_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(238, 236, 252))
+    );
     assert!(click_frame.contains_action(&WidgetAction::Toggle));
     assert!(!click_frame.contains_action(&WidgetAction::Close));
     assert!(context_frame.contains_action(&WidgetAction::Context));
@@ -3973,11 +4072,29 @@ fn document_widget_css_helpers_return_authoring_errors_without_panics() {
         Ok(_) => panic!("action widget projection errors should be returned after CSS parses"),
         Err(error) => error,
     };
+    let dispatch_projection_error = match widget.try_update_with_input_and_css_and_dispatch(
+        Size::new(320.0, 180.0),
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        "#rendered { width: 120px; }",
+        |_| {},
+    ) {
+        Ok(_) => panic!("dispatch widget projection errors should be returned after CSS parses"),
+        Err(error) => error,
+    };
     let forgiving_projection_error = match widget.try_action_surface_with_css_forgiving(
         Size::new(320.0, 180.0),
         ".ignored { unknown-property: yes; } #rendered { width: 120px; }",
     ) {
         Ok(_) => panic!("forgiving CSS should still report widget projection errors"),
+        Err(error) => error,
+    };
+    let forgiving_dispatch_projection_error = match widget
+        .try_update_and_dispatch_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } #rendered { width: 120px; }",
+            |_| {},
+        ) {
+        Ok(_) => panic!("forgiving dispatch should still report widget projection errors"),
         Err(error) => error,
     };
 
@@ -3991,7 +4108,15 @@ fn document_widget_css_helpers_return_authoring_errors_without_panics() {
         DocumentAuthoringError::Document(_)
     ));
     assert!(matches!(
+        dispatch_projection_error,
+        DocumentAuthoringError::Document(_)
+    ));
+    assert!(matches!(
         forgiving_projection_error,
+        DocumentAuthoringError::Document(_)
+    ));
+    assert!(matches!(
+        forgiving_dispatch_projection_error,
         DocumentAuthoringError::Document(_)
     ));
     assert!(projection_error.to_string().contains("missing"));
