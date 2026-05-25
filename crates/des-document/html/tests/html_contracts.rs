@@ -1078,6 +1078,33 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
             commands.push_context_menu("project.menu", HtmlAction::Menu);
         })
         .expect("HTML should create an action surface with a typed stylesheet");
+    let skipped_stylesheet = des_document::StyleSheet::new().id(
+        "run",
+        des_document::Style::default().width(des_document::Length::Px(999.0)),
+    );
+    let mut skipped_styled_surface = html
+        .to_action_surface_with_stylesheet_if_and(
+            Size::new(320.0, 180.0),
+            skipped_stylesheet,
+            false,
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+            },
+        )
+        .expect("skipped typed stylesheet should still create an action surface");
+    let conditional_registry =
+        DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
+    let mut conditional_styled_surface = html
+        .to_action_surface_with_stylesheet_if(
+            Size::new(320.0, 180.0),
+            des_document::StyleSheet::new().id(
+                "run",
+                des_document::Style::default().width(des_document::Length::Px(104.0)),
+            ),
+            true,
+            conditional_registry,
+        )
+        .expect("conditional typed stylesheet should create an action surface");
     let intent_html = HtmlDocument::parse_fragment(
         r#"<button id="shared" on:click="project.open" on:contextmenu="project.open">Open</button>"#,
     )
@@ -1104,6 +1131,10 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let context_frame = styled_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let skipped_styled_frame = skipped_styled_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let conditional_styled_frame = conditional_styled_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let intent_click_frame = intent_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let intent_context_frame = intent_surface
@@ -1124,6 +1155,30 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
     assert!(context_frame.contains_action(&HtmlAction::Menu));
     assert_eq!(run.rect().size.width, 96.0);
     assert_eq!(styled_surface.commands().bindings().len(), 2);
+    assert!(skipped_styled_frame.contains_action(&HtmlAction::Run));
+    assert_ne!(
+        skipped_styled_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        999.0
+    );
+    assert!(conditional_styled_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        conditional_styled_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        104.0
+    );
 }
 
 #[test]

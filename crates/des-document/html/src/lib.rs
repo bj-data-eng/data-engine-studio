@@ -512,6 +512,19 @@ impl HtmlDocument {
             .action_surface(commands))
     }
 
+    /// Conditionally creates an action surface with typed stylesheet rules.
+    pub fn to_action_surface_with_stylesheet_if<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        present: bool,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_stylesheet_if(viewport, stylesheet, present)?
+            .action_surface(commands))
+    }
+
     /// Creates an action surface from this HTML tree and stylesheet, configuring commands in place.
     pub fn to_action_surface_with_stylesheet_and<Action>(
         &self,
@@ -521,6 +534,19 @@ impl HtmlDocument {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         Ok(self
             .to_view_with_stylesheet(viewport, stylesheet)?
+            .action_surface_with(configure))
+    }
+
+    /// Conditionally creates a styled action surface and configures commands in place.
+    pub fn to_action_surface_with_stylesheet_if_and<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        present: bool,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_stylesheet_if(viewport, stylesheet, present)?
             .action_surface_with(configure))
     }
 
@@ -2859,6 +2885,19 @@ impl HtmlSet {
             .to_action_surface_with_stylesheet(viewport, stylesheet, commands)
     }
 
+    /// Conditionally creates a named action surface with typed stylesheet rules.
+    pub fn to_action_surface_with_stylesheet_if<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        present: bool,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_stylesheet_if(viewport, stylesheet, present, commands)
+    }
+
     /// Creates an action surface from a named document and stylesheet, configuring commands in place.
     pub fn to_action_surface_with_stylesheet_and<Action>(
         &self,
@@ -2869,6 +2908,19 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         self.get(name)?
             .to_action_surface_with_stylesheet_and(viewport, stylesheet, configure)
+    }
+
+    /// Conditionally creates a named styled action surface and configures commands.
+    pub fn to_action_surface_with_stylesheet_if_and<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        present: bool,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_stylesheet_if_and(viewport, stylesheet, present, configure)
     }
 
     /// Parses CSS and creates an action surface for a named document.
