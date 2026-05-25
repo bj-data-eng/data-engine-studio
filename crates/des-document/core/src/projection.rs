@@ -118,6 +118,42 @@ impl DocumentProjection {
             });
     }
 
+    pub fn set_data(
+        self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.set_attribute(id, prefixed_attribute_name("data-", name), value)
+    }
+
+    pub fn push_data(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+    ) {
+        self.push_attribute(id, prefixed_attribute_name("data-", name), value);
+    }
+
+    pub fn set_aria(
+        self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.set_attribute(id, prefixed_attribute_name("aria-", name), value)
+    }
+
+    pub fn push_aria(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+    ) {
+        self.push_attribute(id, prefixed_attribute_name("aria-", name), value);
+    }
+
     pub fn remove_attribute(mut self, id: impl Into<ElementId>, name: impl Into<String>) -> Self {
         self.push_remove_attribute(id, name);
         self
@@ -129,6 +165,22 @@ impl DocumentProjection {
                 id: id.into(),
                 name: name.into(),
             });
+    }
+
+    pub fn remove_data(self, id: impl Into<ElementId>, name: impl AsRef<str>) -> Self {
+        self.remove_attribute(id, prefixed_attribute_name("data-", name))
+    }
+
+    pub fn push_remove_data(&mut self, id: impl Into<ElementId>, name: impl AsRef<str>) {
+        self.push_remove_attribute(id, prefixed_attribute_name("data-", name));
+    }
+
+    pub fn remove_aria(self, id: impl Into<ElementId>, name: impl AsRef<str>) -> Self {
+        self.remove_attribute(id, prefixed_attribute_name("aria-", name))
+    }
+
+    pub fn push_remove_aria(&mut self, id: impl Into<ElementId>, name: impl AsRef<str>) {
+        self.push_remove_attribute(id, prefixed_attribute_name("aria-", name));
     }
 
     pub fn set_selected(mut self, id: impl Into<ElementId>, selected: bool) -> Self {
@@ -193,6 +245,22 @@ impl DocumentProjection {
         });
     }
 
+    pub fn add_class(self, id: impl Into<ElementId>, class: impl Into<ClassName>) -> Self {
+        self.set_class(id, class, true)
+    }
+
+    pub fn push_add_class(&mut self, id: impl Into<ElementId>, class: impl Into<ClassName>) {
+        self.push_class(id, class, true);
+    }
+
+    pub fn remove_class(self, id: impl Into<ElementId>, class: impl Into<ClassName>) -> Self {
+        self.set_class(id, class, false)
+    }
+
+    pub fn push_remove_class(&mut self, id: impl Into<ElementId>, class: impl Into<ClassName>) {
+        self.push_class(id, class, false);
+    }
+
     pub fn operations(&self) -> &[DocumentProjectionOperation] {
         &self.operations
     }
@@ -237,9 +305,29 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn data(&mut self, name: impl AsRef<str>, value: impl Into<String>) -> &mut Self {
+        self.projection.push_data(self.id.clone(), name, value);
+        self
+    }
+
+    pub fn aria(&mut self, name: impl AsRef<str>, value: impl Into<String>) -> &mut Self {
+        self.projection.push_aria(self.id.clone(), name, value);
+        self
+    }
+
     pub fn remove_attribute(&mut self, name: impl Into<String>) -> &mut Self {
         self.projection
             .push_remove_attribute(self.id.clone(), name.into());
+        self
+    }
+
+    pub fn remove_data(&mut self, name: impl AsRef<str>) -> &mut Self {
+        self.projection.push_remove_data(self.id.clone(), name);
+        self
+    }
+
+    pub fn remove_aria(&mut self, name: impl AsRef<str>) -> &mut Self {
+        self.projection.push_remove_aria(self.id.clone(), name);
         self
     }
 
@@ -262,6 +350,25 @@ impl ElementProjection<'_> {
         self.projection
             .push_class(self.id.clone(), class.into(), present);
         self
+    }
+
+    pub fn add_class(&mut self, class: impl Into<ClassName>) -> &mut Self {
+        self.projection.push_add_class(self.id.clone(), class);
+        self
+    }
+
+    pub fn remove_class(&mut self, class: impl Into<ClassName>) -> &mut Self {
+        self.projection.push_remove_class(self.id.clone(), class);
+        self
+    }
+}
+
+fn prefixed_attribute_name(prefix: &str, name: impl AsRef<str>) -> String {
+    let name = name.as_ref();
+    if name.starts_with(prefix) {
+        name.to_owned()
+    } else {
+        format!("{prefix}{name}")
     }
 }
 

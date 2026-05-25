@@ -347,8 +347,8 @@ fn document_projection_batches_app_state_updates() {
                 .value("ready")
                 .selected(true)
                 .focused(true)
-                .class("pending", false)
-                .class("ready", true);
+                .remove_class("pending")
+                .add_class("ready");
         });
 
     let report = view.project(&projection).unwrap();
@@ -378,8 +378,9 @@ fn document_projection_batches_app_state_updates() {
 fn document_projection_updates_semantic_attributes() {
     let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
         ui.button("run")
-            .attribute("aria-label", "Run query")
-            .attribute("data-state", "idle")
+            .aria("label", "Run query")
+            .data("state", "idle")
+            .data("ephemeral", "yes")
             .text("Run");
     });
 
@@ -387,27 +388,30 @@ fn document_projection_updates_semantic_attributes() {
         .project_with(|projection| {
             projection
                 .element("run")
-                .attribute("aria-label", "Query running")
-                .attribute("aria-busy", "true")
-                .remove_attribute("data-state");
+                .aria("label", "Query running")
+                .aria("busy", "true")
+                .data("state", "running")
+                .remove_data("ephemeral");
         })
         .unwrap();
     let output = view.update();
     let run = output.snapshot().find("run").unwrap();
 
-    assert_eq!(report.operations, 3);
-    assert_eq!(report.changed, 3);
+    assert_eq!(report.operations, 4);
+    assert_eq!(report.changed, 4);
     assert_eq!(run.attribute("aria-label"), Some("Query running"));
     assert_eq!(run.attribute("aria-busy"), Some("true"));
-    assert_eq!(run.attribute("data-state"), None);
+    assert_eq!(run.attribute("data-state"), Some("running"));
+    assert_eq!(run.attribute("data-ephemeral"), None);
 
     let unchanged = DocumentProjection::new()
-        .set_attribute("run", "aria-label", "Query running")
-        .set_attribute("run", "aria-busy", "true")
-        .remove_attribute("run", "data-state");
+        .set_aria("run", "label", "Query running")
+        .set_aria("run", "busy", "true")
+        .set_data("run", "state", "running")
+        .remove_data("run", "ephemeral");
     let unchanged_report = view.project(&unchanged).unwrap();
 
-    assert_eq!(unchanged_report.operations, 3);
+    assert_eq!(unchanged_report.operations, 4);
     assert_eq!(unchanged_report.changed, 0);
 }
 
