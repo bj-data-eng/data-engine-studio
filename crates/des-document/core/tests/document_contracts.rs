@@ -4015,6 +4015,23 @@ fn document_widgets_can_declare_typed_command_bindings() {
             |command| css_dispatched_actions.push(*command.action()),
         )
         .expect("widget should dispatch directly with strict CSS");
+    let mut css_dispatched_values = Vec::new();
+    let (css_value_dispatch_frame, css_value_dispatch_report) = toggle
+        .update_with_input_and_css_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".toggle { background: rgb(234, 244, 255); }",
+            |action| css_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch action values directly with strict CSS");
+    let mut css_idle_dispatched_values = Vec::new();
+    let (css_idle_value_dispatch_frame, css_idle_value_dispatch_report) = toggle
+        .update_and_dispatch_action_values_with_css(
+            Size::new(320.0, 180.0),
+            ".toggle { background: rgb(236, 246, 255); }",
+            |action| css_idle_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch idle action values directly with strict CSS");
     let mut try_css_dispatched_actions = Vec::new();
     let (try_css_dispatch_frame, try_css_dispatch_report) = toggle
         .try_update_with_input_and_css_and_dispatch(
@@ -4024,6 +4041,23 @@ fn document_widgets_can_declare_typed_command_bindings() {
             |command| try_css_dispatched_actions.push(*command.action()),
         )
         .expect("widget should dispatch directly with strict CSS and explicit errors");
+    let mut try_css_dispatched_values = Vec::new();
+    let (try_css_value_dispatch_frame, try_css_value_dispatch_report) = toggle
+        .try_update_with_input_and_css_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".toggle { background: rgb(228, 242, 253); }",
+            |action| try_css_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch strict CSS action values with explicit errors");
+    let mut try_css_idle_dispatched_values = Vec::new();
+    let (try_css_idle_value_dispatch_frame, try_css_idle_value_dispatch_report) = toggle
+        .try_update_and_dispatch_action_values_with_css(
+            Size::new(320.0, 180.0),
+            ".toggle { background: rgb(224, 238, 250); }",
+            |action| try_css_idle_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch idle strict CSS action values with explicit errors");
     let mut forgiving_dispatch_actions = Vec::new();
     let (forgiving_dispatch_frame, forgiving_dispatch_report) = toggle
         .update_and_dispatch_with_css_forgiving(
@@ -4032,6 +4066,23 @@ fn document_widgets_can_declare_typed_command_bindings() {
             |command| forgiving_dispatch_actions.push(*command.action()),
         )
         .expect("widget should dispatch directly with forgiving CSS");
+    let mut forgiving_idle_dispatched_values = Vec::new();
+    let (forgiving_idle_value_dispatch_frame, forgiving_idle_value_dispatch_report) = toggle
+        .update_and_dispatch_action_values_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(242, 240, 255); }",
+            |action| forgiving_idle_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch idle action values directly with forgiving CSS");
+    let mut try_forgiving_idle_dispatched_values = Vec::new();
+    let (try_forgiving_idle_value_dispatch_frame, try_forgiving_idle_value_dispatch_report) =
+        toggle
+            .try_update_and_dispatch_action_values_with_css_forgiving(
+                Size::new(320.0, 180.0),
+                ".ignored { unknown-property: yes; } .toggle { background: rgb(244, 242, 255); }",
+                |action| try_forgiving_idle_dispatched_values.push(*action),
+            )
+            .expect("widget should dispatch idle forgiving CSS action values explicitly");
     let mut forgiving_input_dispatch_actions = Vec::new();
     let (forgiving_input_dispatch_frame, forgiving_input_dispatch_report) = toggle
         .try_update_with_input_and_css_forgiving_and_dispatch(
@@ -4041,6 +4092,25 @@ fn document_widgets_can_declare_typed_command_bindings() {
             |command| forgiving_input_dispatch_actions.push(*command.action()),
         )
         .expect("widget should dispatch input directly with forgiving CSS and explicit errors");
+    let mut forgiving_input_dispatched_values = Vec::new();
+    let (forgiving_input_value_dispatch_frame, forgiving_input_value_dispatch_report) = toggle
+        .update_with_input_and_css_forgiving_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 254); }",
+            |action| forgiving_input_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch input action values directly with forgiving CSS");
+    let mut try_forgiving_input_dispatched_values = Vec::new();
+    let (try_forgiving_input_value_dispatch_frame, try_forgiving_input_value_dispatch_report) =
+        toggle
+            .try_update_with_input_and_css_forgiving_and_dispatch_action_values(
+                Size::new(320.0, 180.0),
+                DocumentInput::primary_click(Point::new(8.0, 8.0)),
+                ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 234, 252); }",
+                |action| try_forgiving_input_dispatched_values.push(*action),
+            )
+            .expect("widget should dispatch forgiving CSS action values with explicit errors");
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
@@ -4181,6 +4251,38 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(232, 242, 255))
     );
+    assert!(css_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        css_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(css_dispatched_values, vec![WidgetAction::Toggle]);
+    assert_eq!(
+        css_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(234, 244, 255))
+    );
+    assert!(css_idle_value_dispatch_frame.is_empty());
+    assert_eq!(
+        css_idle_value_dispatch_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(css_idle_dispatched_values.is_empty());
+    assert_eq!(
+        css_idle_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(236, 246, 255))
+    );
     assert!(try_css_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
         try_css_dispatch_report,
@@ -4196,6 +4298,38 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .style()
             .background,
         Some(Color::rgb(226, 240, 252))
+    );
+    assert!(try_css_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        try_css_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(try_css_dispatched_values, vec![WidgetAction::Toggle]);
+    assert_eq!(
+        try_css_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(228, 242, 253))
+    );
+    assert!(try_css_idle_value_dispatch_frame.is_empty());
+    assert_eq!(
+        try_css_idle_value_dispatch_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(try_css_idle_dispatched_values.is_empty());
+    assert_eq!(
+        try_css_idle_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(224, 238, 250))
     );
     assert!(forgiving_dispatch_frame.is_empty());
     assert_eq!(
@@ -4213,6 +4347,38 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(240, 238, 255))
     );
+    assert!(forgiving_idle_value_dispatch_frame.is_empty());
+    assert_eq!(
+        forgiving_idle_value_dispatch_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(forgiving_idle_dispatched_values.is_empty());
+    assert_eq!(
+        forgiving_idle_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(242, 240, 255))
+    );
+    assert!(try_forgiving_idle_value_dispatch_frame.is_empty());
+    assert_eq!(
+        try_forgiving_idle_value_dispatch_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(try_forgiving_idle_dispatched_values.is_empty());
+    assert_eq!(
+        try_forgiving_idle_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(244, 242, 255))
+    );
     assert!(forgiving_input_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
         forgiving_input_dispatch_report,
@@ -4228,6 +4394,44 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .style()
             .background,
         Some(Color::rgb(238, 236, 252))
+    );
+    assert!(forgiving_input_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        forgiving_input_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(
+        forgiving_input_dispatched_values,
+        vec![WidgetAction::Toggle]
+    );
+    assert_eq!(
+        forgiving_input_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(238, 236, 254))
+    );
+    assert!(try_forgiving_input_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        try_forgiving_input_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(
+        try_forgiving_input_dispatched_values,
+        vec![WidgetAction::Toggle]
+    );
+    assert_eq!(
+        try_forgiving_input_value_dispatch_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(236, 234, 252))
     );
     assert!(click_frame.contains_action(&WidgetAction::Toggle));
     assert!(!click_frame.contains_action(&WidgetAction::Close));
