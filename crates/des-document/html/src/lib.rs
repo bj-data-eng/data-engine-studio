@@ -727,6 +727,54 @@ impl HtmlStylesheet {
         Ok(self.into_view(viewport)?.action_surface_with(configure))
     }
 
+    /// Creates an action surface, applies retained state projection, and returns both.
+    pub fn to_action_surface_with_projection<Action>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)> {
+        let mut surface = self.to_action_surface(viewport, commands)?;
+        let report = surface.project(projection)?;
+        Ok((report, surface))
+    }
+
+    /// Creates an action surface, builds retained state projection in place, and applies it.
+    pub fn to_action_surface_projected_with<Action>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.to_action_surface_with_projection(viewport, &projection, commands)
+    }
+
+    /// Creates an action surface, applies projection, and configures typed commands in one hook.
+    pub fn to_action_surface_with_projection_and<Action>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)> {
+        let mut surface = self.to_action_surface_with(viewport, configure)?;
+        let report = surface.project(projection)?;
+        Ok((report, surface))
+    }
+
+    /// Creates an action surface, builds projection, and configures typed commands in one hook.
+    pub fn to_action_surface_projected_with_and<Action>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.to_action_surface_with_projection_and(viewport, &projection, configure)
+    }
+
     /// Creates a view, applies retained state projection, and returns both.
     pub fn to_view_with_projection(
         &self,

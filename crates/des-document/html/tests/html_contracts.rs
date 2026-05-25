@@ -978,6 +978,45 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(run.aria("pressed"), Some("true"));
     assert!(frame.contains_action(&HtmlAction::Run));
     assert!(!frame.contains_action(&HtmlAction::Select));
+
+    let projected_registry = bundle.command_registry(|hook| match hook.command() {
+        "project.run" => Some(HtmlAction::Run),
+        "project.select" => Some(HtmlAction::Select),
+        _ => None,
+    });
+    let (surface_report, mut surface) = bundle
+        .to_action_surface_with_projection(Size::new(320.0, 180.0), &projection, projected_registry)
+        .expect("HTML bundle should create a projected action surface");
+    let surface_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 0.0)));
+    let surface_run = surface_frame.output().snapshot().find("run").unwrap();
+
+    assert_eq!(surface_report.operations, 7);
+    assert_eq!(surface_report.changed, 7);
+    assert_eq!(surface_run.text(), Some("Ready".to_owned()));
+    assert!(surface_run.has_class("is-ready"));
+    assert!(surface_frame.contains_clicked_action(&HtmlAction::Run));
+
+    let (configured_report, mut configured_surface) = bundle
+        .to_action_surface_projected_with_and(
+            Size::new(320.0, 180.0),
+            |projection| {
+                projection.element("select").add_class("is-selected");
+            },
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+                commands.push_click("project.select", HtmlAction::Select);
+            },
+        )
+        .expect("HTML bundle should configure projected action surfaces in one call");
+    let configured_frame = configured_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 32.0)));
+    let configured_select = configured_frame.output().snapshot().find("select").unwrap();
+
+    assert_eq!(configured_report.operations, 1);
+    assert_eq!(configured_report.changed, 1);
+    assert!(configured_select.has_class("is-selected"));
+    assert!(configured_frame.contains_clicked_action(&HtmlAction::Select));
 }
 
 #[test]
