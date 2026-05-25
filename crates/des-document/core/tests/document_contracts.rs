@@ -3064,6 +3064,22 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let toggle_commands = toggle.commands();
     let boxed_toggle_commands = boxed_toggle.commands();
     let toggle_registry = toggle.command_registry();
+    let direct_toggle_frame = toggle.update_with_input_actions(
+        Size::new(320.0, 180.0),
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+    );
+    let try_direct_toggle_frame = toggle
+        .try_update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        )
+        .unwrap();
+    let mut dispatched_actions = Vec::new();
+    let (direct_dispatch_frame, direct_dispatch_report) = toggle.update_with_input_and_dispatch(
+        Size::new(320.0, 180.0),
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        |command| dispatched_actions.push(*command.action()),
+    );
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
@@ -3081,6 +3097,12 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(boxed_toggle_commands.bindings(), toggle_commands.bindings());
     assert_eq!(toggle_registry.bindings().len(), 2);
     assert_eq!(toggle_surface.commands().bindings().len(), 2);
+    assert!(direct_toggle_frame.contains_action(&WidgetAction::Toggle));
+    assert!(try_direct_toggle_frame.contains_action(&WidgetAction::Toggle));
+    assert!(direct_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(direct_dispatch_report.command_count(), 1);
+    assert_eq!(direct_dispatch_report.handled_count(), 1);
+    assert_eq!(dispatched_actions, vec![WidgetAction::Toggle]);
     assert!(click_frame.contains_action(&WidgetAction::Toggle));
     assert!(!click_frame.contains_action(&WidgetAction::Close));
     assert!(context_frame.contains_action(&WidgetAction::Context));

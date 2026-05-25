@@ -8,7 +8,10 @@ use crate::geometry::{
 };
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
 use crate::projection::{DocumentProjection, ElementProjectionPatch};
-use crate::state::{DocumentCommandRegistry, ElementState, ResolvedElement, ResolvedFloating};
+use crate::state::{
+    DocumentCommandAction, DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentInput,
+    ElementState, ResolvedElement, ResolvedFloating,
+};
 use crate::style::{
     ChildPosition, ComputedStyle, StyleMatchContext, StyleResolutionContext, StyleSheet,
     classify_computed_style_change, resolve_style_with_position,
@@ -1423,6 +1426,127 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         Self: Sized,
     {
         self.commands()
+    }
+
+    /// Builds this widget, resolves it, and collects typed app actions.
+    fn update_actions(&self, viewport: Size) -> crate::DocumentActionFrame<Action>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        self.action_surface(viewport).update_actions()
+    }
+
+    /// Builds this widget, resolves it, and returns projection errors explicitly.
+    fn try_update_actions(
+        &self,
+        viewport: Size,
+    ) -> DocumentResult<crate::DocumentActionFrame<Action>>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self.try_action_surface(viewport)?.update_actions())
+    }
+
+    /// Builds this widget, routes input, and collects typed app actions.
+    fn update_with_input_actions(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+    ) -> crate::DocumentActionFrame<Action>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        self.action_surface(viewport)
+            .update_with_input_actions(input)
+    }
+
+    /// Builds this widget, routes input, and returns projection errors explicitly.
+    fn try_update_with_input_actions(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+    ) -> DocumentResult<crate::DocumentActionFrame<Action>>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface(viewport)?
+            .update_with_input_actions(input))
+    }
+
+    /// Builds this widget, resolves it, collects actions, and dispatches them.
+    fn update_and_dispatch(
+        &self,
+        viewport: Size,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> (
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        self.action_surface(viewport).update_and_dispatch(handler)
+    }
+
+    /// Builds this widget, resolves it, and returns projection errors explicitly.
+    fn try_update_and_dispatch(
+        &self,
+        viewport: Size,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface(viewport)?
+            .update_and_dispatch(handler))
+    }
+
+    /// Builds this widget, routes input, collects actions, and dispatches them.
+    fn update_with_input_and_dispatch(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> (
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        self.action_surface(viewport)
+            .update_with_input_and_dispatch(input, handler)
+    }
+
+    /// Builds this widget, routes input, and returns projection errors explicitly.
+    fn try_update_with_input_and_dispatch(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface(viewport)?
+            .update_with_input_and_dispatch(input, handler))
     }
 
     /// Creates a ready-to-update action surface containing this widget.
