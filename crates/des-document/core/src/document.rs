@@ -1437,16 +1437,10 @@ fn resolved_document_rect(
     anchors: &HashMap<ElementId, DocumentRect>,
     boundaries: &HashMap<ElementId, DocumentRect>,
 ) -> (DocumentRect, Option<ResolvedFloating>) {
-    if let Some(anchor) = &style.anchor {
-        if let Some(anchor_rect) = anchors.get(&anchor.target) {
-            return anchored_document_rect(
-                style,
-                *anchor_rect,
-                raw_rect.size,
-                viewport,
-                boundaries,
-            );
-        }
+    if let Some(anchor) = &style.anchor
+        && let Some(anchor_rect) = anchors.get(&anchor.target)
+    {
+        return anchored_document_rect(style, *anchor_rect, raw_rect.size, viewport, boundaries);
     }
 
     if style.position != Position::AbsoluteViewport {

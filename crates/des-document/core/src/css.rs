@@ -896,17 +896,17 @@ fn parse_flex_flow(input: &str) -> Result<(FlexDirection, FlexWrap), CssParseErr
     let mut direction = None;
     let mut wrap = None;
     for part in input.split_whitespace() {
-        if direction.is_none() {
-            if let Ok(value) = parse_flex_direction(part) {
-                direction = Some(value);
-                continue;
-            }
+        if direction.is_none()
+            && let Ok(value) = parse_flex_direction(part)
+        {
+            direction = Some(value);
+            continue;
         }
-        if wrap.is_none() {
-            if let Ok(value) = parse_flex_wrap(part) {
-                wrap = Some(value);
-                continue;
-            }
+        if wrap.is_none()
+            && let Ok(value) = parse_flex_wrap(part)
+        {
+            wrap = Some(value);
+            continue;
         }
         return Err(CssParseError::new(format!(
             "unsupported flex-flow component `{part}`"

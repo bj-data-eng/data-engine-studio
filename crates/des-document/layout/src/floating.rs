@@ -2039,9 +2039,7 @@ fn limit_shift_bounds_x(
     reference: FloatingRect,
     floating: Size<f32>,
 ) -> Option<(f32, f32)> {
-    let Some(limiter) = shift.limiter else {
-        return None;
-    };
+    let limiter = shift.limiter?;
     let applies = if side.is_vertical() {
         limiter.cross_axis
     } else {
@@ -2063,9 +2061,7 @@ fn limit_shift_bounds_y(
     reference: FloatingRect,
     floating: Size<f32>,
 ) -> Option<(f32, f32)> {
-    let Some(limiter) = shift.limiter else {
-        return None;
-    };
+    let limiter = shift.limiter?;
     let applies = if side.is_vertical() {
         limiter.main_axis
     } else {

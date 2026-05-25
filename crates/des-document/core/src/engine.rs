@@ -456,7 +456,7 @@ impl DocumentEngine {
                 if update
                     .completed_drag
                     .as_ref()
-                    .is_some_and(|drag| drag_delta_is_click(drag))
+                    .is_some_and(drag_delta_is_click)
                 {
                     state.click_count += 1;
                 }

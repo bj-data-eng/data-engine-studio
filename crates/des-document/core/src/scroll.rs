@@ -23,27 +23,29 @@ fn collect_scroll_chrome(
 ) {
     if let Some(max_scroll) = scroll_limits.get(&frame.id).copied() {
         let clip_rect = scroll_geometry_clip(frame.clip_rect);
-        if frame.style.overflow_y.is_scrollable() && max_scroll.height > 0.0 {
-            if let Some(scroll_chrome) = scroll_chrome_for_frame(
+        if frame.style.overflow_y.is_scrollable()
+            && max_scroll.height > 0.0
+            && let Some(scroll_chrome) = scroll_chrome_for_frame(
                 frame,
                 states,
                 ScrollAxis::Vertical,
                 max_scroll.height,
                 clip_rect,
-            ) {
-                chrome.push(scroll_chrome);
-            }
+            )
+        {
+            chrome.push(scroll_chrome);
         }
-        if frame.style.overflow_x.is_scrollable() && max_scroll.width > 0.0 {
-            if let Some(scroll_chrome) = scroll_chrome_for_frame(
+        if frame.style.overflow_x.is_scrollable()
+            && max_scroll.width > 0.0
+            && let Some(scroll_chrome) = scroll_chrome_for_frame(
                 frame,
                 states,
                 ScrollAxis::Horizontal,
                 max_scroll.width,
                 clip_rect,
-            ) {
-                chrome.push(scroll_chrome);
-            }
+            )
+        {
+            chrome.push(scroll_chrome);
         }
     }
 

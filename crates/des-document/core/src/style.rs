@@ -264,9 +264,9 @@ impl NthChildFormula {
             return self.offset > 0 && position == self.offset;
         }
         if self.offset == 0 {
-            return position % self.step == 0;
+            return position.is_multiple_of(self.step);
         }
-        position >= self.offset && (position - self.offset) % self.step == 0
+        position >= self.offset && (position - self.offset).is_multiple_of(self.step)
     }
 }
 
