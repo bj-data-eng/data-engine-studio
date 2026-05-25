@@ -1592,6 +1592,23 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         self.action_surface(viewport).update_and_dispatch(handler)
     }
 
+    /// Builds this widget, resolves it, and dispatches only typed app action values.
+    fn update_and_dispatch_action_values(
+        &self,
+        viewport: Size,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> (
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        self.action_surface(viewport)
+            .update_and_dispatch_action_values(handler)
+    }
+
     /// Builds this widget, resolves it, and returns projection errors explicitly.
     fn try_update_and_dispatch(
         &self,
@@ -1626,6 +1643,24 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
     {
         self.action_surface(viewport)
             .update_with_input_and_dispatch(input, handler)
+    }
+
+    /// Builds this widget, routes input, and dispatches only typed app action values.
+    fn update_with_input_and_dispatch_action_values(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> (
+        crate::DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )
+    where
+        Self: Sized,
+        Action: Clone,
+    {
+        self.action_surface(viewport)
+            .update_with_input_and_dispatch_action_values(input, handler)
     }
 
     /// Builds this widget, routes input, and returns projection errors explicitly.

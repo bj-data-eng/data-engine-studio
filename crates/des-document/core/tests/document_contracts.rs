@@ -1129,6 +1129,12 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
             dispatched.push(action.action().clone());
         },
     );
+    let mut dispatched_values = Vec::new();
+    let (value_dispatch_frame, value_dispatch_report) = surface
+        .update_with_input_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| dispatched_values.push(action.clone()),
+        );
 
     assert_eq!(surface.commands().bindings().len(), 2);
     assert!(surface.stylesheet().has_rule_for_class("run-action"));
@@ -1137,6 +1143,12 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert!(dispatch_frame.contains_clicked_action(&AppAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![AppAction::Run]);
+    assert!(value_dispatch_frame.contains_clicked_action(&AppAction::Run));
+    assert_eq!(
+        value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(dispatched_values, vec![AppAction::Run]);
 
     let output_only_projection = DocumentProjection::new().set_text("inspect", "Inspect projected");
     let (output_report, output_only) = surface
@@ -3889,6 +3901,13 @@ fn document_widgets_can_declare_typed_command_bindings() {
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
         |command| dispatched_actions.push(*command.action()),
     );
+    let mut directly_dispatched_values = Vec::new();
+    let (direct_value_dispatch_frame, direct_value_dispatch_report) = toggle
+        .update_with_input_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| directly_dispatched_values.push(*action),
+        );
     let mut css_dispatched_actions = Vec::new();
     let (css_dispatch_frame, css_dispatch_report) = toggle
         .update_with_input_and_css_and_dispatch(
@@ -4030,6 +4049,12 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(direct_dispatch_report.command_count(), 1);
     assert_eq!(direct_dispatch_report.handled_count(), 1);
     assert_eq!(dispatched_actions, vec![WidgetAction::Toggle]);
+    assert!(direct_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        direct_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(directly_dispatched_values, vec![WidgetAction::Toggle]);
     assert!(css_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
         css_dispatch_report,

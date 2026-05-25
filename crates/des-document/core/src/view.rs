@@ -1391,6 +1391,19 @@ impl<Action> DocumentActionSurface<Action> {
         (frame, report)
     }
 
+    /// Resolves the view, collects actions, and dispatches only typed app action values.
+    pub fn update_and_dispatch_action_values(
+        &mut self,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
+    where
+        Action: Clone,
+    {
+        let frame = self.update_actions();
+        let report = frame.dispatch_action_values(handler);
+        (frame, report)
+    }
+
     /// Routes input, resolves the view, and collects typed app actions.
     pub fn update_with_input_actions(&mut self, input: DocumentInput) -> DocumentActionFrame<Action>
     where
@@ -1410,6 +1423,20 @@ impl<Action> DocumentActionSurface<Action> {
     {
         let frame = self.update_with_input_actions(input);
         let report = frame.dispatch(handler);
+        (frame, report)
+    }
+
+    /// Routes input, collects actions, and dispatches only typed app action values.
+    pub fn update_with_input_and_dispatch_action_values(
+        &mut self,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions(input);
+        let report = frame.dispatch_action_values(handler);
         (frame, report)
     }
 
