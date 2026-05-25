@@ -1160,6 +1160,13 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
             [("project.run", HtmlAction::Run)],
         )
         .expect("HTML should map commands for one update");
+    let mapped_click_values = html
+        .update_with_input_action_values_with_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML should map commands directly to action values");
     let intent_mapped_key_frame = html
         .update_with_input_actions_with_intent_actions(
             Size::new(320.0, 180.0),
@@ -1171,6 +1178,17 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
             )],
         )
         .expect("HTML should map intent-scoped commands for one update");
+    let intent_mapped_key_values = html
+        .update_with_input_action_values_with_intent_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.search",
+                HtmlAction::Search,
+            )],
+        )
+        .expect("HTML should map intent-scoped commands directly to action values");
     let configured_empty_frame = html
         .update_actions_with(Size::new(320.0, 180.0), |commands| {
             commands.push_click("project.run", HtmlAction::Run);
@@ -1245,7 +1263,9 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     assert!(key_input_frame.contains_action(&HtmlAction::Search));
     assert!(configured_key_frame.contains_action(&HtmlAction::Search));
     assert!(mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(mapped_click_values, vec![HtmlAction::Run]);
     assert!(intent_mapped_key_frame.contains_action(&HtmlAction::Search));
+    assert_eq!(intent_mapped_key_values, vec![HtmlAction::Search]);
     assert!(configured_empty_frame.is_empty());
     assert!(mapped_empty_frame.is_empty());
     assert!(key_frame.is_empty());
@@ -1834,6 +1854,13 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             [("project.run", HtmlAction::Run)],
         )
         .expect("HTML bundle should map commands for one update");
+    let mapped_click_values = bundle
+        .update_with_input_action_values_with_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML bundle should map commands directly to action values");
     let intent_mapped_key_frame = bundle
         .update_with_input_actions_with_intent_actions(
             Size::new(320.0, 180.0),
@@ -1845,6 +1872,17 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             )],
         )
         .expect("HTML bundle should map intent-scoped commands for one update");
+    let intent_mapped_key_values = bundle
+        .update_with_input_action_values_with_intent_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.filter",
+                HtmlAction::Filter,
+            )],
+        )
+        .expect("HTML bundle should map intent-scoped commands directly to action values");
     let configured_empty_frame = bundle
         .update_actions_with(Size::new(320.0, 180.0), |commands| {
             commands.push("project.run", HtmlAction::Run);
@@ -1908,7 +1946,9 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     assert!(key_frame.contains_action(&HtmlAction::Filter));
     assert!(configured_click_frame.contains_action(&HtmlAction::Run));
     assert!(mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(mapped_click_values, vec![HtmlAction::Run]);
     assert!(intent_mapped_key_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(intent_mapped_key_values, vec![HtmlAction::Filter]);
     assert!(configured_empty_frame.is_empty());
     assert!(mapped_empty_frame.is_empty());
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));

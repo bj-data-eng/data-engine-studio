@@ -3493,6 +3493,8 @@ fn document_widget_trait_builds_views_through_its_front_door() {
     let (boxed_projected_report, mut boxed_projected_document) =
         boxed.projected_document(Size::new(240.0, 120.0)).unwrap();
     let mut boxed_view = boxed.try_view(Size::new(240.0, 120.0)).unwrap();
+    let direct_contract_output = widget.update(Size::new(240.0, 120.0));
+    let try_contract_output = widget.try_update(Size::new(240.0, 120.0)).unwrap();
 
     assert_eq!(widget_stylesheet.rule_count(), 2);
     assert_eq!(boxed_stylesheet.rule_count(), 2);
@@ -3527,6 +3529,18 @@ fn document_widget_trait_builds_views_through_its_front_door() {
     assert_eq!(
         direct_badge.style().background,
         Some(Color::rgb(205, 239, 221))
+    );
+    assert_eq!(
+        direct_contract_output
+            .snapshot()
+            .find("badge")
+            .unwrap()
+            .text(),
+        Some("Ready".to_owned())
+    );
+    assert_eq!(
+        try_contract_output.snapshot().find("badge").unwrap().text(),
+        Some("Ready".to_owned())
     );
 
     let projected_output =

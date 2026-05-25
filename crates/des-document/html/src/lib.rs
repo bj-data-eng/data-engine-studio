@@ -1086,6 +1086,21 @@ impl HtmlDocument {
         self.update_with_input_actions(viewport, input, &registry)
     }
 
+    /// Routes input and returns only typed Rust action values mapped from command names.
+    pub fn update_with_input_action_values_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_actions(viewport, input, actions)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
     /// Routes input through this HTML tree and maps intent-scoped commands.
     pub fn update_with_input_actions_with_intent_actions<Action, Command>(
         &self,
@@ -1099,6 +1114,21 @@ impl HtmlDocument {
     {
         let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions(viewport, input, &registry)
+    }
+
+    /// Routes input and returns only typed Rust action values mapped by intent and command.
+    pub fn update_with_input_action_values_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_intent_actions(viewport, input, actions)
+            .map(DocumentActionFrame::into_action_values)
     }
 
     /// Routes input through this HTML tree, collects typed actions, and dispatches them.
@@ -2798,6 +2828,21 @@ impl HtmlStylesheet {
         self.update_with_input_actions(viewport, input, &registry)
     }
 
+    /// Creates a view, routes input, and returns only typed action values.
+    pub fn update_with_input_action_values_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_actions(viewport, input, actions)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
     /// Creates a view, routes input, and maps intent-scoped commands.
     pub fn update_with_input_actions_with_intent_actions<Action, Command>(
         &self,
@@ -2811,6 +2856,21 @@ impl HtmlStylesheet {
     {
         let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions(viewport, input, &registry)
+    }
+
+    /// Creates a view, routes input, and returns action values mapped by intent and command.
+    pub fn update_with_input_action_values_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_intent_actions(viewport, input, actions)
+            .map(DocumentActionFrame::into_action_values)
     }
 
     /// Creates a view, routes input, collects typed actions, and dispatches them.

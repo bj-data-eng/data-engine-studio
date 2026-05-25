@@ -1521,6 +1521,22 @@ pub trait DocumentWidget {
     ) -> DocumentResult<crate::DocumentView> {
         crate::DocumentView::try_build_widget(viewport, stylesheet, self)
     }
+
+    /// Builds this widget, resolves it, and returns document output.
+    fn update(&self, viewport: Size) -> crate::DocumentOutput
+    where
+        Self: Sized,
+    {
+        self.view(viewport).update()
+    }
+
+    /// Builds this widget, resolves it, and returns projection errors explicitly.
+    fn try_update(&self, viewport: Size) -> DocumentResult<crate::DocumentOutput>
+    where
+        Self: Sized,
+    {
+        Ok(self.try_view(viewport)?.update())
+    }
 }
 
 /// Widget convention for declaring typed app actions alongside document hooks.
