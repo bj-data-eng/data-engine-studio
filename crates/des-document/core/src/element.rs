@@ -726,7 +726,7 @@ impl ElementBehaviorHook {
     }
 
     pub fn has_command(&self, command: &str) -> bool {
-        self.command == command.trim()
+        self.command.trim() == command.trim()
     }
 
     pub fn intent(&self) -> Option<ElementBehaviorEvent> {

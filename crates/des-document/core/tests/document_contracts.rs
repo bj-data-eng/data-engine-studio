@@ -1,16 +1,17 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget,
-    DocumentAuthoringError, DocumentBuilder, DocumentCommandAction, DocumentCommandBinding,
-    DocumentCommandDispatchReport, DocumentCommandRef, DocumentCommandRegistry, DocumentEngine,
-    DocumentEvent, DocumentEventKind, DocumentInput, DocumentInteractionState, DocumentKey,
-    DocumentProjection, DocumentProjectionOperation, DocumentProjectionOperationKind,
-    DocumentProjectionReport, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
-    ElementBehaviorHook, ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector,
-    FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point,
-    PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
-    TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextLayoutRequest, TextLayoutResult,
-    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentAuthoringError, DocumentBuilder, DocumentCommand, DocumentCommandAction,
+    DocumentCommandBinding, DocumentCommandDispatchReport, DocumentCommandRef,
+    DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
+    DocumentInteractionState, DocumentKey, DocumentProjection, DocumentProjectionOperation,
+    DocumentProjectionOperationKind, DocumentProjectionReport, DocumentView, DocumentWidget,
+    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, ElementProjectionPatch,
+    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
+    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextContent,
+    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -128,6 +129,68 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert!(run.has_behavior_hook(ElementBehaviorEvent::Click, "run-query"));
     assert!(run.has_command_hook("open-query-menu"));
     assert!(!run.has_behavior_hook(ElementBehaviorEvent::KeyDown, "run-query"));
+}
+
+#[test]
+fn document_command_names_normalize_across_hooks_bindings_and_queries() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+        Menu,
+    }
+
+    let stylesheet = StyleSheet::new().id("run", Style::default().size(96.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run")
+            .behavior_hooks([
+                (ElementBehaviorEvent::Click, " run-query "),
+                (ElementBehaviorEvent::ContextMenu, " open-menu "),
+            ])
+            .text("Run");
+    });
+    let registry = DocumentCommandRegistry::new()
+        .bind(" run-query ", AppAction::Run)
+        .bind_on(
+            ElementBehaviorEvent::ContextMenu,
+            " open-menu ",
+            AppAction::Menu,
+        );
+
+    let frame = view.update_with_input_actions(
+        pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0),
+        &registry,
+    );
+    let output = frame.output();
+    let command = output.first_command().expect("click should emit a command");
+    let standalone_command = DocumentCommand::new("run", DocumentEventKind::Clicked, " run-query ");
+    let standalone_action = DocumentCommandAction::new(
+        "run",
+        DocumentEventKind::Clicked,
+        " run-query ",
+        AppAction::Run,
+    );
+
+    assert_eq!(registry.bindings()[0].command(), "run-query");
+    assert_eq!(registry.bindings()[1].command(), "open-menu");
+    assert_eq!(standalone_command.command(), "run-query");
+    assert_eq!(standalone_action.command(), "run-query");
+    assert_eq!(command.command(), "run-query");
+    assert!(command.command_is(" run-query "));
+    assert!(output.has_command("run", " run-query "));
+    assert!(output.has_command_kind("run", DocumentEventKind::Clicked, " run-query "));
+    assert!(output.has_command_intent("run", ElementBehaviorEvent::Click, " run-query "));
+    assert_eq!(registry.action_for(" run-query "), Some(&AppAction::Run));
+    assert!(registry.has_binding_for(" run-query "));
+    assert!(
+        registry.has_binding_for_command_intent(" open-menu ", ElementBehaviorEvent::ContextMenu)
+    );
+    assert_eq!(frame.actions().len(), 1);
+    assert!(frame.contains_action_for_target_intent(
+        "run",
+        ElementBehaviorEvent::Click,
+        &AppAction::Run
+    ));
+    assert!(frame.actions()[0].command_is(" run-query "));
 }
 
 #[test]

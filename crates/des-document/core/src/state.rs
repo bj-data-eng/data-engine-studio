@@ -639,12 +639,12 @@ impl DocumentOutput {
 
     pub fn has_command(&self, target: &str, command: &str) -> bool {
         self.commands_for(target)
-            .any(|event| event.command == command)
+            .any(|event| event.command_is(command))
     }
 
     pub fn has_command_kind(&self, target: &str, kind: DocumentEventKind, command: &str) -> bool {
         self.commands_for(target)
-            .any(|event| event.event == kind && event.command == command)
+            .any(|event| event.event == kind && event.command_is(command))
     }
 
     pub fn has_command_intent(
@@ -654,7 +654,7 @@ impl DocumentOutput {
         command: &str,
     ) -> bool {
         self.commands_for(target)
-            .any(|event| intent.matches_document_event(&event.event) && event.command == command)
+            .any(|event| intent.matches_document_event(&event.event) && event.command_is(command))
     }
 
     pub fn text_selection(&self) -> Option<&DocumentTextSelection> {
@@ -1009,6 +1009,10 @@ fn disabled_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
     element.children.iter().find_map(disabled_element)
 }
 
+fn normalize_command_name(command: impl Into<String>) -> String {
+    command.into().trim().to_owned()
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocumentCommand {
     pub target: ElementId,
@@ -1025,7 +1029,7 @@ impl DocumentCommand {
         Self {
             target: target.into(),
             event,
-            command: command.into(),
+            command: normalize_command_name(command),
         }
     }
 
@@ -1051,7 +1055,7 @@ impl DocumentCommand {
 
     /// Returns true when this command has the supplied authored command name.
     pub fn command_is(&self, command: &str) -> bool {
-        self.command == command.trim()
+        self.command.trim() == command.trim()
     }
 
     /// Returns true when this command was emitted by the supplied behavior intent.
@@ -1171,7 +1175,7 @@ impl<'a> DocumentCommandRef<'a> {
 
     /// Returns true when this command has the supplied authored command name.
     pub fn command_is(&self, command: &str) -> bool {
-        self.command == command.trim()
+        self.command.trim() == command.trim()
     }
 
     /// Returns true when this command was emitted by the supplied behavior intent.
@@ -1258,7 +1262,7 @@ impl<Action> DocumentCommandBinding<Action> {
     pub fn new(command: impl Into<String>, action: Action) -> Self {
         Self {
             event: None,
-            command: command.into(),
+            command: normalize_command_name(command),
             action,
         }
     }
@@ -1266,7 +1270,7 @@ impl<Action> DocumentCommandBinding<Action> {
     pub fn on(event: ElementBehaviorEvent, command: impl Into<String>, action: Action) -> Self {
         Self {
             event: Some(event),
-            command: command.into(),
+            command: normalize_command_name(command),
             action,
         }
     }
@@ -1356,7 +1360,7 @@ impl<Action> DocumentCommandBinding<Action> {
     }
 
     pub fn matches_command(&self, command: &str) -> bool {
-        self.command == command.trim()
+        self.command.trim() == command.trim()
     }
 
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
@@ -1364,7 +1368,7 @@ impl<Action> DocumentCommandBinding<Action> {
     }
 
     fn matches(&self, command: DocumentCommandRef<'_>) -> bool {
-        self.command == command.command.trim()
+        self.matches_command(command.command)
             && self
                 .event
                 .is_none_or(|event| event.matches_document_event(&command.event))
@@ -2035,10 +2039,9 @@ impl<Action> DocumentCommandRegistry<Action> {
     }
 
     pub fn action_for(&self, command: &str) -> Option<&Action> {
-        let command = command.trim();
         self.bindings
             .iter()
-            .find(|binding| binding.event.is_none() && binding.command == command)
+            .find(|binding| binding.event.is_none() && binding.matches_command(command))
             .map(|binding| &binding.action)
     }
 
@@ -2749,10 +2752,9 @@ impl<Action> DocumentCommandRegistry<Action> {
         &self,
         command: &str,
     ) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
-        let command = command.trim().to_owned();
         self.bindings
             .iter()
-            .filter(move |binding| binding.command == command)
+            .filter(move |binding| binding.matches_command(command))
     }
 
     pub fn first_binding_for(&self, command: &str) -> Option<&DocumentCommandBinding<Action>> {
@@ -2788,10 +2790,9 @@ impl<Action> DocumentCommandRegistry<Action> {
         command: &str,
         intent: ElementBehaviorEvent,
     ) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
-        let command = command.trim().to_owned();
-        self.bindings
-            .iter()
-            .filter(move |binding| binding.command == command && binding.event == Some(intent))
+        self.bindings.iter().filter(move |binding| {
+            binding.matches_command(command) && binding.event == Some(intent)
+        })
     }
 
     pub fn first_binding_for_command_intent(
@@ -3131,7 +3132,7 @@ impl<Action> DocumentCommandActionRef<'_, Action> {
 
     /// Returns true when this action was mapped from the supplied authored command name.
     pub fn command_is(&self, command: &str) -> bool {
-        self.command == command.trim()
+        self.command.trim() == command.trim()
     }
 
     /// Returns the typed app action mapped from this command.
@@ -3223,7 +3224,7 @@ impl<Action> DocumentCommandAction<Action> {
         Self {
             target: target.into(),
             event,
-            command: command.into(),
+            command: normalize_command_name(command),
             action,
         }
     }
@@ -3250,7 +3251,7 @@ impl<Action> DocumentCommandAction<Action> {
 
     /// Returns true when this action was mapped from the supplied authored command name.
     pub fn command_is(&self, command: &str) -> bool {
-        self.command == command.trim()
+        self.command.trim() == command.trim()
     }
 
     /// Returns the typed app action mapped from this command.
