@@ -3,6 +3,29 @@ use crate::geometry::{ClipRect, Point, Rect};
 use crate::layout::hit_path;
 use crate::state::ResolvedElement;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentQueryError {
+    id: String,
+}
+
+impl DocumentQueryError {
+    pub fn missing(id: impl Into<String>) -> Self {
+        Self { id: id.into() }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}
+
+impl std::fmt::Display for DocumentQueryError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "document element '{}' was not found", self.id)
+    }
+}
+
+impl std::error::Error for DocumentQueryError {}
+
 #[derive(Clone, Copy, Debug)]
 pub struct DocumentSnapshot<'a> {
     root: &'a ResolvedElement,
@@ -19,6 +42,10 @@ impl<'a> DocumentSnapshot<'a> {
 
     pub fn find(&self, id: &str) -> Option<ElementSnapshot<'a>> {
         find_element(self.root, id).map(|element| ElementSnapshot { element })
+    }
+
+    pub fn require(&self, id: &str) -> Result<ElementSnapshot<'a>, DocumentQueryError> {
+        self.find(id).ok_or_else(|| DocumentQueryError::missing(id))
     }
 
     pub fn contains(&self, id: &str) -> bool {
@@ -54,12 +81,51 @@ impl<'a> DocumentSnapshot<'a> {
         elements
     }
 
+    pub fn contains_class(&self, class: impl Into<ClassName>) -> bool {
+        let class = class.into();
+        find_matching_element(self.root, &mut |element| {
+            element
+                .classes
+                .iter()
+                .any(|element_class| element_class == &class)
+        })
+        .is_some()
+    }
+
+    pub fn first_with_class(&self, class: impl Into<ClassName>) -> Option<ElementSnapshot<'a>> {
+        let class = class.into();
+        find_matching_element(self.root, &mut |element| {
+            element
+                .classes
+                .iter()
+                .any(|element_class| element_class == &class)
+        })
+        .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_with_class(&self, class: impl Into<ClassName>) -> usize {
+        self.elements_with_class(class).len()
+    }
+
     pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
         let mut elements = Vec::new();
         collect_elements(self.root, &mut elements, &mut |element| {
             element.element == target
         });
         elements
+    }
+
+    pub fn contains_element(&self, target: Element) -> bool {
+        find_matching_element(self.root, &mut |element| element.element == target).is_some()
+    }
+
+    pub fn first_by_element(&self, target: Element) -> Option<ElementSnapshot<'a>> {
+        find_matching_element(self.root, &mut |element| element.element == target)
+            .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_by_element(&self, target: Element) -> usize {
+        self.elements_by_element(target).len()
     }
 }
 
@@ -75,6 +141,10 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn element(&self) -> Element {
         self.element.element
+    }
+
+    pub fn is_element(&self, element: Element) -> bool {
+        self.element() == element
     }
 
     pub fn classes(&self) -> &[ClassName] {
@@ -122,6 +192,10 @@ impl<'a> ElementSnapshot<'a> {
             .classes
             .iter()
             .any(|element_class| element_class.as_str() == class)
+    }
+
+    pub fn id_is(&self, id: &str) -> bool {
+        self.id().as_str() == id
     }
 
     pub fn has_all_classes<'b>(&self, classes: impl IntoIterator<Item = &'b str>) -> bool {
@@ -211,6 +285,19 @@ fn find_element<'a>(element: &'a ResolvedElement, id: &str) -> Option<&'a Resolv
         .children
         .iter()
         .find_map(|child| find_element(child, id))
+}
+
+fn find_matching_element<'a>(
+    element: &'a ResolvedElement,
+    predicate: &mut impl FnMut(&ResolvedElement) -> bool,
+) -> Option<&'a ResolvedElement> {
+    if predicate(element) {
+        return Some(element);
+    }
+    element
+        .children
+        .iter()
+        .find_map(|child| find_matching_element(child, predicate))
 }
 
 fn prefixed_attribute_name(prefix: &str, name: &str) -> String {

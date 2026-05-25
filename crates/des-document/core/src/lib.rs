@@ -104,7 +104,7 @@ pub use geometry::{
 pub use projection::{
     DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport, ElementProjection,
 };
-pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
+pub use query::{DocumentQueryError, DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentCommand, DocumentCommandActionRef, DocumentCommandBinding,
     DocumentCommandDispatchReport, DocumentCommandIter, DocumentCommandRef,
@@ -151,19 +151,19 @@ pub mod prelude {
         DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
         DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics,
         DocumentOutput, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
-        DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView, DocumentViewBuilder,
-        DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook,
-        ElementBuilder, ElementId, ElementProjection, ElementSnapshot, ElementSpec, ElementState,
-        ElementStateSelector, FallbackTextMeasurer, FlexDirection, FlexWrap, FloatingBoundary,
-        FloatingPlacement, Glyph, GridAutoFlow, GridPlacement, GridTemplateArea,
-        GridTemplateComponent, GridTrack, HitResult, InlineTextStyle, Insets, JustifyContent,
-        KeyInput, KeyModifiers, Length, NthChildFormula, Overflow, Point, PointerInput, Position,
-        PositionInsets, Rect, ResolvedElement, ResolvedFloating, ScrollAxis, ScrollChrome, Shadow,
-        Size, Style, StyleCondition, StyleRule, StyleSelector, StyleSheet, TableCellSpec,
-        TableColumnId, TableColumnSpec, TableSpec, TableTrackSize, TextAlign, TextContent,
-        TextDecoration, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
-        TextOverflow, TextRun, TextSelectionGranularity, TextTransform, TextVerticalAlign,
-        TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, VisualElementClone,
-        WhiteSpace,
+        DocumentQueryError, DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView,
+        DocumentViewBuilder, DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent,
+        ElementBehaviorHook, ElementBuilder, ElementId, ElementProjection, ElementSnapshot,
+        ElementSpec, ElementState, ElementStateSelector, FallbackTextMeasurer, FlexDirection,
+        FlexWrap, FloatingBoundary, FloatingPlacement, Glyph, GridAutoFlow, GridPlacement,
+        GridTemplateArea, GridTemplateComponent, GridTrack, HitResult, InlineTextStyle, Insets,
+        JustifyContent, KeyInput, KeyModifiers, Length, NthChildFormula, Overflow, Point,
+        PointerInput, Position, PositionInsets, Rect, ResolvedElement, ResolvedFloating,
+        ScrollAxis, ScrollChrome, Shadow, Size, Style, StyleCondition, StyleRule, StyleSelector,
+        StyleSheet, TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize,
+        TextAlign, TextContent, TextDecoration, TextLayoutRequest, TextLayoutResult,
+        TextLayoutStyle, TextMeasurer, TextOverflow, TextRun, TextSelectionGranularity,
+        TextTransform, TextVerticalAlign, TextWrapMode, Transition, ViewportQuery,
+        VisualCloneOptions, VisualElementClone, WhiteSpace,
     };
 }

@@ -1195,12 +1195,19 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
 
     let output = engine.update(&mut document, &stylesheet);
     let snapshot = output.snapshot();
-    let drop_target = snapshot.find("drop-target").unwrap();
+    let drop_target = snapshot.require("drop-target").unwrap();
 
     assert_eq!(snapshot.root().id().as_str(), "root");
     assert!(snapshot.contains("drop-target"));
     assert!(!snapshot.contains("missing"));
+    assert_eq!(snapshot.require("missing").unwrap_err().id(), "missing");
+    assert_eq!(
+        snapshot.require("missing").unwrap_err().to_string(),
+        "document element 'missing' was not found"
+    );
     assert_eq!(drop_target.element(), Element::Div);
+    assert!(drop_target.id_is("drop-target"));
+    assert!(drop_target.is_element(Element::Div));
     assert!(drop_target.has_class("drop-zone"));
     assert!(drop_target.has_all_classes(["drop-zone", "accepts-files"]));
     assert!(drop_target.has_any_class(["missing", "accepts-files"]));
@@ -1212,11 +1219,25 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert!(drop_target.interactive());
     assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
     assert_eq!(
-        snapshot.find("drop-label").unwrap().text(),
+        snapshot.require("drop-label").unwrap().text(),
         Some("Drop here".to_string())
     );
     assert_eq!(snapshot.elements_with_class("drop-zone").len(), 1);
+    assert!(snapshot.contains_class("drop-zone"));
+    assert!(
+        snapshot
+            .first_with_class("drop-zone")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert_eq!(snapshot.count_with_class("drop-zone"), 1);
     assert_eq!(snapshot.elements_by_element(Element::Div).len(), 2);
+    assert!(snapshot.contains_element(Element::Div));
+    assert!(
+        snapshot
+            .first_by_element(Element::Div)
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert_eq!(snapshot.count_by_element(Element::Div), 2);
 }
 
 #[test]
