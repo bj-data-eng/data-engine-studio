@@ -1503,6 +1503,14 @@ impl ElementBuilder<'_> {
         self
     }
 
+    pub fn command(self, command: impl Into<String>) -> Self {
+        self.on_click(command)
+    }
+
+    pub fn command_on(self, event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
+        self.on(event, command)
+    }
+
     pub fn on_events<I, C>(mut self, events: I) -> Self
     where
         I: IntoIterator<Item = (ElementBehaviorEvent, C)>,

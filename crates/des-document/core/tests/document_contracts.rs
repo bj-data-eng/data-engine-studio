@@ -133,6 +133,38 @@ fn document_output_exposes_interaction_query_helpers() {
 }
 
 #[test]
+fn document_builder_expresses_default_and_event_scoped_commands() {
+    let stylesheet = StyleSheet::new()
+        .id("run", Style::default().size(96.0, 32.0))
+        .id("search", Style::default().size(160.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").command("run-query").text("Run");
+        ui.input("search")
+            .focused(true)
+            .command_on(ElementBehaviorEvent::KeyDown, "submit-search")
+            .empty();
+    });
+
+    let click_output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
+    let run = click_output.snapshot().find("run").unwrap();
+    let search = key_output.snapshot().find("search").unwrap();
+
+    assert!(run.interactive());
+    assert_eq!(run.behavior_hooks()[0].event, "click");
+    assert_eq!(run.behavior_hooks()[0].command, "run-query");
+    assert!(click_output.has_command_intent("run", ElementBehaviorEvent::Click, "run-query"));
+    assert!(search.interactive());
+    assert_eq!(search.behavior_hooks()[0].event, "keydown");
+    assert_eq!(search.behavior_hooks()[0].command, "submit-search");
+    assert!(key_output.has_command_intent(
+        "search",
+        ElementBehaviorEvent::KeyDown,
+        "submit-search"
+    ));
+}
+
+#[test]
 fn document_command_registry_maps_hook_commands_to_typed_actions() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum AppAction {
