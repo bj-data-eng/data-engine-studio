@@ -697,6 +697,86 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
 }
 
 #[test]
+fn html_document_projects_state_without_css_plumbing() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+    }
+
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <main id="app">
+          <button id="run" on:click="project.run">Run</button>
+        </main>
+        "#,
+    )
+    .expect("HTML should parse");
+    let projection = DocumentProjection::new()
+        .set_text("run", "Ready")
+        .add_class("run", "is-ready")
+        .set_data("app", "state", "ready");
+
+    let (report, output) = html
+        .update_with_projection(Size::new(320.0, 180.0), &projection)
+        .expect("HTML document should project retained state before update");
+    let run = output.snapshot().find("run").unwrap();
+
+    assert_eq!(report.operations, 3);
+    assert_eq!(report.changed, 3);
+    assert_eq!(
+        output.snapshot().find("app").unwrap().data("state"),
+        Some("ready")
+    );
+    assert_eq!(run.text(), Some("Ready".to_owned()));
+    assert!(run.has_class("is-ready"));
+
+    let (mapped_report, mapped_frame) = html
+        .update_with_input_projected_with_and_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection
+                    .element("run")
+                    .text("Running")
+                    .add_class("is-ready");
+            },
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML document should project state and map actions without CSS");
+    let mapped_run = mapped_frame.output().snapshot().find("run").unwrap();
+
+    assert_eq!(mapped_report.operations, 2);
+    assert_eq!(mapped_report.changed, 2);
+    assert_eq!(mapped_run.text(), Some("Running".to_owned()));
+    assert!(mapped_frame.contains_clicked_action(&HtmlAction::Run));
+
+    let (surface_report, mut surface) = html
+        .to_action_surface_projected_with_actions(
+            Size::new(320.0, 180.0),
+            |projection| {
+                projection.element("run").text("Ready");
+            },
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML document should create projected mapped action surfaces without CSS");
+    let surface_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+
+    assert_eq!(surface_report.operations, 1);
+    assert_eq!(surface_report.changed, 1);
+    assert!(surface_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(
+        surface_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .text(),
+        Some("Ready".to_owned())
+    );
+}
+
+#[test]
 fn html_document_can_create_action_surfaces_without_css_plumbing() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {
@@ -1405,6 +1485,38 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             registry.clone(),
         )
         .expect("named document should build a styled action surface through the set front door");
+    let (project_report, projected_output) = set
+        .update_projected_with("inline", Size::new(240.0, 160.0), |projection| {
+            projection
+                .element("inline")
+                .text("Projected")
+                .add_class("is-ready");
+        })
+        .expect("named document should project state through the set front door");
+    let projected_inline = projected_output.snapshot().find("inline").unwrap();
+    let (mapped_project_report, mapped_project_frame) = set
+        .update_with_input_projected_with_and_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("inline").text("Mapped");
+            },
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should project state and map actions through the set front door");
+    let (projected_surface_report, mut projected_surface) = set
+        .to_action_surface_projected_with_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            |projection| {
+                projection.element("inline").text("Surface");
+            },
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should build projected mapped action surfaces");
+    let projected_surface_frame = projected_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
 
     assert!(input_output.was_clicked("inline"));
     assert!(action_frame.contains_action(&SetAction::Run));
@@ -1417,6 +1529,34 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert!(surface_frame.contains_action(&SetAction::Run));
     assert!(mapped_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(styled_surface.commands().bindings().len(), 2);
+    assert_eq!(project_report.operations, 2);
+    assert_eq!(project_report.changed, 2);
+    assert_eq!(projected_inline.text(), Some("Projected".to_owned()));
+    assert!(projected_inline.has_class("is-ready"));
+    assert_eq!(mapped_project_report.operations, 1);
+    assert_eq!(mapped_project_report.changed, 1);
+    assert!(mapped_project_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        mapped_project_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .text(),
+        Some("Mapped".to_owned())
+    );
+    assert_eq!(projected_surface_report.operations, 1);
+    assert_eq!(projected_surface_report.changed, 1);
+    assert!(projected_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        projected_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .text(),
+        Some("Surface".to_owned())
+    );
 
     fs::write(
         path,
