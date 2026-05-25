@@ -38,7 +38,7 @@ impl DocumentView {
     pub fn build_widget(
         viewport: Size,
         mut stylesheet: StyleSheet,
-        widget: &impl DocumentWidget,
+        widget: &(impl DocumentWidget + ?Sized),
     ) -> Self {
         widget.push_styles(&mut stylesheet);
         Self::new(
@@ -122,8 +122,18 @@ impl DocumentView {
     }
 
     /// Adds styles declared by a reusable document widget.
-    pub fn push_widget_styles(&mut self, widget: &impl DocumentWidget) {
+    pub fn push_widget_styles(&mut self, widget: &(impl DocumentWidget + ?Sized)) {
         widget.push_styles(&mut self.stylesheet);
+    }
+
+    /// Adds styles declared by a collection of reusable document widgets.
+    pub fn push_widget_styles_many<'a, W>(&mut self, widgets: impl IntoIterator<Item = &'a W>)
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        for widget in widgets {
+            self.push_widget_styles(widget);
+        }
     }
 
     /// Returns the retained document engine.
@@ -213,15 +223,43 @@ impl DocumentViewBuilder {
         self.css_forgiving(css)
     }
 
-    pub fn widget_styles(mut self, widget: &impl DocumentWidget) -> Self {
+    pub fn widget_styles(mut self, widget: &(impl DocumentWidget + ?Sized)) -> Self {
         widget.push_styles(&mut self.stylesheet);
         self
     }
 
-    pub fn widget(mut self, widget: &impl DocumentWidget) -> DocumentView {
+    pub fn widget_styles_many<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> Self
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        for widget in widgets {
+            widget.push_styles(&mut self.stylesheet);
+        }
+        self
+    }
+
+    pub fn widget(mut self, widget: &(impl DocumentWidget + ?Sized)) -> DocumentView {
         widget.push_styles(&mut self.stylesheet);
         DocumentView::new(
             Document::build(self.viewport, |ui| ui.widget(widget)),
+            self.stylesheet,
+        )
+    }
+
+    pub fn widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> DocumentView
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        let widgets = widgets.into_iter().collect::<Vec<_>>();
+        for widget in &widgets {
+            widget.push_styles(&mut self.stylesheet);
+        }
+        DocumentView::new(
+            Document::build(self.viewport, |ui| {
+                for widget in widgets {
+                    ui.widget(widget);
+                }
+            }),
             self.stylesheet,
         )
     }

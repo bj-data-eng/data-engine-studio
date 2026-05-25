@@ -1231,7 +1231,7 @@ impl DocumentBuilder {
         }
     }
 
-    pub fn widget(&mut self, widget: &impl DocumentWidget) {
+    pub fn widget(&mut self, widget: &(impl DocumentWidget + ?Sized)) {
         widget.render(self);
     }
 

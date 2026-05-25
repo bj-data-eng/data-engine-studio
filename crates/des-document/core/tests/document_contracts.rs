@@ -681,6 +681,7 @@ fn document_view_compose_collects_css_and_widget_styles() {
 #[test]
 fn document_view_can_mount_a_widget_with_its_styles() {
     struct BadgeWidget;
+    struct MeterWidget;
 
     impl DocumentWidget for BadgeWidget {
         fn render(&self, ui: &mut DocumentBuilder) {
@@ -698,16 +699,50 @@ fn document_view_can_mount_a_widget_with_its_styles() {
         }
     }
 
+    impl DocumentWidget for MeterWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div("meter").class("meter").empty();
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_rule(
+                StyleSelector::class("meter"),
+                Style::default()
+                    .width(Length::Px(120.0))
+                    .height(Length::Px(8.0))
+                    .background(Color::rgb(205, 239, 221)),
+            );
+        }
+    }
+
     let widget = BadgeWidget;
     let mut direct =
         DocumentView::build_widget(Size::new(320.0, 180.0), StyleSheet::new(), &widget);
     let mut composed = DocumentView::compose(Size::new(320.0, 180.0)).widget(&widget);
+    let badge: Box<dyn DocumentWidget> = Box::new(BadgeWidget);
+    let meter: Box<dyn DocumentWidget> = Box::new(MeterWidget);
+    let widget_refs = [&*badge, &*meter];
+    let mut boxed = DocumentView::compose(Size::new(320.0, 180.0)).widgets(widget_refs);
+    let mut pushed = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.widget(&*badge);
+        ui.widget(&*meter);
+    });
+    pushed.push_widget_styles_many(widget_refs);
 
     for output in [direct.update(), composed.update()] {
         let badge = output.snapshot().find("badge").unwrap();
         assert_eq!(badge.text(), Some("Ready".to_owned()));
         assert_eq!(badge.rect().size, Size::new(88.0, 24.0));
         assert_eq!(badge.style().background, Some(Color::rgb(220, 238, 255)));
+    }
+
+    for output in [boxed.update(), pushed.update()] {
+        let badge = output.snapshot().find("badge").unwrap();
+        let meter = output.snapshot().find("meter").unwrap();
+
+        assert_eq!(badge.rect().size, Size::new(88.0, 24.0));
+        assert_eq!(meter.rect().size, Size::new(120.0, 8.0));
+        assert_eq!(meter.style().background, Some(Color::rgb(205, 239, 221)));
     }
 }
 
