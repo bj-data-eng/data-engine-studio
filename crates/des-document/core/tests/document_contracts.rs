@@ -304,6 +304,25 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
             .collect::<Vec<_>>(),
         vec!["run-query"]
     );
+    assert_eq!(output.first_command().unwrap().command(), "run-query");
+    assert_eq!(
+        output.first_command_for("run").unwrap().target().as_str(),
+        "run"
+    );
+    assert_eq!(
+        output
+            .first_command_of_kind(DocumentEventKind::Clicked)
+            .unwrap()
+            .command(),
+        "run-query"
+    );
+    assert_eq!(
+        output
+            .first_command_for_intent(ElementBehaviorEvent::Click)
+            .unwrap()
+            .command(),
+        "run-query"
+    );
     assert!(output.has_command("run", "run-query"));
     assert!(output.has_command_kind("run", DocumentEventKind::Clicked, "run-query"));
     assert!(!output.has_command("cancel", "cancel-query"));

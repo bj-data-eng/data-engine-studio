@@ -311,12 +311,20 @@ impl DocumentOutput {
         }
     }
 
+    pub fn first_command(&self) -> Option<DocumentCommandRef<'_>> {
+        self.command_events().next()
+    }
+
     pub fn commands_of_kind(
         &self,
         kind: DocumentEventKind,
     ) -> impl Iterator<Item = DocumentCommandRef<'_>> {
         self.command_events()
             .filter(move |command| command.event == kind)
+    }
+
+    pub fn first_command_of_kind(&self, kind: DocumentEventKind) -> Option<DocumentCommandRef<'_>> {
+        self.commands_of_kind(kind).next()
     }
 
     pub fn commands_for_intent(
@@ -327,12 +335,23 @@ impl DocumentOutput {
             .filter(move |command| intent.matches_document_event(&command.event))
     }
 
+    pub fn first_command_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<DocumentCommandRef<'_>> {
+        self.commands_for_intent(intent).next()
+    }
+
     pub fn commands_for<'a>(
         &'a self,
         target: &'a str,
     ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
         self.command_events()
             .filter(move |command| command.target.as_str() == target)
+    }
+
+    pub fn first_command_for<'a>(&'a self, target: &'a str) -> Option<DocumentCommandRef<'a>> {
+        self.commands_for(target).next()
     }
 
     pub fn has_command(&self, target: &str, command: &str) -> bool {
