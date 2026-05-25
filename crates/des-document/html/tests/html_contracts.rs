@@ -1,6 +1,5 @@
 use des_document::{
-    DocumentCommandRegistry, DocumentEngine, DocumentInput, Element, ElementId, Point,
-    PointerInput, Size,
+    DocumentCommandRegistry, DocumentEngine, DocumentInput, Element, ElementId, Point, Size,
 };
 use des_html::{HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
@@ -288,16 +287,7 @@ fn html_stylesheet_can_create_ready_to_update_document_view() {
         .to_view(Size::new(320.0, 180.0))
         .expect("HTML bundle should create a document view");
 
-    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
-        position: Point::new(8.0, 8.0),
-        primary_delta: Point::ZERO,
-        primary_down: true,
-        primary_pressed: false,
-        primary_clicked: true,
-        primary_click_count: 1,
-        secondary_clicked: false,
-        time_seconds: 0.0,
-    }));
+    let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let run = output.snapshot().find("run").unwrap();
 
     assert_eq!(run.rect().size.width, 96.0);
@@ -316,16 +306,7 @@ fn html_document_can_create_ready_to_update_document_view_without_css() {
         .to_view(Size::new(320.0, 180.0))
         .expect("HTML document should create a document view");
 
-    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
-        position: Point::new(0.0, 0.0),
-        primary_delta: Point::ZERO,
-        primary_down: true,
-        primary_pressed: false,
-        primary_clicked: true,
-        primary_click_count: 1,
-        secondary_clicked: false,
-        time_seconds: 0.0,
-    }));
+    let output = view.update_with_input(DocumentInput::primary_click(Point::new(0.0, 0.0)));
     let app = output.snapshot().find("app").unwrap();
     let run = output.snapshot().find("run").unwrap();
 
@@ -351,16 +332,7 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
     let mut view = bundle
         .to_view(Size::new(320.0, 180.0))
         .expect("HTML bundle should create a document view");
-    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
-        position: Point::new(8.0, 8.0),
-        primary_delta: Point::ZERO,
-        primary_down: true,
-        primary_pressed: false,
-        primary_clicked: true,
-        primary_click_count: 1,
-        secondary_clicked: false,
-        time_seconds: 0.0,
-    }));
+    let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let registry = DocumentCommandRegistry::new().bind("project.run", HtmlAction::Run);
     let mut actions = Vec::new();
     let report = registry.dispatch(&output, |command| {

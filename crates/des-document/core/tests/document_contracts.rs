@@ -361,6 +361,48 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
     assert_eq!(triple_click.primary_click_count, 3);
     assert!(click.primary_clicked);
     assert!(context_click.secondary_clicked);
+
+    assert_eq!(
+        DocumentInput::pointer_at(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .position,
+        Point::new(1.0, 2.0)
+    );
+    assert_eq!(
+        DocumentInput::pointer_at_time(Point::new(1.0, 2.0), 3.5)
+            .pointer
+            .unwrap()
+            .time_seconds,
+        3.5
+    );
+    assert_eq!(
+        DocumentInput::primary_click(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .primary_click_count,
+        1
+    );
+    assert_eq!(
+        DocumentInput::primary_double_click(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .primary_click_count,
+        2
+    );
+    assert_eq!(
+        DocumentInput::primary_triple_click(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .primary_click_count,
+        3
+    );
+    assert!(
+        DocumentInput::secondary_click(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .secondary_clicked
+    );
 }
 
 #[test]
@@ -634,11 +676,7 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         .with_css(".primary { background: rgb(220, 238, 255); }")
         .expect("CSS should compose from the prelude")
         .widget(&widget);
-    let output = view.update_with_input(DocumentInput::pointer(
-        PointerInput::at(Point::new(8.0, 8.0))
-            .primary_down()
-            .primary_clicked(),
-    ));
+    let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
     let actions = registry
         .command_actions_of_kind(&output, DocumentEventKind::Clicked)

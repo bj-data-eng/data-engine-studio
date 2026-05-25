@@ -55,9 +55,7 @@
 //! })
 //! .expect("projection applies to retained document state");
 //!
-//! let output = view.update_with_input(DocumentInput::pointer(
-//!     PointerInput::at(Point::new(8.0, 8.0)).primary_clicked(),
-//! ));
+//! let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
 //!
 //! let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
 //! let actions = registry

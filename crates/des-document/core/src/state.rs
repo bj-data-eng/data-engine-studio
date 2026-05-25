@@ -531,6 +531,30 @@ impl DocumentInput {
         }
     }
 
+    pub fn pointer_at(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position))
+    }
+
+    pub fn pointer_at_time(position: Point, time_seconds: f64) -> Self {
+        Self::pointer(PointerInput::new(position, time_seconds))
+    }
+
+    pub fn primary_click(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position).primary_clicked())
+    }
+
+    pub fn primary_double_click(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position).primary_double_clicked())
+    }
+
+    pub fn primary_triple_click(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position).primary_triple_clicked())
+    }
+
+    pub fn secondary_click(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position).secondary_clicked())
+    }
+
     pub fn scroll(delta: Point) -> Self {
         Self {
             scroll_delta: delta,

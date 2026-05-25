@@ -279,7 +279,7 @@ mod tests {
     use super::*;
     use des_document::{
         Document, DocumentCommandRegistry, DocumentEngine, DocumentInput, DocumentView,
-        FloatingPlacement, PointerInput, Size, StyleSheet,
+        FloatingPlacement, Size, StyleSheet,
     };
 
     #[test]
@@ -347,16 +347,7 @@ mod tests {
         let mut view = DocumentView::build(Size::new(240.0, 140.0), StyleSheet::new(), |ui| {
             ui.widget(&menu);
         });
-        let output = view.update_with_input(DocumentInput::pointer(PointerInput {
-            position: Point::new(2.0, 2.0),
-            primary_delta: Point::ZERO,
-            primary_down: true,
-            primary_pressed: false,
-            primary_clicked: true,
-            primary_click_count: 1,
-            secondary_clicked: false,
-            time_seconds: 0.0,
-        }));
+        let output = view.update_with_input(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let registry = DocumentCommandRegistry::new().bind("copy-selection", MenuAction::Copy);
         let mut actions = Vec::new();
         let report = registry.dispatch(&output, |command| {
