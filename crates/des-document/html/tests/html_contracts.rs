@@ -99,6 +99,62 @@ fn html_document_parser_handles_void_elements_entities_and_comments() {
 }
 
 #[test]
+fn html_document_exposes_parsed_tree_queries() {
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <main id="app" class="shell">
+          <section id="primary" class="panel selected"><button id="run" class="control">Run</button></section>
+          <section id="secondary" class="panel"><button id="stop" class="control danger">Stop</button></section>
+        </main>
+        "#,
+    )
+    .expect("HTML should parse");
+
+    let app = html.find_by_id("app").expect("app id should be queryable");
+    let primary = app
+        .find_by_id("primary")
+        .expect("subtree ids should be queryable");
+    let controls = html.nodes_with_class("control");
+    let sections = html.nodes_by_tag("section");
+
+    assert!(app.has_class("shell"));
+    assert!(primary.has_class("selected"));
+    assert_eq!(
+        html.first_by_tag("button").unwrap().id.as_deref(),
+        Some("run")
+    );
+    assert_eq!(
+        app.first_by_tag("button").unwrap().id.as_deref(),
+        Some("run")
+    );
+    assert_eq!(
+        app.nodes_by_tag("button")
+            .into_iter()
+            .map(|node| node.id.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("run"), Some("stop")]
+    );
+    assert_eq!(
+        sections
+            .into_iter()
+            .map(|node| node.id.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("primary"), Some("secondary")]
+    );
+    assert_eq!(
+        controls
+            .into_iter()
+            .map(|node| node.id.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("run"), Some("stop")]
+    );
+    assert_eq!(
+        app.nodes_with_class("danger")[0].id.as_deref(),
+        Some("stop")
+    );
+}
+
+#[test]
 fn html_document_preserves_braces_as_text_not_logic() {
     let html = HtmlDocument::parse_fragment("<section>{if loading}<p>{title}</p>{/if}</section>")
         .expect("curly-brace text should be valid HTML text");
@@ -837,10 +893,11 @@ fn html_file_hot_reloads_when_source_changes() {
     fs::write(path, "<section id=\"status\">Before</section>")
         .expect("html fixture should be writable");
     let mut file = HtmlFile::load(path).expect("html file should load");
-    assert!(file.document().children.iter().any(|node| {
-        node.find_by_id("status")
+    assert!(
+        file.document()
+            .find_by_id("status")
             .is_some_and(|node| node.text.as_deref() == Some("Before"))
-    }));
+    );
 
     std::thread::sleep(Duration::from_millis(5));
     fs::write(
@@ -855,12 +912,9 @@ fn html_file_hot_reloads_when_source_changes() {
 
     assert!(status.changed);
     assert!(
-        file.document()
-            .children
-            .iter()
-            .any(|node| node.find_by_id("status").is_some_and(|node| {
-                node.classes == ["changed"] && node.text.as_deref() == Some("After")
-            }))
+        file.document().find_by_id("status").is_some_and(
+            |node| node.classes == ["changed"] && node.text.as_deref() == Some("After")
+        )
     );
 }
 
@@ -888,10 +942,11 @@ fn html_file_hot_reload_detects_same_mtime_content_changes() {
         .expect("html file should hot reload");
 
     assert!(status.changed);
-    assert!(file.document().children.iter().any(|node| {
-        node.find_by_id("status")
+    assert!(
+        file.document()
+            .find_by_id("status")
             .is_some_and(|node| node.text.as_deref() == Some("After"))
-    }));
+    );
 }
 
 #[test]
@@ -920,9 +975,8 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert!(
         set.get("file")
             .expect("file document should exist")
-            .children
-            .iter()
-            .any(|node| node.find_by_id("file").is_some())
+            .find_by_id("file")
+            .is_some()
     );
     let output = set
         .update_with_stylesheet(
@@ -944,23 +998,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert!(
         set.get("file")
             .expect("file document should exist")
-            .children
-            .iter()
-            .any(|node| node
-                .find_by_id("file")
-                .is_some_and(|node| node.text.as_deref() == Some("After")))
+            .find_by_id("file")
+            .is_some_and(|node| node.text.as_deref() == Some("After"))
     );
-}
-
-trait HtmlNodeTestExt {
-    fn find_by_id(&self, id: &str) -> Option<&HtmlNode>;
-}
-
-impl HtmlNodeTestExt for HtmlNode {
-    fn find_by_id(&self, id: &str) -> Option<&HtmlNode> {
-        if self.id.as_deref() == Some(id) {
-            return Some(self);
-        }
-        self.children.iter().find_map(|child| child.find_by_id(id))
-    }
 }

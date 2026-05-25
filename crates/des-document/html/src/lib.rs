@@ -156,6 +156,36 @@ impl HtmlDocument {
         !self.is_clean()
     }
 
+    /// Finds the first parsed node with the supplied HTML id.
+    pub fn find_by_id(&self, id: &str) -> Option<&HtmlNode> {
+        self.children.iter().find_map(|child| child.find_by_id(id))
+    }
+
+    /// Finds the first parsed node with the supplied tag name.
+    pub fn first_by_tag(&self, tag: &str) -> Option<&HtmlNode> {
+        self.children
+            .iter()
+            .find_map(|child| child.first_by_tag(tag))
+    }
+
+    /// Returns parsed nodes with the supplied tag name in document order.
+    pub fn nodes_by_tag(&self, tag: &str) -> Vec<&HtmlNode> {
+        let mut nodes = Vec::new();
+        for child in &self.children {
+            child.collect_by_tag(tag, &mut nodes);
+        }
+        nodes
+    }
+
+    /// Returns parsed nodes with the supplied class in document order.
+    pub fn nodes_with_class(&self, class: &str) -> Vec<&HtmlNode> {
+        let mut nodes = Vec::new();
+        for child in &self.children {
+            child.collect_with_class(class, &mut nodes);
+        }
+        nodes
+    }
+
     /// Creates a retained document from this HTML tree.
     pub fn to_document(&self, viewport: Size) -> HtmlResult<Document> {
         Ok(Document::build(viewport, |document| {
@@ -667,6 +697,61 @@ impl HtmlNode {
     /// Returns true when this node represents parsed text.
     pub fn is_text(&self) -> bool {
         self.tag == "#text"
+    }
+
+    /// Returns true when this parsed element has the supplied class.
+    pub fn has_class(&self, class: &str) -> bool {
+        self.classes.iter().any(|candidate| candidate == class)
+    }
+
+    /// Finds the first node in this subtree with the supplied HTML id.
+    pub fn find_by_id(&self, id: &str) -> Option<&HtmlNode> {
+        if self.id.as_deref() == Some(id) {
+            return Some(self);
+        }
+        self.children.iter().find_map(|child| child.find_by_id(id))
+    }
+
+    /// Finds the first node in this subtree with the supplied tag name.
+    pub fn first_by_tag(&self, tag: &str) -> Option<&HtmlNode> {
+        if self.tag == tag {
+            return Some(self);
+        }
+        self.children
+            .iter()
+            .find_map(|child| child.first_by_tag(tag))
+    }
+
+    /// Returns nodes in this subtree with the supplied tag name in document order.
+    pub fn nodes_by_tag(&self, tag: &str) -> Vec<&HtmlNode> {
+        let mut nodes = Vec::new();
+        self.collect_by_tag(tag, &mut nodes);
+        nodes
+    }
+
+    /// Returns nodes in this subtree with the supplied class in document order.
+    pub fn nodes_with_class(&self, class: &str) -> Vec<&HtmlNode> {
+        let mut nodes = Vec::new();
+        self.collect_with_class(class, &mut nodes);
+        nodes
+    }
+
+    fn collect_by_tag<'a>(&'a self, tag: &str, nodes: &mut Vec<&'a HtmlNode>) {
+        if self.tag == tag {
+            nodes.push(self);
+        }
+        for child in &self.children {
+            child.collect_by_tag(tag, nodes);
+        }
+    }
+
+    fn collect_with_class<'a>(&'a self, class: &str, nodes: &mut Vec<&'a HtmlNode>) {
+        if self.has_class(class) {
+            nodes.push(self);
+        }
+        for child in &self.children {
+            child.collect_with_class(class, nodes);
+        }
     }
 
     fn write_to_document_builder(&self, builder: &mut DocumentBuilder, path: &[usize]) {
