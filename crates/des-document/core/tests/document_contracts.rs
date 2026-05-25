@@ -4,12 +4,12 @@ use des_document::{
     DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
     DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentProjectionOperationKind,
     DocumentProjectionReport, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
-    ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector, FlexWrap, Insets,
-    JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis,
-    Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
-    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
-    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    ElementBehaviorHook, ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector,
+    FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point,
+    PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
+    TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
+    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -96,16 +96,24 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert_eq!(commands[0].event, DocumentEventKind::Clicked);
     assert_eq!(commands[0].command, "run-query");
     assert_eq!(hooks.len(), 2);
-    assert!(hooks.iter().any(|hook| hook.command == "open-query-menu"));
+    assert!(hooks.iter().any(|hook| hook.has_command("open-query-menu")));
+    assert_eq!(hooks[0].event(), "click");
+    assert_eq!(hooks[0].command(), "run-query");
+    assert_eq!(hooks[0].intent(), Some(ElementBehaviorEvent::Click));
+    assert!(hooks[0].is_click());
+    assert!(!hooks[0].is_key_down());
+    assert!(hooks[1].matches_intent(ElementBehaviorEvent::ContextMenu));
+    assert!(hooks[1].is_context_menu());
+    assert!(!hooks[1].is_any_drag());
     assert_eq!(
         run.behavior_hooks_for(ElementBehaviorEvent::Click)
-            .map(|hook| hook.command.as_str())
+            .map(ElementBehaviorHook::command)
             .collect::<Vec<_>>(),
         vec!["run-query"]
     );
     assert_eq!(
         run.first_behavior_hook_for(ElementBehaviorEvent::ContextMenu)
-            .map(|hook| hook.command.as_str()),
+            .map(ElementBehaviorHook::command),
         Some("open-query-menu")
     );
     assert!(run.has_behavior_hook(ElementBehaviorEvent::Click, "run-query"));

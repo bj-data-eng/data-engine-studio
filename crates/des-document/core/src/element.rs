@@ -645,9 +645,81 @@ impl ElementBehaviorHook {
         Self::new(event.as_str(), command)
     }
 
-    pub fn matches_document_event(&self, event: &DocumentEventKind) -> bool {
+    pub fn event(&self) -> &str {
+        &self.event
+    }
+
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+
+    pub fn has_command(&self, command: &str) -> bool {
+        self.command == command
+    }
+
+    pub fn intent(&self) -> Option<ElementBehaviorEvent> {
         ElementBehaviorEvent::from_name(&self.event)
+    }
+
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        self.intent() == Some(intent)
+    }
+
+    pub fn matches_document_event(&self, event: &DocumentEventKind) -> bool {
+        self.intent()
             .is_some_and(|hook_event| hook_event.matches_document_event(event))
+    }
+
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    pub fn is_pointer_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerDown)
+    }
+
+    pub fn is_pointer_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerUp)
+    }
+
+    pub fn is_drag_start(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+    }
+
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Drag)
+    }
+
+    pub fn is_drag_end(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragEnd)
+    }
+
+    pub fn is_any_drag(&self) -> bool {
+        self.is_drag_start() || self.is_drag() || self.is_drag_end()
+    }
+
+    pub fn is_scroll(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
     }
 }
 

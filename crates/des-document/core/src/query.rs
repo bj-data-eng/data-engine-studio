@@ -404,7 +404,7 @@ impl<'a> ElementSnapshot<'a> {
         self.element
             .behavior_hooks
             .iter()
-            .filter(move |hook| crate::ElementBehaviorEvent::from_name(&hook.event) == Some(event))
+            .filter(move |hook| hook.matches_intent(event))
     }
 
     pub fn first_behavior_hook_for(
@@ -416,14 +416,14 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn has_behavior_hook(&self, event: crate::ElementBehaviorEvent, command: &str) -> bool {
         self.behavior_hooks_for(event)
-            .any(|hook| hook.command == command)
+            .any(|hook| hook.has_command(command))
     }
 
     pub fn has_command_hook(&self, command: &str) -> bool {
         self.element
             .behavior_hooks
             .iter()
-            .any(|hook| hook.command == command)
+            .any(|hook| hook.has_command(command))
     }
 
     pub fn has_class(&self, class: &str) -> bool {
