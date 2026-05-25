@@ -184,4 +184,5 @@ Prefer the Rust dev launcher and screenshot harness for UI iteration. Rebuild th
 - Keep `.venv/`, `target/`, `build/`, `dist/`, `*.egg-info/`, secrets, host identity, and runtime residue out of git.
 - Check status before/after edits: `git status --short --branch`.
 - Before commits, run focused checks; run `cargo test` when Rust changed; run Python smoke when PyO3/Python changed.
+- Commit at logical checkpoints so the trail stays clear and auditable; avoid letting unrelated or oversized diffs accumulate.
 - Commit messages should be short and concrete.
