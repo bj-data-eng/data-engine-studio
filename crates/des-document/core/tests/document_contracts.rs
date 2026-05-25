@@ -1,13 +1,13 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentBuilder, DocumentCommandAction,
     DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
-    DocumentKey, DocumentProjection, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
-    ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput,
-    KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    VisualCloneOptions, WhiteSpace,
+    DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentView, DocumentWidget,
+    Element, ElementBehaviorEvent, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
+    JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis,
+    Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
+    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1017,6 +1017,67 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
     assert!(reset_status.has_class("is-stale"));
     assert_eq!(reset_status.data("busy"), Some("true"));
     assert_eq!(reset_status.aria("busy"), None);
+}
+
+#[test]
+fn document_projection_composes_subprojections_for_app_state() {
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.div("summary").data("state", "empty").children(|ui| {
+            ui.text("summary-count", "0 rows");
+        });
+        ui.button("refresh").text("Refresh");
+    });
+
+    let summary_projection = DocumentProjection::new()
+        .set_text("summary-count", "42 rows")
+        .set_data("summary", "state", "ready");
+    let controls_projection = [
+        DocumentProjectionOperation::SetDisabled {
+            id: ElementId::new("refresh"),
+            disabled: true,
+        },
+        DocumentProjectionOperation::SetClass {
+            id: ElementId::new("refresh"),
+            class: "is-loading".into(),
+            present: true,
+        },
+    ]
+    .into_iter()
+    .collect::<DocumentProjection>();
+    let mut projection = DocumentProjection::new()
+        .with_projection(summary_projection)
+        .with_projection(controls_projection);
+
+    assert_eq!(projection.len(), 4);
+    assert!(!projection.is_empty());
+    assert_eq!(
+        projection
+            .operations()
+            .iter()
+            .map(DocumentProjectionOperation::target)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["summary-count", "summary", "refresh", "refresh"]
+    );
+
+    let report = view.project(&projection).unwrap();
+    let output = view.update();
+    let summary = output.snapshot().find("summary").unwrap();
+    let refresh = output.snapshot().find("refresh").unwrap();
+
+    assert_eq!(report.operations, 4);
+    assert_eq!(report.changed, 4);
+    assert_eq!(
+        output.snapshot().find("summary-count").unwrap().text(),
+        Some("42 rows".to_owned())
+    );
+    assert_eq!(summary.data("state"), Some("ready"));
+    assert!(refresh.disabled());
+    assert!(refresh.has_class("is-loading"));
+
+    projection.clear();
+    assert_eq!(projection.len(), 0);
+    assert!(projection.is_empty());
 }
 
 #[test]

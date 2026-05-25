@@ -54,6 +54,14 @@ impl DocumentProjection {
         Self::default()
     }
 
+    pub fn from_operations(
+        operations: impl IntoIterator<Item = DocumentProjectionOperation>,
+    ) -> Self {
+        Self {
+            operations: operations.into_iter().collect(),
+        }
+    }
+
     pub fn element(&mut self, id: impl Into<ElementId>) -> ElementProjection<'_> {
         ElementProjection {
             projection: self,
@@ -461,12 +469,33 @@ impl DocumentProjection {
         }
     }
 
+    pub fn push_operation(&mut self, operation: DocumentProjectionOperation) {
+        self.operations.push(operation);
+    }
+
+    pub fn extend(&mut self, projection: impl Into<DocumentProjection>) {
+        self.operations.extend(projection.into().operations);
+    }
+
+    pub fn with_projection(mut self, projection: impl Into<DocumentProjection>) -> Self {
+        self.extend(projection);
+        self
+    }
+
     pub fn operations(&self) -> &[DocumentProjectionOperation] {
         &self.operations
     }
 
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.operations.clear();
     }
 
     pub fn apply_to(&self, document: &mut Document) -> DocumentResult<DocumentProjectionReport> {
@@ -480,6 +509,12 @@ impl DocumentProjection {
             }
         }
         Ok(report)
+    }
+}
+
+impl FromIterator<DocumentProjectionOperation> for DocumentProjection {
+    fn from_iter<T: IntoIterator<Item = DocumentProjectionOperation>>(iter: T) -> Self {
+        Self::from_operations(iter)
     }
 }
 
