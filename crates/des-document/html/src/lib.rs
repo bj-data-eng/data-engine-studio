@@ -1401,6 +1401,34 @@ impl HtmlSet {
             })
     }
 
+    /// Pushes typed Rust actions for a named document's HTML command hooks.
+    pub fn push_command_actions<Action, Command>(
+        &self,
+        name: &str,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<()>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?.push_command_actions(registry, actions);
+        Ok(())
+    }
+
+    /// Creates typed Rust action bindings for a named document from `(command, action)` pairs.
+    pub fn command_action_registry<Action, Command>(
+        &self,
+        name: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentCommandRegistry<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self.get(name)?.command_action_registry(actions))
+    }
+
     /// Creates a retained document from a named HTML document.
     pub fn to_document(&self, name: &str, viewport: Size) -> HtmlResult<Document> {
         self.get(name)?.to_document(viewport)
@@ -1440,6 +1468,21 @@ impl HtmlSet {
         configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         self.get(name)?.to_action_surface_with(viewport, configure)
+    }
+
+    /// Creates an action surface from a named document and `(command, action)` pairs.
+    pub fn to_action_surface_with_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let commands = self.command_action_registry(name, actions)?;
+        self.to_action_surface(name, viewport, commands)
     }
 
     /// Creates an action surface from a named document, stylesheet, and typed commands.

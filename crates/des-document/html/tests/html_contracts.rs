@@ -1252,6 +1252,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     let registry = DocumentCommandRegistry::new()
         .bind_click("inline.run", SetAction::Run)
         .bind_click("file.open", SetAction::Open);
+    let mapped_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should build mapped command actions");
+    let mut pushed_mapped_registry = DocumentCommandRegistry::new();
+    set.push_command_actions(
+        "inline",
+        &mut pushed_mapped_registry,
+        [("inline.run", SetAction::Run)],
+    )
+    .expect("named document should push mapped command actions");
 
     assert_eq!(set.len(), 2);
     assert!(!set.is_empty());
@@ -1307,6 +1317,15 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build an action surface through the set front door");
     let surface_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut mapped_surface = set
+        .to_action_surface_with_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should build mapped action surfaces");
+    let mapped_surface_frame = mapped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let styled_surface = set
         .to_action_surface_with_stylesheet(
             "inline",
@@ -1320,7 +1339,13 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert!(input_output.was_clicked("inline"));
     assert!(action_frame.contains_action(&SetAction::Run));
     assert!(empty_frame.is_empty());
+    assert_eq!(
+        mapped_registry.bindings(),
+        pushed_mapped_registry.bindings()
+    );
+    assert_eq!(mapped_registry.bindings().len(), 1);
     assert!(surface_frame.contains_action(&SetAction::Run));
+    assert!(mapped_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(styled_surface.commands().bindings().len(), 2);
 
     fs::write(
