@@ -5395,10 +5395,19 @@ fn document_builder_supports_fluent_html_like_elements() {
                     .classes(["topbar", "primary-region"])
                     .attributes([("data-region", "chrome"), ("aria-label", "Top bar")])
                     .children(|ui| {
-                        ui.h1("title").text("Data Engine Studio");
+                        ui.h1("title")
+                            .text("Data Engine Studio")
+                            .span("title-badge")
+                            .class("title-badge")
+                            .text("Preview");
                     });
                 ui.div("content").class("content").children(|ui| {
-                    ui.button("run").class("primary").text("Run");
+                    ui.button("run")
+                        .class("primary")
+                        .text("Run")
+                        .div("run-help")
+                        .class("caption")
+                        .text("Ready");
                 });
             });
     });
@@ -5416,6 +5425,8 @@ fn document_builder_supports_fluent_html_like_elements() {
     let output = engine.update(&mut document, &stylesheet);
     let app = output.layout.find("app").unwrap();
     let run = output.layout.find("run").unwrap();
+    let title_badge = output.layout.find("title-badge").unwrap();
+    let run_help = output.layout.find("run-help").unwrap();
 
     assert_eq!(app.element, Element::Main);
     assert!(
@@ -5452,6 +5463,16 @@ fn document_builder_supports_fluent_html_like_elements() {
         Some("Run")
     );
     assert_eq!(run.rect.size.width, 72.0);
+    assert_eq!(title_badge.element, Element::Span);
+    assert_eq!(
+        title_badge.text.as_ref().map(|text| text.semantic_text()),
+        Some("Preview")
+    );
+    assert_eq!(run_help.element, Element::Div);
+    assert_eq!(
+        run_help.text.as_ref().map(|text| text.semantic_text()),
+        Some("Ready")
+    );
 }
 
 #[test]

@@ -2512,7 +2512,7 @@ impl DocumentBuilder {
     }
 }
 
-impl ElementBuilder<'_> {
+impl<'a> ElementBuilder<'a> {
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
         self.spec = self.spec.class(class);
         self
@@ -2872,27 +2872,35 @@ impl ElementBuilder<'_> {
         self
     }
 
-    pub fn empty(self) {
-        self.push(None, Vec::new());
+    pub fn empty(self) -> &'a mut DocumentBuilder {
+        self.push(None, Vec::new())
     }
 
-    pub fn text(self, text: impl Into<TextContent>) {
-        self.push(Some(text.into()), Vec::new());
+    pub fn text(self, text: impl Into<TextContent>) -> &'a mut DocumentBuilder {
+        self.push(Some(text.into()), Vec::new())
     }
 
-    pub fn children(self, add_contents: impl FnOnce(&mut DocumentBuilder)) {
+    pub fn children(
+        self,
+        add_contents: impl FnOnce(&mut DocumentBuilder),
+    ) -> &'a mut DocumentBuilder {
         let mut child_builder = DocumentBuilder::default();
         add_contents(&mut child_builder);
-        self.push(None, child_builder.children);
+        self.push(None, child_builder.children)
     }
 
-    fn push(self, text: Option<TextContent>, children: Vec<DocumentNode>) {
+    fn push(
+        self,
+        text: Option<TextContent>,
+        children: Vec<DocumentNode>,
+    ) -> &'a mut DocumentBuilder {
         self.parent.children.push(DocumentNode {
             id: self.id,
             spec: self.spec,
             text,
             children,
         });
+        self.parent
     }
 }
 
