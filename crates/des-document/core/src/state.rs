@@ -127,6 +127,40 @@ impl DocumentOutput {
         self.events_of_kind(kind).map(|event| &event.target)
     }
 
+    pub fn first_event_target(&self, kind: DocumentEventKind) -> Option<&ElementId> {
+        self.event_targets_of_kind(kind).next()
+    }
+
+    pub fn clicked_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::Clicked)
+    }
+
+    pub fn first_clicked_target(&self) -> Option<&ElementId> {
+        self.clicked_targets().next()
+    }
+
+    pub fn context_requested_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::ContextRequested)
+    }
+
+    pub fn first_context_requested_target(&self) -> Option<&ElementId> {
+        self.context_requested_targets().next()
+    }
+
+    pub fn key_down_events(&self) -> impl Iterator<Item = (&ElementId, KeyInput)> {
+        self.events.iter().filter_map(|event| match event.kind {
+            DocumentEventKind::KeyDown(key) => Some((&event.target, key)),
+            _ => None,
+        })
+    }
+
+    pub fn key_up_events(&self) -> impl Iterator<Item = (&ElementId, KeyInput)> {
+        self.events.iter().filter_map(|event| match event.kind {
+            DocumentEventKind::KeyUp(key) => Some((&event.target, key)),
+            _ => None,
+        })
+    }
+
     pub fn has_event(&self, target: &str, kind: DocumentEventKind) -> bool {
         self.events_for(target).any(|event| event.kind == kind)
     }

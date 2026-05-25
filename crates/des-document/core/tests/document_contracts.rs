@@ -128,8 +128,69 @@ fn document_output_exposes_interaction_query_helpers() {
             .collect::<Vec<_>>(),
         vec!["run"]
     );
+    assert_eq!(
+        output
+            .first_event_target(DocumentEventKind::Clicked)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(
+        output
+            .clicked_targets()
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        output.first_clicked_target().map(ElementId::as_str),
+        Some("run")
+    );
     assert!(run_events.contains(&&DocumentEvent::pressed("run")));
     assert!(run_events.contains(&&DocumentEvent::clicked("run")));
+}
+
+#[test]
+fn document_output_exposes_context_and_keyboard_query_helpers() {
+    let stylesheet = StyleSheet::new()
+        .id("menu", Style::default().size(96.0, 32.0))
+        .id("search", Style::default().size(160.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("menu").text("Menu");
+        ui.input("search").focused(true).empty();
+    });
+
+    let context_output =
+        view.update_with_input(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let key_down_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
+    let key_up_output = view.update_with_input(DocumentInput::key_up(DocumentKey::Enter));
+
+    assert_eq!(
+        context_output
+            .context_requested_targets()
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["menu"]
+    );
+    assert_eq!(
+        context_output
+            .first_context_requested_target()
+            .map(ElementId::as_str),
+        Some("menu")
+    );
+    assert_eq!(
+        key_down_output
+            .key_down_events()
+            .map(|(target, key)| (target.as_str(), key))
+            .collect::<Vec<_>>(),
+        vec![("search", KeyInput::down(DocumentKey::Enter))]
+    );
+    assert_eq!(
+        key_up_output
+            .key_up_events()
+            .map(|(target, key)| (target.as_str(), key))
+            .collect::<Vec<_>>(),
+        vec![("search", KeyInput::up(DocumentKey::Enter))]
+    );
 }
 
 #[test]
