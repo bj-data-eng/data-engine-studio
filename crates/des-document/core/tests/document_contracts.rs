@@ -2408,21 +2408,15 @@ fn element_projection_patch_groups_reusable_state_updates() {
         .operations_for_kind("status-label", DocumentProjectionOperationKind::Text)
         .next()
         .and_then(DocumentProjectionOperation::text);
-    let ready_attribute = status_operations.iter().find_map(|operation| {
-        operation
-            .attribute()
-            .filter(|(name, _)| *name == "data-state")
-    });
-    let atomic_attribute = status_operations.iter().find_map(|operation| {
-        operation
-            .attribute()
-            .filter(|(name, _)| *name == "aria-atomic")
-    });
-    let source_attribute = status_operations.iter().find_map(|operation| {
-        operation
-            .attribute()
-            .filter(|(name, _)| *name == "data-source")
-    });
+    let ready_attribute = status_operations
+        .iter()
+        .find_map(|operation| operation.attribute_named("data-state"));
+    let atomic_attribute = status_operations
+        .iter()
+        .find_map(|operation| operation.attribute_named("aria-atomic"));
+    let source_attribute = status_operations
+        .iter()
+        .find_map(|operation| operation.attribute_named("data-source"));
     let removed_attribute = status_operations
         .iter()
         .find_map(|operation| operation.removed_attribute());
@@ -2437,34 +2431,56 @@ fn element_projection_patch_groups_reusable_state_updates() {
         .find_map(|operation| operation.focused());
     let ready_class = status_operations.iter().find_map(|operation| {
         operation
-            .class()
-            .filter(|(class, _)| class.as_str() == "is-ready")
+            .class_named("is-ready")
+            .map(|present| ("is-ready", present))
     });
     let hot_class = status_operations.iter().find_map(|operation| {
         operation
-            .class()
-            .filter(|(class, _)| class.as_str() == "is-hot")
+            .class_named("is-hot")
+            .map(|present| ("is-hot", present))
     });
-    let skipped_class = status_operations.iter().find_map(|operation| {
-        operation
-            .class()
-            .filter(|(class, _)| class.as_str() == "should-not-apply")
-    });
+    let removed_class = status_operations
+        .iter()
+        .find(|operation| operation.removes_class("is-stale"));
+    let skipped_class = status_operations
+        .iter()
+        .find(|operation| operation.adds_class("should-not-apply"));
 
     assert_eq!(ready_patch.operation_count(), 12);
     assert!(!ready_patch.is_empty());
     assert_eq!(status_operations.len(), 12);
     assert_eq!(label_text.map(TextContent::semantic_text), Some("Ready"));
     assert_eq!(status_operations[0].value(), Some("ready"));
-    assert_eq!(ready_attribute, Some(("data-state", "ready")));
-    assert_eq!(atomic_attribute, Some(("aria-atomic", "true")));
-    assert_eq!(source_attribute, Some(("data-source", "projection")));
+    assert_eq!(ready_attribute, Some("ready"));
+    assert_eq!(atomic_attribute, Some("true"));
+    assert_eq!(source_attribute, Some("projection"));
     assert_eq!(removed_attribute, Some("data-ephemeral"));
+    assert!(
+        status_operations
+            .iter()
+            .any(|operation| operation.removes_attribute("data-ephemeral"))
+    );
     assert_eq!(selected, Some(true));
+    assert!(
+        status_operations
+            .iter()
+            .any(|operation| operation.sets_selected(true))
+    );
     assert_eq!(disabled, Some(false));
+    assert!(
+        status_operations
+            .iter()
+            .any(|operation| operation.sets_disabled(false))
+    );
     assert_eq!(focused, Some(true));
-    assert_eq!(ready_class.map(|(_, present)| present), Some(true));
-    assert_eq!(hot_class.map(|(_, present)| present), Some(true));
+    assert!(
+        status_operations
+            .iter()
+            .any(|operation| operation.sets_focused(true))
+    );
+    assert_eq!(ready_class, Some(("is-ready", true)));
+    assert_eq!(hot_class, Some(("is-hot", true)));
+    assert!(removed_class.is_some());
     assert!(skipped_class.is_none());
 
     let report = view.project(&projection).unwrap();
