@@ -19,8 +19,8 @@ pub struct DocumentView {
 /// Resolved document output plus typed app actions collected from authored commands.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DocumentActionFrame<Action> {
-    pub output: DocumentOutput,
-    pub actions: Vec<DocumentCommandAction<Action>>,
+    output: DocumentOutput,
+    actions: Vec<DocumentCommandAction<Action>>,
 }
 
 impl<Action> DocumentActionFrame<Action> {
@@ -766,6 +766,11 @@ impl<Action> DocumentActionFrame<Action> {
         self.actions
     }
 
+    /// Consumes the frame and returns only the resolved document output.
+    pub fn into_output(self) -> DocumentOutput {
+        self.output
+    }
+
     fn dispatch_matching<'a>(
         &'a self,
         mut matches: impl FnMut(&DocumentCommandAction<Action>) -> bool,
@@ -789,8 +794,8 @@ impl<Action> DocumentActionFrame<Action> {
 /// together, then update calls can collect typed app actions without passing the
 /// same registry through every frame.
 pub struct DocumentActionSurface<Action> {
-    pub view: DocumentView,
-    pub commands: DocumentCommandRegistry<Action>,
+    view: DocumentView,
+    commands: DocumentCommandRegistry<Action>,
 }
 
 impl<Action> DocumentActionSurface<Action> {
@@ -1723,6 +1728,16 @@ impl<Action> DocumentActionSurface<Action> {
     /// Splits the surface into its owned view and typed command registry.
     pub fn into_parts(self) -> (DocumentView, DocumentCommandRegistry<Action>) {
         (self.view, self.commands)
+    }
+
+    /// Consumes the surface and returns only the retained document view.
+    pub fn into_view(self) -> DocumentView {
+        self.view
+    }
+
+    /// Consumes the surface and returns only the typed command registry.
+    pub fn into_commands(self) -> DocumentCommandRegistry<Action> {
+        self.commands
     }
 }
 

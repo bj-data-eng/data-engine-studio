@@ -1002,11 +1002,11 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
         &registry,
     );
-    let run = frame.output.snapshot().find("run").unwrap();
+    let run = frame.output().snapshot().find("run").unwrap();
 
     assert_eq!(run.text(), Some("Run".to_owned()));
     assert_eq!(
-        frame.actions,
+        frame.actions(),
         vec![DocumentCommandAction {
             target: ElementId::new("run"),
             event: DocumentEventKind::Clicked,
@@ -1054,6 +1054,7 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
         |_| {},
     );
+    let output_only = view.update_actions(&registry).into_output();
 
     assert_eq!(report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(
@@ -1087,6 +1088,7 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
     );
     assert_eq!(kind_values, vec![AppAction::Run]);
     assert_eq!(missing_report, DocumentCommandDispatchReport::new(0, 0, 0));
+    assert!(output_only.snapshot().find("run").is_some());
 }
 
 #[test]
@@ -3233,6 +3235,33 @@ fn document_view_builder_can_build_action_surfaces_directly() {
     ));
     assert_eq!(configured_surface.commands().bindings().len(), 1);
     assert_eq!(menu.rect().size, Size::new(112.0, 32.0));
+
+    let mut view_only = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_action_surface(DocumentCommandRegistry::<AppAction>::new(), |ui| {
+            ui.button("owned-view").text("Owned view");
+        })
+        .into_view();
+    let commands_only = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_action_surface(
+            DocumentCommandRegistry::new().bind_click("owned-command", AppAction::Run),
+            |ui| {
+                ui.button("owned-command")
+                    .command("owned-command")
+                    .text("Owned");
+            },
+        )
+        .into_commands();
+
+    assert_eq!(
+        view_only
+            .update()
+            .snapshot()
+            .find("owned-view")
+            .unwrap()
+            .text(),
+        Some("Owned view".to_owned())
+    );
+    assert_eq!(commands_only.bindings().len(), 1);
 }
 
 #[test]
@@ -5080,7 +5109,7 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
         &registry,
     );
-    let run = frame.output.snapshot().find("run").unwrap();
+    let run = frame.output().snapshot().find("run").unwrap();
     let inline = InlineTextStyle {
         font_weight: Some(FontWeight::BOLD),
         font_stretch: Some(FontStretch::CONDENSED),
@@ -5129,8 +5158,8 @@ fn document_prelude_exposes_common_app_authoring_surface() {
     let _selector_combinator: Option<SelectorCombinator> = None;
     let _track_sizing: Option<TrackSizingFunction> = None;
 
-    assert_eq!(frame.actions.len(), 1);
-    assert_eq!(frame.actions[0].action, AppAction::Run);
+    assert_eq!(frame.actions().len(), 1);
+    assert_eq!(frame.actions()[0].action, AppAction::Run);
     assert!(run.has_all_classes(["badge", "primary"]));
     assert_eq!(run.aria("label"), Some("Run"));
     assert_eq!(run.rect().size, Size::new(72.0, 28.0));

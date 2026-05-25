@@ -58,14 +58,14 @@ mod tests {
             DocumentInput::primary_click(Point::new(2.0, 2.0)),
             &registry,
         );
-        let copy = frame.output.snapshot().find("copy").unwrap();
-        let paste = frame.output.snapshot().find("paste").unwrap();
+        let copy = frame.output().snapshot().find("copy").unwrap();
+        let paste = frame.output().snapshot().find("paste").unwrap();
 
         assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
         assert!(copy.interactive());
         assert!(!paste.interactive());
-        assert_eq!(frame.actions.len(), 1);
-        assert_eq!(frame.actions[0].target, ElementId::new("copy"));
-        assert_eq!(frame.actions[0].action, MenuAction::Copy);
+        assert_eq!(frame.actions().len(), 1);
+        assert_eq!(frame.actions()[0].target, ElementId::new("copy"));
+        assert_eq!(frame.actions()[0].action, MenuAction::Copy);
     }
 }

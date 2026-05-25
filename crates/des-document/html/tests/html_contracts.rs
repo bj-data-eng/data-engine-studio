@@ -2348,7 +2348,7 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         .expect("prelude-authored HTML should create an action surface");
     let frame: DocumentActionFrame<HtmlAction> =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let run = frame.output.snapshot().find("run").unwrap();
+    let run = frame.output().snapshot().find("run").unwrap();
 
     assert_eq!(run.rect().size.width, 96.0);
     assert_eq!(run.style().padding, Insets::all(2.0));
@@ -2356,9 +2356,9 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     assert_eq!(run.style().radius, CornerRadii::all(4.0));
     assert_eq!(run.style().border, Some(Color::rgb(90, 120, 180)));
     assert_eq!(surface.commands().bindings().len(), 1);
-    assert_eq!(frame.actions.len(), 1);
-    assert_eq!(frame.actions[0].action, HtmlAction::Run);
-    assert_eq!(frame.actions[0].target, ElementId::new("run"));
+    assert_eq!(frame.actions().len(), 1);
+    assert_eq!(frame.actions()[0].action, HtmlAction::Run);
+    assert_eq!(frame.actions()[0].target, ElementId::new("run"));
 }
 
 #[test]
