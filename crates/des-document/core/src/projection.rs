@@ -78,6 +78,18 @@ impl DocumentProjection {
         self
     }
 
+    pub fn when(mut self, present: bool, project: impl FnOnce(&mut Self)) -> Self {
+        self.project_if(present, project);
+        self
+    }
+
+    pub fn project_if(&mut self, present: bool, project: impl FnOnce(&mut Self)) -> &mut Self {
+        if present {
+            project(self);
+        }
+        self
+    }
+
     pub fn set_text(mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) -> Self {
         self.push_text(id, text);
         self
@@ -482,6 +494,21 @@ impl DocumentProjection {
         self
     }
 
+    pub fn extend_if(&mut self, projection: impl Into<DocumentProjection>, present: bool) {
+        if present {
+            self.extend(projection);
+        }
+    }
+
+    pub fn with_projection_if(
+        mut self,
+        projection: impl Into<DocumentProjection>,
+        present: bool,
+    ) -> Self {
+        self.extend_if(projection, present);
+        self
+    }
+
     pub fn operations(&self) -> &[DocumentProjectionOperation] {
         &self.operations
     }
@@ -524,6 +551,13 @@ pub struct ElementProjection<'a> {
 }
 
 impl ElementProjection<'_> {
+    pub fn when(&mut self, present: bool, project: impl FnOnce(&mut Self)) -> &mut Self {
+        if present {
+            project(self);
+        }
+        self
+    }
+
     pub fn text(&mut self, text: impl Into<TextContent>) -> &mut Self {
         self.projection.push_text(self.id.clone(), text);
         self

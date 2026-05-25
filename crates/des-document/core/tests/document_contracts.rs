@@ -1054,6 +1054,8 @@ fn document_projection_updates_semantic_attributes() {
 
 #[test]
 fn document_projection_expresses_conditional_app_state_without_branching() {
+    let show_details = true;
+    let show_error = false;
     let stylesheet = StyleSheet::new()
         .class(
             "is-ready",
@@ -1075,6 +1077,7 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
             .children(|ui| {
                 ui.text("status-label", "Loading");
             });
+        ui.div("details").text("Hidden");
     });
 
     let report = view
@@ -1084,26 +1087,43 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
                 .class_if("is-ready", true)
                 .classes_if(["is-loading", "is-stale"], false)
                 .data_if("busy", "true", false)
-                .aria_if("busy", "false", true);
+                .aria_if("busy", "false", true)
+                .when(show_error, |status| {
+                    status.data("error", "true").add_class("has-error");
+                });
+            projection.project_if(show_details, |projection| {
+                projection
+                    .element("details")
+                    .text("Ready details")
+                    .class("is-ready", true);
+            });
         })
         .unwrap();
     let output = view.update();
     let status = output.snapshot().find("status").unwrap();
+    let details = output.snapshot().find("details").unwrap();
 
-    assert_eq!(report.operations, 5);
-    assert_eq!(report.changed, 5);
+    assert_eq!(report.operations, 7);
+    assert_eq!(report.changed, 7);
     assert!(status.has_class("is-ready"));
     assert!(!status.has_class("is-loading"));
     assert!(!status.has_class("is-stale"));
+    assert!(!status.has_class("has-error"));
     assert_eq!(status.data("busy"), None);
+    assert_eq!(status.data("error"), None);
     assert_eq!(status.aria("busy"), Some("false"));
     assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
+    assert_eq!(details.text(), Some("Ready details".to_owned()));
+    assert!(details.has_class("is-ready"));
 
     let reset = DocumentProjection::new()
         .class_if("status", "is-ready", false)
         .classes_if("status", ["is-loading", "is-stale"], true)
         .set_data_if("status", "busy", "true", true)
-        .set_aria_if("status", "busy", "false", false);
+        .set_aria_if("status", "busy", "false", false)
+        .when(show_error, |projection| {
+            projection.push_data("status", "error", "true");
+        });
     let reset_report = view.project(&reset).unwrap();
     let reset_output = view.update();
     let reset_status = reset_output.snapshot().find("status").unwrap();
@@ -1144,9 +1164,17 @@ fn document_projection_composes_subprojections_for_app_state() {
     .collect::<DocumentProjection>();
     let mut projection = DocumentProjection::new()
         .with_projection(summary_projection)
-        .with_projection(controls_projection);
+        .with_projection(controls_projection)
+        .with_projection_if(
+            DocumentProjection::new().set_data("summary", "debug", "true"),
+            false,
+        );
+    projection.extend_if(
+        DocumentProjection::new().set_aria("summary", "live", "polite"),
+        true,
+    );
 
-    assert_eq!(projection.len(), 4);
+    assert_eq!(projection.len(), 5);
     assert!(!projection.is_empty());
     assert_eq!(
         projection
@@ -1155,7 +1183,7 @@ fn document_projection_composes_subprojections_for_app_state() {
             .map(DocumentProjectionOperation::target)
             .map(ElementId::as_str)
             .collect::<Vec<_>>(),
-        vec!["summary-count", "summary", "refresh", "refresh"]
+        vec!["summary-count", "summary", "refresh", "refresh", "summary"]
     );
 
     let report = view.project(&projection).unwrap();
@@ -1163,13 +1191,15 @@ fn document_projection_composes_subprojections_for_app_state() {
     let summary = output.snapshot().find("summary").unwrap();
     let refresh = output.snapshot().find("refresh").unwrap();
 
-    assert_eq!(report.operations, 4);
-    assert_eq!(report.changed, 4);
+    assert_eq!(report.operations, 5);
+    assert_eq!(report.changed, 5);
     assert_eq!(
         output.snapshot().find("summary-count").unwrap().text(),
         Some("42 rows".to_owned())
     );
     assert_eq!(summary.data("state"), Some("ready"));
+    assert_eq!(summary.aria("live"), Some("polite"));
+    assert_eq!(summary.data("debug"), None);
     assert!(refresh.disabled());
     assert!(refresh.has_class("is-loading"));
 
