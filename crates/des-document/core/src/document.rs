@@ -47,6 +47,13 @@ impl StyleResolutionReport {
     }
 }
 
+#[derive(Clone, Debug)]
+struct OwnedStyleMatchContext {
+    element: DocumentNode,
+    state: Option<ElementState>,
+    position: Option<ChildPosition>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentError {
     DuplicateElement(ElementId),
@@ -461,90 +468,119 @@ impl Document {
         states: &HashMap<ElementId, ElementState>,
         resolve_container_queries: bool,
     ) -> DocumentResult<StyleResolutionReport> {
-        let mut positions = Vec::new();
-        self.collect_positions(
+        let mut report = StyleResolutionReport::default();
+        self.apply_stylesheet_subtree(
             self.root.clone(),
             None,
+            stylesheet,
+            states,
+            resolve_container_queries,
             &mut Vec::new(),
-            Vec::new(),
-            &mut positions,
+            &[],
+            &mut report,
         )?;
-        let mut report = StyleResolutionReport {
-            visited: positions.len(),
-            ..Default::default()
-        };
-
-        for (id, position, ancestor_ids, previous_sibling_ids) in positions {
-            let element = self.snapshot_element(&id)?;
-            let ancestors = ancestor_ids
-                .iter()
-                .map(|(id, position)| self.snapshot_element(id).map(|node| (node, *position)))
-                .collect::<DocumentResult<Vec<_>>>()?;
-            let previous_siblings = previous_sibling_ids
-                .iter()
-                .map(|(id, position)| self.snapshot_element(id).map(|node| (node, *position)))
-                .collect::<DocumentResult<Vec<_>>>()?;
-            let ancestor_contexts = ancestors
-                .iter()
-                .map(|(element, position)| StyleMatchContext {
-                    element,
-                    state: states.get(&element.id),
-                    position: *position,
-                })
-                .collect::<Vec<_>>();
-            let previous_sibling_contexts = previous_siblings
-                .iter()
-                .map(|(element, position)| StyleMatchContext {
-                    element,
-                    state: states.get(&element.id),
-                    position: *position,
-                })
-                .collect::<Vec<_>>();
-            let computed = resolve_style_with_position(
-                &element,
-                stylesheet,
-                states.get(&id),
-                position,
-                &ancestor_contexts,
-                &previous_sibling_contexts,
-                self.viewport,
-                if resolve_container_queries {
-                    self.parent_container_size(&id)?
-                } else {
-                    None
-                },
-            );
-            let computed = if id == self.root {
-                root_sized_style(computed, self.viewport)
-            } else {
-                computed
-            };
-            let rendered = states
-                .get(&id)
-                .and_then(|state| state.rendered_style.clone())
-                .map(|style| {
-                    if id == self.root {
-                        root_sized_style(style, self.viewport)
-                    } else {
-                        style
-                    }
-                })
-                .unwrap_or(computed);
-            let invalidation = classify_computed_style_change(
-                Some(&self.element(&id)?.computed_style),
-                Some(&rendered),
-            );
-            report.paint_changed |= invalidation.paint_changed;
-            let scroll_offset = states
-                .get(&id)
-                .map(|state| Point::new(state.scroll_x, state.scroll_y))
-                .unwrap_or(Point::ZERO);
-            self.element_mut(&id)?.scroll_offset = scroll_offset;
-            report.layout_changed |= self.apply_computed_style(id.clone(), &rendered)?;
-        }
         report.layout_changed |= self.apply_table_grid_styles()?;
 
         Ok(report)
+    }
+
+    fn apply_stylesheet_subtree(
+        &mut self,
+        id: ElementId,
+        position: Option<ChildPosition>,
+        stylesheet: &StyleSheet,
+        states: &HashMap<ElementId, ElementState>,
+        resolve_container_queries: bool,
+        ancestors: &mut Vec<OwnedStyleMatchContext>,
+        previous_siblings: &[OwnedStyleMatchContext],
+        report: &mut StyleResolutionReport,
+    ) -> DocumentResult<OwnedStyleMatchContext> {
+        report.visited += 1;
+        let element = self.snapshot_element(&id)?;
+        let ancestor_contexts = ancestors
+            .iter()
+            .map(|context| StyleMatchContext {
+                element: &context.element,
+                state: context.state.as_ref(),
+                position: context.position,
+            })
+            .collect::<Vec<_>>();
+        let previous_sibling_contexts = previous_siblings
+            .iter()
+            .map(|context| StyleMatchContext {
+                element: &context.element,
+                state: context.state.as_ref(),
+                position: context.position,
+            })
+            .collect::<Vec<_>>();
+        let computed = resolve_style_with_position(
+            &element,
+            stylesheet,
+            states.get(&id),
+            position,
+            &ancestor_contexts,
+            &previous_sibling_contexts,
+            self.viewport,
+            if resolve_container_queries {
+                self.parent_container_size(&id)?
+            } else {
+                None
+            },
+        );
+        let computed = if id == self.root {
+            root_sized_style(computed, self.viewport)
+        } else {
+            computed
+        };
+        let rendered = states
+            .get(&id)
+            .and_then(|state| state.rendered_style.clone())
+            .map(|style| {
+                if id == self.root {
+                    root_sized_style(style, self.viewport)
+                } else {
+                    style
+                }
+            })
+            .unwrap_or(computed);
+        let invalidation = classify_computed_style_change(
+            Some(&self.element(&id)?.computed_style),
+            Some(&rendered),
+        );
+        report.paint_changed |= invalidation.paint_changed;
+        let scroll_offset = states
+            .get(&id)
+            .map(|state| Point::new(state.scroll_x, state.scroll_y))
+            .unwrap_or(Point::ZERO);
+        self.element_mut(&id)?.scroll_offset = scroll_offset;
+        report.layout_changed |= self.apply_computed_style(id.clone(), &rendered)?;
+
+        let context = OwnedStyleMatchContext {
+            element,
+            state: states.get(&id).cloned(),
+            position,
+        };
+        let children = self.children(id)?;
+        let sibling_count = children.len();
+        ancestors.push(context.clone());
+        let mut previous_siblings = Vec::new();
+        for (index, child) in children.into_iter().enumerate() {
+            let child_position = Some(ChildPosition::new(index, sibling_count));
+            let child_context = self.apply_stylesheet_subtree(
+                child,
+                child_position,
+                stylesheet,
+                states,
+                resolve_container_queries,
+                ancestors,
+                &previous_siblings,
+                report,
+            )?;
+            previous_siblings.push(child_context);
+        }
+        ancestors.pop();
+
+        Ok(context)
     }
 
     pub(crate) fn parent_container_size(&self, id: &ElementId) -> DocumentResult<Option<Size>> {
@@ -958,45 +994,6 @@ impl Document {
         }
 
         Ok(resolved.into_iter().flatten().collect())
-    }
-
-    fn collect_positions(
-        &self,
-        id: ElementId,
-        position: Option<ChildPosition>,
-        ancestors: &mut Vec<(ElementId, Option<ChildPosition>)>,
-        previous_siblings: Vec<(ElementId, Option<ChildPosition>)>,
-        positions: &mut Vec<(
-            ElementId,
-            Option<ChildPosition>,
-            Vec<(ElementId, Option<ChildPosition>)>,
-            Vec<(ElementId, Option<ChildPosition>)>,
-        )>,
-    ) -> DocumentResult<()> {
-        positions.push((id.clone(), position, ancestors.clone(), previous_siblings));
-
-        let children = self.children(id)?;
-        let sibling_count = children.len();
-        let current = positions
-            .last()
-            .map(|(id, position, _, _)| (id.clone(), *position))
-            .expect("current style position was just recorded");
-        ancestors.push(current);
-        let mut previous_siblings = Vec::new();
-        for (index, child) in children.into_iter().enumerate() {
-            let child_position = Some(ChildPosition::new(index, sibling_count));
-            self.collect_positions(
-                child.clone(),
-                child_position,
-                ancestors,
-                previous_siblings.clone(),
-                positions,
-            )?;
-            previous_siblings.push((child, child_position));
-        }
-        ancestors.pop();
-
-        Ok(())
     }
 
     fn snapshot_element(&self, id: &ElementId) -> DocumentResult<DocumentNode> {

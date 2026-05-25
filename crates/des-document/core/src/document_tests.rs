@@ -1206,8 +1206,8 @@ fn css_stylesheet_scales_to_many_rules_on_default_stack() {
     let stylesheet = StyleSheet::parse_css(&css).unwrap();
 
     let mut document = Document::new(Size::new(1024.0, 768.0));
-    for index in 0..1_000 {
-        let class = if index == 777 {
+    for index in 0..5_000 {
+        let class = if index == 4_777 {
             "target".to_string()
         } else {
             format!("node-{index}")
@@ -1221,16 +1221,35 @@ fn css_stylesheet_scales_to_many_rules_on_default_stack() {
             .unwrap();
     }
 
-    document
+    let tree = document.element_tree().unwrap();
+    let target = find_document_node(&tree, "node-4777").unwrap();
+    let miss = find_document_node(&tree, "node-0").unwrap();
+    assert_eq!(stylesheet.candidate_rule_count(target), 1);
+    assert_eq!(stylesheet.candidate_rule_count(miss), 0);
+
+    let report = document
         .apply_stylesheet(&stylesheet, &HashMap::new())
         .unwrap();
+    assert_eq!(report.visited, 5_001);
     document.compute_layout().unwrap();
 
     assert_eq!(stylesheet.rule_count(), 10_001);
     assert_eq!(
-        document.layout_rect("node-777").unwrap().size,
+        document.layout_rect("node-4777").unwrap().size,
         Size::new(240.0, 32.0)
     );
+}
+
+fn find_document_node<'a>(
+    node: &'a crate::element::DocumentNode,
+    id: &str,
+) -> Option<&'a crate::element::DocumentNode> {
+    if node.id.as_str() == id {
+        return Some(node);
+    }
+    node.children
+        .iter()
+        .find_map(|child| find_document_node(child, id))
 }
 
 #[test]

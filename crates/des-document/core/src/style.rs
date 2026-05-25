@@ -2156,6 +2156,11 @@ impl StyleSheet {
         self.rules.len()
     }
 
+    #[cfg(test)]
+    pub(crate) fn candidate_rule_count(&self, element: &DocumentNode) -> usize {
+        self.index.candidates_for(element).len()
+    }
+
     pub(crate) fn key(&self) -> StyleSheetKey {
         self.key
     }
