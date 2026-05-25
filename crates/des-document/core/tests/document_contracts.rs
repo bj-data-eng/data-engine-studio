@@ -4602,6 +4602,47 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .selectable_text_if(selectable)
             .copyable_text_if(false, disabled)
             .text("Ready to run.");
+        ui.child_with("child-with", Element::Div, |node| {
+            node.class("manual-child").text("Built through child_with");
+        })
+        .child_with_if("child-with-skipped", Element::Div, disabled, |node| {
+            node.text("Skipped");
+        })
+        .element_if(
+            "spec-child",
+            ElementSpec::new(Element::Section).class("spec-child"),
+            show_badge,
+            |ui| {
+                ui.text_if("spec-child-label", "Spec child", true)
+                    .text_if("spec-child-skipped", "Skipped", false)
+                    .text_element_if(
+                        "spec-child-note",
+                        ElementSpec::new(Element::Text).class("note"),
+                        "Note",
+                        true,
+                    )
+                    .text_element_if(
+                        "spec-child-note-skipped",
+                        ElementSpec::new(Element::Text),
+                        "Skipped",
+                        false,
+                    )
+                    .text_node_with("spec-child-detail", |node| {
+                        node.class("detail").text("Detail");
+                    })
+                    .text_node_with_if("spec-child-detail-skipped", false, |node| {
+                        node.text("Skipped");
+                    });
+            },
+        )
+        .element_if(
+            "spec-child-skipped",
+            ElementSpec::new(Element::Section),
+            disabled,
+            |ui| {
+                ui.text("nested-skipped", "Skipped");
+            },
+        );
         ui.when(show_badge, |ui| {
             ui.div("conditional").class("conditional").empty();
         })
@@ -4639,6 +4680,36 @@ fn document_builder_supports_conditional_authoring_helpers() {
     assert!(description.copyable_text());
     assert_eq!(run.rect().size, Size::new(96.0, 32.0));
     assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
+    assert_eq!(
+        output.snapshot().find("child-with").unwrap().text(),
+        Some("Built through child_with".to_owned())
+    );
+    assert!(output.snapshot().find("child-with-skipped").is_none());
+    assert_eq!(
+        output.snapshot().find("spec-child").unwrap().element(),
+        Element::Section
+    );
+    assert_eq!(
+        output.snapshot().find("spec-child-label").unwrap().text(),
+        Some("Spec child".to_owned())
+    );
+    assert_eq!(
+        output.snapshot().find("spec-child-note").unwrap().text(),
+        Some("Note".to_owned())
+    );
+    assert_eq!(
+        output.snapshot().find("spec-child-detail").unwrap().text(),
+        Some("Detail".to_owned())
+    );
+    assert!(output.snapshot().find("spec-child-skipped").is_none());
+    assert!(output.snapshot().find("spec-child-label-skipped").is_none());
+    assert!(output.snapshot().find("spec-child-note-skipped").is_none());
+    assert!(
+        output
+            .snapshot()
+            .find("spec-child-detail-skipped")
+            .is_none()
+    );
     assert!(output.snapshot().find("conditional").is_some());
     assert!(output.snapshot().find("disabled-only").is_none());
     assert!(output.snapshot().find("skipped").is_none());

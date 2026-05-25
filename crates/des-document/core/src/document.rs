@@ -1995,6 +1995,29 @@ impl DocumentBuilder {
         }
     }
 
+    pub fn child_with(
+        &mut self,
+        id: impl Into<ElementId>,
+        element: Element,
+        build: impl FnOnce(ElementBuilder<'_>),
+    ) -> &mut Self {
+        build(self.child(id, element));
+        self
+    }
+
+    pub fn child_with_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        element: Element,
+        present: bool,
+        build: impl FnOnce(ElementBuilder<'_>),
+    ) -> &mut Self {
+        if present {
+            self.child_with(id, element, build);
+        }
+        self
+    }
+
     pub fn when(&mut self, present: bool, build: impl FnOnce(&mut DocumentBuilder)) -> &mut Self {
         if present {
             build(self);
@@ -2128,12 +2151,58 @@ impl DocumentBuilder {
         });
     }
 
+    pub fn element_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        spec: ElementSpec,
+        present: bool,
+        add_contents: impl FnOnce(&mut DocumentBuilder),
+    ) -> &mut Self {
+        if present {
+            self.element(id, spec, add_contents);
+        }
+        self
+    }
+
     pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) {
         self.text_element(id, ElementSpec::new(Element::Text), text);
     }
 
+    pub fn text_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        text: impl Into<TextContent>,
+        present: bool,
+    ) -> &mut Self {
+        if present {
+            self.text(id, text);
+        }
+        self
+    }
+
     pub fn text_node(&mut self, id: impl Into<ElementId>) -> ElementBuilder<'_> {
         self.child(id, Element::Text)
+    }
+
+    pub fn text_node_with(
+        &mut self,
+        id: impl Into<ElementId>,
+        build: impl FnOnce(ElementBuilder<'_>),
+    ) -> &mut Self {
+        build(self.text_node(id));
+        self
+    }
+
+    pub fn text_node_with_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        present: bool,
+        build: impl FnOnce(ElementBuilder<'_>),
+    ) -> &mut Self {
+        if present {
+            self.text_node_with(id, build);
+        }
+        self
     }
 
     pub fn text_element(
@@ -2150,8 +2219,33 @@ impl DocumentBuilder {
         });
     }
 
+    pub fn text_element_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        spec: ElementSpec,
+        text: impl Into<TextContent>,
+        present: bool,
+    ) -> &mut Self {
+        if present {
+            self.text_element(id, spec, text);
+        }
+        self
+    }
+
     pub fn visual_clone(&mut self, clone: &VisualElementClone, options: VisualCloneOptions) {
         self.children.push(clone.to_element(&options, true));
+    }
+
+    pub fn visual_clone_if(
+        &mut self,
+        clone: &VisualElementClone,
+        options: VisualCloneOptions,
+        present: bool,
+    ) -> &mut Self {
+        if present {
+            self.visual_clone(clone, options);
+        }
+        self
     }
 }
 
