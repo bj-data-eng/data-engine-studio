@@ -6,9 +6,10 @@
 //! JavaScript and does not embed template logic in HTML.
 
 use des_document::{
-    Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry,
-    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView,
-    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
+    Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandAction,
+    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentInput, DocumentOutput,
+    DocumentProjection, DocumentProjectionReport, DocumentView, Element, ElementBehaviorEvent,
+    ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -549,6 +550,38 @@ impl HtmlDocument {
         self.update_with_input_actions(viewport, input, &registry)
     }
 
+    /// Routes input through this HTML tree, collects typed actions, and dispatches them.
+    pub fn update_with_input_and_dispatch<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions(viewport, input, registry)?;
+        let report = frame.dispatch(handler);
+        Ok((frame, report))
+    }
+
+    /// Routes input, configures typed actions in one hook, and dispatches them.
+    pub fn update_with_input_and_dispatch_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_dispatch(viewport, input, &registry, handler)
+    }
+
     /// Parses CSS and creates an action surface configured with typed Rust commands.
     pub fn to_action_surface_with_css<Action>(
         &self,
@@ -689,6 +722,40 @@ impl HtmlDocument {
         self.update_with_input_actions_and_css(viewport, input, css, &registry)
     }
 
+    /// Parses CSS, routes input, collects typed actions, and dispatches them.
+    pub fn update_with_input_and_css_and_dispatch<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions_and_css(viewport, input, css, registry)?;
+        let report = frame.dispatch(handler);
+        Ok((frame, report))
+    }
+
+    /// Parses CSS, configures typed actions in one hook, routes input, and dispatches them.
+    pub fn update_with_input_and_css_and_dispatch_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_css_and_dispatch(viewport, input, css, &registry, handler)
+    }
+
     /// Parses forgiving CSS, routes input through this HTML tree, and returns output.
     pub fn update_with_input_and_css_forgiving(
         &self,
@@ -729,6 +796,43 @@ impl HtmlDocument {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
+    }
+
+    /// Parses forgiving CSS, routes input, collects typed actions, and dispatches them.
+    pub fn update_with_input_and_css_forgiving_and_dispatch<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame =
+            self.update_with_input_actions_and_css_forgiving(viewport, input, css, registry)?;
+        let report = frame.dispatch(handler);
+        Ok((frame, report))
+    }
+
+    /// Parses forgiving CSS, configures typed actions, routes input, and dispatches them.
+    pub fn update_with_input_and_css_forgiving_and_dispatch_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_css_forgiving_and_dispatch(
+            viewport, input, css, &registry, handler,
+        )
     }
 
     /// Emits this parsed HTML tree into a caller-owned document builder.

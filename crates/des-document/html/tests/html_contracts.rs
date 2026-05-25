@@ -1,6 +1,6 @@
 use des_document::{
-    DocumentCommandRegistry, DocumentEngine, DocumentInput, DocumentKey, DocumentProjection,
-    Element, ElementBehaviorEvent, ElementId, Point, Size,
+    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentInput,
+    DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Point, Size,
 };
 use des_html::{HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
@@ -538,6 +538,45 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("forgiving CSS should create a typed action surface directly");
     let surface_key =
         forgiving_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
+    let mut dispatched = Vec::new();
+    let (dispatch_frame, dispatch_report) = html
+        .update_with_input_and_css_and_dispatch(
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            css,
+            &registry,
+            |action| {
+                dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML and CSS should dispatch typed actions directly");
+    let mut configured_dispatched = Vec::new();
+    let (configured_dispatch_frame, configured_dispatch_report) = html
+        .update_with_input_and_css_and_dispatch_with(
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            css,
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+            |action| {
+                configured_dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML and CSS should configure and dispatch typed actions directly");
+    let mut forgiving_dispatched = Vec::new();
+    let (forgiving_dispatch_frame, forgiving_dispatch_report) = html
+        .update_with_input_and_css_forgiving_and_dispatch(
+            Size::new(240.0, 160.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            &registry,
+            |action| {
+                forgiving_dispatched.push(*action.action());
+            },
+        )
+        .expect("forgiving CSS should dispatch typed actions directly");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -560,6 +599,21 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     assert!(configured_forgiving_frame.contains_action(&HtmlAction::Filter));
     assert!(surface_click.contains_action(&HtmlAction::Run));
     assert!(surface_key.contains_action(&HtmlAction::Filter));
+    assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![HtmlAction::Run]);
+    assert!(configured_dispatch_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        configured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched, vec![HtmlAction::Run]);
+    assert!(forgiving_dispatch_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(
+        forgiving_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(forgiving_dispatched, vec![HtmlAction::Filter]);
 }
 
 #[test]
@@ -680,6 +734,31 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
             &registry,
         )
         .expect("HTML should collect keyboard actions without CSS");
+    let mut dispatched = Vec::new();
+    let (dispatch_frame, dispatch_report) = html
+        .update_with_input_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| {
+                dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML should dispatch typed actions without CSS");
+    let mut configured_dispatched = Vec::new();
+    let (configured_dispatch_frame, configured_dispatch_report) = html
+        .update_with_input_and_dispatch_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+                commands.push_key_down("project.search", HtmlAction::Search);
+            },
+            |action| {
+                configured_dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML should configure and dispatch typed actions without CSS");
     let input_output = html
         .update_with_input(
             Size::new(320.0, 180.0),
@@ -694,6 +773,15 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     assert!(configured_key_frame.contains_action(&HtmlAction::Search));
     assert!(configured_empty_frame.is_empty());
     assert!(key_frame.is_empty());
+    assert!(dispatch_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![HtmlAction::Run]);
+    assert!(configured_dispatch_frame.contains_action(&HtmlAction::Search));
+    assert_eq!(
+        configured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched, vec![HtmlAction::Search]);
 }
 
 #[test]
