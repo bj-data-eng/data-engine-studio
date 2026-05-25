@@ -4250,6 +4250,45 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
             ["title", "subtitle"],
             Style::default().height(Length::Px(20.0)),
         )
+        .element_if(Element::Button, Style::default().radius(8.0), false)
+        .class_if("typed-if", Style::default().height(Length::Px(18.0)), true)
+        .class_if(
+            "typed-skipped",
+            Style::default().height(Length::Px(999.0)),
+            false,
+        )
+        .classes_if(
+            ["typed-a", "typed-b"],
+            Style::default().width(Length::Px(18.0)),
+            true,
+        )
+        .id_if(
+            "typed-title",
+            Style::default().padding(Insets::all(1.0)),
+            true,
+        )
+        .ids_if(
+            ["typed-skipped-a", "typed-skipped-b"],
+            Style::default().height(Length::Px(999.0)),
+            false,
+        )
+        .state_if(
+            ElementStateSelector::Selected,
+            Style::default().border(Color::rgb(20, 80, 120)),
+            true,
+        )
+        .class_state_if(
+            "typed-if",
+            ElementStateSelector::Hovered,
+            Style::default().background(Color::rgb(210, 230, 250)),
+            true,
+        )
+        .id_state_if(
+            "typed-title",
+            ElementStateSelector::Focused,
+            Style::default().border(Color::rgb(20, 80, 120)),
+            true,
+        )
         .with_css(".panel { width: 120px; }")
         .expect("strict CSS should compose")
         .with_css_if(compact, ".css-extra { height: 12px; }")
@@ -4303,7 +4342,26 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert!(stylesheet.has_rule_for_class("css-extra"));
     assert!(stylesheet.has_rule_for_class("css-forgiving"));
     assert!(!stylesheet.has_rule_for_class("skipped-css"));
+    assert!(stylesheet.has_rule_for_class("typed-if"));
+    assert!(stylesheet.has_rule_for_class("typed-a"));
+    assert!(stylesheet.has_rule_for_class("typed-b"));
+    assert!(!stylesheet.has_rule_for_class("typed-skipped"));
     assert!(stylesheet.has_rule_for_id("title"));
+    assert!(stylesheet.has_rule_for_id("typed-title"));
+    assert!(!stylesheet.has_rule_for_id("typed-skipped-a"));
+    assert!(
+        stylesheet.has_rule_for_selector(&StyleSelector::State(ElementStateSelector::Selected))
+    );
+    assert!(
+        stylesheet.has_rule_for_selector(&StyleSelector::class_state(
+            "typed-if",
+            ElementStateSelector::Hovered
+        ))
+    );
+    assert!(stylesheet.has_rule_for_selector(&StyleSelector::id_state(
+        "typed-title",
+        ElementStateSelector::Focused
+    )));
     assert!(stylesheet.rules_for_class("panel").count() >= 2);
     assert_eq!(stylesheet.rules_for_id("title").count(), 2);
     assert_eq!(
@@ -4340,6 +4398,16 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
                 Style::default().width(Length::Px(12.0)),
             );
             stylesheet.push_ids(["mutable-title"], Style::default().height(Length::Px(14.0)));
+            stylesheet.push_class_if(
+                "mutable-typed",
+                Style::default().height(Length::Px(18.0)),
+                true,
+            );
+            stylesheet.push_id_if(
+                "mutable-skipped-id",
+                Style::default().height(Length::Px(999.0)),
+                false,
+            );
         })
         .extend_css_if(true, ".mutable-css { width: 24px; }")
         .expect("conditional mutable CSS should compose")
@@ -4358,7 +4426,9 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
         );
     assert!(mutable_stylesheet.has_rule_for_class("mutable-css"));
     assert!(mutable_stylesheet.has_rule_for_class("mutable-forgiving"));
+    assert!(mutable_stylesheet.has_rule_for_class("mutable-typed"));
     assert!(!mutable_stylesheet.has_rule_for_class("mutable-skipped"));
+    assert!(!mutable_stylesheet.has_rule_for_id("mutable-skipped-id"));
     let mut view = DocumentView::build(Size::new(320.0, 200.0), stylesheet, |ui| {
         ui.div("panel")
             .classes(["panel", "accent", "compact", "danger", "frame", "skipped"])
@@ -4382,7 +4452,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert_eq!(panel.style().radius, CornerRadii::all(4.0));
     assert_eq!(title.rect().size, Size::new(80.0, 20.0));
     assert_eq!(title.style().padding.left, 4.0);
-    assert_eq!(mutable_stylesheet.rule_count(), 7);
+    assert_eq!(mutable_stylesheet.rule_count(), 8);
     assert!(view.stylesheet().rule_count() >= 6);
 }
 

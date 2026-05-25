@@ -2136,6 +2136,68 @@ impl StyleSheet {
         self.rule(StyleSelector::id_state(id, state), style)
     }
 
+    pub fn rule_if(self, selector: StyleSelector, style: Style, present: bool) -> Self {
+        if present {
+            self.rule(selector, style)
+        } else {
+            self
+        }
+    }
+
+    pub fn element_if(self, element: Element, style: Style, present: bool) -> Self {
+        self.rule_if(StyleSelector::element(element), style, present)
+    }
+
+    pub fn class_if(self, class: impl Into<ClassName>, style: Style, present: bool) -> Self {
+        self.rule_if(StyleSelector::class(class), style, present)
+    }
+
+    pub fn classes_if<I, C>(mut self, classes: I, style: Style, present: bool) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.push_classes_if(classes, style, present);
+        self
+    }
+
+    pub fn id_if(self, id: impl Into<ElementId>, style: Style, present: bool) -> Self {
+        self.rule_if(StyleSelector::id(id), style, present)
+    }
+
+    pub fn ids_if<I, Id>(mut self, ids: I, style: Style, present: bool) -> Self
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        self.push_ids_if(ids, style, present);
+        self
+    }
+
+    pub fn state_if(self, state: ElementStateSelector, style: Style, present: bool) -> Self {
+        self.rule_if(StyleSelector::State(state), style, present)
+    }
+
+    pub fn class_state_if(
+        self,
+        class: impl Into<ClassName>,
+        state: ElementStateSelector,
+        style: Style,
+        present: bool,
+    ) -> Self {
+        self.rule_if(StyleSelector::class_state(class, state), style, present)
+    }
+
+    pub fn id_state_if(
+        self,
+        id: impl Into<ElementId>,
+        state: ElementStateSelector,
+        style: Style,
+        present: bool,
+    ) -> Self {
+        self.rule_if(StyleSelector::id_state(id, state), style, present)
+    }
+
     pub fn rules<I>(mut self, rules: I) -> Self
     where
         I: IntoIterator<Item = (StyleSelector, Style)>,
@@ -2222,12 +2284,26 @@ impl StyleSheet {
         self.push_style_rule(StyleRule::new(selector, style));
     }
 
+    pub fn push_rule_if(&mut self, selector: StyleSelector, style: Style, present: bool) {
+        if present {
+            self.push_rule(selector, style);
+        }
+    }
+
     pub fn push_element(&mut self, element: Element, style: Style) {
         self.push_rule(StyleSelector::element(element), style);
     }
 
+    pub fn push_element_if(&mut self, element: Element, style: Style, present: bool) {
+        self.push_rule_if(StyleSelector::element(element), style, present);
+    }
+
     pub fn push_class(&mut self, class: impl Into<ClassName>, style: Style) {
         self.push_rule(StyleSelector::class(class), style);
+    }
+
+    pub fn push_class_if(&mut self, class: impl Into<ClassName>, style: Style, present: bool) {
+        self.push_rule_if(StyleSelector::class(class), style, present);
     }
 
     pub fn push_classes<I, C>(&mut self, classes: I, style: Style)
@@ -2240,8 +2316,22 @@ impl StyleSheet {
         }
     }
 
+    pub fn push_classes_if<I, C>(&mut self, classes: I, style: Style, present: bool)
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        if present {
+            self.push_classes(classes, style);
+        }
+    }
+
     pub fn push_id(&mut self, id: impl Into<ElementId>, style: Style) {
         self.push_rule(StyleSelector::id(id), style);
+    }
+
+    pub fn push_id_if(&mut self, id: impl Into<ElementId>, style: Style, present: bool) {
+        self.push_rule_if(StyleSelector::id(id), style, present);
     }
 
     pub fn push_ids<I, Id>(&mut self, ids: I, style: Style)
@@ -2254,8 +2344,22 @@ impl StyleSheet {
         }
     }
 
+    pub fn push_ids_if<I, Id>(&mut self, ids: I, style: Style, present: bool)
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        if present {
+            self.push_ids(ids, style);
+        }
+    }
+
     pub fn push_state(&mut self, state: ElementStateSelector, style: Style) {
         self.push_rule(StyleSelector::State(state), style);
+    }
+
+    pub fn push_state_if(&mut self, state: ElementStateSelector, style: Style, present: bool) {
+        self.push_rule_if(StyleSelector::State(state), style, present);
     }
 
     pub fn push_class_state(
@@ -2267,6 +2371,16 @@ impl StyleSheet {
         self.push_rule(StyleSelector::class_state(class, state), style);
     }
 
+    pub fn push_class_state_if(
+        &mut self,
+        class: impl Into<ClassName>,
+        state: ElementStateSelector,
+        style: Style,
+        present: bool,
+    ) {
+        self.push_rule_if(StyleSelector::class_state(class, state), style, present);
+    }
+
     pub fn push_id_state(
         &mut self,
         id: impl Into<ElementId>,
@@ -2274,6 +2388,16 @@ impl StyleSheet {
         style: Style,
     ) {
         self.push_rule(StyleSelector::id_state(id, state), style);
+    }
+
+    pub fn push_id_state_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        state: ElementStateSelector,
+        style: Style,
+        present: bool,
+    ) {
+        self.push_rule_if(StyleSelector::id_state(id, state), style, present);
     }
 
     pub fn push_conditional_rule(
