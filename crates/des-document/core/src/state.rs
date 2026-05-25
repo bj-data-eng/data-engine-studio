@@ -795,6 +795,37 @@ impl<Action> DocumentCommandRegistry<Action> {
         Self::default()
     }
 
+    pub fn with(mut self, configure: impl FnOnce(&mut Self)) -> Self {
+        configure(&mut self);
+        self
+    }
+
+    pub fn when(mut self, present: bool, configure: impl FnOnce(&mut Self)) -> Self {
+        if present {
+            configure(&mut self);
+        }
+        self
+    }
+
+    pub fn try_with<E>(
+        mut self,
+        configure: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        configure(&mut self)?;
+        Ok(self)
+    }
+
+    pub fn try_when<E>(
+        mut self,
+        present: bool,
+        configure: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        if present {
+            configure(&mut self)?;
+        }
+        Ok(self)
+    }
+
     pub fn bind(mut self, command: impl Into<String>, action: Action) -> Self {
         self.push(command, action);
         self

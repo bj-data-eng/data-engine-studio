@@ -1,16 +1,16 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget,
     DocumentAuthoringError, DocumentBuilder, DocumentCommandAction, DocumentCommandBinding,
-    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentEvent,
-    DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection, DocumentProjectionOperation,
-    DocumentProjectionOperationKind, DocumentProjectionReport, DocumentView, DocumentWidget,
-    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, ElementProjectionPatch,
-    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
-    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextContent,
-    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    VisualCloneOptions, WhiteSpace,
+    DocumentCommandDispatchReport, DocumentCommandRef, DocumentCommandRegistry, DocumentEngine,
+    DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection,
+    DocumentProjectionOperation, DocumentProjectionOperationKind, DocumentProjectionReport,
+    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId,
+    ElementProjectionPatch, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent,
+    KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextContent, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
+    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -694,6 +694,31 @@ fn document_command_registry_supports_conditional_action_bindings() {
             [(ElementBehaviorEvent::Click, "ignored", AppAction::Cancel)],
             false,
         )
+        .with(|registry| {
+            registry.push_pointer_enter("hover-run", AppAction::Run);
+            registry.push_pointer_leave_if("hover-cancel", AppAction::Cancel, false);
+        })
+        .when(true, |registry| {
+            registry.push_pointer_down("press-run", AppAction::Run);
+        })
+        .when(false, |registry| {
+            registry.push_pointer_up("release-cancel", AppAction::Cancel);
+        })
+        .try_with::<&'static str>(|registry| {
+            registry.push_drag_start("drag-run", AppAction::Run);
+            Ok(())
+        })
+        .expect("fallible command configuration should compose")
+        .try_when::<&'static str>(true, |registry| {
+            registry.push_drag_end("drag-end-run", AppAction::Run);
+            Ok(())
+        })
+        .expect("conditional fallible command configuration should compose")
+        .try_when::<&'static str>(false, |registry| {
+            registry.push_scroll("scroll-cancel", AppAction::Cancel);
+            Err("skipped")
+        })
+        .expect("skipped fallible command configuration should not run")
         .bind_key_down_if("run-key", AppAction::RunKey, true)
         .bind_key_down_if("cancel-key", AppAction::CancelKey, false)
         .bind_bindings_if(
@@ -715,7 +740,7 @@ fn document_command_registry_supports_conditional_action_bindings() {
     let key_frame =
         view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter), &registry);
 
-    assert_eq!(registry.bindings().len(), 5);
+    assert_eq!(registry.bindings().len(), 9);
     assert!(click_frame.contains_action(&AppAction::Run));
     assert!(!click_frame.contains_action(&AppAction::Cancel));
     assert!(context_frame.contains_action_for_target_intent(
@@ -725,6 +750,25 @@ fn document_command_registry_supports_conditional_action_bindings() {
     ));
     assert!(key_frame.contains_action(&AppAction::RunKey));
     assert!(!key_frame.contains_action(&AppAction::CancelKey));
+    let command_target = ElementId::new("run");
+    assert!(
+        registry
+            .action_for_event(DocumentCommandRef {
+                target: &command_target,
+                event: DocumentEventKind::Pressed,
+                command: "press-run",
+            })
+            .is_some()
+    );
+    assert!(
+        registry
+            .action_for_event(DocumentCommandRef {
+                target: &command_target,
+                event: DocumentEventKind::Scrolled(ScrollAxis::Vertical),
+                command: "scroll-cancel",
+            })
+            .is_none()
+    );
 
     let mut pushed = DocumentCommandRegistry::new();
     pushed.push_click_if("run", AppAction::Run, true);
