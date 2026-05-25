@@ -1740,6 +1740,8 @@ fn document_prelude_exposes_common_app_authoring_surface() {
 
 #[test]
 fn stylesheet_composes_typed_rules_and_css_fluently() {
+    let compact = true;
+    let destructive = false;
     let stylesheet = StyleSheet::new()
         .element(Element::Div, Style::default().radius(4.0))
         .class("panel", Style::default().height(Length::Px(48.0)))
@@ -1753,20 +1755,48 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
         )
         .with_css(".panel { width: 120px; }")
         .expect("strict CSS should compose")
+        .when(compact, |stylesheet| {
+            stylesheet.push_class("compact", Style::default().padding(Insets::all(2.0)));
+        })
+        .when(destructive, |stylesheet| {
+            stylesheet.push_class(
+                "danger",
+                Style::default().background(Color::rgb(255, 180, 180)),
+            );
+        })
         .extended(
             StyleSheet::from_css_forgiving(
                 ".panel { unknown-property: 1px; } .title { width: 80px; height: 20px; }",
             )
             .expect("forgiving CSS should keep valid rules"),
+        )
+        .extended_if(
+            StyleSheet::new().class("frame", Style::default().border(Color::rgb(90, 120, 180))),
+            compact,
+        )
+        .extended_if(
+            StyleSheet::new().class("skipped", Style::default().width(Length::Px(999.0))),
+            destructive,
+        );
+    let mut mutable_stylesheet = StyleSheet::new();
+    mutable_stylesheet
+        .style_if(true, |stylesheet| {
+            stylesheet.push_class("mutable", Style::default().height(Length::Px(12.0)));
+        })
+        .extend_if(
+            StyleSheet::new().class("ignored", Style::default().width(Length::Px(999.0))),
+            false,
         );
     let mut view = DocumentView::build(Size::new(320.0, 200.0), stylesheet, |ui| {
-        ui.div("panel").classes(["panel", "accent"]).children(|ui| {
-            ui.text_element(
-                "title",
-                ElementSpec::new(Element::Text).class("title"),
-                "Ready",
-            );
-        });
+        ui.div("panel")
+            .classes(["panel", "accent", "compact", "danger", "frame", "skipped"])
+            .children(|ui| {
+                ui.text_element(
+                    "title",
+                    ElementSpec::new(Element::Text).class("title"),
+                    "Ready",
+                );
+            });
     });
 
     let output = view.update();
@@ -1775,9 +1805,12 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
 
     assert_eq!(panel.rect().size, Size::new(120.0, 48.0));
     assert_eq!(panel.style().background, Some(Color::rgb(220, 238, 255)));
+    assert_eq!(panel.style().border, Some(Color::rgb(90, 120, 180)));
+    assert_eq!(panel.style().padding, Insets::all(2.0));
     assert_eq!(panel.style().radius, CornerRadii::all(4.0));
     assert_eq!(title.rect().size, Size::new(80.0, 20.0));
     assert_eq!(title.style().padding.left, 4.0);
+    assert_eq!(mutable_stylesheet.rule_count(), 1);
     assert!(view.stylesheet().rule_count() >= 6);
 }
 

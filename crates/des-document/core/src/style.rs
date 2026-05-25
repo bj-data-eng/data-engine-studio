@@ -2108,6 +2108,18 @@ impl StyleSheet {
         self
     }
 
+    pub fn when(mut self, present: bool, style: impl FnOnce(&mut Self)) -> Self {
+        self.style_if(present, style);
+        self
+    }
+
+    pub fn style_if(&mut self, present: bool, style: impl FnOnce(&mut Self)) -> &mut Self {
+        if present {
+            style(self);
+        }
+        self
+    }
+
     pub fn conditional_rule(
         mut self,
         condition: StyleCondition,
@@ -2242,6 +2254,17 @@ impl StyleSheet {
 
     pub fn extended(mut self, stylesheet: StyleSheet) -> Self {
         self.extend(stylesheet);
+        self
+    }
+
+    pub fn extend_if(&mut self, stylesheet: StyleSheet, present: bool) {
+        if present {
+            self.extend(stylesheet);
+        }
+    }
+
+    pub fn extended_if(mut self, stylesheet: StyleSheet, present: bool) -> Self {
+        self.extend_if(stylesheet, present);
         self
     }
 
