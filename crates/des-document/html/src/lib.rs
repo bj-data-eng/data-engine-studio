@@ -137,6 +137,41 @@ impl HtmlDocument {
         })
     }
 
+    /// Configures the parsed HTML tree and returns it.
+    pub fn with(mut self, configure: impl FnOnce(&mut Self)) -> Self {
+        configure(&mut self);
+        self
+    }
+
+    /// Fallibly configures the parsed HTML tree and returns it.
+    pub fn try_with<E>(
+        mut self,
+        configure: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        configure(&mut self)?;
+        Ok(self)
+    }
+
+    /// Conditionally configures the parsed HTML tree and returns it.
+    pub fn when(mut self, present: bool, configure: impl FnOnce(&mut Self)) -> Self {
+        if present {
+            configure(&mut self);
+        }
+        self
+    }
+
+    /// Conditionally and fallibly configures the parsed HTML tree and returns it.
+    pub fn try_when<E>(
+        mut self,
+        present: bool,
+        configure: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        if present {
+            configure(&mut self)?;
+        }
+        Ok(self)
+    }
+
     /// Returns the top-level parsed HTML nodes in source order.
     pub fn children(&self) -> &[HtmlNode] {
         &self.children
@@ -1243,6 +1278,41 @@ impl HtmlStylesheet {
     /// Pairs a parsed HTML tree with a parsed document stylesheet.
     pub fn new(html: HtmlDocument, stylesheet: StyleSheet) -> Self {
         Self { html, stylesheet }
+    }
+
+    /// Configures this parsed HTML/CSS bundle and returns it.
+    pub fn with(mut self, configure: impl FnOnce(&mut Self)) -> Self {
+        configure(&mut self);
+        self
+    }
+
+    /// Fallibly configures this parsed HTML/CSS bundle and returns it.
+    pub fn try_with<E>(
+        mut self,
+        configure: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        configure(&mut self)?;
+        Ok(self)
+    }
+
+    /// Conditionally configures this parsed HTML/CSS bundle and returns it.
+    pub fn when(mut self, present: bool, configure: impl FnOnce(&mut Self)) -> Self {
+        if present {
+            configure(&mut self);
+        }
+        self
+    }
+
+    /// Conditionally and fallibly configures this parsed HTML/CSS bundle and returns it.
+    pub fn try_when<E>(
+        mut self,
+        present: bool,
+        configure: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        if present {
+            configure(&mut self)?;
+        }
+        Ok(self)
     }
 
     /// Returns the browser-parsed HTML document or fragment.

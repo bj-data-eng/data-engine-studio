@@ -1751,19 +1751,57 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         Run,
     }
 
-    let bundle = HtmlStylesheet::parse_fragment(
-        r#"<button id="run" class="primary" on:click="project.run">Run</button>"#,
-        r#".primary { width: 96px; height: 32px; }"#,
+    let html = HtmlDocument::parse_fragment(
+        r#"<script>ignored()</script><button id="run" class="primary" on:click="project.run">Run</button>"#,
     )
-    .and_then(|bundle| bundle.with_css(".primary { padding: 2px; }"))
-    .and_then(|bundle| bundle.with_css_if(false, ".primary { width: ; }"))
-    .and_then(|bundle| {
-        bundle.with_css_forgiving(".primary { unknown-property: 1px; } .primary { margin: 1px; }")
+    .map(|html| {
+        html.with(|html| html.diagnostics.clear())
+            .when(false, |html| html.children.clear())
     })
-    .map(|bundle| {
-        bundle.with_stylesheet(StyleSheet::new().class("primary", Style::default().radius(4.0)))
-    })
-    .expect("HTML and CSS should compile together from the prelude");
+    .and_then(|html| html.try_with(|html| {
+        assert!(html.find_by_id("run").is_some());
+        Ok::<_, HtmlError>(())
+    }))
+    .and_then(|html| html.try_when(true, |html| {
+        assert!(html.has_command_hook("project.run"));
+        Ok::<_, HtmlError>(())
+    }))
+    .expect("HTML should compile and configure from the prelude");
+    let bundle = html
+        .with_css(r#".primary { width: 96px; height: 32px; }"#)
+        .and_then(|bundle| bundle.with_css(".primary { padding: 2px; }"))
+        .and_then(|bundle| bundle.with_css_if(false, ".primary { width: ; }"))
+        .and_then(|bundle| {
+            bundle
+                .with_css_forgiving(".primary { unknown-property: 1px; } .primary { margin: 1px; }")
+        })
+        .map(|bundle| {
+            bundle
+                .with(|bundle| {
+                    bundle.extend_stylesheet(
+                        StyleSheet::new().class("primary", Style::default().radius(4.0)),
+                    );
+                })
+                .when(false, |bundle| {
+                    bundle.replace_stylesheet(StyleSheet::new());
+                })
+        })
+        .and_then(|bundle| {
+            bundle.try_with(|bundle| {
+                bundle.extend_css_forgiving(".primary { unknown-property: 2px; }")?;
+                Ok::<_, HtmlError>(())
+            })
+        })
+        .and_then(|bundle| {
+            bundle.try_when(true, |bundle| {
+                bundle.extend_stylesheet(
+                    StyleSheet::new()
+                        .class("primary", Style::default().border(Color::rgb(90, 120, 180))),
+                );
+                Ok::<_, HtmlError>(())
+            })
+        })
+        .expect("HTML and CSS should compile together from the prelude");
     assert!(bundle.html().is_clean());
     assert_eq!(bundle.html().children()[0].id.as_deref(), Some("run"));
     assert!(bundle.stylesheet().rule_count() >= 4);
@@ -1783,6 +1821,7 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     assert_eq!(run.style().padding, Insets::all(2.0));
     assert_eq!(run.style().margin, Insets::all(1.0));
     assert_eq!(run.style().radius, CornerRadii::all(4.0));
+    assert_eq!(run.style().border, Some(Color::rgb(90, 120, 180)));
     assert_eq!(surface.commands().bindings().len(), 1);
     assert_eq!(frame.actions.len(), 1);
     assert_eq!(frame.actions[0].action, HtmlAction::Run);
