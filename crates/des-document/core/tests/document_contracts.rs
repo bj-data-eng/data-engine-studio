@@ -3281,6 +3281,9 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         word_break: WordBreak::BreakAll,
         ..TextLayoutStyle::default()
     };
+    let projection = DocumentProjection::new()
+        .set_text("run", "Run now")
+        .set_class("run", "is-ready", true);
     let _normalized: Option<NormalizedText> = None;
     let _layout_line: Option<TextLayoutLine> = None;
     let _layout_run: Option<TextLayoutRun> = None;
@@ -3301,6 +3304,13 @@ fn document_prelude_exposes_common_app_authoring_surface() {
     );
     assert_eq!(text_style.overflow_wrap, OverflowWrap::Anywhere);
     assert_eq!(text_style.word_break, WordBreak::BreakAll);
+    assert!(projection.has_operation_for_kind("run", DocumentProjectionOperationKind::Text));
+    assert_eq!(
+        projection
+            .operations_of_kind(DocumentProjectionOperationKind::Class)
+            .count(),
+        1
+    );
 }
 
 #[test]
