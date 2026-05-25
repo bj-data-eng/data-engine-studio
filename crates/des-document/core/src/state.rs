@@ -507,6 +507,21 @@ impl DocumentCommand {
     pub fn is_click(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::Click)
     }
+
+    /// Returns true when this command was emitted by context-menu intent.
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns true when this command was emitted by pointer-enter intent.
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns true when this command was emitted by pointer-leave intent.
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -545,6 +560,21 @@ impl DocumentCommandRef<'_> {
     /// Returns true when this command was emitted by click intent.
     pub fn is_click(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this command was emitted by context-menu intent.
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns true when this command was emitted by pointer-enter intent.
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns true when this command was emitted by pointer-leave intent.
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 }
 
@@ -1505,6 +1535,21 @@ impl<Action> DocumentCommandActionRef<'_, Action> {
         self.matches_intent(ElementBehaviorEvent::Click)
     }
 
+    /// Returns true when this action was emitted by context-menu intent.
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns true when this action was emitted by pointer-enter intent.
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns true when this action was emitted by pointer-leave intent.
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
     /// Returns true when this command mapped to the supplied typed app action.
     pub fn is_action(&self, action: &Action) -> bool
     where
@@ -1556,6 +1601,21 @@ impl<Action> DocumentCommandAction<Action> {
     /// Returns true when this action was emitted by click intent.
     pub fn is_click(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this action was emitted by context-menu intent.
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns true when this action was emitted by pointer-enter intent.
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns true when this action was emitted by pointer-leave intent.
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 
     /// Returns true when this command mapped to the supplied typed app action.
@@ -1707,6 +1767,21 @@ impl DocumentEvent {
     /// Returns true when this event is click intent.
     pub fn is_click(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this event is context-menu intent.
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns true when this event is pointer-enter intent.
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns true when this event is pointer-leave intent.
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 
     /// Returns true when this event is key-down intent.

@@ -138,6 +138,10 @@ fn document_output_exposes_interaction_query_helpers() {
         output.first_event_for("run").unwrap(),
         &DocumentEvent::pointer_entered("run")
     );
+    let pointer_entered = output.first_event_for("run").unwrap();
+    assert!(pointer_entered.is_pointer_enter());
+    assert!(!pointer_entered.is_pointer_leave());
+    assert!(!pointer_entered.is_context_menu());
     assert_eq!(
         output
             .first_event_of_kind(DocumentEventKind::Pressed)
@@ -205,6 +209,9 @@ fn document_output_exposes_interaction_query_helpers() {
     assert_eq!(clicked.kind(), DocumentEventKind::Clicked);
     assert!(clicked.matches_intent(ElementBehaviorEvent::Click));
     assert!(clicked.is_click());
+    assert!(!clicked.is_context_menu());
+    assert!(!clicked.is_pointer_enter());
+    assert!(!clicked.is_pointer_leave());
     assert!(!clicked.is_key_down());
     assert!(!clicked.is_key_up());
     assert!(!clicked.is_drag());
@@ -219,6 +226,12 @@ fn document_output_exposes_interaction_query_helpers() {
         Some("run")
     );
     assert!(exit_output.pointer_exited_for("run"));
+    assert!(
+        exit_output
+            .first_event_for("run")
+            .unwrap()
+            .is_pointer_leave()
+    );
     assert!(
         exit_output
             .pointer_exited_targets()
@@ -358,6 +371,10 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert_eq!(*run_actions[0].action, AppAction::RunQuery);
     assert_eq!(clicked_commands.len(), 1);
     assert_eq!(clicked_commands[0].command, "run-query");
+    assert!(clicked_commands[0].is_click());
+    assert!(!clicked_commands[0].is_context_menu());
+    assert!(!clicked_commands[0].is_pointer_enter());
+    assert!(!clicked_commands[0].is_pointer_leave());
     assert_eq!(
         output
             .commands_for("run")
@@ -384,6 +401,7 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
             .command(),
         "run-query"
     );
+    assert!(output.first_command().unwrap().is_click());
     assert!(output.has_command("run", "run-query"));
     assert!(output.has_command_kind("run", DocumentEventKind::Clicked, "run-query"));
     assert!(!output.has_command("cancel", "cancel-query"));
@@ -516,10 +534,16 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     );
     assert_eq!(context_actions.len(), 1);
     assert_eq!(*context_actions[0].action, AppAction::CommitByContextMenu);
+    assert!(context_actions[0].is_context_menu());
+    assert!(!context_actions[0].is_pointer_enter());
     assert_eq!(hover_actions.len(), 1);
     assert_eq!(*hover_actions[0].action, AppAction::CommitByPointerEnter);
+    assert!(hover_actions[0].is_pointer_enter());
+    assert!(!hover_actions[0].is_pointer_leave());
     assert_eq!(leave_actions.len(), 1);
     assert_eq!(*leave_actions[0].action, AppAction::CommitByPointerLeave);
+    assert!(leave_actions[0].is_pointer_leave());
+    assert!(!leave_actions[0].is_pointer_enter());
 }
 
 #[test]
@@ -842,6 +866,9 @@ fn document_action_frame_supports_app_update_loop_queries() {
     assert_eq!(click_action.action(), &AppAction::Run);
     assert!(click_action.matches_intent(ElementBehaviorEvent::Click));
     assert!(click_action.is_click());
+    assert!(!click_action.is_context_menu());
+    assert!(!click_action.is_pointer_enter());
+    assert!(!click_action.is_pointer_leave());
     assert!(click_action.is_action(&AppAction::Run));
     assert_eq!(click_frame.actions_for("run").count(), 1);
     assert_eq!(
@@ -911,6 +938,12 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .map(|action| &action.action),
         Some(&AppAction::Inspect)
     );
+    assert!(
+        hover_frame
+            .first_pointer_enter_action()
+            .unwrap()
+            .is_pointer_enter()
+    );
     assert!(hover_frame.contains_pointer_enter_action(&AppAction::Inspect));
     let leave_frame = view.update_with_input_actions(
         DocumentInput::pointer_at(Point::new(180.0, 120.0)),
@@ -922,6 +955,12 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .first_pointer_leave_action()
             .map(|action| &action.action),
         Some(&AppAction::Uninspect)
+    );
+    assert!(
+        leave_frame
+            .first_pointer_leave_action()
+            .unwrap()
+            .is_pointer_leave()
     );
     assert!(leave_frame.contains_pointer_leave_action(&AppAction::Uninspect));
 }
