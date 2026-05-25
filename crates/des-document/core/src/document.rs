@@ -1334,6 +1334,26 @@ pub trait DocumentWidget {
     fn push_styles(&self, _stylesheet: &mut StyleSheet) {}
 
     fn push_projection(&self, _projection: &mut DocumentProjection) {}
+
+    fn view(&self, viewport: Size) -> crate::DocumentView {
+        self.view_with_stylesheet(viewport, StyleSheet::new())
+    }
+
+    fn try_view(&self, viewport: Size) -> DocumentResult<crate::DocumentView> {
+        self.try_view_with_stylesheet(viewport, StyleSheet::new())
+    }
+
+    fn view_with_stylesheet(&self, viewport: Size, stylesheet: StyleSheet) -> crate::DocumentView {
+        crate::DocumentView::build_widget(viewport, stylesheet, self)
+    }
+
+    fn try_view_with_stylesheet(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+    ) -> DocumentResult<crate::DocumentView> {
+        crate::DocumentView::try_build_widget(viewport, stylesheet, self)
+    }
 }
 
 pub struct ElementBuilder<'a> {

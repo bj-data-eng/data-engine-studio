@@ -1341,6 +1341,72 @@ fn document_view_can_mount_a_widget_with_its_styles() {
 }
 
 #[test]
+fn document_widget_trait_builds_views_through_its_front_door() {
+    struct BadgeWidget {
+        ready: bool,
+    }
+
+    impl DocumentWidget for BadgeWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("badge")
+                .classes(["badge", "accent"])
+                .command("badge.toggle")
+                .text("Pending");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_class("badge", Style::default().size(88.0, 24.0));
+            stylesheet.push_class(
+                "is-ready",
+                Style::default().background(Color::rgb(205, 239, 221)),
+            );
+        }
+
+        fn push_projection(&self, projection: &mut DocumentProjection) {
+            projection
+                .element("badge")
+                .text(if self.ready { "Ready" } else { "Waiting" })
+                .class("is-ready", self.ready);
+        }
+    }
+
+    let widget = BadgeWidget { ready: true };
+    let mut direct = widget.view(Size::new(240.0, 120.0));
+    let mut with_stylesheet = widget.view_with_stylesheet(
+        Size::new(240.0, 120.0),
+        StyleSheet::new().class("accent", Style::default().border(Color::rgb(90, 120, 180))),
+    );
+    let boxed: Box<dyn DocumentWidget> = Box::new(BadgeWidget { ready: true });
+    let mut boxed_view = boxed.try_view(Size::new(240.0, 120.0)).unwrap();
+
+    let direct_output = direct.update();
+    let direct_badge = direct_output.snapshot().find("badge").unwrap();
+    assert_eq!(direct_badge.text(), Some("Ready".to_owned()));
+    assert_eq!(direct_badge.rect().size, Size::new(88.0, 24.0));
+    assert_eq!(
+        direct_badge.style().background,
+        Some(Color::rgb(205, 239, 221))
+    );
+
+    let styled_output = with_stylesheet.update();
+    assert_eq!(
+        styled_output
+            .snapshot()
+            .find("badge")
+            .unwrap()
+            .style()
+            .border,
+        Some(Color::rgb(90, 120, 180))
+    );
+
+    let boxed_output = boxed_view.update();
+    assert_eq!(
+        boxed_output.snapshot().find("badge").unwrap().text(),
+        Some("Ready".to_owned())
+    );
+}
+
+#[test]
 fn document_view_widget_composition_can_return_projection_errors() {
     struct BrokenWidget;
 
