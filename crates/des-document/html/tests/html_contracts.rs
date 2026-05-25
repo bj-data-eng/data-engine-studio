@@ -750,10 +750,17 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {
         Run,
+        CommitByClick,
+        CommitByKeyboard,
     }
 
     let bundle = HtmlStylesheet::parse_fragment(
-        r#"<button id="run" class="primary" data-command="project.run">Run</button>"#,
+        r#"
+        <section id="panel">
+          <button id="run" class="primary" data-command="project.run">Run</button>
+          <button id="commit" autofocus data-command="project.commit" on:keydown="project.commit">Commit</button>
+        </section>
+        "#,
         r#".primary { width: 96px; height: 32px; }"#,
     )
     .expect("HTML and CSS should compile together");
@@ -771,6 +778,40 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
     assert_eq!(report.handled, 1);
     assert_eq!(report.unhandled, 0);
     assert_eq!(actions, vec![(ElementId::new("run"), HtmlAction::Run)]);
+
+    let hooks = bundle.behavior_hooks();
+    assert_eq!(hooks.len(), 3);
+    assert!(hooks.iter().any(|hook| {
+        hook.command() == "project.commit" && hook.matches_intent(ElementBehaviorEvent::KeyDown)
+    }));
+
+    let registry = bundle.command_registry(|hook| match (hook.command(), hook.intent()) {
+        ("project.run", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::Run),
+        ("project.commit", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::CommitByClick),
+        ("project.commit", Some(ElementBehaviorEvent::KeyDown)) => {
+            Some(HtmlAction::CommitByKeyboard)
+        }
+        _ => None,
+    });
+    let click_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+        )
+        .expect("HTML-authored command registry should route click actions");
+    let key_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            &registry,
+        )
+        .expect("HTML-authored command registry should route keyboard actions");
+
+    assert!(click_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(!click_frame.contains_action(&HtmlAction::CommitByKeyboard));
+    assert!(key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
+    assert!(!key_frame.contains_clicked_action(&HtmlAction::CommitByClick));
 }
 
 #[test]

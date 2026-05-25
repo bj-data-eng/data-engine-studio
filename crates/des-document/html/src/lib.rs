@@ -186,6 +186,46 @@ impl HtmlDocument {
         nodes
     }
 
+    /// Returns Rust behavior hooks declared by HTML nodes in document order.
+    pub fn behavior_hooks(&self) -> Vec<&HtmlBehaviorHook> {
+        let mut hooks = Vec::new();
+        for child in &self.children {
+            child.collect_behavior_hooks(&mut hooks);
+        }
+        hooks
+    }
+
+    /// Pushes typed Rust command bindings for HTML-authored behavior hooks.
+    ///
+    /// The mapper receives each parsed `on:*` or `data-command` hook in document
+    /// order. Returning `Some(action)` binds the hook's declared command to the
+    /// parsed document event intent; hooks whose event name is not part of the
+    /// document input model are left unbound because they cannot be emitted.
+    pub fn push_commands<Action>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        mut action_for: impl FnMut(&HtmlBehaviorHook) -> Option<Action>,
+    ) {
+        for hook in self.behavior_hooks() {
+            let Some(intent) = hook.intent() else {
+                continue;
+            };
+            if let Some(action) = action_for(hook) {
+                registry.push_on(intent, hook.command(), action);
+            }
+        }
+    }
+
+    /// Creates typed Rust command bindings for HTML-authored behavior hooks.
+    pub fn command_registry<Action>(
+        &self,
+        action_for: impl FnMut(&HtmlBehaviorHook) -> Option<Action>,
+    ) -> DocumentCommandRegistry<Action> {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_commands(&mut registry, action_for);
+        registry
+    }
+
     /// Creates a retained document from this HTML tree.
     pub fn to_document(&self, viewport: Size) -> HtmlResult<Document> {
         Ok(Document::build(viewport, |document| {
@@ -570,6 +610,28 @@ impl HtmlStylesheet {
         &self.stylesheet
     }
 
+    /// Returns Rust behavior hooks declared by the parsed HTML in document order.
+    pub fn behavior_hooks(&self) -> Vec<&HtmlBehaviorHook> {
+        self.html.behavior_hooks()
+    }
+
+    /// Pushes typed Rust command bindings for HTML-authored behavior hooks.
+    pub fn push_commands<Action>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        action_for: impl FnMut(&HtmlBehaviorHook) -> Option<Action>,
+    ) {
+        self.html.push_commands(registry, action_for);
+    }
+
+    /// Creates typed Rust command bindings for HTML-authored behavior hooks.
+    pub fn command_registry<Action>(
+        &self,
+        action_for: impl FnMut(&HtmlBehaviorHook) -> Option<Action>,
+    ) -> DocumentCommandRegistry<Action> {
+        self.html.command_registry(action_for)
+    }
+
     /// Parses an HTML document and CSS stylesheet into typed document inputs.
     pub fn parse(html: &str, css: &str) -> HtmlResult<Self> {
         let stylesheet = parse_stylesheet(css)?;
@@ -940,6 +1002,13 @@ impl HtmlNode {
         nodes
     }
 
+    /// Returns Rust behavior hooks declared in this subtree in document order.
+    pub fn behavior_hooks(&self) -> Vec<&HtmlBehaviorHook> {
+        let mut hooks = Vec::new();
+        self.collect_behavior_hooks(&mut hooks);
+        hooks
+    }
+
     fn collect_by_tag<'a>(&'a self, tag: &str, nodes: &mut Vec<&'a HtmlNode>) {
         if self.tag == tag {
             nodes.push(self);
@@ -955,6 +1024,13 @@ impl HtmlNode {
         }
         for child in &self.children {
             child.collect_with_class(class, nodes);
+        }
+    }
+
+    fn collect_behavior_hooks<'a>(&'a self, hooks: &mut Vec<&'a HtmlBehaviorHook>) {
+        hooks.extend(self.behavior_hooks.iter());
+        for child in &self.children {
+            child.collect_behavior_hooks(hooks);
         }
     }
 
