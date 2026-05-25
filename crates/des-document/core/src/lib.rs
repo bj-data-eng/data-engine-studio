@@ -70,3 +70,35 @@ pub use text::{
     WordBreak,
 };
 pub use view::{DocumentView, DocumentViewBuilder};
+
+/// Common app-facing imports for authoring document UIs.
+///
+/// This prelude intentionally collects the fluent Rust authoring surface,
+/// browser-inspired style/document primitives, retained-state projection, and
+/// interaction outputs most application code needs. Lower-level layout,
+/// animation, and host-adapter details remain available from the crate root.
+pub mod prelude {
+    pub use crate::{
+        AlignContent, AlignItems, AlignSelf, Anchor, AnchorPlacement, BorderStyle, ChangeSet,
+        ClassName, Color, ComplexSelector, CompoundSelector, ComputedStyle, ContainerQuery,
+        CornerRadii, CssParseError, Direction, Display, Document, DocumentBuilder, DocumentCommand,
+        DocumentCommandActionRef, DocumentCommandBinding, DocumentCommandDispatchReport,
+        DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
+        DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics,
+        DocumentOutput, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
+        DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView, DocumentViewBuilder,
+        DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook,
+        ElementBuilder, ElementId, ElementProjection, ElementSnapshot, ElementSpec, ElementState,
+        ElementStateSelector, FallbackTextMeasurer, FlexDirection, FlexWrap, FloatingBoundary,
+        FloatingPlacement, Glyph, GridAutoFlow, GridPlacement, GridTemplateArea,
+        GridTemplateComponent, GridTrack, HitResult, InlineTextStyle, Insets, JustifyContent,
+        KeyInput, KeyModifiers, Length, NthChildFormula, Overflow, Point, PointerInput, Position,
+        PositionInsets, Rect, ResolvedElement, ResolvedFloating, ScrollAxis, ScrollChrome, Shadow,
+        Size, Style, StyleCondition, StyleRule, StyleSelector, StyleSheet, TableCellSpec,
+        TableColumnId, TableColumnSpec, TableSpec, TableTrackSize, TextAlign, TextContent,
+        TextDecoration, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+        TextOverflow, TextRun, TextSelectionGranularity, TextTransform, TextVerticalAlign,
+        TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, VisualElementClone,
+        WhiteSpace,
+    };
+}

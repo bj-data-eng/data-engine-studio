@@ -200,9 +200,17 @@ impl DocumentViewBuilder {
         Ok(self)
     }
 
+    pub fn with_css(self, css: &str) -> Result<Self, crate::CssParseError> {
+        self.css(css)
+    }
+
     pub fn css_forgiving(mut self, css: &str) -> Result<Self, crate::CssParseError> {
         self.stylesheet.extend_css_forgiving(css)?;
         Ok(self)
+    }
+
+    pub fn with_css_forgiving(self, css: &str) -> Result<Self, crate::CssParseError> {
+        self.css_forgiving(css)
     }
 
     pub fn widget_styles(mut self, widget: &impl DocumentWidget) -> Self {

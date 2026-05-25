@@ -598,6 +598,63 @@ fn document_builder_and_engine_update_are_front_door_api() {
 }
 
 #[test]
+fn document_prelude_exposes_common_app_authoring_surface() {
+    use des_document::prelude::*;
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+    }
+
+    struct RunBadge;
+
+    impl DocumentWidget for RunBadge {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("run")
+                .classes(["badge", "primary"])
+                .aria("label", "Run")
+                .on_click("run")
+                .text("Run");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_rule(
+                StyleSelector::class("badge"),
+                Style::default().size(72.0, 28.0),
+            );
+        }
+    }
+
+    let widget = RunBadge;
+    let mut view = DocumentView::compose(Size::new(240.0, 120.0))
+        .with_css(".primary { background: rgb(220, 238, 255); }")
+        .expect("CSS should compose from the prelude")
+        .widget(&widget);
+    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
+        position: Point::new(8.0, 8.0),
+        primary_delta: Point::ZERO,
+        primary_down: true,
+        primary_pressed: false,
+        primary_clicked: true,
+        primary_click_count: 1,
+        secondary_clicked: false,
+        time_seconds: 0.0,
+    }));
+    let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
+    let actions = registry
+        .command_actions_of_kind(&output, DocumentEventKind::Clicked)
+        .collect::<Vec<_>>();
+    let run = output.snapshot().find("run").unwrap();
+
+    assert_eq!(actions.len(), 1);
+    assert_eq!(*actions[0].action, AppAction::Run);
+    assert!(run.has_all_classes(["badge", "primary"]));
+    assert_eq!(run.aria("label"), Some("Run"));
+    assert_eq!(run.rect().size, Size::new(72.0, 28.0));
+    assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
+}
+
+#[test]
 fn stylesheet_composes_typed_rules_and_css_fluently() {
     let stylesheet = StyleSheet::new()
         .rules([
