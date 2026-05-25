@@ -7,8 +7,8 @@
 
 use des_document::{
     Document, DocumentActionFrame, DocumentBuilder, DocumentCommandRegistry, DocumentInput,
-    DocumentOutput, DocumentView, Element, ElementBehaviorHook, ElementSpec, Size, StyleSheet,
-    TextContent,
+    DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView, Element,
+    ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -53,6 +53,8 @@ pub enum HtmlError {
     Css(String),
     /// The HTML or CSS file could not be read or inspected.
     Io(String),
+    /// The parsed HTML emitted a document, but a state projection could not be applied.
+    Document(String),
 }
 
 impl fmt::Display for HtmlError {
@@ -69,6 +71,7 @@ impl fmt::Display for HtmlError {
             ),
             Self::Css(message) => write!(f, "html css error: {message}"),
             Self::Io(message) => write!(f, "html io error: {message}"),
+            Self::Document(message) => write!(f, "html document error: {message}"),
         }
     }
 }
@@ -78,6 +81,12 @@ impl std::error::Error for HtmlError {}
 impl From<std::io::Error> for HtmlError {
     fn from(error: std::io::Error) -> Self {
         Self::Io(error.to_string())
+    }
+}
+
+impl From<des_document::DocumentError> for HtmlError {
+    fn from(error: des_document::DocumentError) -> Self {
+        Self::Document(error.to_string())
     }
 }
 
@@ -389,6 +398,132 @@ impl HtmlStylesheet {
             self.html.to_document(viewport)?,
             self.stylesheet,
         ))
+    }
+
+    /// Creates a view, applies retained state projection, and returns both.
+    pub fn to_view_with_projection(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentView)> {
+        let mut view = self.to_view(viewport)?;
+        let report = view.project(projection)?;
+        Ok((report, view))
+    }
+
+    /// Creates a view and applies retained state projection built in place.
+    pub fn to_view_projected_with(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentView)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.to_view_with_projection(viewport, &projection)
+    }
+
+    /// Creates a view, applies retained state projection, resolves it, and returns the frame.
+    pub fn update_with_projection(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut view = self.to_view(viewport)?;
+        Ok(view.project_and_update(projection)?)
+    }
+
+    /// Creates a view, builds retained state projection in place, and resolves it.
+    pub fn update_projected_with(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_projection(viewport, &projection)
+    }
+
+    /// Creates a projected view, resolves it, and collects typed Rust actions.
+    pub fn update_with_projection_actions<Action>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut view = self.to_view(viewport)?;
+        Ok(view.project_and_update_actions(projection, registry)?)
+    }
+
+    /// Builds retained state projection in place, resolves it, and collects typed actions.
+    pub fn update_projected_with_actions<Action>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_projection_actions(viewport, &projection, registry)
+    }
+
+    /// Creates a projected view, routes input, and returns the resolved output.
+    pub fn update_with_input_and_projection(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut view = self.to_view(viewport)?;
+        Ok(view.project_and_update_with_input(projection, input)?)
+    }
+
+    /// Builds retained state projection in place, routes input, and returns the output.
+    pub fn update_with_input_projected_with(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_and_projection(viewport, input, &projection)
+    }
+
+    /// Creates a projected view, routes input, and collects typed Rust actions.
+    pub fn update_with_input_projection_actions<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut view = self.to_view(viewport)?;
+        Ok(view.project_and_update_with_input_actions(projection, input, registry)?)
+    }
+
+    /// Builds retained state projection in place, routes input, and collects typed actions.
+    pub fn update_with_input_projected_with_actions<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_projection_actions(viewport, input, &projection, registry)
     }
 
     /// Creates a view, resolves the document, and returns the first output frame.

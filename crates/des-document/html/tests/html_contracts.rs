@@ -1,6 +1,6 @@
 use des_document::{
-    DocumentCommandRegistry, DocumentEngine, DocumentInput, DocumentKey, Element,
-    ElementBehaviorEvent, ElementId, Point, Size,
+    DocumentCommandRegistry, DocumentEngine, DocumentInput, DocumentKey, DocumentProjection,
+    Element, ElementBehaviorEvent, ElementId, Point, Size,
 };
 use des_html::{HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
@@ -576,6 +576,99 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             .unwrap()
             .value(),
         Some("active")
+    );
+}
+
+#[test]
+fn html_stylesheet_projects_app_state_through_one_front_door() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+        Select,
+    }
+
+    let bundle = HtmlStylesheet::parse_fragment(
+        r#"
+        <section id="panel" class="card">
+          <button id="run" class="primary" data-command="project.run">Run</button>
+          <button id="select" class="secondary" on:click="project.select">Select</button>
+        </section>
+        "#,
+        r#"
+        .card { width: 220px; height: 96px; }
+        .is-ready { width: 104px; height: 32px; }
+        .is-selected { height: 32px; }
+        "#,
+    )
+    .expect("HTML and CSS should compile together");
+    let projection = DocumentProjection::new()
+        .set_text("run", "Ready")
+        .add_class("run", "is-ready")
+        .set_data("panel", "state", "ready")
+        .with_elements(["run", "select"], |mut control| {
+            control.aria("pressed", "false").add_class("control");
+        });
+    let registry = DocumentCommandRegistry::new()
+        .bind("project.run", HtmlAction::Run)
+        .bind_click("project.select", HtmlAction::Select);
+
+    let (report, output) = bundle
+        .update_with_projection(Size::new(320.0, 180.0), &projection)
+        .expect("HTML bundle should project app state before update");
+    let run = output.snapshot().find("run").unwrap();
+
+    assert_eq!(report.operations, 7);
+    assert_eq!(report.changed, 7);
+    assert_eq!(
+        output.snapshot().find("panel").unwrap().data("state"),
+        Some("ready")
+    );
+    assert_eq!(run.text(), Some("Ready".to_owned()));
+    assert!(run.has_class("is-ready"));
+    assert_eq!(run.aria("pressed"), Some("false"));
+    assert_eq!(run.rect().size.width, 104.0);
+
+    let (report, frame) = bundle
+        .update_with_input_projected_with_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection
+                    .element("run")
+                    .text("Running")
+                    .aria("pressed", "true")
+                    .add_class("is-ready");
+                projection.element("select").add_class("is-selected");
+            },
+            &registry,
+        )
+        .expect("HTML bundle should project app state and collect actions");
+    let run = frame.output().snapshot().find("run").unwrap();
+
+    assert_eq!(report.operations, 4);
+    assert_eq!(report.changed, 4);
+    assert_eq!(run.text(), Some("Running".to_owned()));
+    assert_eq!(run.aria("pressed"), Some("true"));
+    assert!(frame.contains_action(&HtmlAction::Run));
+    assert!(!frame.contains_action(&HtmlAction::Select));
+}
+
+#[test]
+fn html_stylesheet_projection_errors_remain_explicit() {
+    let bundle = HtmlStylesheet::parse_fragment(
+        r#"<section id="panel">Panel</section>"#,
+        r#"#panel { width: 120px; height: 40px; }"#,
+    )
+    .expect("HTML and CSS should compile together");
+    let error = bundle
+        .update_projected_with(Size::new(320.0, 180.0), |projection| {
+            projection.element("missing").add_class("is-ready");
+        })
+        .expect_err("missing projection targets should stay visible");
+
+    assert!(
+        error.to_string().contains("html document error"),
+        "unexpected error: {error}"
     );
 }
 
