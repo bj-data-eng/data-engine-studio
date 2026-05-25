@@ -2713,6 +2713,46 @@ pub struct DocumentTextSelection {
 }
 
 impl DocumentTextSelection {
+    /// Returns the selectable text element that owns this selection.
+    pub fn target(&self) -> &ElementId {
+        &self.target
+    }
+
+    /// Returns true when this selection belongs to the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
+
+    /// Returns the pointer location where this selection started.
+    pub fn anchor(&self) -> Point {
+        self.anchor
+    }
+
+    /// Returns the pointer location where this selection currently ends.
+    pub fn focus(&self) -> Point {
+        self.focus
+    }
+
+    /// Returns the semantic text index where this selection started.
+    pub fn anchor_index(&self) -> usize {
+        self.anchor_index
+    }
+
+    /// Returns the semantic text index where this selection currently ends.
+    pub fn focus_index(&self) -> usize {
+        self.focus_index
+    }
+
+    /// Returns the selection granularity chosen from pointer gesture intent.
+    pub fn granularity(&self) -> TextSelectionGranularity {
+        self.granularity
+    }
+
+    /// Returns true while the pointer gesture is actively extending this selection.
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
     pub fn char_range(&self) -> std::ops::Range<usize> {
         let start = self.anchor_index.min(self.focus_index);
         let end = self.anchor_index.max(self.focus_index);

@@ -6842,7 +6842,17 @@ fn selectable_text_exposes_selected_text_for_copy() {
         },
     );
 
-    assert_eq!(output.text_selection().unwrap().char_range(), 0..8);
+    let selection = output.text_selection().unwrap();
+    assert_eq!(selection.target().as_str(), "label");
+    assert!(selection.target_is("label"));
+    assert!(!selection.target_is("other"));
+    assert_eq!(selection.anchor(), start);
+    assert_eq!(selection.focus(), end);
+    assert_eq!(selection.anchor_index(), 0);
+    assert_eq!(selection.focus_index(), 8);
+    assert_eq!(selection.char_range(), 0..8);
+    assert_eq!(selection.granularity(), TextSelectionGranularity::Character);
+    assert!(selection.is_active());
     assert_eq!(output.text_selection_range(), Some(0..8));
     assert_eq!(
         output.text_selection_target().map(ElementId::as_str),
