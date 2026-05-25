@@ -242,6 +242,45 @@ fn document_projection_batches_app_state_updates() {
 }
 
 #[test]
+fn document_view_projects_state_and_updates_in_one_fluent_call() {
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("empty"),
+            Style::default().background(Color::rgb(245, 245, 245)),
+        )
+        .rule(
+            StyleSelector::class("ready"),
+            Style::default().background(Color::rgb(208, 236, 255)),
+        );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.div("summary").class("empty").children(|ui| {
+            ui.text("summary-count", "0 rows");
+        });
+    });
+
+    let (report, output) = view
+        .project_with_and_update(|projection| {
+            projection.push_text("summary-count", "42 rows");
+            projection
+                .element("summary")
+                .class("empty", false)
+                .class("ready", true);
+        })
+        .unwrap();
+    let summary = output.snapshot().find("summary").unwrap();
+
+    assert_eq!(report.operations, 3);
+    assert_eq!(report.changed, 3);
+    assert_eq!(
+        output.snapshot().find("summary-count").unwrap().text(),
+        Some("42 rows".to_owned())
+    );
+    assert!(summary.has_class("ready"));
+    assert!(!summary.has_class("empty"));
+    assert_eq!(summary.style().background, Some(Color::rgb(208, 236, 255)));
+}
+
+#[test]
 fn document_builder_and_engine_update_are_front_door_api() {
     let mut document = Document::build(Size::new(320.0, 200.0), |document| {
         document.element(

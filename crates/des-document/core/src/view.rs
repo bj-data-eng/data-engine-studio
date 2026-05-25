@@ -56,6 +56,36 @@ impl DocumentView {
         projection.apply_to(&mut self.document)
     }
 
+    /// Builds and applies a projection in one call.
+    pub fn project_with(
+        &mut self,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<DocumentProjectionReport> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project(&projection)
+    }
+
+    /// Applies a projection and resolves the updated document.
+    pub fn project_and_update(
+        &mut self,
+        projection: &DocumentProjection,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let report = self.project(projection)?;
+        let output = self.update();
+        Ok((report, output))
+    }
+
+    /// Builds a projection, applies it, and resolves the updated document.
+    pub fn project_with_and_update(
+        &mut self,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project_and_update(&projection)
+    }
+
     /// Returns the stylesheet used to resolve this document.
     pub fn stylesheet(&self) -> &StyleSheet {
         &self.stylesheet
