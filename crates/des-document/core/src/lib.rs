@@ -4,6 +4,80 @@
 //! resolution, retained element state, resolved layout output, and input
 //! routing. Rendering hosts such as egui translate platform input into
 //! [`DocumentInput`] and paint [`DocumentOutput::layout`].
+//!
+//! ## App-facing authoring model
+//!
+//! Application code should usually start from [`prelude`], compose a
+//! [`DocumentView`] from typed Rust widgets or browser-grade HTML/CSS, project
+//! app state into retained document state, then translate document commands
+//! back into typed app actions. The document layer keeps this loop independent
+//! from egui so structure, style, behavior intent, and state projection can be
+//! tested without a host renderer.
+//!
+//! ```
+//! use des_document::prelude::*;
+//!
+//! #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+//! enum AppAction {
+//!     Run,
+//! }
+//!
+//! struct RunButton;
+//!
+//! impl DocumentWidget for RunButton {
+//!     fn render(&self, ui: &mut DocumentBuilder) {
+//!         ui.button("run")
+//!             .classes(["control", "primary"])
+//!             .aria("label", "Run query")
+//!             .on_click("run")
+//!             .text("Run");
+//!     }
+//!
+//!     fn push_styles(&self, stylesheet: &mut StyleSheet) {
+//!         stylesheet.push_rule(
+//!             StyleSelector::class("control"),
+//!             Style::default().size(96.0, 36.0),
+//!         );
+//!     }
+//! }
+//!
+//! let widget = RunButton;
+//! let mut view = DocumentView::compose(Size::new(320.0, 180.0))
+//!     .with_css(".primary { background: rgb(222, 238, 255); }")
+//!     .expect("valid app stylesheet")
+//!     .widget(&widget);
+//!
+//! view.project_with(|projection| {
+//!     projection
+//!         .element("run")
+//!         .data("state", "ready")
+//!         .add_class("is-ready");
+//! })
+//! .expect("projection applies to retained document state");
+//!
+//! let output = view.update_with_input(DocumentInput::pointer(PointerInput {
+//!     position: Point::new(8.0, 8.0),
+//!     primary_delta: Point::new(0.0, 0.0),
+//!     primary_down: false,
+//!     primary_pressed: false,
+//!     primary_clicked: true,
+//!     primary_click_count: 1,
+//!     secondary_clicked: false,
+//!     time_seconds: 0.0,
+//! }));
+//!
+//! let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
+//! let actions = registry
+//!     .command_actions_of_kind(&output, DocumentEventKind::Clicked)
+//!     .collect::<Vec<_>>();
+//!
+//! assert_eq!(actions.len(), 1);
+//! assert_eq!(*actions[0].action, AppAction::Run);
+//! ```
+//!
+//! HTML/CSS entry points live in the sibling `des-html` crate and produce the
+//! same document/view contracts, including `on:*` behavior hooks and
+//! `data-command` command metadata for typed Rust dispatch.
 
 mod animation;
 mod css;
