@@ -876,6 +876,11 @@ fn document_action_frame_supports_app_update_loop_queries() {
         click_frame.first_action().map(|action| &action.action),
         Some(&AppAction::Run)
     );
+    assert_eq!(
+        click_frame.action_values().collect::<Vec<_>>(),
+        vec![&AppAction::Run]
+    );
+    assert_eq!(click_frame.first_action_value(), Some(&AppAction::Run));
     let click_action = click_frame.first_action().unwrap();
     assert_eq!(click_action.target().as_str(), "run");
     assert!(click_action.target_is("run"));
@@ -898,6 +903,14 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .map(|action| &action.action),
         Some(&AppAction::Run)
     );
+    assert_eq!(
+        click_frame.action_values_for("run").collect::<Vec<_>>(),
+        vec![&AppAction::Run]
+    );
+    assert_eq!(
+        click_frame.first_action_value_for("run"),
+        Some(&AppAction::Run)
+    );
     assert!(click_frame.contains_action_for("run", &AppAction::Run));
     assert!(!click_frame.contains_action_for("cancel", &AppAction::Run));
     assert_eq!(click_frame.clicked_actions().count(), 1);
@@ -905,6 +918,14 @@ fn document_action_frame_supports_app_update_loop_queries() {
         click_frame
             .first_clicked_action()
             .map(|action| &action.action),
+        Some(&AppAction::Run)
+    );
+    assert_eq!(
+        click_frame.clicked_action_values().collect::<Vec<_>>(),
+        vec![&AppAction::Run]
+    );
+    assert_eq!(
+        click_frame.first_clicked_action_value(),
         Some(&AppAction::Run)
     );
     assert!(click_frame.contains_clicked_action(&AppAction::Run));
@@ -916,6 +937,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
         vec!["run"]
     );
     assert!(click_frame.contains_action_of_kind(DocumentEventKind::Clicked, &AppAction::Run));
+    assert_eq!(
+        click_frame
+            .action_values_of_kind(DocumentEventKind::Clicked)
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Run]
+    );
+    assert_eq!(
+        click_frame.first_action_value_of_kind(DocumentEventKind::Clicked),
+        Some(&AppAction::Run)
+    );
 
     let key_frame =
         view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Escape), &registry);
@@ -934,6 +965,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .map(|action| &action.action),
         Some(&AppAction::Cancel)
     );
+    assert_eq!(
+        key_frame
+            .action_values_for_intent(ElementBehaviorEvent::KeyDown)
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Cancel]
+    );
+    assert_eq!(
+        key_frame.first_action_value_for_intent(ElementBehaviorEvent::KeyDown),
+        Some(&AppAction::Cancel)
+    );
     assert!(
         key_frame.contains_action_for_intent(ElementBehaviorEvent::KeyDown, &AppAction::Cancel)
     );
@@ -948,6 +989,14 @@ fn document_action_frame_supports_app_update_loop_queries() {
         key_frame
             .first_key_down_action()
             .map(|action| &action.action),
+        Some(&AppAction::Cancel)
+    );
+    assert_eq!(
+        key_frame.key_down_action_values().collect::<Vec<_>>(),
+        vec![&AppAction::Cancel]
+    );
+    assert_eq!(
+        key_frame.first_key_down_action_value(),
         Some(&AppAction::Cancel)
     );
     assert!(key_frame.contains_key_down_action(&AppAction::Cancel));

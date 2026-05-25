@@ -49,6 +49,16 @@ impl<Action> DocumentActionFrame<Action> {
         self.actions.first()
     }
 
+    /// Iterates only the typed app action values collected for this frame.
+    pub fn action_values(&self) -> impl Iterator<Item = &Action> {
+        self.actions.iter().map(DocumentCommandAction::action)
+    }
+
+    /// Returns only the first typed app action value, when one was collected.
+    pub fn first_action_value(&self) -> Option<&Action> {
+        self.first_action().map(DocumentCommandAction::action)
+    }
+
     /// Iterates typed app actions emitted by one element.
     pub fn actions_for<'a>(
         &'a self,
@@ -64,6 +74,20 @@ impl<Action> DocumentActionFrame<Action> {
         self.actions
             .iter()
             .find(|action| action.target.as_str() == target)
+    }
+
+    /// Iterates only typed app action values emitted by one element.
+    pub fn action_values_for<'a>(
+        &'a self,
+        target: &'a str,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.actions_for(target).map(DocumentCommandAction::action)
+    }
+
+    /// Returns only the first typed app action value emitted by one element.
+    pub fn first_action_value_for(&self, target: &str) -> Option<&Action> {
+        self.first_action_for(target)
+            .map(DocumentCommandAction::action)
     }
 
     /// Iterates typed app actions emitted by one resolved document event kind.
@@ -82,6 +106,18 @@ impl<Action> DocumentActionFrame<Action> {
         kind: DocumentEventKind,
     ) -> Option<&DocumentCommandAction<Action>> {
         self.actions.iter().find(|action| action.event == kind)
+    }
+
+    /// Iterates only typed app action values emitted by one resolved event kind.
+    pub fn action_values_of_kind(&self, kind: DocumentEventKind) -> impl Iterator<Item = &Action> {
+        self.actions_of_kind(kind)
+            .map(DocumentCommandAction::action)
+    }
+
+    /// Returns only the first typed app action value emitted by one resolved event kind.
+    pub fn first_action_value_of_kind(&self, kind: DocumentEventKind) -> Option<&Action> {
+        self.first_action_of_kind(kind)
+            .map(DocumentCommandAction::action)
     }
 
     /// Iterates typed app actions emitted by one authored behavior intent.
@@ -104,6 +140,21 @@ impl<Action> DocumentActionFrame<Action> {
             .find(|action| action.matches_intent(intent))
     }
 
+    /// Iterates only typed app action values emitted by one behavior intent.
+    pub fn action_values_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &Action> {
+        self.actions_for_intent(intent)
+            .map(DocumentCommandAction::action)
+    }
+
+    /// Returns only the first typed app action value emitted by one behavior intent.
+    pub fn first_action_value_for_intent(&self, intent: ElementBehaviorEvent) -> Option<&Action> {
+        self.first_action_for_intent(intent)
+            .map(DocumentCommandAction::action)
+    }
+
     /// Iterates typed app actions emitted by click intent.
     pub fn clicked_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::Click)
@@ -112,6 +163,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by click intent.
     pub fn first_clicked_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Iterates only typed app action values emitted by click intent.
+    pub fn clicked_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns only the first typed app action value emitted by click intent.
+    pub fn first_clicked_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::Click)
     }
 
     /// Iterates typed app actions emitted by pointer-enter intent.
@@ -202,6 +263,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by key-down intent.
     pub fn first_key_down_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Iterates only typed app action values emitted by key-down intent.
+    pub fn key_down_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns only the first typed app action value emitted by key-down intent.
+    pub fn first_key_down_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::KeyDown)
     }
 
     /// Iterates typed app actions emitted by key-up intent.
