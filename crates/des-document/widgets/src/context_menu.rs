@@ -41,6 +41,7 @@ pub enum ContextMenuEntry {
 pub struct ContextMenuItem {
     pub id: ElementId,
     pub label: String,
+    pub command: Option<String>,
     pub selected: bool,
     pub disabled: bool,
 }
@@ -88,6 +89,15 @@ impl ContextMenu {
 
     pub fn item(self, id: impl Into<ElementId>, label: impl Into<String>) -> Self {
         self.item_with(ContextMenuItem::new(id, label))
+    }
+
+    pub fn command_item(
+        self,
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        command: impl Into<String>,
+    ) -> Self {
+        self.item_with(ContextMenuItem::new(id, label).command(command))
     }
 
     pub fn disabled_item(self, id: impl Into<ElementId>, label: impl Into<String>) -> Self {
@@ -210,9 +220,15 @@ impl ContextMenuItem {
         Self {
             id: id.into(),
             label: label.into(),
+            command: None,
             selected: false,
             disabled: false,
         }
+    }
+
+    pub fn command(mut self, command: impl Into<String>) -> Self {
+        self.command = Some(command.into());
+        self
     }
 
     pub fn selected(mut self, selected: bool) -> Self {
@@ -232,6 +248,9 @@ impl ContextMenuItem {
             .disabled(self.disabled);
         if !self.disabled {
             spec = spec.interactive();
+            if let Some(command) = &self.command {
+                spec = spec.on_click(command.clone());
+            }
         }
         ui.element(self.id.as_str(), spec, |ui| {
             ui.text_element(
@@ -259,7 +278,8 @@ pub fn context_menu_surface_style() -> Style {
 mod tests {
     use super::*;
     use des_document::{
-        Document, DocumentEngine, DocumentView, FloatingPlacement, Size, StyleSheet,
+        Document, DocumentCommandRegistry, DocumentEngine, DocumentInput, DocumentView,
+        FloatingPlacement, PointerInput, Size, StyleSheet,
     };
 
     #[test]
@@ -314,6 +334,50 @@ mod tests {
                 .rect()
                 .origin,
             Point::new(40.0, 24.0)
+        );
+    }
+
+    #[test]
+    fn context_menu_items_can_declare_document_commands() {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum MenuAction {
+            Copy,
+        }
+
+        let menu = ContextMenu::new("text-context-menu")
+            .command_item("copy", "Copy", "copy-selection")
+            .disabled_item("paste", "Paste");
+        let mut view = DocumentView::build(Size::new(240.0, 140.0), StyleSheet::new(), |ui| {
+            ui.widget(&menu);
+        });
+        let output = view.update_with_input(DocumentInput::pointer(PointerInput {
+            position: Point::new(2.0, 2.0),
+            primary_delta: Point::ZERO,
+            primary_down: true,
+            primary_pressed: false,
+            primary_clicked: true,
+            primary_click_count: 1,
+            secondary_clicked: false,
+            time_seconds: 0.0,
+        }));
+        let registry = DocumentCommandRegistry::new().bind("copy-selection", MenuAction::Copy);
+        let mut actions = Vec::new();
+        let report = registry.dispatch(&output, |command| {
+            actions.push((command.target.clone(), *command.action));
+        });
+
+        assert_eq!(report.commands, 1);
+        assert_eq!(report.handled, 1);
+        assert_eq!(report.unhandled, 0);
+        assert_eq!(actions, vec![(ElementId::new("copy"), MenuAction::Copy)]);
+        assert_eq!(output.commands()[0].command, "copy-selection");
+        assert!(
+            output
+                .snapshot()
+                .find("paste")
+                .unwrap()
+                .behavior_hooks()
+                .is_empty()
         );
     }
 
