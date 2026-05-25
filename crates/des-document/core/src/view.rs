@@ -2399,6 +2399,22 @@ impl DocumentViewBuilder {
         Ok(DocumentActionSurface::new(view, commands))
     }
 
+    pub fn build_action_surface<Action>(
+        self,
+        commands: DocumentCommandRegistry<Action>,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentActionSurface<Action> {
+        self.build(build).action_surface(commands)
+    }
+
+    pub fn build_action_surface_with<Action>(
+        self,
+        build: impl FnOnce(&mut DocumentBuilder),
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> DocumentActionSurface<Action> {
+        self.build(build).action_surface_with(configure)
+    }
+
     pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {
         DocumentView::new(Document::build(self.viewport, build), self.stylesheet)
     }

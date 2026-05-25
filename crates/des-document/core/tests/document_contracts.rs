@@ -2728,6 +2728,52 @@ fn document_view_compose_collects_css_and_widget_styles() {
 }
 
 #[test]
+fn document_view_builder_can_build_action_surfaces_directly() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+        Menu,
+    }
+
+    let registry = DocumentCommandRegistry::new().bind_click("run", AppAction::Run);
+    let mut direct_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .with_css("#run { width: 96px; height: 32px; }")
+        .expect("CSS should compose")
+        .build_action_surface(registry, |ui| {
+            ui.button("run").command("run").text("Run");
+        });
+    let mut configured_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .with_css("#menu { width: 112px; height: 32px; }")
+        .expect("CSS should compose")
+        .build_action_surface_with(
+            |ui| {
+                ui.button("menu").on_context_menu("menu.open").text("Menu");
+            },
+            |commands| {
+                commands.push_context_menu("menu.open", AppAction::Menu);
+            },
+        );
+
+    let direct_frame = direct_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let configured_frame = configured_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let run = direct_frame.output().snapshot().find("run").unwrap();
+    let menu = configured_frame.output().snapshot().find("menu").unwrap();
+
+    assert!(direct_frame.contains_clicked_action(&AppAction::Run));
+    assert_eq!(direct_surface.commands().bindings().len(), 1);
+    assert_eq!(run.rect().size, Size::new(96.0, 32.0));
+    assert!(configured_frame.contains_action_for_target_intent(
+        "menu",
+        ElementBehaviorEvent::ContextMenu,
+        &AppAction::Menu
+    ));
+    assert_eq!(configured_surface.commands().bindings().len(), 1);
+    assert_eq!(menu.rect().size, Size::new(112.0, 32.0));
+}
+
+#[test]
 fn document_view_can_mount_a_widget_with_its_styles() {
     struct BadgeWidget;
     struct MeterWidget;
