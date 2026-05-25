@@ -679,8 +679,7 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
 
     let click_actions = registry.collect_actions(&click_output);
     let clicked_actions = registry.collect_clicked_actions(&click_output);
-    let key_actions =
-        registry.collect_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
+    let key_actions = registry.collect_key_down_actions(&key_output);
     let hover_actions = registry.collect_pointer_enter_actions(&hover_output);
     let commit_actions = registry.collect_actions_for(&click_output, "commit");
 
@@ -826,12 +825,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
         Cancel,
         Inspect,
         Uninspect,
+        Grab,
+        Drop,
+        Drag,
     }
 
     let stylesheet = StyleSheet::new()
         .id("run", Style::default().size(96.0, 32.0))
         .id("cancel", Style::default().size(96.0, 32.0))
-        .id("inspect", Style::default().size(96.0, 32.0));
+        .id("inspect", Style::default().size(96.0, 32.0))
+        .id("handle", Style::default().size(96.0, 32.0));
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run").on_click("run").text("Run");
         ui.button("cancel")
@@ -842,12 +845,20 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .on_pointer_enter("inspect")
             .on_pointer_leave("uninspect")
             .text("Inspect");
+        ui.button("handle")
+            .on_pointer_down("grab")
+            .on_pointer_up("drop")
+            .on_drag_start("drag")
+            .text("Handle");
     });
     let registry = DocumentCommandRegistry::new()
         .bind_click("run", AppAction::Run)
         .bind_on(ElementBehaviorEvent::KeyDown, "cancel", AppAction::Cancel)
         .bind_pointer_enter("inspect", AppAction::Inspect)
-        .bind_pointer_leave("uninspect", AppAction::Uninspect);
+        .bind_pointer_leave("uninspect", AppAction::Uninspect)
+        .bind_pointer_down("grab", AppAction::Grab)
+        .bind_pointer_up("drop", AppAction::Drop)
+        .bind_drag_start("drag", AppAction::Drag);
 
     let click_frame = view.update_with_input_actions(
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -925,6 +936,23 @@ fn document_action_frame_supports_app_update_loop_queries() {
     assert!(
         key_frame.contains_action_for_intent(ElementBehaviorEvent::KeyDown, &AppAction::Cancel)
     );
+    assert_eq!(
+        key_frame
+            .key_down_actions()
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["cancel"]
+    );
+    assert_eq!(
+        key_frame
+            .first_key_down_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Cancel)
+    );
+    assert!(key_frame.contains_key_down_action(&AppAction::Cancel));
+    assert_eq!(key_frame.key_up_actions().count(), 0);
+    assert_eq!(key_frame.first_key_up_action(), None);
+    assert!(!key_frame.contains_key_up_action(&AppAction::Cancel));
     assert_eq!(key_frame.clicked_actions().count(), 0);
     assert_eq!(key_frame.first_clicked_action(), None);
     let (output, actions) = key_frame.into_parts();
@@ -975,6 +1003,65 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .is_pointer_leave()
     );
     assert!(leave_frame.contains_pointer_leave_action(&AppAction::Uninspect));
+
+    let pointer_down_frame = view.update_with_input_actions(
+        DocumentInput::primary_press(Point::new(8.0, 104.0)),
+        &registry,
+    );
+    assert_eq!(
+        pointer_down_frame
+            .pointer_down_actions()
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["grab"]
+    );
+    assert_eq!(
+        pointer_down_frame
+            .first_pointer_down_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Grab)
+    );
+    assert!(pointer_down_frame.contains_pointer_down_action(&AppAction::Grab));
+
+    let drag_start_frame = view.update_with_input_actions(
+        DocumentInput::primary_drag(Point::new(32.0, 104.0), Point::new(24.0, 0.0)),
+        &registry,
+    );
+    assert_eq!(
+        drag_start_frame
+            .drag_start_actions()
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["drag"]
+    );
+    assert_eq!(
+        drag_start_frame
+            .first_drag_start_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Drag)
+    );
+    assert!(drag_start_frame.contains_drag_start_action(&AppAction::Drag));
+    assert_eq!(drag_start_frame.drag_actions().count(), 0);
+    assert_eq!(drag_start_frame.drag_end_actions().count(), 0);
+
+    let pointer_up_frame = view.update_with_input_actions(
+        DocumentInput::pointer_at(Point::new(32.0, 104.0)),
+        &registry,
+    );
+    assert_eq!(
+        pointer_up_frame
+            .pointer_up_actions()
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["drop"]
+    );
+    assert_eq!(
+        pointer_up_frame
+            .first_pointer_up_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Drop)
+    );
+    assert!(pointer_up_frame.contains_pointer_up_action(&AppAction::Drop));
 }
 
 #[test]

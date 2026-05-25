@@ -1354,6 +1354,62 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::PointerLeave)
     }
 
+    pub fn pointer_down_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::PointerDown)
+    }
+
+    pub fn pointer_up_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::PointerUp)
+    }
+
+    pub fn drag_start_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::DragStart)
+    }
+
+    pub fn drag_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::Drag)
+    }
+
+    pub fn drag_end_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::DragEnd)
+    }
+
+    pub fn scroll_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::Scroll)
+    }
+
+    pub fn key_down_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::KeyDown)
+    }
+
+    pub fn key_up_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::KeyUp)
+    }
+
     pub fn collect_clicked_actions(
         &self,
         output: &DocumentOutput,
@@ -1386,6 +1442,102 @@ impl<Action> DocumentCommandRegistry<Action> {
         Action: Clone,
     {
         self.pointer_leave_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_pointer_down_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.pointer_down_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_pointer_up_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.pointer_up_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_drag_start_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.drag_start_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_drag_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.drag_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_drag_end_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.drag_end_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_scroll_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.scroll_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_key_down_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.key_down_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_key_up_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.key_up_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
     }
@@ -1505,6 +1657,94 @@ impl<Action> DocumentCommandRegistry<Action> {
         Handler: FnMut(DocumentCommandActionRef<'a, Action>),
     {
         self.dispatch_intent(output, ElementBehaviorEvent::PointerLeave, handler)
+    }
+
+    pub fn dispatch_pointer_down<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::PointerDown, handler)
+    }
+
+    pub fn dispatch_pointer_up<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::PointerUp, handler)
+    }
+
+    pub fn dispatch_drag_start<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::DragStart, handler)
+    }
+
+    pub fn dispatch_drag<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::Drag, handler)
+    }
+
+    pub fn dispatch_drag_end<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::DragEnd, handler)
+    }
+
+    pub fn dispatch_scroll<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::Scroll, handler)
+    }
+
+    pub fn dispatch_key_down<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::KeyDown, handler)
+    }
+
+    pub fn dispatch_key_up<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::KeyUp, handler)
     }
 }
 

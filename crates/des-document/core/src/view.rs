@@ -134,6 +134,86 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_for_intent(ElementBehaviorEvent::PointerLeave)
     }
 
+    /// Iterates typed app actions emitted by pointer-down intent.
+    pub fn pointer_down_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::PointerDown)
+    }
+
+    /// Returns the first typed app action emitted by pointer-down intent.
+    pub fn first_pointer_down_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::PointerDown)
+    }
+
+    /// Iterates typed app actions emitted by pointer-up intent.
+    pub fn pointer_up_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::PointerUp)
+    }
+
+    /// Returns the first typed app action emitted by pointer-up intent.
+    pub fn first_pointer_up_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::PointerUp)
+    }
+
+    /// Iterates typed app actions emitted by drag-start intent.
+    pub fn drag_start_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::DragStart)
+    }
+
+    /// Returns the first typed app action emitted by drag-start intent.
+    pub fn first_drag_start_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::DragStart)
+    }
+
+    /// Iterates typed app actions emitted by drag-move intent.
+    pub fn drag_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::Drag)
+    }
+
+    /// Returns the first typed app action emitted by drag-move intent.
+    pub fn first_drag_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::Drag)
+    }
+
+    /// Iterates typed app actions emitted by drag-end intent.
+    pub fn drag_end_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::DragEnd)
+    }
+
+    /// Returns the first typed app action emitted by drag-end intent.
+    pub fn first_drag_end_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::DragEnd)
+    }
+
+    /// Iterates typed app actions emitted by scroll intent.
+    pub fn scroll_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    /// Returns the first typed app action emitted by scroll intent.
+    pub fn first_scroll_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    /// Iterates typed app actions emitted by key-down intent.
+    pub fn key_down_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns the first typed app action emitted by key-down intent.
+    pub fn first_key_down_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Iterates typed app actions emitted by key-up intent.
+    pub fn key_up_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns the first typed app action emitted by key-up intent.
+    pub fn first_key_up_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::KeyUp)
+    }
+
     /// Returns true when the frame contains the supplied typed action.
     pub fn contains_action(&self, action: &Action) -> bool
     where
@@ -193,6 +273,70 @@ impl<Action> DocumentActionFrame<Action> {
         Action: PartialEq,
     {
         self.contains_action_for_intent(ElementBehaviorEvent::PointerLeave, action)
+    }
+
+    /// Returns true when pointer-down intent emitted the supplied typed action.
+    pub fn contains_pointer_down_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::PointerDown, action)
+    }
+
+    /// Returns true when pointer-up intent emitted the supplied typed action.
+    pub fn contains_pointer_up_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::PointerUp, action)
+    }
+
+    /// Returns true when drag-start intent emitted the supplied typed action.
+    pub fn contains_drag_start_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::DragStart, action)
+    }
+
+    /// Returns true when drag-move intent emitted the supplied typed action.
+    pub fn contains_drag_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::Drag, action)
+    }
+
+    /// Returns true when drag-end intent emitted the supplied typed action.
+    pub fn contains_drag_end_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::DragEnd, action)
+    }
+
+    /// Returns true when scroll intent emitted the supplied typed action.
+    pub fn contains_scroll_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::Scroll, action)
+    }
+
+    /// Returns true when key-down intent emitted the supplied typed action.
+    pub fn contains_key_down_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::KeyDown, action)
+    }
+
+    /// Returns true when key-up intent emitted the supplied typed action.
+    pub fn contains_key_up_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::KeyUp, action)
     }
 
     /// Consumes the frame into the resolved output and collected app actions.
