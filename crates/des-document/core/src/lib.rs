@@ -22,7 +22,9 @@
 //!     Run,
 //! }
 //!
-//! struct RunButton;
+//! struct RunButton {
+//!     ready: bool,
+//! }
 //!
 //! impl DocumentWidget for RunButton {
 //!     fn render(&self, ui: &mut DocumentBuilder) {
@@ -40,8 +42,8 @@
 //!     fn push_projection(&self, projection: &mut DocumentProjection) {
 //!         projection
 //!             .element("run")
-//!             .data("state", "ready")
-//!             .class_if("is-ready", true);
+//!             .data("state", if self.ready { "ready" } else { "waiting" })
+//!             .class_if("is-ready", self.ready);
 //!     }
 //! }
 //!
@@ -51,7 +53,7 @@
 //!     }
 //! }
 //!
-//! let widget = RunButton;
+//! let widget = RunButton { ready: false };
 //! let mut surface = widget
 //!     .action_surface_with_css(
 //!         Size::new(320.0, 180.0),
@@ -59,11 +61,24 @@
 //!     )
 //!     .expect("valid app stylesheet");
 //!
-//! let frame =
-//!     surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+//! let mut actions = Vec::new();
+//! let (projection, frame, dispatch) = surface
+//!     .project_with_and_update_with_input_and_dispatch_action_values(
+//!         DocumentInput::primary_click(Point::new(8.0, 8.0)),
+//!         |projection| {
+//!             projection
+//!                 .element("run")
+//!                 .data("state", "ready")
+//!                 .class_if("is-ready", true);
+//!         },
+//!         |action| actions.push(*action),
+//!     )
+//!     .expect("widget projection targets rendered elements");
 //!
-//! assert_eq!(frame.actions.len(), 1);
-//! assert_eq!(frame.actions[0].action, AppAction::Run);
+//! assert_eq!(projection.changed, 2);
+//! assert_eq!(dispatch.handled_count(), 1);
+//! assert_eq!(actions, vec![AppAction::Run]);
+//! assert!(frame.output().snapshot().find("run").unwrap().has_class("is-ready"));
 //! ```
 //!
 //! HTML/CSS entry points live in the sibling `des-html` crate and produce the
