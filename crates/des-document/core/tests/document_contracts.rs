@@ -47,20 +47,24 @@ fn document_view_groups_document_stylesheet_and_engine_update() {
             ui.text("label", "Ready");
         });
     });
+    view.extend_css(".panel { padding: 3px; }")
+        .expect("strict CSS should extend an existing view")
+        .extend_css_if(false, ".panel { width: ; }")
+        .expect("skipped CSS should not parse")
+        .extend_css_forgiving(".panel { unknown-property: 1px; } .panel { margin: 2px; }")
+        .expect("forgiving CSS should extend an existing view")
+        .extend_stylesheet(
+            StyleSheet::new().class("panel", Style::default().border(Color::rgb(90, 120, 180))),
+        );
 
     let output = view.update();
+    let panel = output.snapshot().find("panel").expect("panel should exist");
 
     assert_eq!(output.layout.id.as_str(), "root");
-    assert_eq!(
-        output
-            .snapshot()
-            .find("panel")
-            .expect("panel should exist")
-            .rect()
-            .size
-            .width,
-        240.0
-    );
+    assert_eq!(panel.rect().size.width, 240.0);
+    assert_eq!(panel.style().padding, Insets::all(3.0));
+    assert_eq!(panel.style().margin, Insets::all(2.0));
+    assert_eq!(panel.style().border, Some(Color::rgb(90, 120, 180)));
     assert_eq!(view.document().viewport(), Size::new(640.0, 480.0));
 }
 
@@ -889,8 +893,12 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         .id("run", Style::default().height(Length::Px(32.0)))
         .id("inspect", Style::default().size(96.0, 32.0));
     let view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
-        ui.button("run").on_click("run").text("Run");
+        ui.button("run")
+            .class("run-action")
+            .on_click("run")
+            .text("Run");
         ui.button("inspect")
+            .class("inspect-action")
             .on_pointer_enter("inspect")
             .text("Inspect");
     });
@@ -903,6 +911,20 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     surface = surface.with_commands(|commands| {
         commands.push_pointer_enter("inspect", AppAction::Inspect);
     });
+    surface = surface
+        .with_css(".run-action { background: rgb(220, 238, 255); }")
+        .expect("strict CSS should extend a configured action surface")
+        .with_css_if(false, ".run-action { width: ; }")
+        .expect("skipped action-surface CSS should not parse");
+    surface
+        .extend_css_forgiving(
+            ".inspect-action { unknown-property: 1px; } .inspect-action { height: 40px; }",
+        )
+        .expect("forgiving CSS should extend a configured action surface")
+        .extend_stylesheet_if(
+            StyleSheet::new().class("run-action", Style::default().radius(4.0)),
+            true,
+        );
 
     let hover_frame =
         surface.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 40.0)));
@@ -917,6 +939,7 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     );
 
     assert_eq!(surface.commands().bindings().len(), 2);
+    assert!(surface.stylesheet().has_rule_for_class("run-action"));
     assert!(hover_frame.contains_action(&AppAction::Inspect));
     assert!(click_frame.contains_action(&AppAction::Run));
     assert!(dispatch_frame.contains_clicked_action(&AppAction::Run));
@@ -948,6 +971,11 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert_eq!(report.changed, 1);
     assert_eq!(measured_run.text(), Some("Run projected".to_owned()));
     assert_eq!(measured_run.rect().size.width, 64.0);
+    assert_eq!(
+        measured_run.style().background,
+        Some(Color::rgb(220, 238, 255))
+    );
+    assert_eq!(measured_run.style().radius, CornerRadii::all(4.0));
     assert!(measured_frame.contains_action(&AppAction::Run));
     assert!(measured_dispatch_frame.contains_action(&AppAction::Run));
     assert_eq!(
