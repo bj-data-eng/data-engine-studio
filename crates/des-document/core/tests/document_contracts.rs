@@ -3438,6 +3438,48 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
             StyleSheet::new().class("skipped", Style::default().width(Length::Px(999.0))),
             destructive,
         );
+    let responsive_stylesheet = StyleSheet::new().viewport_min_width(
+        480.0,
+        StyleSelector::class("wide"),
+        Style::default().width(Length::Px(200.0)),
+    );
+    let responsive_rule = responsive_stylesheet
+        .first_rule_for_class("wide")
+        .expect("conditional class rule should be queryable");
+
+    assert_eq!(stylesheet.style_rules().len(), stylesheet.rule_count());
+    assert_eq!(stylesheet.iter_rules().count(), stylesheet.rule_count());
+    assert!(stylesheet.has_rule_for_selector(&StyleSelector::class("panel")));
+    assert!(stylesheet.has_rule_for_element(Element::Div));
+    assert!(stylesheet.has_rule_for_class("panel"));
+    assert!(stylesheet.has_rule_for_id("title"));
+    assert!(stylesheet.rules_for_class("panel").count() >= 2);
+    assert_eq!(stylesheet.rules_for_id("title").count(), 2);
+    assert_eq!(
+        stylesheet
+            .first_rule_for_class("accent")
+            .expect("accent rule should be queryable")
+            .style()
+            .background,
+        Some(Color::rgb(220, 238, 255))
+    );
+    assert!(
+        stylesheet
+            .first_rule_for_class("accent")
+            .expect("accent rule should be queryable")
+            .is_unconditional()
+    );
+    assert_eq!(
+        stylesheet
+            .first_rule_for_selector(&StyleSelector::id("title"))
+            .expect("title rule should be queryable")
+            .selector(),
+        &StyleSelector::id("title")
+    );
+    assert!(responsive_rule.is_conditional());
+    assert!(responsive_rule.condition().is_some());
+    assert!(!responsive_rule.is_unconditional());
+
     let mut mutable_stylesheet = StyleSheet::new();
     mutable_stylesheet
         .style_if(true, |stylesheet| {

@@ -2000,6 +2000,26 @@ impl StyleRule {
             condition: Some(condition),
         }
     }
+
+    pub fn selector(&self) -> &StyleSelector {
+        &self.selector
+    }
+
+    pub fn style(&self) -> &Style {
+        &self.style
+    }
+
+    pub fn condition(&self) -> Option<&StyleCondition> {
+        self.condition.as_ref()
+    }
+
+    pub fn is_conditional(&self) -> bool {
+        self.condition.is_some()
+    }
+
+    pub fn is_unconditional(&self) -> bool {
+        self.condition.is_none()
+    }
 }
 
 static NEXT_STYLESHEET_ID: AtomicU64 = AtomicU64::new(1);
@@ -2336,6 +2356,82 @@ impl StyleSheet {
 
     pub fn rule_count(&self) -> usize {
         self.rules.len()
+    }
+
+    pub fn style_rules(&self) -> &[StyleRule] {
+        &self.rules
+    }
+
+    pub fn iter_rules(&self) -> impl Iterator<Item = &StyleRule> {
+        self.rules.iter()
+    }
+
+    pub fn rules_for_selector<'a>(
+        &'a self,
+        selector: &StyleSelector,
+    ) -> impl Iterator<Item = &'a StyleRule> + 'a {
+        let selector = selector.clone();
+        self.rules
+            .iter()
+            .filter(move |rule| rule.selector() == &selector)
+    }
+
+    pub fn first_rule_for_selector(&self, selector: &StyleSelector) -> Option<&StyleRule> {
+        self.rules_for_selector(selector).next()
+    }
+
+    pub fn has_rule_for_selector(&self, selector: &StyleSelector) -> bool {
+        self.first_rule_for_selector(selector).is_some()
+    }
+
+    pub fn rules_for_element(&self, element: Element) -> impl Iterator<Item = &StyleRule> {
+        self.index
+            .by_element
+            .get(&element)
+            .into_iter()
+            .flat_map(|indices| indices.iter().map(|index| &self.rules[*index]))
+    }
+
+    pub fn first_rule_for_element(&self, element: Element) -> Option<&StyleRule> {
+        self.rules_for_element(element).next()
+    }
+
+    pub fn has_rule_for_element(&self, element: Element) -> bool {
+        self.first_rule_for_element(element).is_some()
+    }
+
+    pub fn rules_for_class(&self, class: impl Into<ClassName>) -> impl Iterator<Item = &StyleRule> {
+        let class = class.into();
+        self.index
+            .by_class
+            .get(&class)
+            .into_iter()
+            .flat_map(|indices| indices.iter().map(|index| &self.rules[*index]))
+    }
+
+    pub fn first_rule_for_class(&self, class: impl Into<ClassName>) -> Option<&StyleRule> {
+        self.rules_for_class(class).next()
+    }
+
+    pub fn has_rule_for_class(&self, class: impl Into<ClassName>) -> bool {
+        self.first_rule_for_class(class).is_some()
+    }
+
+    pub fn rules_for_id(&self, id: impl Into<ElementId>) -> impl Iterator<Item = &StyleRule> {
+        let id = id.into();
+        self.index
+            .by_id
+            .get(&id)
+            .into_iter()
+            .flat_map(|indices| indices.iter().map(|index| &self.rules[*index]))
+    }
+
+    pub fn first_rule_for_id(&self, id: impl Into<ElementId>) -> Option<&StyleRule> {
+        self.rules_for_id(id).next()
+    }
+
+    pub fn has_rule_for_id(&self, id: impl Into<ElementId>) -> bool {
+        self.first_rule_for_id(id).is_some()
     }
 
     #[cfg(test)]
