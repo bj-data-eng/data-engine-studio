@@ -100,6 +100,30 @@ impl DocumentProjection {
         Self::default()
     }
 
+    pub fn with(mut self, project: impl FnOnce(&mut Self)) -> Self {
+        project(&mut self);
+        self
+    }
+
+    pub fn try_with<E>(
+        mut self,
+        project: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        project(&mut self)?;
+        Ok(self)
+    }
+
+    pub fn try_when<E>(
+        mut self,
+        present: bool,
+        project: impl FnOnce(&mut Self) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        if present {
+            project(&mut self)?;
+        }
+        Ok(self)
+    }
+
     pub fn from_operations(
         operations: impl IntoIterator<Item = DocumentProjectionOperation>,
     ) -> Self {
@@ -996,11 +1020,27 @@ impl ElementProjectionPatch {
         Self::default()
     }
 
+    pub fn with(self, project: impl FnOnce(Self) -> Self) -> Self {
+        project(self)
+    }
+
+    pub fn try_with<E>(self, project: impl FnOnce(Self) -> Result<Self, E>) -> Result<Self, E> {
+        project(self)
+    }
+
     pub fn when(mut self, present: bool, project: impl FnOnce(Self) -> Self) -> Self {
         if present {
             self = project(self);
         }
         self
+    }
+
+    pub fn try_when<E>(
+        self,
+        present: bool,
+        project: impl FnOnce(Self) -> Result<Self, E>,
+    ) -> Result<Self, E> {
+        if present { project(self) } else { Ok(self) }
     }
 
     pub fn text(mut self, text: impl Into<TextContent>) -> Self {

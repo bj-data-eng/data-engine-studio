@@ -2100,6 +2100,17 @@ fn element_projection_patch_groups_reusable_state_updates() {
         .data("state", "ready")
         .remove_data("ephemeral")
         .aria("live", "polite")
+        .with(|patch| patch.aria("atomic", "true"))
+        .try_with(|patch| Ok::<_, &'static str>(patch.data("source", "projection")))
+        .unwrap()
+        .try_when(true, |patch| {
+            Ok::<_, &'static str>(patch.add_class("is-hot"))
+        })
+        .unwrap()
+        .try_when(false, |patch| {
+            Ok::<_, &'static str>(patch.add_class("should-not-apply"))
+        })
+        .unwrap()
         .select()
         .enable()
         .focus()
@@ -2119,6 +2130,16 @@ fn element_projection_patch_groups_reusable_state_updates() {
             .attribute()
             .filter(|(name, _)| *name == "data-state")
     });
+    let atomic_attribute = status_operations.iter().find_map(|operation| {
+        operation
+            .attribute()
+            .filter(|(name, _)| *name == "aria-atomic")
+    });
+    let source_attribute = status_operations.iter().find_map(|operation| {
+        operation
+            .attribute()
+            .filter(|(name, _)| *name == "data-source")
+    });
     let removed_attribute = status_operations
         .iter()
         .find_map(|operation| operation.removed_attribute());
@@ -2136,35 +2157,52 @@ fn element_projection_patch_groups_reusable_state_updates() {
             .class()
             .filter(|(class, _)| class.as_str() == "is-ready")
     });
+    let hot_class = status_operations.iter().find_map(|operation| {
+        operation
+            .class()
+            .filter(|(class, _)| class.as_str() == "is-hot")
+    });
+    let skipped_class = status_operations.iter().find_map(|operation| {
+        operation
+            .class()
+            .filter(|(class, _)| class.as_str() == "should-not-apply")
+    });
 
-    assert_eq!(ready_patch.operation_count(), 9);
+    assert_eq!(ready_patch.operation_count(), 12);
     assert!(!ready_patch.is_empty());
-    assert_eq!(status_operations.len(), 9);
+    assert_eq!(status_operations.len(), 12);
     assert_eq!(label_text.map(TextContent::semantic_text), Some("Ready"));
     assert_eq!(status_operations[0].value(), Some("ready"));
     assert_eq!(ready_attribute, Some(("data-state", "ready")));
+    assert_eq!(atomic_attribute, Some(("aria-atomic", "true")));
+    assert_eq!(source_attribute, Some(("data-source", "projection")));
     assert_eq!(removed_attribute, Some("data-ephemeral"));
     assert_eq!(selected, Some(true));
     assert_eq!(disabled, Some(false));
     assert_eq!(focused, Some(true));
     assert_eq!(ready_class.map(|(_, present)| present), Some(true));
+    assert_eq!(hot_class.map(|(_, present)| present), Some(true));
+    assert!(skipped_class.is_none());
 
     let report = view.project(&projection).unwrap();
     let output = view.update();
     let status = output.snapshot().find("status").unwrap();
     let label = output.snapshot().find("status-label").unwrap();
 
-    assert_eq!(report.operations, 10);
-    assert_eq!(report.changed, 9);
+    assert_eq!(report.operations, 13);
+    assert_eq!(report.changed, 12);
     assert_eq!(label.text(), Some("Ready".to_owned()));
     assert_eq!(status.value(), Some("ready"));
     assert_eq!(status.data("state"), Some("ready"));
+    assert_eq!(status.data("source"), Some("projection"));
     assert_eq!(status.data("ephemeral"), None);
     assert_eq!(status.aria("live"), Some("polite"));
+    assert_eq!(status.aria("atomic"), Some("true"));
     assert!(status.selected());
     assert!(!status.disabled());
     assert!(status.focused());
     assert!(status.has_class("is-ready"));
+    assert!(status.has_class("is-hot"));
     assert!(!status.has_class("is-stale"));
     assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
 
@@ -2432,6 +2470,24 @@ fn document_projection_composes_subprojections_for_app_state() {
     .into_iter()
     .collect::<DocumentProjection>();
     let mut projection = DocumentProjection::new()
+        .with(|projection| {
+            projection.push_data("summary", "source", "app-state");
+        })
+        .try_with(|projection| {
+            projection.push_data("summary", "revision", "42");
+            Ok::<_, &'static str>(())
+        })
+        .unwrap()
+        .try_when(true, |projection| {
+            projection.push_class("summary", "has-results", true);
+            Ok::<_, &'static str>(())
+        })
+        .unwrap()
+        .try_when(false, |projection| {
+            projection.push_class("summary", "should-not-apply", true);
+            Ok::<_, &'static str>(())
+        })
+        .unwrap()
         .with_projection(summary_projection)
         .with_projection(controls_projection)
         .with_projection_if(
@@ -2443,14 +2499,23 @@ fn document_projection_composes_subprojections_for_app_state() {
         true,
     );
 
-    assert_eq!(projection.len(), 5);
+    assert_eq!(projection.len(), 8);
     assert!(!projection.is_empty());
     assert_eq!(
         projection
             .targets()
             .map(ElementId::as_str)
             .collect::<Vec<_>>(),
-        vec!["summary-count", "summary", "refresh", "refresh", "summary"]
+        vec![
+            "summary",
+            "summary",
+            "summary",
+            "summary-count",
+            "summary",
+            "refresh",
+            "refresh",
+            "summary"
+        ]
     );
     assert_eq!(
         projection
@@ -2458,6 +2523,9 @@ fn document_projection_composes_subprojections_for_app_state() {
             .map(DocumentProjectionOperation::kind)
             .collect::<Vec<_>>(),
         vec![
+            DocumentProjectionOperationKind::Attribute,
+            DocumentProjectionOperationKind::Attribute,
+            DocumentProjectionOperationKind::Class,
             DocumentProjectionOperationKind::Attribute,
             DocumentProjectionOperationKind::Attribute,
         ]
@@ -2468,7 +2536,7 @@ fn document_projection_composes_subprojections_for_app_state() {
             .map(DocumentProjectionOperation::target)
             .map(ElementId::as_str)
             .collect::<Vec<_>>(),
-        vec!["summary", "summary"]
+        vec!["summary", "summary", "summary", "summary"]
     );
     assert_eq!(
         projection
@@ -2478,6 +2546,7 @@ fn document_projection_composes_subprojections_for_app_state() {
     );
     assert!(projection.has_operation_for("summary-count"));
     assert!(!projection.has_operation_for("missing"));
+    assert!(projection.has_operation_for_kind("summary", DocumentProjectionOperationKind::Class));
     assert!(projection.has_operation_kind(DocumentProjectionOperationKind::Disabled));
     assert!(
         projection.has_operation_for_kind("refresh", DocumentProjectionOperationKind::Disabled)
@@ -2487,23 +2556,23 @@ fn document_projection_composes_subprojections_for_app_state() {
     );
     assert_eq!(
         projection.operations()[0].kind(),
-        DocumentProjectionOperationKind::Text
+        DocumentProjectionOperationKind::Attribute
     );
-    assert!(projection.operations()[0].is_text());
-    assert!(projection.operations()[0].targets("summary-count"));
-    assert!(projection.operations()[1].is_attribute());
-    assert!(projection.operations()[2].is_disabled());
-    assert!(projection.operations()[3].is_class());
+    assert!(projection.operations()[0].is_attribute());
+    assert!(projection.operations()[0].targets("summary"));
+    assert!(projection.operations()[3].is_text());
+    assert!(projection.operations()[5].is_disabled());
+    assert!(projection.operations()[6].is_class());
 
     let report = view.project(&projection).unwrap();
     let output = view.update();
     let summary = output.snapshot().find("summary").unwrap();
     let refresh = output.snapshot().find("refresh").unwrap();
 
-    assert_eq!(report.operations, 5);
-    assert_eq!(report.changed, 5);
-    assert_eq!(report.operation_count(), 5);
-    assert_eq!(report.changed_count(), 5);
+    assert_eq!(report.operations, 8);
+    assert_eq!(report.changed, 8);
+    assert_eq!(report.operation_count(), 8);
+    assert_eq!(report.changed_count(), 8);
     assert!(!report.is_empty());
     assert!(report.changed_any());
     assert!(!report.unchanged());
@@ -2513,8 +2582,12 @@ fn document_projection_composes_subprojections_for_app_state() {
         Some("42 rows".to_owned())
     );
     assert_eq!(summary.data("state"), Some("ready"));
+    assert_eq!(summary.data("source"), Some("app-state"));
+    assert_eq!(summary.data("revision"), Some("42"));
     assert_eq!(summary.aria("live"), Some("polite"));
     assert_eq!(summary.data("debug"), None);
+    assert!(summary.has_class("has-results"));
+    assert!(!summary.has_class("should-not-apply"));
     assert!(refresh.disabled());
     assert!(refresh.has_class("is-loading"));
 
