@@ -53,7 +53,7 @@ pub(super) fn render_nav(ui: &mut des_document::DocumentBuilder, selected: LabVi
                     view.id(),
                     ElementSpec::new(Element::Div)
                         .class("nav-item")
-                        .interactive()
+                        .on_click(view.id())
                         .selected(view == selected),
                     |ui| {
                         ui.text_element(
@@ -812,7 +812,7 @@ fn render_document_update_loop(ui: &mut des_document::DocumentBuilder) {
                         "loop-action-button",
                         ElementSpec::new(Element::Button)
                             .class("loop-button")
-                            .interactive(),
+                            .on_click("loop-action-button"),
                         |ui| {
                             ui.text_element(
                                 "loop-action-button-label",
@@ -1387,7 +1387,7 @@ fn control_checkbox(ui: &mut des_document::DocumentBuilder, checked: bool) {
                 "control-checkbox",
                 ElementSpec::new(Element::Checkbox)
                     .class("control-row")
-                    .interactive()
+                    .on_click("control-checkbox")
                     .selected(checked),
                 |ui| {
                     ui.element(
@@ -1437,7 +1437,7 @@ fn control_radio_group(ui: &mut des_document::DocumentBuilder, choice: usize) {
                     id,
                     ElementSpec::new(Element::Radio)
                         .class("control-row")
-                        .interactive()
+                        .on_click(id)
                         .selected(choice == index),
                     |ui| {
                         ui.element(
@@ -1482,7 +1482,7 @@ fn control_dropdown(ui: &mut des_document::DocumentBuilder, open: bool, choice: 
                 "control-dropdown",
                 ElementSpec::new(Element::Div)
                     .class("dropdown-field")
-                    .interactive(),
+                    .on_click("control-dropdown"),
                 |ui| {
                     ui.element(
                         "control-dropdown-trigger",
@@ -1522,7 +1522,7 @@ fn control_dropdown(ui: &mut des_document::DocumentBuilder, open: bool, choice: 
                                         id,
                                         ElementSpec::new(Element::Button)
                                             .class("dropdown-option")
-                                            .interactive()
+                                            .on_click(id)
                                             .selected(choice == index),
                                         |ui| {
                                             ui.text_element(

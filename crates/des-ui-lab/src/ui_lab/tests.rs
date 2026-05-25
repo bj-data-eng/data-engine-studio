@@ -1080,6 +1080,27 @@ fn common_control_clicks_update_lab_state() {
 }
 
 #[test]
+fn common_controls_declare_click_commands() {
+    let output = lab_output("interaction");
+
+    for (id, command) in [
+        ("view-text", "view-text"),
+        ("control-checkbox", "control-checkbox"),
+        ("control-radio-remote", "control-radio-remote"),
+        ("control-dropdown", "control-dropdown"),
+        ("loop-action-button", "loop-action-button"),
+    ] {
+        let hooks = &frame(&output, id).behavior_hooks;
+        assert!(
+            hooks
+                .iter()
+                .any(|hook| hook.event == "click" && hook.command == command),
+            "expected {id} to declare click command {command}"
+        );
+    }
+}
+
+#[test]
 fn radio_click_refreshes_retained_document_in_same_frame() {
     let mut harness = lab_harness("interaction");
     let target = center(state_rect(harness.state(), "control-radio-remote"));

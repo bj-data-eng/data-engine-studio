@@ -558,28 +558,45 @@ impl UiLabState {
 
     fn apply_clicked_document_actions(&mut self, ui: &egui::Ui, output: &DocumentOutput) -> bool {
         let mut changed = false;
+        let mut handled_commands = Vec::new();
+        for command in output.command_events() {
+            if command.event == DocumentEventKind::Clicked
+                && let Some(action) = lab_action_for_command(command.command)
+            {
+                self.apply_triggered_lab_action(ui, action);
+                handled_commands.push((command.target.clone(), command.event));
+                changed = true;
+            }
+        }
         for event in &output.events {
             if event.kind == DocumentEventKind::Clicked
+                && !handled_commands
+                    .iter()
+                    .any(|(target, kind)| *kind == event.kind && target == &event.target)
                 && let Some(action) = lab_action_for_id(event.target.as_str())
             {
-                match action {
-                    LabAction::CopyTextSelection => {
-                        if let Some(text) = self
-                            .text_context_menu
-                            .as_ref()
-                            .and_then(|menu| menu.selected_text.clone())
-                            .filter(|text| !text.is_empty())
-                        {
-                            ui.ctx().copy_text(text);
-                        }
-                        self.text_context_menu = None;
-                    }
-                    _ => self.apply_lab_action(action),
-                }
+                self.apply_triggered_lab_action(ui, action);
                 changed = true;
             }
         }
         changed
+    }
+
+    fn apply_triggered_lab_action(&mut self, ui: &egui::Ui, action: LabAction) {
+        match action {
+            LabAction::CopyTextSelection => {
+                if let Some(text) = self
+                    .text_context_menu
+                    .as_ref()
+                    .and_then(|menu| menu.selected_text.clone())
+                    .filter(|text| !text.is_empty())
+                {
+                    ui.ctx().copy_text(text);
+                }
+                self.text_context_menu = None;
+            }
+            _ => self.apply_lab_action(action),
+        }
     }
 
     fn sync_drag_state(&mut self, ui: &egui::Ui, output: &DocumentOutput) -> bool {
@@ -1222,7 +1239,12 @@ fn drop_cell_at(output: &DocumentOutput, point: Point) -> Option<usize> {
 }
 
 fn lab_action_for_id(id: &str) -> Option<LabAction> {
-    match id {
+    lab_action_for_command(id)
+}
+
+fn lab_action_for_command(command: &str) -> Option<LabAction> {
+    let command = command.trim();
+    match command {
         "view-layout" => Some(LabAction::SelectView(LabView::Layout)),
         "view-interaction" => Some(LabAction::SelectView(LabView::Interaction)),
         "view-draggable" => Some(LabAction::SelectView(LabView::Draggable)),
@@ -1246,7 +1268,7 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
         "control-dropdown-option-python" => Some(LabAction::SelectDropdown(2)),
         "loop-action-button" => Some(LabAction::IncrementLoopAction),
         TEXT_CONTEXT_MENU_COPY_ID => Some(LabAction::CopyTextSelection),
-        _ => shadow_tune_action_for_id(id),
+        _ => shadow_tune_action_for_id(command),
     }
 }
 

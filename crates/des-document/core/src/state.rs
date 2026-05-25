@@ -92,22 +92,21 @@ impl DocumentOutput {
     }
 
     pub fn commands(&self) -> Vec<DocumentCommand> {
-        let mut commands = Vec::new();
-        for event in &self.events {
-            let Some(element) = self.layout.find(event.target.as_str()) else {
-                continue;
-            };
-            for hook in &element.behavior_hooks {
-                if hook.matches_document_event(&event.kind) {
-                    commands.push(DocumentCommand {
-                        target: event.target.clone(),
-                        event: event.kind,
-                        command: hook.command.clone(),
-                    });
-                }
-            }
+        self.command_events()
+            .map(|command| DocumentCommand {
+                target: command.target.clone(),
+                event: command.event,
+                command: command.command.to_owned(),
+            })
+            .collect()
+    }
+
+    pub fn command_events(&self) -> DocumentCommandIter<'_> {
+        DocumentCommandIter {
+            output: self,
+            event_index: 0,
+            hook_index: 0,
         }
-        commands
     }
 
     pub fn selected_text(&self) -> Option<String> {
@@ -126,6 +125,48 @@ pub struct DocumentCommand {
     pub target: ElementId,
     pub event: DocumentEventKind,
     pub command: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DocumentCommandRef<'a> {
+    pub target: &'a ElementId,
+    pub event: DocumentEventKind,
+    pub command: &'a str,
+}
+
+pub struct DocumentCommandIter<'a> {
+    output: &'a DocumentOutput,
+    event_index: usize,
+    hook_index: usize,
+}
+
+impl<'a> Iterator for DocumentCommandIter<'a> {
+    type Item = DocumentCommandRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.event_index < self.output.events.len() {
+            let event = &self.output.events[self.event_index];
+            let Some(element) = self.output.layout.find(event.target.as_str()) else {
+                self.event_index += 1;
+                self.hook_index = 0;
+                continue;
+            };
+            while self.hook_index < element.behavior_hooks.len() {
+                let hook = &element.behavior_hooks[self.hook_index];
+                self.hook_index += 1;
+                if hook.matches_document_event(&event.kind) {
+                    return Some(DocumentCommandRef {
+                        target: &event.target,
+                        event: event.kind,
+                        command: hook.command.as_str(),
+                    });
+                }
+            }
+            self.event_index += 1;
+            self.hook_index = 0;
+        }
+        None
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
