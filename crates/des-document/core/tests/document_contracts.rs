@@ -1192,27 +1192,33 @@ fn document_projection_updates_semantic_attributes() {
                 .aria("label", "Query running")
                 .aria("busy", "true")
                 .data("state", "running")
-                .remove_data("ephemeral");
+                .remove_data("ephemeral")
+                .attribute_if("draggable", "true", true)
+                .attribute_if("title", "Idle run", false);
         })
         .unwrap();
     let output = view.update();
     let run = output.snapshot().find("run").unwrap();
 
-    assert_eq!(report.operations, 4);
-    assert_eq!(report.changed, 4);
+    assert_eq!(report.operations, 6);
+    assert_eq!(report.changed, 5);
     assert_eq!(run.attribute("aria-label"), Some("Query running"));
     assert_eq!(run.attribute("aria-busy"), Some("true"));
     assert_eq!(run.attribute("data-state"), Some("running"));
     assert_eq!(run.attribute("data-ephemeral"), None);
+    assert_eq!(run.attribute("draggable"), Some("true"));
+    assert_eq!(run.attribute("title"), None);
 
     let unchanged = DocumentProjection::new()
         .set_aria("run", "label", "Query running")
         .set_aria("run", "busy", "true")
         .set_data("run", "state", "running")
-        .remove_data("run", "ephemeral");
+        .remove_data("run", "ephemeral")
+        .set_attribute_if("run", "draggable", "true", true)
+        .set_attribute_if("run", "title", "Idle run", false);
     let unchanged_report = view.project(&unchanged).unwrap();
 
-    assert_eq!(unchanged_report.operations, 4);
+    assert_eq!(unchanged_report.operations, 6);
     assert_eq!(unchanged_report.changed, 0);
 }
 

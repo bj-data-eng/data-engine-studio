@@ -311,6 +311,34 @@ impl DocumentProjection {
         }
     }
 
+    pub fn set_attribute_if(
+        self,
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.set_attribute(id, name, value)
+        } else {
+            self.remove_attribute(id, name)
+        }
+    }
+
+    pub fn push_attribute_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        present: bool,
+    ) {
+        if present {
+            self.push_attribute(id, name, value);
+        } else {
+            self.push_remove_attribute(id, name);
+        }
+    }
+
     pub fn set_data(
         self,
         id: impl Into<ElementId>,
@@ -726,6 +754,17 @@ impl ElementProjection<'_> {
     pub fn attribute(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
         self.projection
             .push_attribute(self.id.clone(), name.into(), value.into());
+        self
+    }
+
+    pub fn attribute_if(
+        &mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> &mut Self {
+        self.projection
+            .push_attribute_if(self.id.clone(), name, value, present);
         self
     }
 
