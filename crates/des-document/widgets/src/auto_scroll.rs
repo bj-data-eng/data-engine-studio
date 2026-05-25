@@ -99,30 +99,30 @@ impl AutoScroller {
         let delta = Point::new(
             horizontal
                 .and_then(|chrome| {
-                    axis_delta(
-                        pointer.x,
-                        pointer.y,
+                    axis_delta(AxisDeltaRequest {
+                        main: pointer.x,
+                        cross: pointer.y,
                         rect,
                         chrome,
-                        self.options.threshold_x,
-                        self.options.acceleration,
-                        self.options.tolerance,
-                        Axis::Horizontal,
-                    )
+                        threshold_ratio: self.options.threshold_x,
+                        acceleration: self.options.acceleration,
+                        tolerance: self.options.tolerance,
+                        axis: Axis::Horizontal,
+                    })
                 })
                 .unwrap_or(0.0),
             vertical
                 .and_then(|chrome| {
-                    axis_delta(
-                        pointer.y,
-                        pointer.x,
+                    axis_delta(AxisDeltaRequest {
+                        main: pointer.y,
+                        cross: pointer.x,
                         rect,
                         chrome,
-                        self.options.threshold_y,
-                        self.options.acceleration,
-                        self.options.tolerance,
-                        Axis::Vertical,
-                    )
+                        threshold_ratio: self.options.threshold_y,
+                        acceleration: self.options.acceleration,
+                        tolerance: self.options.tolerance,
+                        axis: Axis::Vertical,
+                    })
                 })
                 .unwrap_or(0.0),
         );
@@ -146,6 +146,18 @@ enum Axis {
     Vertical,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct AxisDeltaRequest<'a> {
+    main: f32,
+    cross: f32,
+    rect: Rect,
+    chrome: &'a ScrollChrome,
+    threshold_ratio: f32,
+    acceleration: f32,
+    tolerance: f32,
+    axis: Axis,
+}
+
 fn scroll_chrome<'a>(
     output: &'a DocumentOutput,
     element_id: &ElementId,
@@ -157,16 +169,17 @@ fn scroll_chrome<'a>(
         .find(|chrome| chrome.element_id == *element_id && chrome.axis == axis)
 }
 
-fn axis_delta(
-    main: f32,
-    cross: f32,
-    rect: Rect,
-    chrome: &ScrollChrome,
-    threshold_ratio: f32,
-    acceleration: f32,
-    tolerance: f32,
-    axis: Axis,
-) -> Option<f32> {
+fn axis_delta(request: AxisDeltaRequest<'_>) -> Option<f32> {
+    let AxisDeltaRequest {
+        main,
+        cross,
+        rect,
+        chrome,
+        threshold_ratio,
+        acceleration,
+        tolerance,
+        axis,
+    } = request;
     let threshold_ratio = threshold_ratio.clamp(0.0, 1.0);
     if threshold_ratio <= f32::EPSILON || acceleration <= f32::EPSILON {
         return None;

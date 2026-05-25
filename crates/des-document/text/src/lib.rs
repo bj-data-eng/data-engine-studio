@@ -1644,13 +1644,15 @@ fn collect_run_decorations(
             (Some((_, min_x, max_x, active_shift, font_size, active_decoration)), next) => {
                 push_decoration_rects(
                     output,
-                    min_x,
-                    max_x,
-                    line_top,
-                    line_y,
-                    active_shift,
-                    font_size,
-                    active_decoration,
+                    DecorationRectRun {
+                        min_x,
+                        max_x,
+                        line_top,
+                        line_y,
+                        baseline_shift: active_shift,
+                        font_size,
+                        decoration: active_decoration,
+                    },
                 );
                 active = next.map(|decoration| {
                     (
@@ -1679,19 +1681,21 @@ fn collect_run_decorations(
     if let Some((_, min_x, max_x, baseline_shift, font_size, decoration)) = active {
         push_decoration_rects(
             output,
-            min_x,
-            max_x,
-            line_top,
-            line_y,
-            baseline_shift,
-            font_size,
-            decoration,
+            DecorationRectRun {
+                min_x,
+                max_x,
+                line_top,
+                line_y,
+                baseline_shift,
+                font_size,
+                decoration,
+            },
         );
     }
 }
 
-fn push_decoration_rects(
-    output: &mut Vec<TextGlyphRect>,
+#[derive(Clone, Copy, Debug)]
+struct DecorationRectRun {
     min_x: f32,
     max_x: f32,
     line_top: f32,
@@ -1699,7 +1703,18 @@ fn push_decoration_rects(
     baseline_shift: f32,
     font_size: f32,
     decoration: TextDecorationPaint,
-) {
+}
+
+fn push_decoration_rects(output: &mut Vec<TextGlyphRect>, run: DecorationRectRun) {
+    let DecorationRectRun {
+        min_x,
+        max_x,
+        line_top,
+        line_y,
+        baseline_shift,
+        font_size,
+        decoration,
+    } = run;
     let baseline = line_y - baseline_shift;
     let width = max_x - min_x;
     if decoration.overline {
@@ -1827,13 +1842,15 @@ fn rasterize_surface(
         glyph_rects += 1;
         blend_rect(
             &mut rgba,
-            width_px,
-            height_px,
-            x - min_x,
-            y - min_y,
-            w,
-            h,
-            color,
+            RasterRect {
+                width_px,
+                height_px,
+                x: x - min_x,
+                y: y - min_y,
+                w,
+                h,
+                color,
+            },
         );
     });
 
@@ -1850,8 +1867,8 @@ fn rasterize_surface(
     }
 }
 
-fn blend_rect(
-    rgba: &mut [u8],
+#[derive(Clone, Copy, Debug)]
+struct RasterRect {
     width_px: u32,
     height_px: u32,
     x: i32,
@@ -1859,7 +1876,18 @@ fn blend_rect(
     w: u32,
     h: u32,
     color: CosmicColor,
-) {
+}
+
+fn blend_rect(rgba: &mut [u8], rect: RasterRect) {
+    let RasterRect {
+        width_px,
+        height_px,
+        x,
+        y,
+        w,
+        h,
+        color,
+    } = rect;
     let (r, g, b, a) = color.as_rgba_tuple();
     let min_x = x.max(0) as u32;
     let min_y = y.max(0) as u32;

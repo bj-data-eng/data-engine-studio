@@ -10,7 +10,8 @@ use des_egui::adapter::{
 };
 use styles::stylesheet;
 use views::{
-    render_debug_overlay_layer, render_drag_overlay_layer, render_nav, render_stage, render_topbar,
+    DragLabState, StageRenderState, render_debug_overlay_layer, render_drag_overlay_layer,
+    render_nav, render_stage, render_topbar,
 };
 
 use des_document::{
@@ -827,24 +828,33 @@ impl UiLabState {
                             render_nav(ui, self.view);
                             render_stage(
                                 ui,
-                                self.view,
-                                self.show_optional_card,
-                                self.dense_mode,
-                                self.checkbox_enabled,
-                                self.radio_choice,
-                                self.dropdown_open,
-                                self.dropdown_choice,
-                                self.drag_item_cells,
-                                self.drag_item_order,
-                                self.scroll_list_item_order,
-                                self.pressed_drag_source.as_deref(),
-                                self.active_drag_item(),
-                                self.active_scroll_list_drag_item(),
-                                self.active_drag.as_ref().map(|drag| drag.current),
-                                self.drag_drop_preview,
-                                self.scroll_list_drop_preview,
-                                self.shadow_tune,
-                                self.shadow_hover_tune,
+                                StageRenderState::new(self.view)
+                                    .optional_card(self.show_optional_card)
+                                    .dense_mode(self.dense_mode)
+                                    .controls(
+                                        self.checkbox_enabled,
+                                        self.radio_choice,
+                                        self.dropdown_open,
+                                        self.dropdown_choice,
+                                    )
+                                    .drag(
+                                        DragLabState::new(
+                                            self.drag_item_cells,
+                                            self.drag_item_order,
+                                            self.scroll_list_item_order,
+                                        )
+                                        .active(
+                                            self.pressed_drag_source.as_deref(),
+                                            self.active_drag_item(),
+                                            self.active_scroll_list_drag_item(),
+                                            self.active_drag.as_ref().map(|drag| drag.current),
+                                        )
+                                        .previews(
+                                            self.drag_drop_preview,
+                                            self.scroll_list_drop_preview,
+                                        ),
+                                    )
+                                    .shadows(self.shadow_tune, self.shadow_hover_tune),
                             );
                         },
                     );

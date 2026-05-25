@@ -500,12 +500,14 @@ impl Graph {
         apply_scroll_navigation_over_children(
             ui,
             &scene_response.response,
-            self.id,
-            layout,
-            scene_rect,
-            graph_rect,
-            self.zoom_range,
-            &self.interaction_exclusion_rects,
+            ScrollNavigationContext {
+                graph_id: self.id,
+                layout,
+                scene_rect,
+                graph_rect,
+                zoom_range: self.zoom_range,
+                interaction_exclusion_rects: &self.interaction_exclusion_rects,
+            },
         );
 
         if self.center_view
@@ -526,13 +528,16 @@ impl Graph {
 fn apply_scroll_navigation_over_children(
     ui: &egui::Ui,
     response: &egui::Response,
-    graph_id: egui::Id,
-    layout: &Layout,
-    scene_rect: &mut egui::Rect,
-    graph_rect: egui::Rect,
-    zoom_range: egui::Rangef,
-    interaction_exclusion_rects: &[egui::Rect],
+    context: ScrollNavigationContext<'_>,
 ) {
+    let ScrollNavigationContext {
+        graph_id,
+        layout,
+        scene_rect,
+        graph_rect,
+        zoom_range,
+        interaction_exclusion_rects,
+    } = context;
     if response.changed() {
         return;
     }
@@ -581,6 +586,15 @@ fn apply_scroll_navigation_over_children(
     }
 
     ui.ctx().request_repaint();
+}
+
+struct ScrollNavigationContext<'a> {
+    graph_id: egui::Id,
+    layout: &'a Layout,
+    scene_rect: &'a mut egui::Rect,
+    graph_rect: egui::Rect,
+    zoom_range: egui::Rangef,
+    interaction_exclusion_rects: &'a [egui::Rect],
 }
 
 fn pointer_over_scroll_blocking_node(

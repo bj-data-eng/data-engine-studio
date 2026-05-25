@@ -2,8 +2,9 @@ use crate::element::{Color, DocumentNode, ElementId};
 use crate::geometry::{CornerRadii, Insets, Length, Point, Size};
 use crate::state::ElementState;
 use crate::style::{
-    ChildPosition, ComputedStyle, Shadow, StyleInvalidation, StyleMatchContext, StyleSheet,
-    Transition, classify_computed_style_change, resolve_style_with_position,
+    ChildPosition, ComputedStyle, Shadow, StyleInvalidation, StyleMatchContext,
+    StyleResolutionContext, StyleSheet, Transition, classify_computed_style_change,
+    resolve_style_with_position,
 };
 use std::collections::HashMap;
 
@@ -28,36 +29,55 @@ pub(crate) fn update_element_style_animation(
     viewport: Size,
     container_size: &dyn Fn(&ElementId) -> Option<Size>,
 ) -> AnimationUpdate {
-    update_element_style_animation_at(
-        element,
+    let mut context = StyleAnimationContext {
         stylesheet,
         states,
         snap_epsilon,
-        None,
-        &mut Vec::new(),
-        &[],
         viewport,
         container_size,
+    };
+    let mut ancestors = Vec::new();
+    update_element_style_animation_at(
+        element,
+        &mut context,
+        StyleAnimationTraversal {
+            position: None,
+            ancestors: &mut ancestors,
+            previous_siblings: &[],
+        },
     )
 }
 
-fn update_element_style_animation_at<'a>(
-    element: &'a DocumentNode,
-    stylesheet: &StyleSheet,
-    states: &mut HashMap<ElementId, ElementState>,
+struct StyleAnimationContext<'a> {
+    stylesheet: &'a StyleSheet,
+    states: &'a mut HashMap<ElementId, ElementState>,
     snap_epsilon: f32,
-    position: Option<ChildPosition>,
-    ancestors: &mut Vec<(&'a DocumentNode, Option<ChildPosition>)>,
-    previous_siblings: &[(&'a DocumentNode, Option<ChildPosition>)],
     viewport: Size,
-    container_size: &dyn Fn(&ElementId) -> Option<Size>,
+    container_size: &'a dyn Fn(&ElementId) -> Option<Size>,
+}
+
+struct StyleAnimationTraversal<'a, 'node> {
+    position: Option<ChildPosition>,
+    ancestors: &'a mut Vec<(&'node DocumentNode, Option<ChildPosition>)>,
+    previous_siblings: &'a [(&'node DocumentNode, Option<ChildPosition>)],
+}
+
+fn update_element_style_animation_at<'node>(
+    element: &'node DocumentNode,
+    context: &mut StyleAnimationContext<'_>,
+    traversal: StyleAnimationTraversal<'_, 'node>,
 ) -> AnimationUpdate {
+    let StyleAnimationTraversal {
+        position,
+        ancestors,
+        previous_siblings,
+    } = traversal;
     let target_style = {
         let ancestor_contexts = ancestors
             .iter()
             .map(|(element, position)| StyleMatchContext {
                 element,
-                state: states.get(&element.id),
+                state: context.states.get(&element.id),
                 position: *position,
             })
             .collect::<Vec<_>>();
@@ -65,30 +85,36 @@ fn update_element_style_animation_at<'a>(
             .iter()
             .map(|(element, position)| StyleMatchContext {
                 element,
-                state: states.get(&element.id),
+                state: context.states.get(&element.id),
                 position: *position,
             })
             .collect::<Vec<_>>();
         resolve_style_with_position(
-            element,
-            stylesheet,
-            states.get(&element.id),
-            position,
-            &ancestor_contexts,
-            &previous_sibling_contexts,
-            viewport,
-            container_size(&element.id),
+            context.stylesheet,
+            StyleResolutionContext {
+                element,
+                state: context.states.get(&element.id),
+                position,
+                ancestors: &ancestor_contexts,
+                previous_siblings: &previous_sibling_contexts,
+                viewport: context.viewport,
+                container: (context.container_size)(&element.id),
+            },
         )
     };
     let mut update = AnimationUpdate::default();
 
-    if let Some(state) = states.get_mut(&element.id) {
+    if let Some(state) = context.states.get_mut(&element.id) {
         let previous = state.rendered_style.clone();
         let next_style = match (state.rendered_style.as_ref(), target_style.transition) {
             (Some(current_style), Some(_)) if current_style == &target_style => Some(target_style),
             (Some(current_style), Some(transition)) => {
-                let (style, still_animating) =
-                    eased_style(current_style, &target_style, transition, snap_epsilon);
+                let (style, still_animating) = eased_style(
+                    current_style,
+                    &target_style,
+                    transition,
+                    context.snap_epsilon,
+                );
                 update.animating |= still_animating;
                 Some(style)
             }
@@ -105,14 +131,12 @@ fn update_element_style_animation_at<'a>(
         let child_position = Some(ChildPosition::new(index, element.children.len()));
         update += update_element_style_animation_at(
             child,
-            stylesheet,
-            states,
-            snap_epsilon,
-            child_position,
-            ancestors,
-            &previous_siblings,
-            viewport,
-            container_size,
+            context,
+            StyleAnimationTraversal {
+                position: child_position,
+                ancestors,
+                previous_siblings: &previous_siblings,
+            },
         );
         previous_siblings.push((child, child_position));
     }

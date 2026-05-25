@@ -443,6 +443,17 @@ pub(crate) struct StyleMatchContext<'a> {
     pub position: Option<ChildPosition>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StyleResolutionContext<'a> {
+    pub element: &'a DocumentNode,
+    pub state: Option<&'a ElementState>,
+    pub position: Option<ChildPosition>,
+    pub ancestors: &'a [StyleMatchContext<'a>],
+    pub previous_siblings: &'a [StyleMatchContext<'a>],
+    pub viewport: Size,
+    pub container: Option<Size>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Easing {
     Linear,
@@ -2287,29 +2298,14 @@ fn primary_compound_selector_key(selector: &CompoundSelector) -> SelectorIndexKe
 }
 
 pub(crate) fn resolve_style_with_position(
-    element: &DocumentNode,
     stylesheet: &StyleSheet,
-    state: Option<&ElementState>,
-    position: Option<ChildPosition>,
-    ancestors: &[StyleMatchContext<'_>],
-    previous_siblings: &[StyleMatchContext<'_>],
-    viewport: Size,
-    container: Option<Size>,
+    context: StyleResolutionContext<'_>,
 ) -> ComputedStyle {
     let mut style = ComputedStyle::default();
 
-    for index in stylesheet.index.candidates_for(element) {
+    for index in stylesheet.index.candidates_for(context.element) {
         let rule = &stylesheet.rules[index];
-        if rule_matches(
-            rule,
-            element,
-            state,
-            position,
-            ancestors,
-            previous_siblings,
-            viewport,
-            container,
-        ) {
+        if rule_matches(rule, context) {
             style.apply(&rule.style);
         }
     }
@@ -2449,25 +2445,16 @@ fn selector_matches(
     }
 }
 
-fn rule_matches(
-    rule: &StyleRule,
-    element: &DocumentNode,
-    state: Option<&ElementState>,
-    position: Option<ChildPosition>,
-    ancestors: &[StyleMatchContext<'_>],
-    previous_siblings: &[StyleMatchContext<'_>],
-    viewport: Size,
-    container: Option<Size>,
-) -> bool {
+fn rule_matches(rule: &StyleRule, context: StyleResolutionContext<'_>) -> bool {
     rule.condition
-        .is_none_or(|condition| condition.matches(viewport, container))
+        .is_none_or(|condition| condition.matches(context.viewport, context.container))
         && selector_matches(
             &rule.selector,
-            element,
-            state,
-            position,
-            ancestors,
-            previous_siblings,
+            context.element,
+            context.state,
+            context.position,
+            context.ancestors,
+            context.previous_siblings,
         )
 }
 

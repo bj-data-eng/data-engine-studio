@@ -89,27 +89,19 @@ fn view_hint(view: LabView) -> &'static str {
     }
 }
 
-pub(super) fn render_stage(
-    ui: &mut des_document::DocumentBuilder,
-    view: LabView,
-    show_optional_card: bool,
-    dense_mode: bool,
-    checkbox_enabled: bool,
-    radio_choice: usize,
-    dropdown_open: bool,
-    dropdown_choice: usize,
-    drag_item_cells: [usize; 3],
-    drag_item_order: [usize; 3],
-    scroll_list_item_order: [usize; 14],
-    pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
-    drag_pointer: Option<des_document::Point>,
-    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
-    shadow_tune: ShadowTuneState,
-    shadow_hover_tune: ShadowTuneState,
-) {
+pub(super) fn render_stage(ui: &mut des_document::DocumentBuilder, state: StageRenderState<'_>) {
+    let StageRenderState {
+        view,
+        show_optional_card,
+        dense_mode,
+        checkbox_enabled,
+        radio_choice,
+        dropdown_open,
+        dropdown_choice,
+        drag,
+        shadow_tune,
+        shadow_hover_tune,
+    } = state;
     ui.element(
         "stage",
         ElementSpec::new(Element::Div)
@@ -124,18 +116,7 @@ pub(super) fn render_stage(
                 dropdown_open,
                 dropdown_choice,
             ),
-            LabView::Draggable => render_draggable_view(
-                ui,
-                drag_item_cells,
-                drag_item_order,
-                scroll_list_item_order,
-                pressed_drag_source,
-                active_drag_item,
-                active_scroll_list_drag_item,
-                drag_pointer,
-                drag_drop_preview,
-                scroll_list_drop_preview,
-            ),
+            LabView::Draggable => render_draggable_view(ui, drag),
             LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
             LabView::Animation => render_animation_view(ui),
             LabView::Scrolling => render_scrolling_view(ui),
@@ -146,6 +127,144 @@ pub(super) fn render_stage(
             LabView::Graph => render_graph_view(ui),
         },
     );
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct StageRenderState<'a> {
+    view: LabView,
+    show_optional_card: bool,
+    dense_mode: bool,
+    checkbox_enabled: bool,
+    radio_choice: usize,
+    dropdown_open: bool,
+    dropdown_choice: usize,
+    drag: DragLabState<'a>,
+    shadow_tune: ShadowTuneState,
+    shadow_hover_tune: ShadowTuneState,
+}
+
+impl<'a> StageRenderState<'a> {
+    pub(super) fn new(view: LabView) -> Self {
+        Self {
+            view,
+            show_optional_card: false,
+            dense_mode: false,
+            checkbox_enabled: false,
+            radio_choice: 0,
+            dropdown_open: false,
+            dropdown_choice: 0,
+            drag: DragLabState::default(),
+            shadow_tune: ShadowTuneState::default(),
+            shadow_hover_tune: ShadowTuneState::default(),
+        }
+    }
+
+    pub(super) fn optional_card(mut self, show_optional_card: bool) -> Self {
+        self.show_optional_card = show_optional_card;
+        self
+    }
+
+    pub(super) fn dense_mode(mut self, dense_mode: bool) -> Self {
+        self.dense_mode = dense_mode;
+        self
+    }
+
+    pub(super) fn controls(
+        mut self,
+        checkbox_enabled: bool,
+        radio_choice: usize,
+        dropdown_open: bool,
+        dropdown_choice: usize,
+    ) -> Self {
+        self.checkbox_enabled = checkbox_enabled;
+        self.radio_choice = radio_choice;
+        self.dropdown_open = dropdown_open;
+        self.dropdown_choice = dropdown_choice;
+        self
+    }
+
+    pub(super) fn drag(mut self, drag: DragLabState<'a>) -> Self {
+        self.drag = drag;
+        self
+    }
+
+    pub(super) fn shadows(
+        mut self,
+        shadow_tune: ShadowTuneState,
+        shadow_hover_tune: ShadowTuneState,
+    ) -> Self {
+        self.shadow_tune = shadow_tune;
+        self.shadow_hover_tune = shadow_hover_tune;
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct DragLabState<'a> {
+    drag_item_cells: [usize; 3],
+    drag_item_order: [usize; 3],
+    scroll_list_item_order: [usize; 14],
+    pressed_drag_source: Option<&'a str>,
+    active_drag_item: Option<des_widgets::SortableItemId>,
+    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
+    drag_pointer: Option<des_document::Point>,
+    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
+    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
+}
+
+impl Default for DragLabState<'_> {
+    fn default() -> Self {
+        Self {
+            drag_item_cells: [0; 3],
+            drag_item_order: [0, 1, 2],
+            scroll_list_item_order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+            pressed_drag_source: None,
+            active_drag_item: None,
+            active_scroll_list_drag_item: None,
+            drag_pointer: None,
+            drag_drop_preview: None,
+            scroll_list_drop_preview: None,
+        }
+    }
+}
+
+impl<'a> DragLabState<'a> {
+    pub(super) fn new(
+        drag_item_cells: [usize; 3],
+        drag_item_order: [usize; 3],
+        scroll_list_item_order: [usize; 14],
+    ) -> Self {
+        Self {
+            drag_item_cells,
+            drag_item_order,
+            scroll_list_item_order,
+            ..Default::default()
+        }
+    }
+
+    pub(super) fn active(
+        mut self,
+        pressed_drag_source: Option<&'a str>,
+        active_drag_item: Option<des_widgets::SortableItemId>,
+        active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
+        drag_pointer: Option<des_document::Point>,
+    ) -> Self {
+        self.pressed_drag_source = pressed_drag_source;
+        self.active_drag_item = active_drag_item;
+        self.active_scroll_list_drag_item = active_scroll_list_drag_item;
+        self.drag_pointer = drag_pointer;
+        self
+    }
+
+    pub(super) fn previews(
+        mut self,
+        drag_drop_preview: Option<des_widgets::SortableDropPreview>,
+        scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
+    ) -> Self {
+        self.drag_drop_preview = drag_drop_preview;
+        self.scroll_list_drop_preview = scroll_list_drop_preview;
+        self
+    }
 }
 
 fn render_layout_view(
@@ -660,36 +779,14 @@ fn render_interaction_view(
     render_document_update_loop(ui);
 }
 
-fn render_draggable_view(
-    ui: &mut des_document::DocumentBuilder,
-    drag_item_cells: [usize; 3],
-    drag_item_order: [usize; 3],
-    scroll_list_item_order: [usize; 14],
-    pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
-    drag_pointer: Option<des_document::Point>,
-    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
-) {
+fn render_draggable_view(ui: &mut des_document::DocumentBuilder, drag: DragLabState<'_>) {
     ui.child("draggable-heading", Element::Text)
         .class("heading")
         .text("Document Draggables");
     ui.child("draggable-copy", Element::Text)
         .class("muted")
         .text("Sortable drag/drop uses document events, visual subtree clones, optional handles, and style-owned overlays.");
-    render_drag_drop_lab(
-        ui,
-        drag_item_cells,
-        drag_item_order,
-        scroll_list_item_order,
-        pressed_drag_source,
-        active_drag_item,
-        active_scroll_list_drag_item,
-        drag_pointer,
-        drag_drop_preview,
-        scroll_list_drop_preview,
-    );
+    render_drag_drop_lab(ui, drag);
 }
 
 fn render_document_update_loop(ui: &mut des_document::DocumentBuilder) {
@@ -790,18 +887,18 @@ fn loop_result_card(
     );
 }
 
-fn render_drag_drop_lab(
-    ui: &mut des_document::DocumentBuilder,
-    drag_item_cells: [usize; 3],
-    drag_item_order: [usize; 3],
-    scroll_list_item_order: [usize; 14],
-    pressed_drag_source: Option<&str>,
-    active_drag_item: Option<des_widgets::SortableItemId>,
-    active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
-    _drag_pointer: Option<des_document::Point>,
-    drag_drop_preview: Option<des_widgets::SortableDropPreview>,
-    scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
-) {
+fn render_drag_drop_lab(ui: &mut des_document::DocumentBuilder, drag: DragLabState<'_>) {
+    let DragLabState {
+        drag_item_cells,
+        drag_item_order,
+        scroll_list_item_order,
+        pressed_drag_source,
+        active_drag_item,
+        active_scroll_list_drag_item,
+        drag_pointer: _,
+        drag_drop_preview,
+        scroll_list_drop_preview,
+    } = drag;
     ui.child("drag-title", Element::Text)
         .class("section-title")
         .text("Drag and drop grid");
@@ -2061,59 +2158,63 @@ fn render_animation_view(ui: &mut des_document::DocumentBuilder) {
         |ui| {
             animation_specimen(
                 ui,
-                "animation-hover-size",
-                "Hovered",
-                "width and height animate while the pointer is over the specimen",
-                "base: width Px(150); height Px(58) | hovered: width Px(220); height Px(84)",
-                "animation-box-hover-size",
-                false,
-                false,
-                false,
+                AnimationSpecimen {
+                    id: "animation-hover-size",
+                    title: "Hovered",
+                    note: "width and height animate while the pointer is over the specimen",
+                    rule_text:
+                        "base: width Px(150); height Px(58) | hovered: width Px(220); height Px(84)",
+                    box_class: "animation-box-hover-size",
+                    ..Default::default()
+                },
             );
             animation_margin_specimen(ui);
             animation_specimen(
                 ui,
-                "animation-pressed-border",
-                "Pressed",
-                "border width and corner radius animate while primary pointer is down",
-                "base: border width all sides 2; radius all corners 4 | pressed: border width all sides 10; radius all corners 22",
-                "animation-box-pressed-border",
-                false,
-                false,
-                false,
+                AnimationSpecimen {
+                    id: "animation-pressed-border",
+                    title: "Pressed",
+                    note: "border width and corner radius animate while primary pointer is down",
+                    rule_text: "base: border width all sides 2; radius all corners 4 | pressed: border width all sides 10; radius all corners 22",
+                    box_class: "animation-box-pressed-border",
+                    ..Default::default()
+                },
             );
             animation_specimen(
                 ui,
-                "animation-selected-spacing",
-                "Selected",
-                "size, spacing, color, radius, and font size animate from selected state",
-                "base: width 150; height 58; padding 8; margin 0; radius 4 | selected: width 210; height 92; padding 16; margin 10; radius 12",
-                "animation-box-selected-spacing",
-                true,
-                false,
-                false,
+                AnimationSpecimen {
+                    id: "animation-selected-spacing",
+                    title: "Selected",
+                    note: "size, spacing, color, radius, and font size animate from selected state",
+                    rule_text: "base: width 150; height 58; padding 8; margin 0; radius 4 | selected: width 210; height 92; padding 16; margin 10; radius 12",
+                    box_class: "animation-box-selected-spacing",
+                    selected: true,
+                    ..Default::default()
+                },
             );
             animation_specimen(
                 ui,
-                "animation-disabled-color",
-                "Disabled",
-                "background, border color, and text color animate from disabled state",
-                "base: background; border; text color | disabled: muted background; muted border; muted text color",
-                "animation-box-disabled-color",
-                false,
-                true,
-                false,
+                AnimationSpecimen {
+                    id: "animation-disabled-color",
+                    title: "Disabled",
+                    note: "background, border color, and text color animate from disabled state",
+                    rule_text: "base: background; border; text color | disabled: muted background; muted border; muted text color",
+                    box_class: "animation-box-disabled-color",
+                    disabled: true,
+                    ..Default::default()
+                },
             );
             animation_specimen(
                 ui,
-                "animation-focused-min-size",
-                "Focused",
-                "size, border width, color, and radius animate from focused state",
-                "base: width 150; height 58; border width 2; radius 4 | focused: width 226; height 88; border width 6; radius 16",
-                "animation-box-focused-min-size",
-                false,
-                false,
-                true,
+                AnimationSpecimen {
+                    id: "animation-focused-min-size",
+                    title: "Focused",
+                    note: "size, border width, color, and radius animate from focused state",
+                    rule_text: "base: width 150; height 58; border width 2; radius 4 | focused: width 226; height 88; border width 6; radius 16",
+                    box_class: "animation-box-focused-min-size",
+                    focused: true,
+                    ..Default::default()
+                },
             );
         },
     );
@@ -2182,8 +2283,8 @@ fn animation_margin_specimen(ui: &mut des_document::DocumentBuilder) {
     );
 }
 
-fn animation_specimen(
-    ui: &mut des_document::DocumentBuilder,
+#[derive(Clone, Copy, Debug, Default)]
+struct AnimationSpecimen {
     id: &'static str,
     title: &'static str,
     note: &'static str,
@@ -2192,7 +2293,19 @@ fn animation_specimen(
     selected: bool,
     disabled: bool,
     focused: bool,
-) {
+}
+
+fn animation_specimen(ui: &mut des_document::DocumentBuilder, specimen: AnimationSpecimen) {
+    let AnimationSpecimen {
+        id,
+        title,
+        note,
+        rule_text,
+        box_class,
+        selected,
+        disabled,
+        focused,
+    } = specimen;
     ui.element(
         id,
         ElementSpec::new(Element::Div).class("animation-specimen"),

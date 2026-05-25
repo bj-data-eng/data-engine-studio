@@ -446,17 +446,16 @@ fn paint_frame_clipped(
                     });
                     paint_atlas_text(
                         &painter,
-                        text_rect.min,
-                        visible_rect,
-                        request,
-                        selection,
-                        frame.style.text_selection_background,
-                        frame.style.text_selection_color,
-                        ui.ctx().pixels_per_point(),
-                        &mut resources.renderer,
-                        &mut resources.atlas,
-                        &mut resources.mesh_cache,
-                        &mut resources.stats,
+                        AtlasTextPaintRequest {
+                            position: text_rect.min,
+                            visible_rect,
+                            layout: request,
+                            selection,
+                            selection_background: frame.style.text_selection_background,
+                            selection_color: frame.style.text_selection_color,
+                            pixels_per_point: ui.ctx().pixels_per_point(),
+                        },
+                        resources,
                     );
                 }
             } else {
@@ -560,21 +559,27 @@ fn children_need_z_sort(children: &[ResolvedElement]) -> bool {
 
 fn paint_atlas_text(
     painter: &egui::Painter,
-    position: egui::Pos2,
-    visible_rect: Rect,
-    request: TextLayoutRequest<'_>,
-    selection: Option<std::ops::Range<usize>>,
-    selection_background: Color,
-    selection_color: Color,
-    pixels_per_point: f32,
-    renderer: &mut CosmicTextRenderer,
-    atlas: &mut TextGlyphAtlas,
-    mesh_cache: &mut TextGlyphMeshCache,
-    stats: &mut TextPaintStats,
+    request: AtlasTextPaintRequest<'_>,
+    resources: &mut CosmicTextPaintResources,
 ) {
+    let AtlasTextPaintRequest {
+        position,
+        visible_rect,
+        layout,
+        selection,
+        selection_background,
+        selection_color,
+        pixels_per_point,
+    } = request;
+    let CosmicTextPaintResources {
+        renderer,
+        atlas,
+        mesh_cache,
+        stats,
+    } = resources;
     stats.paint_text_requests += 1;
     let glyph_run_start = Instant::now();
-    let glyph_run = renderer.paint_glyphs(request.clone(), pixels_per_point, Some(visible_rect));
+    let glyph_run = renderer.paint_glyphs(layout.clone(), pixels_per_point, Some(visible_rect));
     stats.glyph_run_time += glyph_run_start.elapsed();
     let scale = pixels_per_point.max(1.0);
     if glyph_run.glyphs.is_empty() {
@@ -586,7 +591,7 @@ fn paint_atlas_text(
     let selection = selection.filter(|selection| selection.start < selection.end);
     if let Some(selection) = selection.clone() {
         for rect in renderer.selection_rects(
-            request.clone(),
+            layout.clone(),
             pixels_per_point,
             selection,
             selection_background,
@@ -598,16 +603,20 @@ fn paint_atlas_text(
     let paint_start = Instant::now();
     paint_text_glyph_meshes(
         painter,
-        position,
-        glyph_run.id,
-        &glyph_run.glyphs,
-        selection.as_ref(),
-        selection_color,
-        scale,
-        renderer,
-        atlas,
-        mesh_cache,
-        stats,
+        GlyphMeshPaintRequest {
+            position,
+            run_id: glyph_run.id,
+            glyphs: &glyph_run.glyphs,
+            selection: selection.as_ref(),
+            selection_color,
+            scale,
+        },
+        GlyphMeshPaintResources {
+            renderer,
+            atlas,
+            mesh_cache,
+            stats,
+        },
     );
     stats.glyph_paint_time += paint_start.elapsed();
     stats.glyph_atlas_time += atlas_start.elapsed();
@@ -616,19 +625,35 @@ fn paint_atlas_text(
     }
 }
 
+struct AtlasTextPaintRequest<'a> {
+    position: egui::Pos2,
+    visible_rect: Rect,
+    layout: TextLayoutRequest<'a>,
+    selection: Option<std::ops::Range<usize>>,
+    selection_background: Color,
+    selection_color: Color,
+    pixels_per_point: f32,
+}
+
 fn paint_text_glyph_meshes(
     painter: &egui::Painter,
-    position: egui::Pos2,
-    run_id: TextPaintRunId,
-    glyphs: &[TextGlyph],
-    selection: Option<&std::ops::Range<usize>>,
-    selection_color: Color,
-    scale: f32,
-    renderer: &mut CosmicTextRenderer,
-    atlas: &mut TextGlyphAtlas,
-    mesh_cache: &mut TextGlyphMeshCache,
-    stats: &mut TextPaintStats,
+    request: GlyphMeshPaintRequest<'_>,
+    resources: GlyphMeshPaintResources<'_>,
 ) {
+    let GlyphMeshPaintRequest {
+        position,
+        run_id,
+        glyphs,
+        selection,
+        selection_color,
+        scale,
+    } = request;
+    let GlyphMeshPaintResources {
+        renderer,
+        atlas,
+        mesh_cache,
+        stats,
+    } = resources;
     let cache_key = TextGlyphMeshCacheKey::new(run_id, position, selection, selection_color);
     if let Some(meshes) = mesh_cache.get(&cache_key) {
         stats.glyph_mesh_cache_hits += 1;
@@ -663,6 +688,22 @@ fn paint_text_glyph_meshes(
     stats.glyph_meshes += meshes.len();
     paint_cached_text_meshes(painter, &meshes);
     mesh_cache.insert(cache_key, meshes);
+}
+
+struct GlyphMeshPaintRequest<'a> {
+    position: egui::Pos2,
+    run_id: TextPaintRunId,
+    glyphs: &'a [TextGlyph],
+    selection: Option<&'a std::ops::Range<usize>>,
+    selection_color: Color,
+    scale: f32,
+}
+
+struct GlyphMeshPaintResources<'a> {
+    renderer: &'a mut CosmicTextRenderer,
+    atlas: &'a mut TextGlyphAtlas,
+    mesh_cache: &'a mut TextGlyphMeshCache,
+    stats: &'a mut TextPaintStats,
 }
 
 fn paint_cached_text_meshes(painter: &egui::Painter, meshes: &[Arc<egui::epaint::Mesh>]) {

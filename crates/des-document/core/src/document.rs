@@ -9,8 +9,8 @@ use crate::geometry::{
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
 use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
-    ChildPosition, ComputedStyle, StyleMatchContext, StyleSheet, classify_computed_style_change,
-    resolve_style_with_position,
+    ChildPosition, ComputedStyle, StyleMatchContext, StyleResolutionContext, StyleSheet,
+    classify_computed_style_change, resolve_style_with_position,
 };
 use crate::table::{TableColumnId, TableSpec, TableTrackSize};
 #[cfg(test)]
@@ -52,6 +52,32 @@ struct OwnedStyleMatchContext {
     element: DocumentNode,
     state: Option<ElementState>,
     position: Option<ChildPosition>,
+}
+
+struct ApplyStylesheetContext<'a> {
+    stylesheet: &'a StyleSheet,
+    states: &'a HashMap<ElementId, ElementState>,
+    resolve_container_queries: bool,
+    report: &'a mut StyleResolutionReport,
+}
+
+struct ApplyStylesheetTraversal<'a> {
+    position: Option<ChildPosition>,
+    ancestors: &'a mut Vec<OwnedStyleMatchContext>,
+    previous_siblings: &'a [OwnedStyleMatchContext],
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ResolveParentFrame {
+    origin: Point,
+    scroll_offset: Point,
+    clip: ClipRect,
+}
+
+struct ResolveTreeContext<'a> {
+    text_measurer: &'a mut dyn TextMeasurer,
+    anchors: &'a mut HashMap<ElementId, DocumentRect>,
+    boundaries: &'a mut HashMap<ElementId, DocumentRect>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -469,15 +495,20 @@ impl Document {
         resolve_container_queries: bool,
     ) -> DocumentResult<StyleResolutionReport> {
         let mut report = StyleResolutionReport::default();
+        let mut ancestors = Vec::new();
         self.apply_stylesheet_subtree(
             self.root.clone(),
-            None,
-            stylesheet,
-            states,
-            resolve_container_queries,
-            &mut Vec::new(),
-            &[],
-            &mut report,
+            ApplyStylesheetContext {
+                stylesheet,
+                states,
+                resolve_container_queries,
+                report: &mut report,
+            },
+            ApplyStylesheetTraversal {
+                position: None,
+                ancestors: &mut ancestors,
+                previous_siblings: &[],
+            },
         )?;
         report.layout_changed |= self.apply_table_grid_styles()?;
 
@@ -487,14 +518,20 @@ impl Document {
     fn apply_stylesheet_subtree(
         &mut self,
         id: ElementId,
-        position: Option<ChildPosition>,
-        stylesheet: &StyleSheet,
-        states: &HashMap<ElementId, ElementState>,
-        resolve_container_queries: bool,
-        ancestors: &mut Vec<OwnedStyleMatchContext>,
-        previous_siblings: &[OwnedStyleMatchContext],
-        report: &mut StyleResolutionReport,
+        context: ApplyStylesheetContext<'_>,
+        traversal: ApplyStylesheetTraversal<'_>,
     ) -> DocumentResult<OwnedStyleMatchContext> {
+        let ApplyStylesheetContext {
+            stylesheet,
+            states,
+            resolve_container_queries,
+            report,
+        } = context;
+        let ApplyStylesheetTraversal {
+            position,
+            ancestors,
+            previous_siblings,
+        } = traversal;
         report.visited += 1;
         let element = self.snapshot_element(&id)?;
         let ancestor_contexts = ancestors
@@ -514,17 +551,19 @@ impl Document {
             })
             .collect::<Vec<_>>();
         let computed = resolve_style_with_position(
-            &element,
             stylesheet,
-            states.get(&id),
-            position,
-            &ancestor_contexts,
-            &previous_sibling_contexts,
-            self.viewport,
-            if resolve_container_queries {
-                self.parent_container_size(&id)?
-            } else {
-                None
+            StyleResolutionContext {
+                element: &element,
+                state: states.get(&id),
+                position,
+                ancestors: &ancestor_contexts,
+                previous_siblings: &previous_sibling_contexts,
+                viewport: self.viewport,
+                container: if resolve_container_queries {
+                    self.parent_container_size(&id)?
+                } else {
+                    None
+                },
             },
         );
         let computed = if id == self.root {
@@ -568,13 +607,17 @@ impl Document {
             let child_position = Some(ChildPosition::new(index, sibling_count));
             let child_context = self.apply_stylesheet_subtree(
                 child,
-                child_position,
-                stylesheet,
-                states,
-                resolve_container_queries,
-                ancestors,
-                &previous_siblings,
-                report,
+                ApplyStylesheetContext {
+                    stylesheet,
+                    states,
+                    resolve_container_queries,
+                    report,
+                },
+                ApplyStylesheetTraversal {
+                    position: child_position,
+                    ancestors,
+                    previous_siblings: &previous_siblings,
+                },
             )?;
             previous_siblings.push(child_context);
         }
@@ -669,17 +712,21 @@ impl Document {
         let mut boundaries = HashMap::new();
         self.resolved_element(
             &self.root,
-            Point::ZERO,
-            Point::ZERO,
-            ClipRect::from_rect(DocumentRect::new(
-                0.0,
-                0.0,
-                self.viewport.width,
-                self.viewport.height,
-            )),
-            text_measurer,
-            &mut anchors,
-            &mut boundaries,
+            ResolveParentFrame {
+                origin: Point::ZERO,
+                scroll_offset: Point::ZERO,
+                clip: ClipRect::from_rect(DocumentRect::new(
+                    0.0,
+                    0.0,
+                    self.viewport.width,
+                    self.viewport.height,
+                )),
+            },
+            &mut ResolveTreeContext {
+                text_measurer,
+                anchors: &mut anchors,
+                boundaries: &mut boundaries,
+            },
         )
     }
 
@@ -865,12 +912,8 @@ impl Document {
     fn resolved_element(
         &self,
         id: &ElementId,
-        parent_origin: Point,
-        parent_scroll_offset: Point,
-        parent_clip: ClipRect,
-        text_measurer: &mut dyn TextMeasurer,
-        anchors: &mut HashMap<ElementId, DocumentRect>,
-        boundaries: &mut HashMap<ElementId, DocumentRect>,
+        parent: ResolveParentFrame,
+        context: &mut ResolveTreeContext<'_>,
     ) -> DocumentResult<ResolvedElement> {
         let element = self.element(id)?;
         let raw_rect = self.layout_rect(id.as_str())?;
@@ -878,10 +921,10 @@ impl Document {
             raw_rect,
             &element.computed_style,
             self.viewport,
-            parent_origin,
-            parent_scroll_offset,
-            anchors,
-            boundaries,
+            parent.origin,
+            parent.scroll_offset,
+            context.anchors,
+            context.boundaries,
         );
         let clip_rect = if element.computed_style.position == Position::AbsoluteViewport {
             ClipRect::from_rect(DocumentRect::new(
@@ -891,7 +934,7 @@ impl Document {
                 self.viewport.height,
             ))
         } else {
-            parent_clip
+            parent.clip
         };
         let normalized_text = element
             .text
@@ -903,10 +946,15 @@ impl Document {
                 .inset(element.computed_style.padding)
                 .size
                 .width;
-            measure_normalized_text(text, &element.computed_style, content_width, text_measurer)
+            measure_normalized_text(
+                text,
+                &element.computed_style,
+                content_width,
+                context.text_measurer,
+            )
         });
-        anchors.insert(element.id.clone(), rect);
-        boundaries.insert(
+        context.anchors.insert(element.id.clone(), rect);
+        context.boundaries.insert(
             element.id.clone(),
             rect.inset(element.computed_style.border_width),
         );
@@ -915,9 +963,7 @@ impl Document {
             rect,
             element.scroll_offset,
             child_clip_rect(rect, &element.computed_style, clip_rect),
-            text_measurer,
-            anchors,
-            boundaries,
+            context,
         )?;
 
         Ok(ResolvedElement {
@@ -951,9 +997,7 @@ impl Document {
         parent_rect: DocumentRect,
         parent_scroll_offset: Point,
         child_clip: ClipRect,
-        text_measurer: &mut dyn TextMeasurer,
-        anchors: &mut HashMap<ElementId, DocumentRect>,
-        boundaries: &mut HashMap<ElementId, DocumentRect>,
+        context: &mut ResolveTreeContext<'_>,
     ) -> DocumentResult<Vec<ResolvedElement>> {
         let children = self.children(id.clone())?;
         let mut resolved = vec![None; children.len()];
@@ -964,16 +1008,16 @@ impl Document {
             }
             resolved[index] = Some(self.resolved_element(
                 child,
-                child_parent_origin(
-                    parent_rect,
-                    &self.element(id)?.computed_style,
-                    &self.element(child)?.computed_style,
-                ),
-                parent_scroll_offset,
-                child_clip,
-                text_measurer,
-                anchors,
-                boundaries,
+                ResolveParentFrame {
+                    origin: child_parent_origin(
+                        parent_rect,
+                        &self.element(id)?.computed_style,
+                        &self.element(child)?.computed_style,
+                    ),
+                    scroll_offset: parent_scroll_offset,
+                    clip: child_clip,
+                },
+                context,
             )?);
         }
 
@@ -983,16 +1027,16 @@ impl Document {
             }
             resolved[index] = Some(self.resolved_element(
                 child,
-                child_parent_origin(
-                    parent_rect,
-                    &self.element(id)?.computed_style,
-                    &self.element(child)?.computed_style,
-                ),
-                parent_scroll_offset,
-                child_clip,
-                text_measurer,
-                anchors,
-                boundaries,
+                ResolveParentFrame {
+                    origin: child_parent_origin(
+                        parent_rect,
+                        &self.element(id)?.computed_style,
+                        &self.element(child)?.computed_style,
+                    ),
+                    scroll_offset: parent_scroll_offset,
+                    clip: child_clip,
+                },
+                context,
             )?);
         }
 
