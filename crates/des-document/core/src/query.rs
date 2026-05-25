@@ -258,32 +258,64 @@ impl<'a> DocumentSnapshot<'a> {
         self.elements_matching(|element| element.selected)
     }
 
+    pub fn checked_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.selected_elements()
+    }
+
     pub fn first_selected(&self) -> Option<ElementSnapshot<'a>> {
         self.first_matching(|element| element.selected)
+    }
+
+    pub fn first_checked(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_selected()
     }
 
     pub fn contains_selected(&self) -> bool {
         self.first_selected().is_some()
     }
 
+    pub fn contains_checked(&self) -> bool {
+        self.contains_selected()
+    }
+
     pub fn count_selected(&self) -> usize {
         self.selected_elements().len()
+    }
+
+    pub fn count_checked(&self) -> usize {
+        self.count_selected()
     }
 
     pub fn disabled_elements(&self) -> Vec<ElementSnapshot<'a>> {
         self.elements_matching(|element| element.disabled)
     }
 
+    pub fn enabled_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| !element.disabled)
+    }
+
     pub fn first_disabled(&self) -> Option<ElementSnapshot<'a>> {
         self.first_matching(|element| element.disabled)
+    }
+
+    pub fn first_enabled(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| !element.disabled)
     }
 
     pub fn contains_disabled(&self) -> bool {
         self.first_disabled().is_some()
     }
 
+    pub fn contains_enabled(&self) -> bool {
+        self.first_enabled().is_some()
+    }
+
     pub fn count_disabled(&self) -> usize {
         self.disabled_elements().len()
+    }
+
+    pub fn count_enabled(&self) -> usize {
+        self.enabled_elements().len()
     }
 
     pub fn focused_elements(&self) -> Vec<ElementSnapshot<'a>> {
@@ -498,6 +530,10 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn disabled(&self) -> bool {
         self.element.disabled
+    }
+
+    pub fn enabled(&self) -> bool {
+        !self.disabled()
     }
 
     pub fn focused(&self) -> bool {
@@ -729,32 +765,64 @@ impl<'a> ElementSnapshot<'a> {
         self.elements_matching(|element| element.selected)
     }
 
+    pub fn checked_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.selected_elements()
+    }
+
     pub fn first_selected(&self) -> Option<ElementSnapshot<'a>> {
         self.first_matching(|element| element.selected)
+    }
+
+    pub fn first_checked(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_selected()
     }
 
     pub fn contains_selected(&self) -> bool {
         self.first_selected().is_some()
     }
 
+    pub fn contains_checked(&self) -> bool {
+        self.contains_selected()
+    }
+
     pub fn count_selected(&self) -> usize {
         self.selected_elements().len()
+    }
+
+    pub fn count_checked(&self) -> usize {
+        self.count_selected()
     }
 
     pub fn disabled_elements(&self) -> Vec<ElementSnapshot<'a>> {
         self.elements_matching(|element| element.disabled)
     }
 
+    pub fn enabled_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| !element.disabled)
+    }
+
     pub fn first_disabled(&self) -> Option<ElementSnapshot<'a>> {
         self.first_matching(|element| element.disabled)
+    }
+
+    pub fn first_enabled(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| !element.disabled)
     }
 
     pub fn contains_disabled(&self) -> bool {
         self.first_disabled().is_some()
     }
 
+    pub fn contains_enabled(&self) -> bool {
+        self.first_enabled().is_some()
+    }
+
     pub fn count_disabled(&self) -> usize {
         self.disabled_elements().len()
+    }
+
+    pub fn count_enabled(&self) -> usize {
+        self.enabled_elements().len()
     }
 
     pub fn focused_elements(&self) -> Vec<ElementSnapshot<'a>> {

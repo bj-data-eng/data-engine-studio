@@ -291,6 +291,8 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
         .id("search", Style::default().size(160.0, 32.0));
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("menu").text("Menu");
+        ui.checkbox("remember").checked(true).text("Remember");
+        ui.button("stop").disabled(true).text("Stop");
         ui.input("search").focused(true).empty();
     });
 
@@ -300,7 +302,12 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
     let key_up_output = view.update_with_input(DocumentInput::key_up(DocumentKey::Enter));
 
     assert!(context_output.contains_focused());
+    assert!(context_output.contains_checked());
+    assert!(context_output.contains_enabled());
+    assert!(context_output.contains_disabled());
     assert_eq!(context_output.count_focused(), 1);
+    assert_eq!(context_output.count_checked(), 1);
+    assert_eq!(context_output.count_disabled(), 1);
     assert_eq!(
         context_output.focused_target().map(ElementId::as_str),
         Some("search")
@@ -320,6 +327,29 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
             .map(|element| element.id().as_str().to_owned())
             .collect::<Vec<_>>(),
         vec!["search"]
+    );
+    assert_eq!(
+        context_output
+            .first_checked()
+            .map(|element| element.id().as_str().to_owned()),
+        Some("remember".to_owned())
+    );
+    assert_eq!(
+        context_output
+            .first_disabled()
+            .map(|element| element.id().as_str().to_owned()),
+        Some("stop".to_owned())
+    );
+    assert!(
+        context_output
+            .enabled_elements()
+            .into_iter()
+            .any(|element| element.id_is("search"))
+    );
+    assert!(
+        context_output
+            .first_enabled()
+            .is_some_and(|element| element.id_is("root"))
     );
     assert_eq!(
         context_output
@@ -6318,7 +6348,9 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert!(drop_target.has_aria("label", "Drop target"));
     assert_eq!(drop_target.value(), Some("target-a"));
     assert!(drop_target.selected());
+    assert!(drop_target.checked());
     assert!(!drop_target.disabled());
+    assert!(drop_target.enabled());
     assert!(drop_target.focused());
     assert!(drop_target.interactive());
     assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
@@ -6379,10 +6411,14 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     );
     assert_eq!(drop_target.count_with_role("button"), 1);
     assert!(drop_target.contains_selected());
+    assert!(drop_target.contains_checked());
+    assert!(drop_target.contains_enabled());
     assert!(drop_target.contains_focused());
     assert!(drop_target.contains_interactive());
     assert!(!drop_target.contains_disabled());
     assert_eq!(drop_target.count_selected(), 1);
+    assert_eq!(drop_target.count_checked(), 1);
+    assert_eq!(drop_target.count_enabled(), 3);
     assert_eq!(drop_target.count_focused(), 1);
     assert_eq!(drop_target.count_interactive(), 1);
     assert_eq!(drop_target.count_disabled(), 0);
@@ -6390,6 +6426,17 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
         drop_target
             .first_selected()
             .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        drop_target
+            .first_checked()
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        drop_target
+            .enabled_elements()
+            .into_iter()
+            .any(|element| element.id_is("drop-helper"))
     );
     assert!(
         drop_target
@@ -6454,10 +6501,14 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     );
     assert_eq!(snapshot.count_with_role("button"), 1);
     assert!(snapshot.contains_selected());
+    assert!(snapshot.contains_checked());
+    assert!(snapshot.contains_enabled());
     assert!(snapshot.contains_disabled());
     assert!(snapshot.contains_focused());
     assert!(snapshot.contains_interactive());
     assert_eq!(snapshot.count_selected(), 1);
+    assert_eq!(snapshot.count_checked(), 1);
+    assert_eq!(snapshot.count_enabled(), 4);
     assert_eq!(snapshot.count_disabled(), 1);
     assert_eq!(snapshot.count_focused(), 1);
     assert_eq!(snapshot.count_interactive(), 1);
@@ -6468,6 +6519,37 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     );
     assert!(
         snapshot
+            .first_checked()
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        snapshot
+            .first_enabled()
+            .is_some_and(|element| element.id_is("root"))
+    );
+    assert!(
+        snapshot
+            .first_disabled()
+            .is_some_and(|element| element.id_is("plain-card"))
+    );
+    assert_eq!(output.count_checked(), 1);
+    assert_eq!(output.count_enabled(), 4);
+    assert_eq!(output.count_disabled(), 1);
+    assert!(output.contains_checked());
+    assert!(output.contains_enabled());
+    assert!(output.contains_disabled());
+    assert!(
+        output
+            .first_checked()
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        output
+            .first_enabled()
+            .is_some_and(|element| element.id_is("root"))
+    );
+    assert!(
+        output
             .first_disabled()
             .is_some_and(|element| element.id_is("plain-card"))
     );

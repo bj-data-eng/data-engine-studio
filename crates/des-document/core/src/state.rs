@@ -114,8 +114,32 @@ impl DocumentOutput {
         self.snapshot().focused_elements()
     }
 
+    pub fn checked_elements(&self) -> Vec<ElementSnapshot<'_>> {
+        self.snapshot().checked_elements()
+    }
+
+    pub fn enabled_elements(&self) -> Vec<ElementSnapshot<'_>> {
+        self.snapshot().enabled_elements()
+    }
+
+    pub fn disabled_elements(&self) -> Vec<ElementSnapshot<'_>> {
+        self.snapshot().disabled_elements()
+    }
+
     pub fn first_focused(&self) -> Option<ElementSnapshot<'_>> {
         self.snapshot().first_focused()
+    }
+
+    pub fn first_checked(&self) -> Option<ElementSnapshot<'_>> {
+        self.snapshot().first_checked()
+    }
+
+    pub fn first_enabled(&self) -> Option<ElementSnapshot<'_>> {
+        self.snapshot().first_enabled()
+    }
+
+    pub fn first_disabled(&self) -> Option<ElementSnapshot<'_>> {
+        self.snapshot().first_disabled()
     }
 
     pub fn focused_target(&self) -> Option<&ElementId> {
@@ -131,8 +155,32 @@ impl DocumentOutput {
         self.first_focused().is_some()
     }
 
+    pub fn contains_checked(&self) -> bool {
+        self.first_checked().is_some()
+    }
+
+    pub fn contains_enabled(&self) -> bool {
+        self.first_enabled().is_some()
+    }
+
+    pub fn contains_disabled(&self) -> bool {
+        self.first_disabled().is_some()
+    }
+
     pub fn count_focused(&self) -> usize {
         self.focused_elements().len()
+    }
+
+    pub fn count_checked(&self) -> usize {
+        self.checked_elements().len()
+    }
+
+    pub fn count_enabled(&self) -> usize {
+        self.enabled_elements().len()
+    }
+
+    pub fn count_disabled(&self) -> usize {
+        self.disabled_elements().len()
     }
 
     pub fn first_event(&self) -> Option<&DocumentEvent> {
