@@ -598,6 +598,47 @@ fn document_builder_and_engine_update_are_front_door_api() {
 }
 
 #[test]
+fn stylesheet_composes_typed_rules_and_css_fluently() {
+    let stylesheet = StyleSheet::new()
+        .rules([
+            (
+                StyleSelector::class("panel"),
+                Style::default().height(Length::Px(48.0)),
+            ),
+            (
+                StyleSelector::class("accent"),
+                Style::default().background(Color::rgb(220, 238, 255)),
+            ),
+        ])
+        .with_css(".panel { width: 120px; }")
+        .expect("strict CSS should compose")
+        .extended(
+            StyleSheet::from_css_forgiving(
+                ".panel { unknown-property: 1px; } .title { width: 80px; height: 20px; }",
+            )
+            .expect("forgiving CSS should keep valid rules"),
+        );
+    let mut view = DocumentView::build(Size::new(320.0, 200.0), stylesheet, |ui| {
+        ui.div("panel").classes(["panel", "accent"]).children(|ui| {
+            ui.text_element(
+                "title",
+                ElementSpec::new(Element::Text).class("title"),
+                "Ready",
+            );
+        });
+    });
+
+    let output = view.update();
+    let panel = output.snapshot().find("panel").unwrap();
+    let title = output.snapshot().find("title").unwrap();
+
+    assert_eq!(panel.rect().size, Size::new(120.0, 48.0));
+    assert_eq!(panel.style().background, Some(Color::rgb(220, 238, 255)));
+    assert_eq!(title.rect().size, Size::new(80.0, 20.0));
+    assert!(view.stylesheet().rule_count() >= 4);
+}
+
+#[test]
 fn document_builder_supports_fluent_html_like_elements() {
     let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.main("app")

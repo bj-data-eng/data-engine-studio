@@ -2051,8 +2051,26 @@ impl StyleSheet {
         Self::default()
     }
 
+    pub fn from_css(input: &str) -> Result<Self, crate::CssParseError> {
+        Self::parse_css(input)
+    }
+
+    pub fn from_css_forgiving(input: &str) -> Result<Self, crate::CssParseError> {
+        Self::parse_css_forgiving(input)
+    }
+
     pub fn rule(mut self, selector: StyleSelector, style: Style) -> Self {
         self.push_rule(selector, style);
+        self
+    }
+
+    pub fn rules<I>(mut self, rules: I) -> Self
+    where
+        I: IntoIterator<Item = (StyleSelector, Style)>,
+    {
+        for (selector, style) in rules {
+            self.push_rule(selector, style);
+        }
         self
     }
 
@@ -2154,6 +2172,11 @@ impl StyleSheet {
         }
     }
 
+    pub fn extended(mut self, stylesheet: StyleSheet) -> Self {
+        self.extend(stylesheet);
+        self
+    }
+
     pub fn parse_css(input: &str) -> Result<Self, crate::CssParseError> {
         crate::css::parse_stylesheet(input)
     }
@@ -2167,9 +2190,19 @@ impl StyleSheet {
         Ok(())
     }
 
+    pub fn with_css(mut self, input: &str) -> Result<Self, crate::CssParseError> {
+        self.extend_css(input)?;
+        Ok(self)
+    }
+
     pub fn extend_css_forgiving(&mut self, input: &str) -> Result<(), crate::CssParseError> {
         self.extend(Self::parse_css_forgiving(input)?);
         Ok(())
+    }
+
+    pub fn with_css_forgiving(mut self, input: &str) -> Result<Self, crate::CssParseError> {
+        self.extend_css_forgiving(input)?;
+        Ok(self)
     }
 
     pub fn rule_count(&self) -> usize {
