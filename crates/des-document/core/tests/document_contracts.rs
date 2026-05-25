@@ -1074,6 +1074,47 @@ fn document_view_can_mount_a_widget_with_its_styles() {
 }
 
 #[test]
+fn document_view_widget_composition_can_return_projection_errors() {
+    struct BrokenWidget;
+
+    impl DocumentWidget for BrokenWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div("rendered").text("Rendered");
+        }
+
+        fn push_projection(&self, projection: &mut DocumentProjection) {
+            projection.element("missing").text("Projected");
+        }
+    }
+
+    fn assert_missing_projection_target(result: des_document::DocumentResult<DocumentView>) {
+        let Err(error) = result else {
+            panic!("widget projection should fail when it targets an unrendered element");
+        };
+        assert!(
+            error.to_string().contains("missing"),
+            "expected missing-element projection error, got {error}"
+        );
+    }
+
+    let widget = BrokenWidget;
+
+    assert_missing_projection_target(DocumentView::try_build_widget(
+        Size::new(320.0, 180.0),
+        StyleSheet::new(),
+        &widget,
+    ));
+    assert_missing_projection_target(
+        DocumentView::compose(Size::new(320.0, 180.0)).try_widget(&widget),
+    );
+    assert_missing_projection_target(
+        DocumentView::compose(Size::new(320.0, 180.0)).try_build_with_widget(&widget, |ui| {
+            ui.widget(&widget);
+        }),
+    );
+}
+
+#[test]
 fn document_widgets_can_project_retained_state_through_the_view_front_door() {
     struct StatusWidget {
         ready: bool,

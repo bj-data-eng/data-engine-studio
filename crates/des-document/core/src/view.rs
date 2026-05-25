@@ -45,17 +45,27 @@ impl DocumentView {
     /// that widget's stylesheet contribution.
     pub fn build_widget(
         viewport: Size,
-        mut stylesheet: StyleSheet,
+        stylesheet: StyleSheet,
         widget: &(impl DocumentWidget + ?Sized),
     ) -> Self {
+        Self::try_build_widget(viewport, stylesheet, widget)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    /// Builds a document view around one reusable widget and returns projection
+    /// errors instead of panicking when the widget contract is incomplete.
+    pub fn try_build_widget(
+        viewport: Size,
+        mut stylesheet: StyleSheet,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<Self> {
         widget.push_styles(&mut stylesheet);
         let mut view = Self::new(
             Document::build(viewport, |ui| ui.widget(widget)),
             stylesheet,
         );
-        view.project_widget(widget)
-            .expect("document widget projection targets rendered elements");
-        view
+        view.project_widget(widget)?;
+        Ok(view)
     }
 
     /// Starts a composable document view builder for collecting structure,
@@ -392,18 +402,36 @@ impl DocumentViewBuilder {
         self
     }
 
-    pub fn widget(mut self, widget: &(impl DocumentWidget + ?Sized)) -> DocumentView {
+    pub fn widget(self, widget: &(impl DocumentWidget + ?Sized)) -> DocumentView {
+        self.try_widget(widget)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_widget(
+        mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<DocumentView> {
         widget.push_styles(&mut self.stylesheet);
         let mut view = DocumentView::new(
             Document::build(self.viewport, |ui| ui.widget(widget)),
             self.stylesheet,
         );
-        view.project_widget(widget)
-            .expect("document widget projection targets rendered elements");
-        view
+        view.project_widget(widget)?;
+        Ok(view)
     }
 
-    pub fn widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> DocumentView
+    pub fn widgets<'a, W>(self, widgets: impl IntoIterator<Item = &'a W>) -> DocumentView
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.try_widgets(widgets)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_widgets<'a, W>(
+        mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<DocumentView>
     where
         W: DocumentWidget + ?Sized + 'a,
     {
@@ -419,28 +447,47 @@ impl DocumentViewBuilder {
             }),
             self.stylesheet,
         );
-        view.project_widgets(widgets)
-            .expect("document widget projection targets rendered elements");
-        view
+        view.project_widgets(widgets)?;
+        Ok(view)
     }
 
     pub fn build_with_widget(
-        mut self,
+        self,
         widget: &(impl DocumentWidget + ?Sized),
         build: impl FnOnce(&mut DocumentBuilder),
     ) -> DocumentView {
+        self.try_build_with_widget(widget, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_build_with_widget(
+        mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentView> {
         widget.push_styles(&mut self.stylesheet);
         let mut view = self.build(build);
-        view.project_widget(widget)
-            .expect("document widget projection targets rendered elements");
-        view
+        view.project_widget(widget)?;
+        Ok(view)
     }
 
     pub fn build_with_widgets<'a, W>(
-        mut self,
+        self,
         widgets: impl IntoIterator<Item = &'a W>,
         build: impl FnOnce(&mut DocumentBuilder),
     ) -> DocumentView
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.try_build_with_widgets(widgets, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_build_with_widgets<'a, W>(
+        mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentView>
     where
         W: DocumentWidget + ?Sized + 'a,
     {
@@ -449,9 +496,8 @@ impl DocumentViewBuilder {
             widget.push_styles(&mut self.stylesheet);
         }
         let mut view = self.build(build);
-        view.project_widgets(widgets)
-            .expect("document widget projection targets rendered elements");
-        view
+        view.project_widgets(widgets)?;
+        Ok(view)
     }
 
     pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {
