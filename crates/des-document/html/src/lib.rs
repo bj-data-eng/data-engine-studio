@@ -126,6 +126,30 @@ impl HtmlDocument {
         ))
     }
 
+    /// Pairs this parsed HTML tree with a typed document stylesheet.
+    pub fn with_stylesheet(self, stylesheet: StyleSheet) -> HtmlStylesheet {
+        HtmlStylesheet::new(self, stylesheet)
+    }
+
+    /// Parses CSS and pairs it with this parsed HTML tree.
+    pub fn with_css(self, css: &str) -> HtmlResult<HtmlStylesheet> {
+        Ok(self.with_stylesheet(parse_stylesheet(css)?))
+    }
+
+    /// Creates a ready-to-update document view from this HTML tree and stylesheet.
+    pub fn to_view_with_stylesheet(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+    ) -> HtmlResult<DocumentView> {
+        Ok(DocumentView::new(self.to_document(viewport)?, stylesheet))
+    }
+
+    /// Parses CSS and creates a ready-to-update document view from this HTML tree.
+    pub fn to_view_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentView> {
+        self.to_view_with_stylesheet(viewport, parse_stylesheet(css)?)
+    }
+
     /// Emits this parsed HTML tree into a caller-owned document builder.
     pub fn write_to_document_builder(&self, builder: &mut DocumentBuilder) {
         let mut path = Vec::new();
@@ -147,30 +171,29 @@ pub struct HtmlStylesheet {
 }
 
 impl HtmlStylesheet {
+    /// Pairs a parsed HTML tree with a parsed document stylesheet.
+    pub fn new(html: HtmlDocument, stylesheet: StyleSheet) -> Self {
+        Self { html, stylesheet }
+    }
+
     /// Parses an HTML document and CSS stylesheet into typed document inputs.
     pub fn parse(html: &str, css: &str) -> HtmlResult<Self> {
         let stylesheet = parse_stylesheet(css)?;
-        Ok(Self {
-            html: HtmlDocument::parse(html)?,
-            stylesheet,
-        })
+        Ok(Self::new(HtmlDocument::parse(html)?, stylesheet))
     }
 
     /// Parses an HTML fragment and CSS stylesheet into typed document inputs.
     pub fn parse_fragment(html: &str, css: &str) -> HtmlResult<Self> {
         let stylesheet = parse_stylesheet(css)?;
-        Ok(Self {
-            html: HtmlDocument::parse_fragment(html)?,
-            stylesheet,
-        })
+        Ok(Self::new(HtmlDocument::parse_fragment(html)?, stylesheet))
     }
 
     /// Reads HTML and CSS files and parses them into typed document inputs.
     pub fn load_files(html_path: impl AsRef<Path>, css_path: impl AsRef<Path>) -> HtmlResult<Self> {
-        Ok(Self {
-            html: HtmlDocument::load(html_path)?,
-            stylesheet: parse_stylesheet(&fs::read_to_string(css_path)?)?,
-        })
+        Ok(Self::new(
+            HtmlDocument::load(html_path)?,
+            parse_stylesheet(&fs::read_to_string(css_path)?)?,
+        ))
     }
 
     /// Creates a ready-to-update retained document view from the parsed assets.

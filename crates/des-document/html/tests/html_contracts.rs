@@ -297,6 +297,29 @@ fn html_stylesheet_can_create_ready_to_update_document_view() {
 }
 
 #[test]
+fn html_document_can_pair_with_css_without_manual_bundle_plumbing() {
+    let html = HtmlDocument::parse_fragment(r#"<section id="panel" class="card">Panel</section>"#)
+        .expect("HTML should parse");
+    let bundle = html
+        .clone()
+        .with_css(r#".card { width: 144px; height: 48px; }"#)
+        .expect("CSS should parse onto HTML");
+    let mut view = html
+        .to_view_with_css(
+            Size::new(240.0, 160.0),
+            r#".card { width: 120px; height: 40px; }"#,
+        )
+        .expect("HTML and CSS should compose directly into a view");
+
+    let output = view.update();
+    let panel = output.snapshot().find("panel").unwrap();
+
+    assert_eq!(bundle.stylesheet.rule_count(), 1);
+    assert_eq!(panel.rect().size.width, 120.0);
+    assert_eq!(panel.rect().size.height, 40.0);
+}
+
+#[test]
 fn html_document_can_create_ready_to_update_document_view_without_css() {
     let html = HtmlDocument::parse_fragment(
         r#"<main id="app" class="shell compact" data-workspace="demo" aria-label="Workspace"><button id="run" on:click="project.run">Run</button></main>"#,
