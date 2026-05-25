@@ -1,8 +1,8 @@
 use des_document::{
-    DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandAction,
-    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentInput, DocumentResult,
-    DocumentView, DocumentWidget, ElementId, FloatingPlacement, FloatingShift, Insets, Length,
-    Point, Size, Style, StyleSelector, StyleSheet,
+    CssParseError, DocumentActionFrame, DocumentActionSurface, DocumentAuthoringResult,
+    DocumentBuilder, DocumentCommandAction, DocumentCommandDispatchReport, DocumentCommandRegistry,
+    DocumentInput, DocumentResult, DocumentView, DocumentWidget, ElementId, FloatingPlacement,
+    FloatingShift, Insets, Length, Point, Size, Style, StyleSelector, StyleSheet,
 };
 use std::collections::BTreeMap;
 
@@ -261,6 +261,28 @@ impl ContextMenu {
             .expect("context menu projection targets rendered elements")
     }
 
+    /// Builds a menu action surface with strict CSS rules.
+    pub fn action_surface_with_css<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> Result<DocumentActionSurface<Action>, CssParseError> {
+        let stylesheet = StyleSheet::from_css(css)?;
+        Ok(self.action_surface_with_stylesheet(viewport, stylesheet, action_for))
+    }
+
+    /// Builds a menu action surface with browser-forgiving CSS rules.
+    pub fn action_surface_with_css_forgiving<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> Result<DocumentActionSurface<Action>, CssParseError> {
+        let stylesheet = StyleSheet::from_css_forgiving(css)?;
+        Ok(self.action_surface_with_stylesheet(viewport, stylesheet, action_for))
+    }
+
     /// Builds a menu action surface from `(command, action)` pairs.
     pub fn action_surface_with_actions<Action, Command>(
         &self,
@@ -289,6 +311,36 @@ impl ContextMenu {
             .expect("context menu projection targets rendered elements")
     }
 
+    /// Builds a menu action surface with strict CSS and `(command, action)` pairs.
+    pub fn action_surface_with_css_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> Result<DocumentActionSurface<Action>, CssParseError>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let stylesheet = StyleSheet::from_css(css)?;
+        Ok(self.action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions))
+    }
+
+    /// Builds a menu action surface with forgiving CSS and `(command, action)` pairs.
+    pub fn action_surface_with_css_forgiving_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> Result<DocumentActionSurface<Action>, CssParseError>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let stylesheet = StyleSheet::from_css_forgiving(css)?;
+        Ok(self.action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions))
+    }
+
     /// Tries to build a menu action surface, returning document projection errors.
     pub fn try_action_surface<Action>(
         &self,
@@ -309,6 +361,28 @@ impl ContextMenu {
             .stylesheet(stylesheet)
             .try_widget(self)?;
         Ok(view.action_surface(self.command_registry(action_for)))
+    }
+
+    /// Tries to build a menu action surface with strict CSS rules.
+    pub fn try_action_surface_with_css<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>> {
+        let stylesheet = StyleSheet::from_css(css)?;
+        Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?)
+    }
+
+    /// Tries to build a menu action surface with browser-forgiving CSS rules.
+    pub fn try_action_surface_with_css_forgiving<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>> {
+        let stylesheet = StyleSheet::from_css_forgiving(css)?;
+        Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?)
     }
 
     /// Tries to build a menu action surface from `(command, action)` pairs.
@@ -339,6 +413,36 @@ impl ContextMenu {
             .stylesheet(stylesheet)
             .try_widget(self)?;
         Ok(view.action_surface(self.command_action_registry(actions)))
+    }
+
+    /// Tries to build a menu action surface with strict CSS and `(command, action)` pairs.
+    pub fn try_action_surface_with_css_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let stylesheet = StyleSheet::from_css(css)?;
+        Ok(self.try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?)
+    }
+
+    /// Tries to build a menu action surface with forgiving CSS and `(command, action)` pairs.
+    pub fn try_action_surface_with_css_forgiving_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let stylesheet = StyleSheet::from_css_forgiving(css)?;
+        Ok(self.try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?)
     }
 
     /// Builds, resolves, and collects typed actions from this menu in one call.
@@ -1039,10 +1143,58 @@ mod tests {
                 ("rename-selection", MenuAction::Rename),
             ],
         );
+        let mut css_surface = menu
+            .action_surface_with_css(Size::new(240.0, 140.0), "#copy { height: 34px; }", |item| {
+                match item.command_name() {
+                    Some("copy-selection") => Some(MenuAction::Copy),
+                    Some("rename-selection") => Some(MenuAction::Rename),
+                    _ => None,
+                }
+            })
+            .expect("strict CSS should create a mapped context menu action surface");
+        let mut css_mapped_surface = menu
+            .action_surface_with_css_and_actions(
+                Size::new(240.0, 140.0),
+                "#copy { height: 35px; }",
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("strict CSS should create a command/action context menu surface");
+        let mut forgiving_css_surface = menu
+            .try_action_surface_with_css_forgiving(
+                Size::new(240.0, 140.0),
+                ".ignored { unknown-property: yes; } #copy { height: 37px; }",
+                |item| match item.command_name() {
+                    Some("copy-selection") => Some(MenuAction::Copy),
+                    Some("rename-selection") => Some(MenuAction::Rename),
+                    _ => None,
+                },
+            )
+            .expect("forgiving CSS should create a context menu action surface");
+        let mut forgiving_css_mapped_surface = menu
+            .try_action_surface_with_css_forgiving_and_actions(
+                Size::new(240.0, 140.0),
+                ".ignored { unknown-property: yes; } #copy { height: 38px; }",
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("forgiving CSS should create a mapped context menu surface");
 
         let frame =
             surface.update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let mapped_frame = mapped_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let css_frame = css_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let css_mapped_frame = css_mapped_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let forgiving_css_frame = forgiving_css_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let forgiving_css_mapped_frame = forgiving_css_mapped_surface
             .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let direct_frame = menu
             .update_with_input_actions(
@@ -1168,10 +1320,62 @@ mod tests {
 
         assert_eq!(surface.commands().bindings().len(), 2);
         assert_eq!(mapped_surface.commands().bindings().len(), 2);
+        assert_eq!(css_surface.commands().bindings().len(), 2);
+        assert_eq!(css_mapped_surface.commands().bindings().len(), 2);
+        assert_eq!(forgiving_css_surface.commands().bindings().len(), 2);
+        assert_eq!(forgiving_css_mapped_surface.commands().bindings().len(), 2);
         assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
         assert!(!paste.interactive());
         assert!(frame.contains_clicked_action(&MenuAction::Copy));
         assert!(mapped_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(css_frame.contains_clicked_action(&MenuAction::Copy));
+        assert_eq!(
+            css_frame
+                .output()
+                .snapshot()
+                .find("copy")
+                .unwrap()
+                .rect()
+                .size
+                .height,
+            34.0
+        );
+        assert!(css_mapped_frame.contains_clicked_action(&MenuAction::Copy));
+        assert_eq!(
+            css_mapped_frame
+                .output()
+                .snapshot()
+                .find("copy")
+                .unwrap()
+                .rect()
+                .size
+                .height,
+            35.0
+        );
+        assert!(forgiving_css_frame.contains_clicked_action(&MenuAction::Copy));
+        assert_eq!(
+            forgiving_css_frame
+                .output()
+                .snapshot()
+                .find("copy")
+                .unwrap()
+                .rect()
+                .size
+                .height,
+            37.0
+        );
+        assert!(forgiving_css_mapped_frame.contains_clicked_action(&MenuAction::Copy));
+        assert_eq!(
+            forgiving_css_mapped_frame
+                .output()
+                .snapshot()
+                .find("copy")
+                .unwrap()
+                .rect()
+                .size
+                .height,
+            38.0
+        );
         assert!(direct_frame.contains_clicked_action(&MenuAction::Copy));
         assert!(direct_mapped_frame.contains_action_for_target_intent(
             "copy",
