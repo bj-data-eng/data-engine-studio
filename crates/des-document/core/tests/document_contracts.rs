@@ -1000,10 +1000,28 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
     let clicked_report = frame.dispatch_clicked(|action| {
         clicked.push(action.action().clone());
     });
+    let mut values = Vec::new();
+    let values_report = frame.dispatch_action_values(|action| {
+        values.push(action.clone());
+    });
+    let mut clicked_values = Vec::new();
+    let clicked_values_report = frame
+        .dispatch_action_values_for_intent(ElementBehaviorEvent::Click, |action| {
+            clicked_values.push(action.clone())
+        });
     let mut by_target = Vec::new();
     let target_report = frame.dispatch_for("run", |action| {
         by_target.push(action.command().to_owned());
     });
+    let mut target_values = Vec::new();
+    let target_values_report = frame.dispatch_action_values_for("run", |action| {
+        target_values.push(action.clone());
+    });
+    let mut kind_values = Vec::new();
+    let kind_values_report =
+        frame.dispatch_action_values_of_kind(DocumentEventKind::Clicked, |action| {
+            kind_values.push(action.clone());
+        });
     let missing_report = frame.dispatch_kind(
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
         |_| {},
@@ -1021,8 +1039,25 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
     );
     assert_eq!(clicked_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(clicked, vec![AppAction::Run]);
+    assert_eq!(values_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(values, vec![AppAction::Run]);
+    assert_eq!(
+        clicked_values_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(clicked_values, vec![AppAction::Run]);
     assert_eq!(target_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(by_target, vec!["run".to_owned()]);
+    assert_eq!(
+        target_values_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(target_values, vec![AppAction::Run]);
+    assert_eq!(
+        kind_values_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(kind_values, vec![AppAction::Run]);
     assert_eq!(missing_report, DocumentCommandDispatchReport::new(0, 0, 0));
 }
 

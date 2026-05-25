@@ -594,6 +594,44 @@ impl<Action> DocumentActionFrame<Action> {
         self.dispatch_matching(|action| action.matches_intent(intent), handler)
     }
 
+    /// Dispatches every collected typed app action value to a handler.
+    ///
+    /// Use this when app code only needs the domain action and does not need
+    /// document target, event, or command metadata.
+    pub fn dispatch_action_values<'a>(
+        &'a self,
+        mut handler: impl FnMut(&'a Action),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch(|action| handler(action.action()))
+    }
+
+    /// Dispatches typed app action values emitted by one element.
+    pub fn dispatch_action_values_for<'a>(
+        &'a self,
+        target: &'a str,
+        mut handler: impl FnMut(&'a Action),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_for(target, |action| handler(action.action()))
+    }
+
+    /// Dispatches typed app action values emitted by one resolved event kind.
+    pub fn dispatch_action_values_of_kind<'a>(
+        &'a self,
+        kind: DocumentEventKind,
+        mut handler: impl FnMut(&'a Action),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_kind(kind, |action| handler(action.action()))
+    }
+
+    /// Dispatches typed app action values emitted by one authored behavior intent.
+    pub fn dispatch_action_values_for_intent<'a>(
+        &'a self,
+        intent: ElementBehaviorEvent,
+        mut handler: impl FnMut(&'a Action),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(intent, |action| handler(action.action()))
+    }
+
     /// Dispatches collected typed actions emitted by click intent.
     pub fn dispatch_clicked<'a>(
         &'a self,
