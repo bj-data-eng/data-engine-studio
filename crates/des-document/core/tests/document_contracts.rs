@@ -142,9 +142,10 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run").on_click("run-query").text("Run");
     });
-    let registry = DocumentCommandRegistry::new()
-        .bind("run-query", AppAction::RunQuery)
-        .bind("cancel-query", AppAction::CancelQuery);
+    let registry = DocumentCommandRegistry::new().bind_many([
+        ("run-query", AppAction::RunQuery),
+        ("cancel-query", AppAction::CancelQuery),
+    ]);
 
     let output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
@@ -165,6 +166,15 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert_eq!(clicked_actions[0].command, "run-query");
     assert_eq!(clicked_commands.len(), 1);
     assert_eq!(clicked_commands[0].command, "run-query");
+
+    let collected = [
+        ("run-query", AppAction::RunQuery),
+        ("cancel-query", AppAction::CancelQuery),
+    ]
+    .into_iter()
+    .collect::<DocumentCommandRegistry<_>>();
+
+    assert_eq!(collected.bindings(), registry.bindings());
 }
 
 #[test]

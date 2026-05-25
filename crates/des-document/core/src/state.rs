@@ -215,9 +215,30 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_many<I, Command>(mut self, bindings: I) -> Self
+    where
+        I: IntoIterator<Item = (Command, Action)>,
+        Command: Into<String>,
+    {
+        self.push_many(bindings);
+        self
+    }
+
     pub fn push(&mut self, command: impl Into<String>, action: Action) {
         self.bindings
             .push(DocumentCommandBinding::new(command, action));
+    }
+
+    pub fn push_many<I, Command>(&mut self, bindings: I)
+    where
+        I: IntoIterator<Item = (Command, Action)>,
+        Command: Into<String>,
+    {
+        self.bindings.extend(
+            bindings
+                .into_iter()
+                .map(|(command, action)| DocumentCommandBinding::new(command, action)),
+        );
     }
 
     pub fn action_for(&self, command: &str) -> Option<&Action> {
@@ -314,6 +335,15 @@ impl<Action> DocumentCommandRegistry<Action> {
             });
         }
         report
+    }
+}
+
+impl<Action, Command> std::iter::FromIterator<(Command, Action)> for DocumentCommandRegistry<Action>
+where
+    Command: Into<String>,
+{
+    fn from_iter<I: IntoIterator<Item = (Command, Action)>>(iter: I) -> Self {
+        Self::new().bind_many(iter)
     }
 }
 
