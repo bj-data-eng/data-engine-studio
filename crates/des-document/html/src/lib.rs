@@ -581,6 +581,23 @@ impl HtmlDocument {
         Ok(view.project_and_update_with_input_actions(projection, input, &registry)?)
     }
 
+    /// Creates a projected view, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_projection_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
+        let mut view = self.to_view(viewport)?;
+        Ok(view.project_and_update_with_input_actions(projection, input, &registry)?)
+    }
+
     /// Builds projection in place, routes input, and maps HTML commands to typed actions.
     pub fn update_with_input_projected_with_and_actions<Action, Command>(
         &self,
@@ -596,6 +613,23 @@ impl HtmlDocument {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_input_projection_and_actions(viewport, input, &projection, actions)
+    }
+
+    /// Builds projection in place, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_projected_with_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_projection_and_intent_actions(viewport, input, &projection, actions)
     }
 
     /// Resolves this HTML tree with an empty stylesheet.
@@ -1259,6 +1293,19 @@ impl HtmlStylesheet {
         self.to_action_surface(viewport, self.command_action_registry(actions))
     }
 
+    /// Creates an action surface from parsed HTML/CSS and intent-scoped actions.
+    pub fn to_action_surface_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.to_action_surface(viewport, self.command_intent_action_registry(actions))
+    }
+
     /// Consumes the parsed HTML/CSS into an action surface paired with typed Rust commands.
     pub fn into_action_surface<Action>(
         self,
@@ -1496,6 +1543,24 @@ impl HtmlStylesheet {
         )
     }
 
+    /// Creates a projected view, resolves it, and maps intent-scoped commands.
+    pub fn update_with_projection_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_projection_actions(
+            viewport,
+            projection,
+            &self.command_intent_action_registry(actions),
+        )
+    }
+
     /// Builds retained state projection in place, resolves it, and collects typed actions.
     pub fn update_projected_with_actions<Action>(
         &self,
@@ -1525,6 +1590,22 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_projection_and_actions(viewport, &projection, actions)
+    }
+
+    /// Builds projection in place, resolves it, and maps intent-scoped commands.
+    pub fn update_projected_with_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_projection_and_intent_actions(viewport, &projection, actions)
     }
 
     /// Creates a projected view, routes input, and returns the resolved output.
@@ -1585,6 +1666,26 @@ impl HtmlStylesheet {
         )
     }
 
+    /// Creates a projected view, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_projection_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_projection_actions(
+            viewport,
+            input,
+            projection,
+            &self.command_intent_action_registry(actions),
+        )
+    }
+
     /// Builds retained state projection in place, routes input, and collects typed actions.
     pub fn update_with_input_projected_with_actions<Action>(
         &self,
@@ -1616,6 +1717,23 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_input_projection_and_actions(viewport, input, &projection, actions)
+    }
+
+    /// Builds projection in place, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_projected_with_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_projection_and_intent_actions(viewport, input, &projection, actions)
     }
 
     /// Creates a view, resolves the document, and returns the first output frame.
@@ -2328,6 +2446,21 @@ impl HtmlSet {
         self.to_action_surface(name, viewport, commands)
     }
 
+    /// Creates an action surface from a named document and intent-scoped actions.
+    pub fn to_action_surface_with_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let commands = self.command_intent_action_registry(name, actions)?;
+        self.to_action_surface(name, viewport, commands)
+    }
+
     /// Creates a named action surface, applies projection, and maps commands to actions.
     pub fn to_action_surface_with_projection_and_actions<Action, Command>(
         &self,
@@ -2344,6 +2477,22 @@ impl HtmlSet {
             .to_action_surface_with_projection_and_actions(viewport, projection, actions)
     }
 
+    /// Creates a named action surface, applies projection, and maps intent-scoped commands.
+    pub fn to_action_surface_with_projection_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .to_action_surface_with_projection_and_intent_actions(viewport, projection, actions)
+    }
+
     /// Creates a named action surface, builds projection, and maps commands to actions.
     pub fn to_action_surface_projected_with_actions<Action, Command>(
         &self,
@@ -2358,6 +2507,22 @@ impl HtmlSet {
     {
         self.get(name)?
             .to_action_surface_projected_with_actions(viewport, project, actions)
+    }
+
+    /// Creates a named action surface, builds projection, and maps intent-scoped commands.
+    pub fn to_action_surface_projected_with_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .to_action_surface_projected_with_intent_actions(viewport, project, actions)
     }
 
     /// Creates an action surface from a named document, stylesheet, and typed commands.
@@ -2496,6 +2661,23 @@ impl HtmlSet {
             .update_with_input_projection_and_actions(viewport, input, projection, actions)
     }
 
+    /// Applies projection, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_projection_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_projection_and_intent_actions(viewport, input, projection, actions)
+    }
+
     /// Builds projection in place, routes input, and maps named HTML commands to typed actions.
     pub fn update_with_input_projected_with_and_actions<Action, Command>(
         &self,
@@ -2511,6 +2693,23 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_projected_with_and_actions(viewport, input, project, actions)
+    }
+
+    /// Builds projection in place, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_projected_with_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_projected_with_and_intent_actions(viewport, input, project, actions)
     }
 
     /// Resolves a named HTML document with the supplied stylesheet.

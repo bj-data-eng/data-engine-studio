@@ -1666,6 +1666,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     enum SetAction {
         Run,
         Open,
+        Menu,
     }
 
     let fixture = TempHtmlPath::new("des-html-set", "html");
@@ -1682,6 +1683,11 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         "<button id=\"inline\" on:click=\"inline.run\">Inline</button>",
     )
     .expect("inline html should parse");
+    set.add_fragment(
+        "shared",
+        r#"<button id="shared" on:click="shared.open" on:contextmenu="shared.open">Shared</button>"#,
+    )
+    .expect("shared html should parse");
     set.add_file("file", path).expect("file html should parse");
     let registry = DocumentCommandRegistry::new()
         .bind_click("inline.run", SetAction::Run)
@@ -1697,10 +1703,13 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     )
     .expect("named document should push mapped command actions");
 
-    assert_eq!(set.len(), 2);
+    assert_eq!(set.len(), 3);
     assert!(!set.is_empty());
     assert!(set.contains("inline"));
-    assert_eq!(set.names().collect::<Vec<_>>(), ["file", "inline"]);
+    assert_eq!(
+        set.names().collect::<Vec<_>>(),
+        ["file", "inline", "shared"]
+    );
     assert!(
         set.get("inline")
             .expect("inline document should exist")
@@ -1788,6 +1797,22 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build mapped action surfaces");
     let mapped_surface_frame = mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut intent_surface = set
+        .to_action_surface_with_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            [
+                (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
+                (
+                    ElementBehaviorEvent::ContextMenu,
+                    "shared.open",
+                    SetAction::Menu,
+                ),
+            ],
+        )
+        .expect("named document should build intent-mapped action surfaces");
+    let intent_surface_frame = intent_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let styled_surface = set
         .to_action_surface_with_stylesheet(
             "inline",
@@ -1817,6 +1842,24 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             [("inline.run", SetAction::Run)],
         )
         .expect("named document should project state and map actions through the set front door");
+    let (intent_project_report, intent_project_frame) = set
+        .update_with_input_projected_with_and_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("shared").text("Menu");
+            },
+            [
+                (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
+                (
+                    ElementBehaviorEvent::ContextMenu,
+                    "shared.open",
+                    SetAction::Menu,
+                ),
+            ],
+        )
+        .expect("named document should project state and map intent-scoped actions");
     let (projected_surface_report, mut projected_surface) = set
         .to_action_surface_projected_with_actions(
             "inline",
@@ -1829,6 +1872,25 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build projected mapped action surfaces");
     let projected_surface_frame = projected_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let (intent_surface_report, mut intent_projected_surface) = set
+        .to_action_surface_projected_with_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            |projection| {
+                projection.element("shared").text("Surface menu");
+            },
+            [
+                (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
+                (
+                    ElementBehaviorEvent::ContextMenu,
+                    "shared.open",
+                    SetAction::Menu,
+                ),
+            ],
+        )
+        .expect("named document should build projected intent-mapped action surfaces");
+    let intent_projected_surface_frame = intent_projected_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
 
     assert!(input_output.was_clicked("inline"));
     assert!(action_frame.contains_action(&SetAction::Run));
@@ -1849,6 +1911,11 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert_eq!(mapped_registry.bindings().len(), 1);
     assert!(surface_frame.contains_action(&SetAction::Run));
     assert!(mapped_surface_frame.contains_action(&SetAction::Run));
+    assert!(intent_surface_frame.contains_action_for_target_intent(
+        "shared",
+        ElementBehaviorEvent::ContextMenu,
+        &SetAction::Menu
+    ));
     assert_eq!(styled_surface.commands().bindings().len(), 2);
     assert_eq!(project_report.operations, 2);
     assert_eq!(project_report.changed, 2);
@@ -1866,6 +1933,22 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .text(),
         Some("Mapped".to_owned())
     );
+    assert_eq!(intent_project_report.operations, 1);
+    assert_eq!(intent_project_report.changed, 1);
+    assert!(intent_project_frame.contains_action_for_target_intent(
+        "shared",
+        ElementBehaviorEvent::ContextMenu,
+        &SetAction::Menu
+    ));
+    assert_eq!(
+        intent_project_frame
+            .output()
+            .snapshot()
+            .find("shared")
+            .unwrap()
+            .text(),
+        Some("Menu".to_owned())
+    );
     assert_eq!(projected_surface_report.operations, 1);
     assert_eq!(projected_surface_report.changed, 1);
     assert!(projected_surface_frame.contains_action(&SetAction::Run));
@@ -1877,6 +1960,24 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .unwrap()
             .text(),
         Some("Surface".to_owned())
+    );
+    assert_eq!(intent_surface_report.operations, 1);
+    assert_eq!(intent_surface_report.changed, 1);
+    assert!(
+        intent_projected_surface_frame.contains_action_for_target_intent(
+            "shared",
+            ElementBehaviorEvent::ContextMenu,
+            &SetAction::Menu
+        )
+    );
+    assert_eq!(
+        intent_projected_surface_frame
+            .output()
+            .snapshot()
+            .find("shared")
+            .unwrap()
+            .text(),
+        Some("Surface menu".to_owned())
     );
 
     fs::write(
