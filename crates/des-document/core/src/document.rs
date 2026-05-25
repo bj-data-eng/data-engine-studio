@@ -1328,45 +1328,61 @@ pub struct DocumentBuilder {
     children: Vec<DocumentNode>,
 }
 
+/// Reusable egui-free widget behavior over the document contract.
+///
+/// A `DocumentWidget` owns the structure it contributes, optional style rules,
+/// and optional retained-state projection. It does not own renderer state or app
+/// state; hosts compose widgets into a [`crate::DocumentView`] and project fresh
+/// app state through the widget on each update as needed.
 pub trait DocumentWidget {
+    /// Renders this widget's retained document structure.
     fn render(&self, ui: &mut DocumentBuilder);
 
+    /// Appends the style rules required by this widget.
     fn push_styles(&self, _stylesheet: &mut StyleSheet) {}
 
+    /// Returns a single-element projection patch for simple state projection.
     fn projection_patch(&self) -> Option<(ElementId, ElementProjectionPatch)> {
         None
     }
 
+    /// Pushes this widget's retained-state projection into a caller-owned batch.
     fn push_projection(&self, projection: &mut DocumentProjection) {
         if let Some((id, patch)) = self.projection_patch() {
             projection.push_patch(id, patch);
         }
     }
 
+    /// Builds the stylesheet declared by this widget.
     fn stylesheet(&self) -> StyleSheet {
         let mut stylesheet = StyleSheet::new();
         self.push_styles(&mut stylesheet);
         stylesheet
     }
 
+    /// Builds the retained-state projection declared by this widget.
     fn projection(&self) -> DocumentProjection {
         let mut projection = DocumentProjection::new();
         self.push_projection(&mut projection);
         projection
     }
 
+    /// Creates a ready-to-update document view containing this widget.
     fn view(&self, viewport: Size) -> crate::DocumentView {
         self.view_with_stylesheet(viewport, StyleSheet::new())
     }
 
+    /// Creates a view containing this widget, returning projection errors explicitly.
     fn try_view(&self, viewport: Size) -> DocumentResult<crate::DocumentView> {
         self.try_view_with_stylesheet(viewport, StyleSheet::new())
     }
 
+    /// Creates a document view containing this widget and an external stylesheet.
     fn view_with_stylesheet(&self, viewport: Size, stylesheet: StyleSheet) -> crate::DocumentView {
         crate::DocumentView::build_widget(viewport, stylesheet, self)
     }
 
+    /// Creates a styled view containing this widget, returning projection errors explicitly.
     fn try_view_with_stylesheet(
         &self,
         viewport: Size,
@@ -1376,15 +1392,23 @@ pub trait DocumentWidget {
     }
 }
 
+/// Widget convention for declaring typed app actions alongside document hooks.
+///
+/// The widget still renders through [`DocumentWidget`]. This extension lets it
+/// pair authored behavior hooks such as clicks, keyboard input, or context menus
+/// with typed Rust actions without coupling the widget to an egui adapter.
 pub trait DocumentActionWidget<Action>: DocumentWidget {
+    /// Pushes this widget's command-to-action bindings into a caller-owned registry.
     fn push_commands(&self, registry: &mut DocumentCommandRegistry<Action>);
 
+    /// Builds the command registry declared by this widget.
     fn commands(&self) -> DocumentCommandRegistry<Action> {
         let mut registry = DocumentCommandRegistry::new();
         self.push_commands(&mut registry);
         registry
     }
 
+    /// Alias for [`DocumentActionWidget::commands`] for call sites that prefer registry language.
     fn command_registry(&self) -> DocumentCommandRegistry<Action>
     where
         Self: Sized,
@@ -1392,6 +1416,7 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         self.commands()
     }
 
+    /// Creates a ready-to-update action surface containing this widget.
     fn action_surface(&self, viewport: Size) -> crate::DocumentActionSurface<Action>
     where
         Self: Sized,
@@ -1399,6 +1424,7 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         self.action_surface_with_stylesheet(viewport, StyleSheet::new())
     }
 
+    /// Creates an action surface, returning projection errors explicitly.
     fn try_action_surface(
         &self,
         viewport: Size,
@@ -1409,6 +1435,7 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         self.try_action_surface_with_stylesheet(viewport, StyleSheet::new())
     }
 
+    /// Creates an action surface containing this widget and an external stylesheet.
     fn action_surface_with_stylesheet(
         &self,
         viewport: Size,
@@ -1422,6 +1449,7 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
             .action_widget(self)
     }
 
+    /// Creates a styled action surface, returning projection errors explicitly.
     fn try_action_surface_with_stylesheet(
         &self,
         viewport: Size,
