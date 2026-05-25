@@ -77,6 +77,18 @@ impl<'a> ElementSnapshot<'a> {
         &self.element.classes
     }
 
+    pub fn attributes(&self) -> &std::collections::BTreeMap<String, String> {
+        &self.element.attributes
+    }
+
+    pub fn attribute(&self, name: &str) -> Option<&str> {
+        self.element.attributes.get(name).map(String::as_str)
+    }
+
+    pub fn behavior_hooks(&self) -> &[crate::ElementBehaviorHook] {
+        &self.element.behavior_hooks
+    }
+
     pub fn has_class(&self, class: &str) -> bool {
         self.element
             .classes

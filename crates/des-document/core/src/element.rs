@@ -2,6 +2,7 @@ use crate::geometry::Point;
 use crate::state::ResolvedElement;
 use crate::table::{TableCellSpec, TableSpec};
 use crate::text::TextContent;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Element {
@@ -148,6 +149,8 @@ impl From<String> for ClassName {
 pub struct ElementSpec {
     pub element: Element,
     pub classes: Vec<ClassName>,
+    pub attributes: BTreeMap<String, String>,
+    pub behavior_hooks: Vec<ElementBehaviorHook>,
     pub interactive: bool,
     pub selected: bool,
     pub disabled: bool,
@@ -166,6 +169,8 @@ impl ElementSpec {
         Self {
             element,
             classes: Vec::new(),
+            attributes: BTreeMap::new(),
+            behavior_hooks: Vec::new(),
             interactive: false,
             selected: false,
             disabled: false,
@@ -182,6 +187,18 @@ impl ElementSpec {
 
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
         self.classes.push(class.into());
+        self
+    }
+
+    pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.attributes.insert(name.into(), value.into());
+        self
+    }
+
+    pub fn behavior_hook(mut self, event: impl Into<String>, command: impl Into<String>) -> Self {
+        self.behavior_hooks
+            .push(ElementBehaviorHook::new(event, command));
+        self.interactive = true;
         self
     }
 
@@ -254,6 +271,21 @@ impl ElementSpec {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ElementBehaviorHook {
+    pub event: String,
+    pub command: String,
+}
+
+impl ElementBehaviorHook {
+    pub fn new(event: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            event: event.into(),
+            command: command.into(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct DocumentNode {
     pub id: ElementId,
@@ -267,6 +299,8 @@ pub struct VisualElementClone {
     pub source_id: ElementId,
     pub element: Element,
     pub classes: Vec<ClassName>,
+    pub attributes: BTreeMap<String, String>,
+    pub behavior_hooks: Vec<ElementBehaviorHook>,
     pub text: Option<TextContent>,
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
@@ -279,6 +313,8 @@ impl VisualElementClone {
             source_id: element.id.clone(),
             element: element.element,
             classes: element.classes.clone(),
+            attributes: element.attributes.clone(),
+            behavior_hooks: element.behavior_hooks.clone(),
             text: element.text.clone(),
             value: element.value.clone(),
             glyph: element.glyph,
@@ -320,6 +356,8 @@ impl VisualElementClone {
     pub(crate) fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> DocumentNode {
         let mut spec = ElementSpec::new(self.element);
         spec.classes = self.classes.clone();
+        spec.attributes = self.attributes.clone();
+        spec.behavior_hooks = self.behavior_hooks.clone();
         if is_root {
             spec.classes.extend(options.root_classes.iter().cloned());
         }

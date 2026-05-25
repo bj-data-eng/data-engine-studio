@@ -924,6 +924,8 @@ impl Document {
             id: element.id.clone(),
             element: element.spec.element,
             classes: element.spec.classes.clone(),
+            attributes: element.spec.attributes.clone(),
+            behavior_hooks: element.spec.behavior_hooks.clone(),
             rect,
             clip_rect,
             style: element.computed_style.clone(),
@@ -1214,6 +1216,16 @@ impl DocumentBuilder {
 impl ElementBuilder<'_> {
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
         self.spec.classes.push(class.into());
+        self
+    }
+
+    pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.spec.attributes.insert(name.into(), value.into());
+        self
+    }
+
+    pub fn behavior_hook(mut self, event: impl Into<String>, command: impl Into<String>) -> Self {
+        self.spec = self.spec.behavior_hook(event, command);
         self
     }
 

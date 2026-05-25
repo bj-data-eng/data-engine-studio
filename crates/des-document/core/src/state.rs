@@ -1,4 +1,4 @@
-use crate::element::{ClassName, Color, Element, ElementId, Glyph};
+use crate::element::{ClassName, Color, Element, ElementBehaviorHook, ElementId, Glyph};
 use crate::geometry::{ClipRect, Point, Rect, ScrollAxis, Size};
 use crate::query::DocumentSnapshot;
 use crate::style::{
@@ -34,6 +34,8 @@ pub struct ResolvedElement {
     pub id: ElementId,
     pub element: Element,
     pub classes: Vec<ClassName>,
+    pub attributes: std::collections::BTreeMap<String, String>,
+    pub behavior_hooks: Vec<ElementBehaviorHook>,
     pub rect: Rect,
     pub clip_rect: ClipRect,
     pub style: ComputedStyle,

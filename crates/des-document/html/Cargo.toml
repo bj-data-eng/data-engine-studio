@@ -1,0 +1,16 @@
+[package]
+name = "des-html"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Runtime and compiled html language for Data Engine Studio document markup."
+
+[dependencies]
+des-document.workspace = true
+html5ever.workspace = true
+markup5ever_rcdom.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+filetime.workspace = true
