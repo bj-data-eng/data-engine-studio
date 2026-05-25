@@ -1119,6 +1119,38 @@ impl HtmlDocument {
             .action_surface_with(configure))
     }
 
+    /// Parses CSS and creates an action surface from `(command, action)` pairs.
+    pub fn to_action_surface_with_css_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self
+            .to_view_with_css(viewport, css)?
+            .action_surface(self.command_action_registry(actions)))
+    }
+
+    /// Parses CSS and creates an action surface from intent-scoped action tuples.
+    pub fn to_action_surface_with_css_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self
+            .to_view_with_css(viewport, css)?
+            .action_surface(self.command_intent_action_registry(actions)))
+    }
+
     /// Conditionally parses CSS and creates an action surface with typed Rust commands.
     pub fn to_action_surface_with_css_if<Action>(
         &self,
@@ -1142,6 +1174,38 @@ impl HtmlDocument {
         Ok(self
             .to_view_with_css_forgiving(viewport, css)?
             .action_surface_with(configure))
+    }
+
+    /// Parses forgiving CSS and creates an action surface from `(command, action)` pairs.
+    pub fn to_action_surface_with_css_forgiving_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self
+            .to_view_with_css_forgiving(viewport, css)?
+            .action_surface(self.command_action_registry(actions)))
+    }
+
+    /// Parses forgiving CSS and creates an action surface from intent-scoped action tuples.
+    pub fn to_action_surface_with_css_forgiving_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self
+            .to_view_with_css_forgiving(viewport, css)?
+            .action_surface(self.command_intent_action_registry(actions)))
     }
 
     /// Conditionally parses forgiving CSS and creates an action surface.
@@ -3342,6 +3406,38 @@ impl HtmlSet {
             .to_action_surface_with_css(viewport, css, configure)
     }
 
+    /// Parses CSS and creates a named action surface from `(command, action)` pairs.
+    pub fn to_action_surface_with_css_and_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .to_action_surface_with_css_and_actions(viewport, css, actions)
+    }
+
+    /// Parses CSS and creates a named action surface from intent-scoped action tuples.
+    pub fn to_action_surface_with_css_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .to_action_surface_with_css_and_intent_actions(viewport, css, actions)
+    }
+
     /// Conditionally parses CSS and creates an action surface for a named document.
     pub fn to_action_surface_with_css_if<Action>(
         &self,
@@ -3365,6 +3461,38 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         self.get(name)?
             .to_action_surface_with_css_forgiving(viewport, css, configure)
+    }
+
+    /// Parses forgiving CSS and creates a named action surface from `(command, action)` pairs.
+    pub fn to_action_surface_with_css_forgiving_and_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .to_action_surface_with_css_forgiving_and_actions(viewport, css, actions)
+    }
+
+    /// Parses forgiving CSS and creates a named action surface from intent-scoped action tuples.
+    pub fn to_action_surface_with_css_forgiving_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .to_action_surface_with_css_forgiving_and_intent_actions(viewport, css, actions)
     }
 
     /// Conditionally parses forgiving CSS and creates an action surface for a named document.

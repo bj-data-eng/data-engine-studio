@@ -615,6 +615,34 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("HTML and CSS should create a typed action surface directly");
     let surface_click =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut mapped_surface = html
+        .to_action_surface_with_css_and_actions(
+            Size::new(240.0, 160.0),
+            ".card { width: 182px; height: 72px; } button { width: 82px; height: 28px; }",
+            [
+                ("project.run", HtmlAction::Run),
+                ("project.filter", HtmlAction::Filter),
+            ],
+        )
+        .expect("HTML and CSS should create a mapped action surface directly");
+    let mapped_surface_click = mapped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut intent_surface = html
+        .to_action_surface_with_css_and_intent_actions(
+            Size::new(240.0, 160.0),
+            ".card { width: 183px; height: 72px; }",
+            [
+                (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+                (
+                    ElementBehaviorEvent::KeyDown,
+                    "project.filter",
+                    HtmlAction::Filter,
+                ),
+            ],
+        )
+        .expect("HTML and CSS should create an intent-mapped action surface directly");
+    let intent_surface_key =
+        intent_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
     let mut skipped_surface = html
         .to_action_surface_with_css_if(
             Size::new(240.0, 160.0),
@@ -639,6 +667,34 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("forgiving CSS should create a typed action surface directly");
     let surface_key =
         forgiving_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
+    let mut forgiving_mapped_surface = html
+        .to_action_surface_with_css_forgiving_and_actions(
+            Size::new(240.0, 160.0),
+            ".broken { width: ; } .card { width: 184px; height: 72px; }",
+            [
+                ("project.run", HtmlAction::Run),
+                ("project.filter", HtmlAction::Filter),
+            ],
+        )
+        .expect("forgiving CSS should create a mapped action surface directly");
+    let forgiving_mapped_surface_click = forgiving_mapped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut forgiving_intent_surface = html
+        .to_action_surface_with_css_forgiving_and_intent_actions(
+            Size::new(240.0, 160.0),
+            ".broken { width: ; } .card { width: 185px; height: 72px; }",
+            [
+                (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+                (
+                    ElementBehaviorEvent::KeyDown,
+                    "project.filter",
+                    HtmlAction::Filter,
+                ),
+            ],
+        )
+        .expect("forgiving CSS should create an intent-mapped action surface directly");
+    let forgiving_intent_surface_key = forgiving_intent_surface
+        .update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
     let mut skipped_forgiving_surface = html
         .to_action_surface_with_css_forgiving_if(
             Size::new(240.0, 160.0),
@@ -757,7 +813,55 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     assert!(configured_click_frame.contains_action(&HtmlAction::Run));
     assert!(configured_forgiving_frame.contains_action(&HtmlAction::Filter));
     assert!(surface_click.contains_action(&HtmlAction::Run));
+    assert!(mapped_surface_click.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        mapped_surface_click
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        182.0
+    );
+    assert!(intent_surface_key.contains_key_down_action(&HtmlAction::Filter));
+    assert_eq!(
+        intent_surface_key
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        183.0
+    );
     assert!(surface_key.contains_action(&HtmlAction::Filter));
+    assert!(forgiving_mapped_surface_click.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        forgiving_mapped_surface_click
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        184.0
+    );
+    assert!(forgiving_intent_surface_key.contains_key_down_action(&HtmlAction::Filter));
+    assert_eq!(
+        forgiving_intent_surface_key
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        185.0
+    );
     assert!(skipped_surface_click.contains_action(&HtmlAction::Run));
     assert!(skipped_forgiving_surface_click.contains_action(&HtmlAction::Run));
     assert_eq!(
@@ -2616,6 +2720,33 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build strict CSS action surfaces");
     let css_surface_frame =
         css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut css_mapped_surface = set
+        .to_action_surface_with_css_and_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            "#inline { width: 161px; height: 32px; }",
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should build mapped strict CSS action surfaces");
+    let css_mapped_surface_frame = css_mapped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut css_intent_surface = set
+        .to_action_surface_with_css_and_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            "#shared { width: 162px; height: 32px; }",
+            [
+                (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
+                (
+                    ElementBehaviorEvent::ContextMenu,
+                    "shared.open",
+                    SetAction::Menu,
+                ),
+            ],
+        )
+        .expect("named document should build intent-mapped strict CSS action surfaces");
+    let css_intent_surface_frame = css_intent_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let mut skipped_css_surface = set
         .to_action_surface_with_css_if(
             "inline",
@@ -2641,6 +2772,33 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build forgiving CSS action surfaces");
     let css_forgiving_surface_frame = css_forgiving_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut css_forgiving_mapped_surface = set
+        .to_action_surface_with_css_forgiving_and_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #inline { width: 165px; height: 32px; }",
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should build mapped forgiving CSS action surfaces");
+    let css_forgiving_mapped_surface_frame = css_forgiving_mapped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut css_forgiving_intent_surface = set
+        .to_action_surface_with_css_forgiving_and_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #shared { width: 166px; height: 32px; }",
+            [
+                (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
+                (
+                    ElementBehaviorEvent::ContextMenu,
+                    "shared.open",
+                    SetAction::Menu,
+                ),
+            ],
+        )
+        .expect("named document should build intent-mapped forgiving CSS action surfaces");
+    let css_forgiving_intent_surface_frame = css_forgiving_intent_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let mut skipped_css_forgiving_surface = set
         .to_action_surface_with_css_forgiving_if(
             "inline",
@@ -3038,6 +3196,34 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         160.0
     );
+    assert!(css_mapped_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_mapped_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        161.0
+    );
+    assert!(css_intent_surface_frame.contains_action_for_target_intent(
+        "shared",
+        ElementBehaviorEvent::ContextMenu,
+        &SetAction::Menu
+    ));
+    assert_eq!(
+        css_intent_surface_frame
+            .output()
+            .snapshot()
+            .find("shared")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        162.0
+    );
     assert!(skipped_css_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(
         skipped_css_surface_frame
@@ -3059,6 +3245,36 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .size
             .width,
         164.0
+    );
+    assert!(css_forgiving_mapped_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_forgiving_mapped_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        165.0
+    );
+    assert!(
+        css_forgiving_intent_surface_frame.contains_action_for_target_intent(
+            "shared",
+            ElementBehaviorEvent::ContextMenu,
+            &SetAction::Menu
+        )
+    );
+    assert_eq!(
+        css_forgiving_intent_surface_frame
+            .output()
+            .snapshot()
+            .find("shared")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        166.0
     );
     assert!(skipped_css_forgiving_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(
