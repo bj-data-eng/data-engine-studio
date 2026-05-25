@@ -2,15 +2,15 @@ use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget,
     DocumentAuthoringError, DocumentBuilder, DocumentCommandAction, DocumentCommandBinding,
     DocumentCommandDispatchReport, DocumentCommandRef, DocumentCommandRegistry, DocumentEngine,
-    DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection,
-    DocumentProjectionOperation, DocumentProjectionOperationKind, DocumentProjectionReport,
-    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId,
-    ElementProjectionPatch, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent,
-    KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextContent, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
-    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
-    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentEvent, DocumentEventKind, DocumentInput, DocumentInteractionState, DocumentKey,
+    DocumentProjection, DocumentProjectionOperation, DocumentProjectionOperationKind,
+    DocumentProjectionReport, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
+    ElementBehaviorHook, ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector,
+    FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point,
+    PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
+    TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextLayoutRequest, TextLayoutResult,
+    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -80,7 +80,7 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run")
             .behavior_hooks([
-                (ElementBehaviorEvent::Click, "run-query"),
+                (ElementBehaviorEvent::Click, " run-query "),
                 (ElementBehaviorEvent::ContextMenu, "open-query-menu"),
             ])
             .text("Run");
@@ -98,6 +98,7 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert_eq!(commands[0].command, "run-query");
     assert!(commands[0].matches_target_intent("run", ElementBehaviorEvent::Click));
     assert!(commands[0].matches_binding("run", ElementBehaviorEvent::Click, "run-query"));
+    assert!(commands[0].command_is(" run-query "));
     assert!(!commands[0].matches_binding("run", ElementBehaviorEvent::ContextMenu, "run-query"));
     let first_command = output.first_command().unwrap();
     assert!(first_command.matches_target_intent("run", ElementBehaviorEvent::Click));
@@ -106,6 +107,7 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert!(hooks.iter().any(|hook| hook.has_command("open-query-menu")));
     assert_eq!(hooks[0].event(), "click");
     assert_eq!(hooks[0].command(), "run-query");
+    assert!(hooks[0].has_command(" run-query "));
     assert_eq!(hooks[0].intent(), Some(ElementBehaviorEvent::Click));
     assert!(hooks[0].is_click());
     assert!(!hooks[0].is_key_down());
@@ -137,10 +139,11 @@ fn document_output_exposes_interaction_query_helpers() {
             .height(Length::Px(32.0)),
     );
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
-        ui.button("run").text("Run");
+        ui.button("run").command("run-query").text("Run");
     });
 
     let output = view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, true, true, 0.0));
+    let interaction: DocumentInteractionState<'_> = output.interaction();
     let run_events = output.events_for("run").collect::<Vec<_>>();
     let clicked = output
         .events_of_kind(DocumentEventKind::Clicked)
@@ -149,7 +152,162 @@ fn document_output_exposes_interaction_query_helpers() {
 
     assert_eq!(output.hit_id().map(ElementId::as_str), Some("run"));
     assert!(output.hit_is("run"));
+    assert_eq!(interaction.hit_target().map(ElementId::as_str), Some("run"));
+    assert!(interaction.hit_is("run"));
     assert_eq!(output.hit_element().unwrap().text(), Some("Run".to_owned()));
+    assert_eq!(interaction.events().len(), output.events.len());
+    assert_eq!(
+        interaction.first_event().unwrap(),
+        &DocumentEvent::pointer_entered("root")
+    );
+    assert!(interaction.events_for("run").any(DocumentEvent::is_click));
+    assert_eq!(
+        interaction.first_event_for("run").unwrap(),
+        &DocumentEvent::pointer_entered("run")
+    );
+    assert_eq!(
+        interaction
+            .events_of_kind(DocumentEventKind::Clicked)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        interaction
+            .first_event_of_kind(DocumentEventKind::Clicked)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(
+        interaction
+            .events_for_intent(ElementBehaviorEvent::Click)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        interaction
+            .first_event_for_intent(ElementBehaviorEvent::Click)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(
+        interaction
+            .events_for_target_intent("run", ElementBehaviorEvent::Click)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        interaction
+            .first_event_for_target_intent("run", ElementBehaviorEvent::Click)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(
+        interaction
+            .event_targets_of_kind(DocumentEventKind::Clicked)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        interaction
+            .first_event_target(DocumentEventKind::Clicked)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(
+        interaction
+            .event_targets_for_intent(ElementBehaviorEvent::Click)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        interaction
+            .first_event_target_for_intent(ElementBehaviorEvent::Click)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert!(interaction.has_event("run", DocumentEventKind::Clicked));
+    assert!(interaction.has_event_kind(DocumentEventKind::Clicked));
+    assert!(interaction.has_event_intent(ElementBehaviorEvent::Click));
+    assert!(interaction.has_event_for_intent("run", ElementBehaviorEvent::Click));
+    assert_eq!(
+        interaction.first_command().map(|command| command.command()),
+        Some("run-query")
+    );
+    assert_eq!(
+        interaction
+            .commands_of_kind(DocumentEventKind::Clicked)
+            .map(|command| command.command())
+            .collect::<Vec<_>>(),
+        vec!["run-query"]
+    );
+    assert_eq!(
+        interaction
+            .first_command_of_kind(DocumentEventKind::Clicked)
+            .map(|command| command.command()),
+        Some("run-query")
+    );
+    assert_eq!(
+        interaction
+            .commands_for_intent(ElementBehaviorEvent::Click)
+            .map(|command| command.command())
+            .collect::<Vec<_>>(),
+        vec!["run-query"]
+    );
+    assert_eq!(
+        interaction
+            .first_command_for_intent(ElementBehaviorEvent::Click)
+            .map(|command| command.command()),
+        Some("run-query")
+    );
+    assert_eq!(
+        interaction
+            .commands_for("run")
+            .map(|command| command.command())
+            .collect::<Vec<_>>(),
+        vec!["run-query"]
+    );
+    assert_eq!(
+        interaction
+            .first_command_for("run")
+            .map(|command| command.command()),
+        Some("run-query")
+    );
+    assert_eq!(
+        interaction
+            .commands_for_target_intent("run", ElementBehaviorEvent::Click)
+            .map(|command| command.command())
+            .collect::<Vec<_>>(),
+        vec!["run-query"]
+    );
+    assert_eq!(
+        interaction
+            .first_command_for_target_intent("run", ElementBehaviorEvent::Click)
+            .map(|command| command.command()),
+        Some("run-query")
+    );
+    assert!(interaction.has_command("run", "run-query"));
+    assert!(interaction.has_command_kind("run", DocumentEventKind::Clicked, "run-query"));
+    assert!(interaction.has_command_intent("run", ElementBehaviorEvent::Click, "run-query"));
+    assert!(
+        interaction
+            .commands()
+            .any(|command| command.matches_binding(
+                "run",
+                ElementBehaviorEvent::Click,
+                "run-query"
+            ))
+    );
     assert_eq!(
         output.first_event().unwrap(),
         &DocumentEvent::pointer_entered("root")
@@ -418,6 +576,121 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
         vec![KeyInput::up(DocumentKey::Enter)]
     );
     assert!(key_up_output.has_key_up("search", KeyInput::up(DocumentKey::Enter)));
+}
+
+#[test]
+fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Focus,
+        Blur,
+        Select,
+    }
+
+    let stylesheet = StyleSheet::new()
+        .id("search", Style::default().size(160.0, 32.0))
+        .id("label", Style::default().size(220.0, 40.0));
+    let registry = DocumentCommandRegistry::new()
+        .bind_focus("search.focus", AppAction::Focus)
+        .bind_blur("search.blur", AppAction::Blur)
+        .bind_select("label.select", AppAction::Select);
+    let mut focus_view = DocumentView::build(Size::new(320.0, 180.0), stylesheet.clone(), |ui| {
+        ui.input("search")
+            .focused(true)
+            .on_focus("search.focus")
+            .on_blur("search.blur")
+            .empty();
+    });
+
+    let focus_frame = focus_view.update_actions(&registry);
+    let (_, blur_frame) = focus_view
+        .project_and_update_actions(&DocumentProjection::new().blur("search"), &registry)
+        .expect("focus projection should update retained document state");
+    let mut dispatched_focus = Vec::new();
+    let focus_dispatch =
+        focus_frame.dispatch_focus(|action| dispatched_focus.push(*action.action()));
+
+    assert!(focus_frame.output().focus_event_for("search"));
+    assert!(focus_frame.contains_action_for_intent(ElementBehaviorEvent::Focus, &AppAction::Focus));
+    assert!(focus_frame.contains_focus_action(&AppAction::Focus));
+    assert_eq!(focus_frame.focus_actions().count(), 1);
+    assert_eq!(
+        focus_frame.first_focus_action_value(),
+        Some(&AppAction::Focus)
+    );
+    assert_eq!(
+        focus_frame.focus_action_values().collect::<Vec<_>>(),
+        vec![&AppAction::Focus]
+    );
+    assert_eq!(
+        registry.collect_focus_action_values(focus_frame.output()),
+        vec![AppAction::Focus]
+    );
+    assert_eq!(
+        registry
+            .focus_actions(focus_frame.output())
+            .map(|action| action.command().to_owned())
+            .collect::<Vec<_>>(),
+        vec!["search.focus".to_owned()]
+    );
+    assert_eq!(focus_dispatch.handled_count(), 1);
+    assert_eq!(dispatched_focus, vec![AppAction::Focus]);
+    assert_eq!(
+        focus_frame
+            .output()
+            .first_command_for_intent(ElementBehaviorEvent::Focus)
+            .map(|command| command.command()),
+        Some("search.focus")
+    );
+    assert!(blur_frame.output().blur_event_for("search"));
+    assert!(blur_frame.contains_action_for_intent(ElementBehaviorEvent::Blur, &AppAction::Blur));
+    assert!(blur_frame.contains_blur_action(&AppAction::Blur));
+    assert_eq!(blur_frame.blur_actions().count(), 1);
+    assert_eq!(blur_frame.first_blur_action_value(), Some(&AppAction::Blur));
+    assert_eq!(
+        registry.collect_blur_action_values(blur_frame.output()),
+        vec![AppAction::Blur]
+    );
+
+    let mut selection_view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.p("label")
+            .selectable_text()
+            .on_select("label.select")
+            .text("hello world");
+    });
+    let select_frame = selection_view
+        .update_with_input_actions(DocumentInput::primary_down(Point::new(8.0, 8.0)), &registry);
+
+    assert!(select_frame.output().selection_started_for("label"));
+    assert!(
+        select_frame
+            .output()
+            .has_event_intent(ElementBehaviorEvent::Select)
+    );
+    assert!(
+        select_frame.contains_action_for_intent(ElementBehaviorEvent::Select, &AppAction::Select)
+    );
+    assert!(select_frame.contains_select_action(&AppAction::Select));
+    assert_eq!(select_frame.select_actions().count(), 1);
+    assert_eq!(
+        select_frame.select_action_values().collect::<Vec<_>>(),
+        vec![&AppAction::Select]
+    );
+    assert_eq!(
+        select_frame.first_select_action_value(),
+        Some(&AppAction::Select)
+    );
+    assert_eq!(
+        registry.collect_select_action_values(select_frame.output()),
+        vec![AppAction::Select]
+    );
+    assert_eq!(
+        select_frame
+            .output()
+            .first_command_for_intent(ElementBehaviorEvent::Select)
+            .map(|command| command.command()),
+        Some("label.select")
+    );
 }
 
 #[test]

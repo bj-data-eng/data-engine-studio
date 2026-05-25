@@ -144,9 +144,9 @@ pub use state::{
     ChangeSet, DocumentCommand, DocumentCommandAction, DocumentCommandActionRef,
     DocumentCommandBinding, DocumentCommandDispatchReport, DocumentCommandIter, DocumentCommandRef,
     DocumentCommandRegistry, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput,
-    DocumentKey, DocumentMetrics, DocumentOutput, DocumentTextSelection, ElementState, KeyInput,
-    KeyModifiers, PointerInput, ResolvedElement, ResolvedFloating, ScrollChrome,
-    TextSelectionGranularity,
+    DocumentInteractionState, DocumentKey, DocumentMetrics, DocumentOutput, DocumentTextSelection,
+    ElementState, KeyInput, KeyModifiers, PointerInput, ResolvedElement, ResolvedFloating,
+    ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
     Anchor, AnchorPlacement, BorderStyle, ComplexSelector, ComplexSelectorPart, CompoundSelector,
@@ -186,8 +186,8 @@ pub mod prelude {
         DocumentAuthoringResult, DocumentBuilder, DocumentCommand, DocumentCommandAction,
         DocumentCommandActionRef, DocumentCommandBinding, DocumentCommandDispatchReport,
         DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
-        DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics,
-        DocumentOutput, DocumentProjection, DocumentProjectionOperation,
+        DocumentEvent, DocumentEventKind, DocumentInput, DocumentInteractionState, DocumentKey,
+        DocumentMetrics, DocumentOutput, DocumentProjection, DocumentProjectionOperation,
         DocumentProjectionOperationKind, DocumentProjectionReport, DocumentQueryError,
         DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView, DocumentViewBuilder,
         DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook,

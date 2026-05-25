@@ -476,6 +476,30 @@ impl ElementSpec {
         self.on_if(ElementBehaviorEvent::Scroll, command, present)
     }
 
+    pub fn on_focus(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Focus, command)
+    }
+
+    pub fn on_focus_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Focus, command, present)
+    }
+
+    pub fn on_blur(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Blur, command)
+    }
+
+    pub fn on_blur_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Blur, command, present)
+    }
+
+    pub fn on_select(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Select, command)
+    }
+
+    pub fn on_select_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Select, command, present)
+    }
+
     pub fn on_key_down(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::KeyDown, command)
     }
@@ -684,8 +708,8 @@ pub struct ElementBehaviorHook {
 impl ElementBehaviorHook {
     pub fn new(event: impl Into<String>, command: impl Into<String>) -> Self {
         Self {
-            event: event.into(),
-            command: command.into(),
+            event: event.into().trim().to_owned(),
+            command: command.into().trim().to_owned(),
         }
     }
 
@@ -702,7 +726,7 @@ impl ElementBehaviorHook {
     }
 
     pub fn has_command(&self, command: &str) -> bool {
-        self.command == command
+        self.command == command.trim()
     }
 
     pub fn intent(&self) -> Option<ElementBehaviorEvent> {
@@ -762,6 +786,18 @@ impl ElementBehaviorHook {
         self.matches_intent(ElementBehaviorEvent::Scroll)
     }
 
+    pub fn is_focus(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Focus)
+    }
+
+    pub fn is_blur(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Blur)
+    }
+
+    pub fn is_select(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Select)
+    }
+
     pub fn is_key_down(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::KeyDown)
     }
@@ -810,6 +846,9 @@ pub enum ElementBehaviorEvent {
     Drag,
     DragEnd,
     Scroll,
+    Focus,
+    Blur,
+    Select,
     KeyDown,
     KeyUp,
 }
@@ -827,6 +866,9 @@ impl ElementBehaviorEvent {
             Self::Drag => "drag",
             Self::DragEnd => "dragend",
             Self::Scroll => "scroll",
+            Self::Focus => "focus",
+            Self::Blur => "blur",
+            Self::Select => "select",
             Self::KeyDown => "keydown",
             Self::KeyUp => "keyup",
         }
@@ -844,6 +886,9 @@ impl ElementBehaviorEvent {
             "drag" => Some(Self::Drag),
             "dragend" => Some(Self::DragEnd),
             "scroll" | "scrollx" | "scroll-x" | "scrolly" | "scroll-y" => Some(Self::Scroll),
+            "focus" | "focusin" => Some(Self::Focus),
+            "blur" | "focusout" => Some(Self::Blur),
+            "select" | "selectionchange" | "selection-change" => Some(Self::Select),
             "keydown" | "key-down" => Some(Self::KeyDown),
             "keyup" | "key-up" => Some(Self::KeyUp),
             _ => None,
@@ -863,6 +908,11 @@ impl ElementBehaviorEvent {
                 | (Self::Drag, DocumentEventKind::DragMoved)
                 | (Self::DragEnd, DocumentEventKind::DragEnded)
                 | (Self::Scroll, DocumentEventKind::Scrolled(_))
+                | (Self::Focus, DocumentEventKind::Focused)
+                | (Self::Blur, DocumentEventKind::Blurred)
+                | (Self::Select, DocumentEventKind::SelectionStarted)
+                | (Self::Select, DocumentEventKind::SelectionChanged)
+                | (Self::Select, DocumentEventKind::SelectionEnded)
                 | (Self::KeyDown, DocumentEventKind::KeyDown(_))
                 | (Self::KeyUp, DocumentEventKind::KeyUp(_))
         )

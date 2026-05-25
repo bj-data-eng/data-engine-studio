@@ -3249,6 +3249,15 @@ impl HtmlNode {
         if self.attributes.contains_key("autofocus") {
             spec = spec.focused(true);
         }
+        if html_boolean_attribute(&self.attributes, "data-selectable-text") {
+            spec = spec.selectable_text();
+        }
+        if self.attributes.contains_key("data-copyable-text") {
+            spec = spec.copyable_text(html_boolean_attribute(
+                &self.attributes,
+                "data-copyable-text",
+            ));
+        }
         if !self.behavior_hooks.is_empty()
             || self.attributes.contains_key("data-command")
             || self.attributes.keys().any(|name| name.starts_with("on:"))
@@ -3288,8 +3297,8 @@ impl HtmlBehaviorHook {
     /// Creates a behavior hook from an HTML-authored event name.
     pub fn new(event: impl Into<String>, command: impl Into<String>) -> Self {
         Self {
-            event: event.into(),
-            command: command.into(),
+            event: event.into().trim().to_owned(),
+            command: command.into().trim().to_owned(),
         }
     }
 
@@ -3310,7 +3319,7 @@ impl HtmlBehaviorHook {
 
     /// Returns true when this hook declares the supplied command.
     pub fn has_command(&self, command: &str) -> bool {
-        self.command == command
+        self.command == command.trim()
     }
 
     /// Returns the parsed typed event intent when this hook maps to a document intent.
@@ -3376,6 +3385,21 @@ impl HtmlBehaviorHook {
     /// Returns true when this hook maps to scroll intent.
     pub fn is_scroll(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    /// Returns true when this hook maps to focus intent.
+    pub fn is_focus(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Returns true when this hook maps to blur intent.
+    pub fn is_blur(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Returns true when this hook maps to text-selection intent.
+    pub fn is_select(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Select)
     }
 
     /// Returns true when this hook maps to key-down intent.
@@ -4965,6 +4989,12 @@ fn html_attribute_name(name: &QualName) -> String {
     } else {
         name.local.to_string()
     }
+}
+
+fn html_boolean_attribute(attributes: &BTreeMap<String, String>, name: &str) -> bool {
+    attributes
+        .get(name)
+        .is_some_and(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "false" | "0"))
 }
 
 fn push_behavior_hook(

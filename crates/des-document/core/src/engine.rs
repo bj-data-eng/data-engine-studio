@@ -94,6 +94,7 @@ pub struct DocumentEngine {
     active_scroll_drag: Option<ScrollDrag>,
     active_pointer_drag: Option<PointerDrag>,
     text_selection: Option<DocumentTextSelection>,
+    focused_target: Option<ElementId>,
     last_text_click: Option<TextClickSequence>,
     cached_layout: Option<ResolvedElement>,
     cached_document_instance_id: Option<u64>,
@@ -125,6 +126,7 @@ impl DocumentEngine {
         text_measurer: &mut dyn TextMeasurer,
     ) -> DocumentOutput {
         let changes = self.sync_document_states(document);
+        let previous_text_selection = self.text_selection.clone();
         let text_measurer_key = text_measurer.cache_key();
         let text_measurer_changed = self.cached_text_measurer_key != Some(text_measurer_key);
         let reused_document_cache = changes.created.is_empty()
@@ -239,6 +241,12 @@ impl DocumentEngine {
         self.cached_text_measurer_key = Some(text_measurer_key);
         let element_count = count_resolved_elements(&layout);
         let scroll_chrome_count = scroll_chrome.len();
+        let mut events = input_update.events;
+        events.extend(self.update_focus_events(&layout));
+        events.extend(text_selection_events(
+            previous_text_selection.as_ref(),
+            self.text_selection.as_ref(),
+        ));
 
         DocumentOutput {
             changes,
@@ -247,7 +255,7 @@ impl DocumentEngine {
             active_drag: input_update.active_drag,
             completed_drag: input_update.completed_drag,
             text_selection: self.text_selection.clone(),
-            events: input_update.events,
+            events,
             scroll_chrome,
             animating: animation_update.animating || scrollbar_animation_update.animating,
             metrics: DocumentMetrics {
@@ -956,6 +964,21 @@ impl DocumentEngine {
             animating: (next - target).abs() > snap_epsilon,
         }
     }
+
+    fn update_focus_events(&mut self, layout: &ResolvedElement) -> Vec<DocumentEvent> {
+        let next = focused_frame(layout).map(|frame| frame.id.clone());
+        let mut events = Vec::new();
+        if self.focused_target != next {
+            if let Some(previous) = self.focused_target.take() {
+                events.push(DocumentEvent::blurred(previous));
+            }
+            if let Some(next) = next.clone() {
+                events.push(DocumentEvent::focused(next));
+            }
+        }
+        self.focused_target = next;
+        events
+    }
 }
 
 fn count_resolved_elements(frame: &ResolvedElement) -> usize {
@@ -971,6 +994,39 @@ fn focused_frame(frame: &ResolvedElement) -> Option<&ResolvedElement> {
         return Some(frame);
     }
     frame.children.iter().find_map(focused_frame)
+}
+
+fn text_selection_events(
+    previous: Option<&DocumentTextSelection>,
+    current: Option<&DocumentTextSelection>,
+) -> Vec<DocumentEvent> {
+    match (previous, current) {
+        (None, None) => Vec::new(),
+        (None, Some(current)) => vec![DocumentEvent::selection_started(current.target.clone())],
+        (Some(previous), None) => vec![DocumentEvent::selection_ended(previous.target.clone())],
+        (Some(previous), Some(current)) if previous.target != current.target => vec![
+            DocumentEvent::selection_ended(previous.target.clone()),
+            DocumentEvent::selection_started(current.target.clone()),
+        ],
+        (Some(previous), Some(current)) if previous.active && !current.active => {
+            vec![DocumentEvent::selection_ended(current.target.clone())]
+        }
+        (Some(previous), Some(current)) if text_selection_range_changed(previous, current) => {
+            vec![DocumentEvent::selection_changed(current.target.clone())]
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn text_selection_range_changed(
+    previous: &DocumentTextSelection,
+    current: &DocumentTextSelection,
+) -> bool {
+    previous.anchor_index != current.anchor_index
+        || previous.focus_index != current.focus_index
+        || previous.anchor_range_start != current.anchor_range_start
+        || previous.anchor_range_end != current.anchor_range_end
+        || previous.granularity != current.granularity
 }
 
 fn set_f32(target: &mut f32, value: f32) -> bool {

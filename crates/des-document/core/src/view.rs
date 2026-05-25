@@ -396,6 +396,66 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_value_for_intent(ElementBehaviorEvent::Scroll)
     }
 
+    /// Iterates typed app actions emitted by focus intent.
+    pub fn focus_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Returns the first typed app action emitted by focus intent.
+    pub fn first_focus_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Iterates only typed app action values emitted by focus intent.
+    pub fn focus_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Returns only the first typed app action value emitted by focus intent.
+    pub fn first_focus_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Iterates typed app actions emitted by blur intent.
+    pub fn blur_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Returns the first typed app action emitted by blur intent.
+    pub fn first_blur_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Iterates only typed app action values emitted by blur intent.
+    pub fn blur_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Returns only the first typed app action value emitted by blur intent.
+    pub fn first_blur_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Iterates typed app actions emitted by selection intent.
+    pub fn select_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::Select)
+    }
+
+    /// Returns the first typed app action emitted by selection intent.
+    pub fn first_select_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::Select)
+    }
+
+    /// Iterates only typed app action values emitted by selection intent.
+    pub fn select_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::Select)
+    }
+
+    /// Returns only the first typed app action value emitted by selection intent.
+    pub fn first_select_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::Select)
+    }
+
     /// Iterates typed app actions emitted by key-down intent.
     pub fn key_down_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::KeyDown)
@@ -565,6 +625,30 @@ impl<Action> DocumentActionFrame<Action> {
         Action: PartialEq,
     {
         self.contains_action_for_intent(ElementBehaviorEvent::Scroll, action)
+    }
+
+    /// Returns true when focus intent emitted the supplied typed action.
+    pub fn contains_focus_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::Focus, action)
+    }
+
+    /// Returns true when blur intent emitted the supplied typed action.
+    pub fn contains_blur_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::Blur, action)
+    }
+
+    /// Returns true when selection intent emitted the supplied typed action.
+    pub fn contains_select_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::Select, action)
     }
 
     /// Returns true when key-down intent emitted the supplied typed action.
@@ -738,6 +822,30 @@ impl<Action> DocumentActionFrame<Action> {
         handler: impl FnMut(&'a DocumentCommandAction<Action>),
     ) -> DocumentCommandDispatchReport {
         self.dispatch_intent(ElementBehaviorEvent::Scroll, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by focus intent.
+    pub fn dispatch_focus<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::Focus, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by blur intent.
+    pub fn dispatch_blur<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::Blur, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by selection intent.
+    pub fn dispatch_select<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::Select, handler)
     }
 
     /// Dispatches collected typed actions emitted by key-down intent.

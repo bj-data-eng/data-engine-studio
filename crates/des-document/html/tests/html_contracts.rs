@@ -195,7 +195,7 @@ fn html_document_preserves_braces_as_text_not_logic() {
 #[test]
 fn html_document_parser_extracts_rust_behavior_hooks() {
     let html = HtmlDocument::parse_fragment(
-        r#"<button id="open" class="primary" on:click="project.open" data-command:input="project.filter">Open</button>"#,
+        r#"<button id="open" class="primary" on:click=" project.open " data-command:input=" project.filter ">Open</button>"#,
     )
     .expect("HTML should parse");
 
@@ -207,6 +207,7 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
     assert_eq!(button.behavior_hooks[0].event(), "click");
     assert_eq!(button.behavior_hooks[0].command(), "project.open");
     assert!(button.behavior_hooks[0].has_command("project.open"));
+    assert!(button.behavior_hooks[0].has_command(" project.open "));
     assert_eq!(
         button.behavior_hooks[0].intent(),
         Some(ElementBehaviorEvent::Click)
@@ -215,7 +216,8 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
     assert!(button.behavior_hooks[0].is_click());
     assert!(!button.behavior_hooks[0].is_key_down());
     assert!(button.has_behavior_hook(ElementBehaviorEvent::Click, "project.open"));
-    assert!(button.has_command_hook("project.filter"));
+    assert!(button.has_behavior_hook(ElementBehaviorEvent::Click, " project.open "));
+    assert!(button.has_command_hook(" project.filter "));
     assert_eq!(
         button.behavior_hooks_for(ElementBehaviorEvent::Click).len(),
         1
@@ -226,8 +228,8 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
             .map(HtmlBehaviorHook::command),
         Some("project.open")
     );
-    assert!(html.has_behavior_hook(ElementBehaviorEvent::Click, "project.open"));
-    assert!(html.has_command_hook("project.filter"));
+    assert!(html.has_behavior_hook(ElementBehaviorEvent::Click, " project.open "));
+    assert!(html.has_command_hook(" project.filter "));
     assert_eq!(
         html.behavior_hooks_for(ElementBehaviorEvent::Click).len(),
         1
@@ -240,6 +242,71 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
     assert_eq!(button.behavior_hooks[1].event, "input");
     assert_eq!(button.behavior_hooks[1].command, "project.filter");
     assert_eq!(button.behavior_hooks[1].intent(), None);
+}
+
+#[test]
+fn html_authored_focus_blur_and_selection_hooks_dispatch_to_typed_actions() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Focus,
+        Blur,
+        Select,
+    }
+
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section id="panel">
+          <input id="search" autofocus on:focus="search.focus" on:blur="search.blur">
+          <p id="label" data-selectable-text on:select="label.select">hello world</p>
+        </section>
+        "#,
+    )
+    .expect("HTML should parse focus and selection hooks");
+    let stylesheet = StyleSheet::new()
+        .id("search", Style::default().size(160.0, 32.0))
+        .id("label", Style::default().size(220.0, 40.0));
+    let registry = DocumentCommandRegistry::new()
+        .bind_focus("search.focus", HtmlAction::Focus)
+        .bind_blur("search.blur", HtmlAction::Blur)
+        .bind_select("label.select", HtmlAction::Select);
+    let mut focus_view = html
+        .to_view_with_stylesheet(Size::new(320.0, 180.0), stylesheet.clone())
+        .expect("HTML should create a focus view");
+
+    let focus = html
+        .first_behavior_hook_for(ElementBehaviorEvent::Focus)
+        .expect("focus hook should be queryable");
+    let blur = html
+        .first_behavior_hook_for(ElementBehaviorEvent::Blur)
+        .expect("blur hook should be queryable");
+    let select = html
+        .first_behavior_hook_for(ElementBehaviorEvent::Select)
+        .expect("selection hook should be queryable");
+
+    let focus_frame = focus_view.update_actions(&registry);
+    let (_, blur_frame) = focus_view
+        .project_and_update_actions(&DocumentProjection::new().blur("search"), &registry)
+        .expect("HTML focus state should project through the document front door");
+    let mut selection_view = html
+        .to_view_with_stylesheet(Size::new(320.0, 180.0), stylesheet)
+        .expect("HTML should create a selection view");
+    let select_frame = selection_view.update_with_input_actions(
+        DocumentInput::primary_down(Point::new(8.0, 40.0)),
+        &registry,
+    );
+
+    assert!(focus.is_focus());
+    assert!(blur.is_blur());
+    assert!(select.is_select());
+    assert!(html.has_behavior_hook(ElementBehaviorEvent::Select, "label.select"));
+    assert!(
+        focus_frame.contains_action_for_intent(ElementBehaviorEvent::Focus, &HtmlAction::Focus)
+    );
+    assert!(blur_frame.contains_action_for_intent(ElementBehaviorEvent::Blur, &HtmlAction::Blur));
+    assert!(
+        select_frame.contains_action_for_intent(ElementBehaviorEvent::Select, &HtmlAction::Select)
+    );
+    assert!(select_frame.output().selection_started_for("label"));
 }
 
 #[test]
@@ -350,6 +417,7 @@ fn html_document_maps_browser_boolean_state_attributes() {
           <button id="save" disabled on:click="save">Save</button>
           <select id="mode"><option id="fast" selected>Fast</option></select>
           <input id="filter" autofocus value="ready">
+          <p id="terms" data-selectable-text data-copyable-text="false">Terms</p>
         </section>
         "#,
     )
@@ -366,6 +434,9 @@ fn html_document_maps_browser_boolean_state_attributes() {
     let filter = snapshot
         .find("filter")
         .expect("input id should be retained");
+    let terms = snapshot
+        .find("terms")
+        .expect("paragraph id should be retained");
 
     assert!(save.disabled());
     assert!(!save.interactive());
@@ -375,6 +446,8 @@ fn html_document_maps_browser_boolean_state_attributes() {
     assert_eq!(fast.attribute("selected"), Some(""));
     assert!(filter.focused());
     assert_eq!(filter.value(), Some("ready"));
+    assert!(terms.selectable_text());
+    assert!(!terms.copyable_text());
     assert_eq!(snapshot.count_disabled(), 1);
     assert_eq!(snapshot.count_selected(), 1);
     assert_eq!(snapshot.count_focused(), 1);

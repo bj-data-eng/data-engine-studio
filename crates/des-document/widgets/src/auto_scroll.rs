@@ -46,6 +46,14 @@ impl AutoScroller {
         self.scroll_drag_with_filter(engine, output, pointer, |_| true)
     }
 
+    pub fn scroll_active_drag(
+        self,
+        engine: &mut DocumentEngine,
+        output: &DocumentOutput,
+    ) -> Option<AutoScrollAction> {
+        self.scroll_active_drag_with_filter(engine, output, |_| true)
+    }
+
     pub fn scroll_view_drag(
         self,
         view: &mut DocumentView,
@@ -53,6 +61,14 @@ impl AutoScroller {
         pointer: Point,
     ) -> Option<AutoScrollAction> {
         self.scroll_view_drag_with_filter(view, output, pointer, |_| true)
+    }
+
+    pub fn scroll_view_active_drag(
+        self,
+        view: &mut DocumentView,
+        output: &DocumentOutput,
+    ) -> Option<AutoScrollAction> {
+        self.scroll_view_active_drag_with_filter(view, output, |_| true)
     }
 
     pub fn scroll_drag_with_filter(
@@ -95,6 +111,16 @@ impl AutoScroller {
         None
     }
 
+    pub fn scroll_active_drag_with_filter(
+        self,
+        engine: &mut DocumentEngine,
+        output: &DocumentOutput,
+        accepts_element: impl FnMut(&ElementId) -> bool,
+    ) -> Option<AutoScrollAction> {
+        let pointer = output.interaction().active_drag()?.current;
+        self.scroll_drag_with_filter(engine, output, pointer, accepts_element)
+    }
+
     pub fn scroll_view_drag_with_filter(
         self,
         view: &mut DocumentView,
@@ -103,6 +129,15 @@ impl AutoScroller {
         accepts_element: impl FnMut(&ElementId) -> bool,
     ) -> Option<AutoScrollAction> {
         self.scroll_drag_with_filter(view.engine_mut(), output, pointer, accepts_element)
+    }
+
+    pub fn scroll_view_active_drag_with_filter(
+        self,
+        view: &mut DocumentView,
+        output: &DocumentOutput,
+        accepts_element: impl FnMut(&ElementId) -> bool,
+    ) -> Option<AutoScrollAction> {
+        self.scroll_active_drag_with_filter(view.engine_mut(), output, accepts_element)
     }
 
     fn scroll_element(
@@ -267,7 +302,9 @@ fn scroll_position(chrome: &ScrollChrome) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_document::{Document, DocumentView, ElementSpec, Overflow, Size, Style, StyleSheet};
+    use des_document::{
+        Document, DocumentInput, DocumentView, ElementSpec, Overflow, Size, Style, StyleSheet,
+    };
 
     fn vertical_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
         let mut engine = DocumentEngine::default();
@@ -280,7 +317,7 @@ mod tests {
             )
             .class("row", Style::default().size(100.0, 32.0));
         let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
-            ui.element("scroll-parent", ElementSpec::div(), |ui| {
+            ui.element("scroll-parent", ElementSpec::div().interactive(), |ui| {
                 for index in 0..8 {
                     ui.element(
                         format!("row-{index}"),
@@ -304,7 +341,7 @@ mod tests {
             )
             .class("row", Style::default().size(100.0, 32.0));
         let mut view = DocumentView::build(Size::new(160.0, 120.0), stylesheet, |ui| {
-            ui.element("scroll-parent", ElementSpec::div(), |ui| {
+            ui.element("scroll-parent", ElementSpec::div().interactive(), |ui| {
                 for index in 0..8 {
                     ui.element(
                         format!("row-{index}"),
@@ -335,6 +372,30 @@ mod tests {
         });
         let output = engine.update(&mut document, &stylesheet);
         (engine, document, stylesheet, output)
+    }
+
+    fn active_vertical_drag_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
+        let (mut engine, mut document, stylesheet, _) = vertical_scroll_fixture();
+        engine.update_with_input(
+            &mut document,
+            &stylesheet,
+            DocumentInput::primary_press(Point::new(40.0, 40.0)),
+        );
+        let output = engine.update_with_input(
+            &mut document,
+            &stylesheet,
+            DocumentInput::primary_down(Point::new(40.0, 76.0)),
+        );
+        assert!(output.interaction().active_drag().is_some());
+        (engine, document, stylesheet, output)
+    }
+
+    fn active_vertical_drag_view_fixture() -> (DocumentView, DocumentOutput) {
+        let (mut view, _) = vertical_scroll_view_fixture();
+        view.update_with_input(DocumentInput::primary_press(Point::new(40.0, 40.0)));
+        let output = view.update_with_input(DocumentInput::primary_down(Point::new(40.0, 76.0)));
+        assert!(output.interaction().active_drag().is_some());
+        (view, output)
     }
 
     #[test]
@@ -369,6 +430,49 @@ mod tests {
                 .scroll_y
                 > 0.0
         );
+    }
+
+    #[test]
+    fn auto_scroller_scrolls_active_document_drag_from_interaction_state() {
+        let (mut engine, _, _, output) = active_vertical_drag_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions::default())
+            .scroll_active_drag(&mut engine, &output)
+            .expect("active drag near the bottom should scroll");
+
+        assert_eq!(action.element_id, ElementId::new("scroll-parent"));
+        assert!(action.delta.y > 0.0);
+        assert!(engine.element_state("scroll-parent").unwrap().scroll_y > 0.0);
+    }
+
+    #[test]
+    fn auto_scroller_scrolls_active_document_view_drag_from_interaction_state() {
+        let (mut view, output) = active_vertical_drag_view_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions::default())
+            .scroll_view_active_drag(&mut view, &output)
+            .expect("active drag near the bottom should scroll a view");
+
+        assert_eq!(action.element_id, ElementId::new("scroll-parent"));
+        assert!(action.delta.y > 0.0);
+        assert!(
+            view.engine()
+                .element_state("scroll-parent")
+                .unwrap()
+                .scroll_y
+                > 0.0
+        );
+    }
+
+    #[test]
+    fn auto_scroller_active_drag_filter_can_reject_scroll_container() {
+        let (mut engine, _, _, output) = active_vertical_drag_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions::default())
+            .scroll_active_drag_with_filter(&mut engine, &output, |_| false);
+
+        assert!(action.is_none());
+        assert_eq!(engine.element_state("scroll-parent").unwrap().scroll_y, 0.0);
     }
 
     #[test]

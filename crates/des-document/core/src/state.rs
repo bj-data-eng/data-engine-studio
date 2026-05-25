@@ -92,6 +92,16 @@ pub struct DocumentOutput {
 }
 
 impl DocumentOutput {
+    /// Returns a compact app-facing view of this frame's interaction state.
+    ///
+    /// `DocumentOutput` remains the complete rendering and query surface. This
+    /// wrapper gathers the state most app update loops inspect after a frame:
+    /// hit target, focus, drag, text selection, resolved events, and authored
+    /// commands.
+    pub fn interaction(&self) -> DocumentInteractionState<'_> {
+        DocumentInteractionState { output: self }
+    }
+
     pub fn snapshot(&self) -> DocumentSnapshot<'_> {
         DocumentSnapshot::new(&self.layout)
     }
@@ -381,6 +391,66 @@ impl DocumentOutput {
         self.has_event(target, DocumentEventKind::ContextRequested)
     }
 
+    pub fn focused_event_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::Focused)
+    }
+
+    pub fn first_focused_event_target(&self) -> Option<&ElementId> {
+        self.focused_event_targets().next()
+    }
+
+    pub fn focus_event_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::Focused)
+    }
+
+    pub fn blurred_event_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::Blurred)
+    }
+
+    pub fn first_blurred_event_target(&self) -> Option<&ElementId> {
+        self.blurred_event_targets().next()
+    }
+
+    pub fn blur_event_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::Blurred)
+    }
+
+    pub fn selection_started_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::SelectionStarted)
+    }
+
+    pub fn first_selection_started_target(&self) -> Option<&ElementId> {
+        self.selection_started_targets().next()
+    }
+
+    pub fn selection_started_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::SelectionStarted)
+    }
+
+    pub fn selection_changed_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::SelectionChanged)
+    }
+
+    pub fn first_selection_changed_target(&self) -> Option<&ElementId> {
+        self.selection_changed_targets().next()
+    }
+
+    pub fn selection_changed_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::SelectionChanged)
+    }
+
+    pub fn selection_ended_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::SelectionEnded)
+    }
+
+    pub fn first_selection_ended_target(&self) -> Option<&ElementId> {
+        self.selection_ended_targets().next()
+    }
+
+    pub fn selection_ended_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::SelectionEnded)
+    }
+
     pub fn drag_started_targets(&self) -> impl Iterator<Item = &ElementId> {
         self.event_targets_of_kind(DocumentEventKind::DragStarted)
     }
@@ -645,6 +715,272 @@ impl DocumentOutput {
     }
 }
 
+/// App-facing interaction state collected for one document update frame.
+///
+/// This is an egui-free summary facade over [`DocumentOutput`]. It keeps the
+/// rendering output and the app's command/event projection model connected
+/// without requiring callers to know which lower-level field owns hit testing,
+/// focus, drag, selection, or hook dispatch data.
+#[derive(Clone, Copy, Debug)]
+pub struct DocumentInteractionState<'a> {
+    output: &'a DocumentOutput,
+}
+
+impl<'a> DocumentInteractionState<'a> {
+    /// Returns the complete document output this interaction state summarizes.
+    pub fn output(self) -> &'a DocumentOutput {
+        self.output
+    }
+
+    /// Returns the element currently under the pointer, when any.
+    pub fn hit_target(self) -> Option<&'a ElementId> {
+        self.output.hit_id()
+    }
+
+    /// Returns true when the pointer hit the supplied element.
+    pub fn hit_is(self, target: &str) -> bool {
+        self.output.hit_is(target)
+    }
+
+    /// Returns the first focused element, when any.
+    pub fn focused_target(self) -> Option<&'a ElementId> {
+        self.output.focused_target()
+    }
+
+    /// Returns true when the supplied element is the focused target.
+    pub fn focused_target_is(self, target: &str) -> bool {
+        self.output.focused_target_is(target)
+    }
+
+    /// Returns the active pointer drag, when one is in progress.
+    pub fn active_drag(self) -> Option<&'a DocumentDrag> {
+        self.output.active_drag()
+    }
+
+    /// Returns the completed pointer drag for this frame, when one ended.
+    pub fn completed_drag(self) -> Option<&'a DocumentDrag> {
+        self.output.completed_drag()
+    }
+
+    /// Returns the current text selection, when text selection is active or retained.
+    pub fn text_selection(self) -> Option<&'a DocumentTextSelection> {
+        self.output.text_selection()
+    }
+
+    /// Returns true when the frame has a non-empty text selection.
+    pub fn has_text_selection(self) -> bool {
+        self.output.has_text_selection()
+    }
+
+    /// Returns the selected text when the owning element permits copy.
+    pub fn selected_text(self) -> Option<String> {
+        self.output.selected_text()
+    }
+
+    /// Returns resolved document events in dispatch order.
+    pub fn events(self) -> &'a [DocumentEvent] {
+        &self.output.events
+    }
+
+    /// Returns the first resolved document event, when any.
+    pub fn first_event(self) -> Option<&'a DocumentEvent> {
+        self.output.first_event()
+    }
+
+    /// Iterates resolved events for one element.
+    pub fn events_for(self, target: &'a str) -> impl Iterator<Item = &'a DocumentEvent> + 'a {
+        self.output.events_for(target)
+    }
+
+    /// Returns the first resolved event for one element, when any.
+    pub fn first_event_for(self, target: &str) -> Option<&'a DocumentEvent> {
+        self.output.first_event_for(target)
+    }
+
+    /// Iterates resolved events of one kind.
+    pub fn events_of_kind(
+        self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = &'a DocumentEvent> + 'a {
+        self.output.events_of_kind(kind)
+    }
+
+    /// Returns the first resolved event of one kind, when any.
+    pub fn first_event_of_kind(self, kind: DocumentEventKind) -> Option<&'a DocumentEvent> {
+        self.output.first_event_of_kind(kind)
+    }
+
+    /// Iterates resolved events matching an authored behavior intent.
+    pub fn events_for_intent(
+        self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a DocumentEvent> + 'a {
+        self.output.events_for_intent(intent)
+    }
+
+    /// Returns the first resolved event matching an authored behavior intent.
+    pub fn first_event_for_intent(self, intent: ElementBehaviorEvent) -> Option<&'a DocumentEvent> {
+        self.output.first_event_for_intent(intent)
+    }
+
+    /// Iterates resolved events for one element and authored behavior intent.
+    pub fn events_for_target_intent(
+        self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a DocumentEvent> + 'a {
+        self.output.events_for_target_intent(target, intent)
+    }
+
+    /// Returns the first event for one element and authored behavior intent.
+    pub fn first_event_for_target_intent(
+        self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&'a DocumentEvent> {
+        self.output.first_event_for_target_intent(target, intent)
+    }
+
+    /// Iterates event target ids of one resolved event kind.
+    pub fn event_targets_of_kind(
+        self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = &'a ElementId> + 'a {
+        self.output.event_targets_of_kind(kind)
+    }
+
+    /// Returns the first target id for one resolved event kind.
+    pub fn first_event_target(self, kind: DocumentEventKind) -> Option<&'a ElementId> {
+        self.output.first_event_target(kind)
+    }
+
+    /// Iterates event target ids matching an authored behavior intent.
+    pub fn event_targets_for_intent(
+        self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a ElementId> + 'a {
+        self.output.event_targets_for_intent(intent)
+    }
+
+    /// Returns the first target id matching an authored behavior intent.
+    pub fn first_event_target_for_intent(
+        self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&'a ElementId> {
+        self.output.first_event_target_for_intent(intent)
+    }
+
+    /// Returns true when one event of the supplied kind targeted the element.
+    pub fn has_event(self, target: &str, kind: DocumentEventKind) -> bool {
+        self.output.has_event(target, kind)
+    }
+
+    /// Returns true when the frame emitted an event of the supplied kind.
+    pub fn has_event_kind(self, kind: DocumentEventKind) -> bool {
+        self.output.has_event_kind(kind)
+    }
+
+    /// Returns true when the frame emitted an event for the authored behavior intent.
+    pub fn has_event_intent(self, intent: ElementBehaviorEvent) -> bool {
+        self.output.has_event_intent(intent)
+    }
+
+    /// Returns true when one element emitted an event for the authored intent.
+    pub fn has_event_for_intent(self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.output.has_event_for_intent(target, intent)
+    }
+
+    /// Iterates authored commands produced by behavior hooks.
+    pub fn commands(self) -> DocumentCommandIter<'a> {
+        self.output.command_events()
+    }
+
+    /// Returns the first authored command produced by behavior hooks.
+    pub fn first_command(self) -> Option<DocumentCommandRef<'a>> {
+        self.output.first_command()
+    }
+
+    /// Iterates authored commands produced by one resolved event kind.
+    pub fn commands_of_kind(
+        self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
+        self.output.commands_of_kind(kind)
+    }
+
+    /// Returns the first authored command produced by one resolved event kind.
+    pub fn first_command_of_kind(self, kind: DocumentEventKind) -> Option<DocumentCommandRef<'a>> {
+        self.output.first_command_of_kind(kind)
+    }
+
+    /// Iterates authored commands matching one behavior intent.
+    pub fn commands_for_intent(
+        self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
+        self.output.commands_for_intent(intent)
+    }
+
+    /// Returns the first authored command matching one behavior intent.
+    pub fn first_command_for_intent(
+        self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<DocumentCommandRef<'a>> {
+        self.output.first_command_for_intent(intent)
+    }
+
+    /// Iterates authored commands produced by one element.
+    pub fn commands_for(
+        self,
+        target: &'a str,
+    ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
+        self.output.commands_for(target)
+    }
+
+    /// Returns the first authored command produced by one element.
+    pub fn first_command_for(self, target: &'a str) -> Option<DocumentCommandRef<'a>> {
+        self.output.first_command_for(target)
+    }
+
+    /// Iterates authored commands for one element and behavior intent.
+    pub fn commands_for_target_intent(
+        self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
+        self.output.commands_for_target_intent(target, intent)
+    }
+
+    /// Returns the first authored command for one element and behavior intent.
+    pub fn first_command_for_target_intent(
+        self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<DocumentCommandRef<'a>> {
+        self.output.first_command_for_target_intent(target, intent)
+    }
+
+    /// Returns true when the supplied element emitted the authored command.
+    pub fn has_command(self, target: &str, command: &str) -> bool {
+        self.output.has_command(target, command)
+    }
+
+    /// Returns true when the supplied element emitted the command for one event kind.
+    pub fn has_command_kind(self, target: &str, kind: DocumentEventKind, command: &str) -> bool {
+        self.output.has_command_kind(target, kind, command)
+    }
+
+    /// Returns true when the supplied element emitted the command through an authored intent.
+    pub fn has_command_intent(
+        self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        command: &str,
+    ) -> bool {
+        self.output.has_command_intent(target, intent, command)
+    }
+}
+
 fn focused_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
     if element.focused {
         return Some(element);
@@ -758,6 +1094,21 @@ impl DocumentCommand {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 
+    /// Returns true when this command was emitted by focus intent.
+    pub fn is_focus(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Returns true when this command was emitted by blur intent.
+    pub fn is_blur(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Returns true when this command was emitted by text-selection intent.
+    pub fn is_select(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Select)
+    }
+
     /// Returns true when this command was emitted by key-down intent.
     pub fn is_key_down(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::KeyDown)
@@ -863,6 +1214,21 @@ impl<'a> DocumentCommandRef<'a> {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 
+    /// Returns true when this command was emitted by focus intent.
+    pub fn is_focus(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Returns true when this command was emitted by blur intent.
+    pub fn is_blur(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Returns true when this command was emitted by text-selection intent.
+    pub fn is_select(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Select)
+    }
+
     /// Returns true when this command was emitted by key-down intent.
     pub fn is_key_down(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::KeyDown)
@@ -951,6 +1317,18 @@ impl<Action> DocumentCommandBinding<Action> {
 
     pub fn key_up(command: impl Into<String>, action: Action) -> Self {
         Self::on(ElementBehaviorEvent::KeyUp, command, action)
+    }
+
+    pub fn focus(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::Focus, command, action)
+    }
+
+    pub fn blur(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::Blur, command, action)
+    }
+
+    pub fn select(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::Select, command, action)
     }
 
     pub fn event(&self) -> Option<ElementBehaviorEvent> {
@@ -1255,6 +1633,51 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_focus(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_focus(command, action);
+        self
+    }
+
+    pub fn bind_focus_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_focus_if(command, action, present);
+        self
+    }
+
+    pub fn bind_blur(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_blur(command, action);
+        self
+    }
+
+    pub fn bind_blur_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_blur_if(command, action, present);
+        self
+    }
+
+    pub fn bind_select(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_select(command, action);
+        self
+    }
+
+    pub fn bind_select_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_select_if(command, action, present);
+        self
+    }
+
     pub fn bind_key_down(mut self, command: impl Into<String>, action: Action) -> Self {
         self.push_key_down(command, action);
         self
@@ -1518,6 +1941,36 @@ impl<Action> DocumentCommandRegistry<Action> {
     pub fn push_scroll_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
         if present {
             self.push_scroll(command, action);
+        }
+    }
+
+    pub fn push_focus(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::Focus, command, action);
+    }
+
+    pub fn push_focus_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_focus(command, action);
+        }
+    }
+
+    pub fn push_blur(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::Blur, command, action);
+    }
+
+    pub fn push_blur_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_blur(command, action);
+        }
+    }
+
+    pub fn push_select(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::Select, command, action);
+    }
+
+    pub fn push_select_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_select(command, action);
         }
     }
 
@@ -1917,6 +2370,48 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.action_values_for_intent(output, ElementBehaviorEvent::Scroll)
     }
 
+    pub fn focus_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::Focus)
+    }
+
+    pub fn focus_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::Focus)
+    }
+
+    pub fn blur_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::Blur)
+    }
+
+    pub fn blur_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::Blur)
+    }
+
+    pub fn select_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::Select)
+    }
+
+    pub fn select_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::Select)
+    }
+
     pub fn key_down_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
@@ -2133,6 +2628,63 @@ impl<Action> DocumentCommandRegistry<Action> {
         Action: Clone,
     {
         self.scroll_action_values(output).cloned().collect()
+    }
+
+    pub fn collect_focus_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.focus_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_focus_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.focus_action_values(output).cloned().collect()
+    }
+
+    pub fn collect_blur_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.blur_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_blur_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.blur_action_values(output).cloned().collect()
+    }
+
+    pub fn collect_select_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.select_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_select_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.select_action_values(output).cloned().collect()
     }
 
     pub fn collect_key_down_actions(
@@ -2459,6 +3011,39 @@ impl<Action> DocumentCommandRegistry<Action> {
         Handler: FnMut(DocumentCommandActionRef<'a, Action>),
     {
         self.dispatch_intent(output, ElementBehaviorEvent::Scroll, handler)
+    }
+
+    pub fn dispatch_focus<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::Focus, handler)
+    }
+
+    pub fn dispatch_blur<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::Blur, handler)
+    }
+
+    pub fn dispatch_select<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::Select, handler)
     }
 
     pub fn dispatch_key_down<'a, Handler>(
@@ -2906,6 +3491,21 @@ impl DocumentEvent {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 
+    /// Returns true when this event is focus intent.
+    pub fn is_focus(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Focus)
+    }
+
+    /// Returns true when this event is blur intent.
+    pub fn is_blur(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Blur)
+    }
+
+    /// Returns true when this event is text-selection intent.
+    pub fn is_select(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Select)
+    }
+
     /// Returns true when this event is key-down intent.
     pub fn is_key_down(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::KeyDown)
@@ -2951,6 +3551,26 @@ impl DocumentEvent {
         Self::new(target, DocumentEventKind::Scrolled(axis))
     }
 
+    pub fn focused(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::Focused)
+    }
+
+    pub fn blurred(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::Blurred)
+    }
+
+    pub fn selection_started(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::SelectionStarted)
+    }
+
+    pub fn selection_changed(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::SelectionChanged)
+    }
+
+    pub fn selection_ended(target: impl Into<ElementId>) -> Self {
+        Self::new(target, DocumentEventKind::SelectionEnded)
+    }
+
     pub fn drag_started(target: impl Into<ElementId>) -> Self {
         Self::new(target, DocumentEventKind::DragStarted)
     }
@@ -2984,6 +3604,11 @@ pub enum DocumentEventKind {
     DragMoved,
     DragEnded,
     Scrolled(ScrollAxis),
+    Focused,
+    Blurred,
+    SelectionStarted,
+    SelectionChanged,
+    SelectionEnded,
     KeyDown(KeyInput),
     KeyUp(KeyInput),
 }

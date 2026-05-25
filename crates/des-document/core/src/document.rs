@@ -2793,6 +2793,30 @@ impl<'a> ElementBuilder<'a> {
         self.on_if(ElementBehaviorEvent::Scroll, command, present)
     }
 
+    pub fn on_focus(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Focus, command)
+    }
+
+    pub fn on_focus_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Focus, command, present)
+    }
+
+    pub fn on_blur(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Blur, command)
+    }
+
+    pub fn on_blur_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Blur, command, present)
+    }
+
+    pub fn on_select(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Select, command)
+    }
+
+    pub fn on_select_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Select, command, present)
+    }
+
     pub fn on_key_down(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::KeyDown, command)
     }
