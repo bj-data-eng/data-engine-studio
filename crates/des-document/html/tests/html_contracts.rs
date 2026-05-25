@@ -369,6 +369,40 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
 }
 
 #[test]
+fn html_prelude_exposes_browser_document_authoring_surface() {
+    use des_html::prelude::*;
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+    }
+
+    let bundle = HtmlStylesheet::parse_fragment(
+        r#"<button id="run" class="primary" on:click="project.run">Run</button>"#,
+        r#".primary { width: 96px; height: 32px; }"#,
+    )
+    .expect("HTML and CSS should compile together from the prelude");
+    assert!(bundle.html().is_clean());
+    assert_eq!(bundle.html().children()[0].id.as_deref(), Some("run"));
+    assert_eq!(bundle.stylesheet().rule_count(), 1);
+
+    let registry = DocumentCommandRegistry::new().bind("project.run", HtmlAction::Run);
+    let mut view = bundle
+        .into_view(Size::new(320.0, 180.0))
+        .expect("prelude-authored HTML should create a document view");
+    let frame: DocumentActionFrame<HtmlAction> = view.update_with_input_actions(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &registry,
+    );
+    let run = frame.output.snapshot().find("run").unwrap();
+
+    assert_eq!(run.rect().size.width, 96.0);
+    assert_eq!(frame.actions.len(), 1);
+    assert_eq!(frame.actions[0].action, HtmlAction::Run);
+    assert_eq!(frame.actions[0].target, ElementId::new("run"));
+}
+
+#[test]
 fn html_document_and_stylesheet_load_from_files() {
     let html_fixture = TempHtmlPath::new("des-html-document-load", "html");
     let css_fixture = TempHtmlPath::new("des-html-stylesheet-load", "css");

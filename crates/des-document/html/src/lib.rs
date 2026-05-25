@@ -20,6 +20,21 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+/// Common app-facing imports for browser-authored document UIs.
+///
+/// This prelude lets application code parse browser-grade HTML/CSS, create a
+/// retained document view, project state, and collect typed Rust actions through
+/// one intentional front door. It re-exports the `des-document` authoring
+/// prelude because parsed HTML emits the same egui-free document contracts as
+/// Rust-authored widgets.
+pub mod prelude {
+    pub use crate::{
+        HtmlBehaviorHook, HtmlDiagnostic, HtmlDiagnosticCode, HtmlDocument, HtmlError, HtmlFile,
+        HtmlNode, HtmlResult, HtmlSet, HtmlStylesheet, ReloadStatus,
+    };
+    pub use des_document::prelude::*;
+}
+
 /// Convenient result type for HTML operations.
 pub type HtmlResult<T> = Result<T, HtmlError>;
 
@@ -111,6 +126,26 @@ impl HtmlDocument {
         })
     }
 
+    /// Returns the top-level parsed HTML nodes in source order.
+    pub fn children(&self) -> &[HtmlNode] {
+        &self.children
+    }
+
+    /// Returns non-fatal diagnostics collected while mapping HTML semantics.
+    pub fn diagnostics(&self) -> &[HtmlDiagnostic] {
+        &self.diagnostics
+    }
+
+    /// Returns true when this parsed document has no authoring diagnostics.
+    pub fn is_clean(&self) -> bool {
+        self.diagnostics.is_empty()
+    }
+
+    /// Returns true when this parsed document has authoring diagnostics.
+    pub fn has_diagnostics(&self) -> bool {
+        !self.is_clean()
+    }
+
     /// Creates a retained document from this HTML tree.
     pub fn to_document(&self, viewport: Size) -> HtmlResult<Document> {
         Ok(Document::build(viewport, |document| {
@@ -174,6 +209,16 @@ impl HtmlStylesheet {
     /// Pairs a parsed HTML tree with a parsed document stylesheet.
     pub fn new(html: HtmlDocument, stylesheet: StyleSheet) -> Self {
         Self { html, stylesheet }
+    }
+
+    /// Returns the browser-parsed HTML document or fragment.
+    pub fn html(&self) -> &HtmlDocument {
+        &self.html
+    }
+
+    /// Returns the parsed document stylesheet.
+    pub fn stylesheet(&self) -> &StyleSheet {
+        &self.stylesheet
     }
 
     /// Parses an HTML document and CSS stylesheet into typed document inputs.
