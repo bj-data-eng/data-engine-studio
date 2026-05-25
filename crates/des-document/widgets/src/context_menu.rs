@@ -1,6 +1,6 @@
 use des_document::{
-    DocumentBuilder, DocumentWidget, Element, ElementId, ElementSpec, FloatingPlacement,
-    FloatingShift, Insets, Length, Point, Style, StyleSelector, StyleSheet,
+    DocumentBuilder, DocumentWidget, ElementId, ElementSpec, FloatingPlacement, FloatingShift,
+    Insets, Length, Point, Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -164,22 +164,21 @@ impl ContextMenu {
     }
 
     pub fn push_styles(&self, stylesheet: &mut StyleSheet) {
-        if let (Some(selector), Some(style)) = (self.anchor_selector(), self.anchor_style()) {
-            stylesheet.push_rule(selector, style);
+        if let Some(style) = self.anchor_style() {
+            let anchor_id = self.anchor_id();
+            stylesheet.push_id(anchor_id.as_str(), style);
         }
-        stylesheet.push_rule(self.position_selector(), self.position_style());
+        stylesheet.push_id(self.id.as_str(), self.position_style());
     }
 
     pub fn render(&self, ui: &mut DocumentBuilder) {
         if matches!(self.anchor, ContextMenuAnchor::Point(_)) {
             let anchor_id = self.anchor_id();
-            ui.element(anchor_id.as_str(), ElementSpec::new(Element::Div), |_| {});
+            ui.element(anchor_id.as_str(), ElementSpec::div(), |_| {});
         }
         ui.element(
             self.id.as_str(),
-            ElementSpec::new(Element::Div)
-                .class(CONTEXT_MENU_CLASS)
-                .interactive(),
+            ElementSpec::div().class(CONTEXT_MENU_CLASS).interactive(),
             |ui| {
                 for entry in &self.entries {
                     match entry {
@@ -187,7 +186,7 @@ impl ContextMenu {
                         ContextMenuEntry::Separator { id } => {
                             ui.element(
                                 id.as_str(),
-                                ElementSpec::new(Element::Div).class(CONTEXT_MENU_SEPARATOR_CLASS),
+                                ElementSpec::div().class(CONTEXT_MENU_SEPARATOR_CLASS),
                                 |_| {},
                             );
                         }
@@ -242,7 +241,7 @@ impl ContextMenuItem {
     }
 
     fn render(&self, ui: &mut DocumentBuilder) {
-        let mut spec = ElementSpec::new(Element::Button)
+        let mut spec = ElementSpec::button()
             .class(CONTEXT_MENU_ITEM_CLASS)
             .selected(self.selected)
             .disabled(self.disabled);
@@ -255,7 +254,7 @@ impl ContextMenuItem {
         ui.element(self.id.as_str(), spec, |ui| {
             ui.text_element(
                 format!("{}-label", self.id.as_str()),
-                ElementSpec::new(Element::Text)
+                ElementSpec::text()
                     .class(CONTEXT_MENU_LABEL_CLASS)
                     .selected(self.selected)
                     .disabled(self.disabled),

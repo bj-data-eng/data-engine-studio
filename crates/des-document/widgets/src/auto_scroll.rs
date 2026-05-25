@@ -248,29 +248,24 @@ fn scroll_position(chrome: &ScrollChrome) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_document::{
-        Document, Element, ElementSpec, Overflow, Size, Style, StyleSelector, StyleSheet,
-    };
+    use des_document::{Document, ElementSpec, Overflow, Size, Style, StyleSheet};
 
     fn vertical_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
         let mut engine = DocumentEngine::default();
         let stylesheet = StyleSheet::new()
-            .rule(
-                StyleSelector::id("scroll-parent"),
+            .id(
+                "scroll-parent",
                 Style::default()
                     .size(120.0, 80.0)
                     .overflow_y(Overflow::Scroll),
             )
-            .rule(
-                StyleSelector::class("row"),
-                Style::default().size(100.0, 32.0),
-            );
+            .class("row", Style::default().size(100.0, 32.0));
         let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
-            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
+            ui.element("scroll-parent", ElementSpec::div(), |ui| {
                 for index in 0..8 {
                     ui.element(
                         format!("row-{index}"),
-                        ElementSpec::new(Element::Div).class("row"),
+                        ElementSpec::div().class("row"),
                         |_| {},
                     );
                 }
@@ -283,19 +278,16 @@ mod tests {
     fn horizontal_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
         let mut engine = DocumentEngine::default();
         let stylesheet = StyleSheet::new()
-            .rule(
-                StyleSelector::id("scroll-parent"),
+            .id(
+                "scroll-parent",
                 Style::default()
                     .size(120.0, 80.0)
                     .overflow_x(Overflow::Scroll),
             )
-            .rule(
-                StyleSelector::id("wide-row"),
-                Style::default().size(240.0, 60.0),
-            );
+            .id("wide-row", Style::default().size(240.0, 60.0));
         let mut document = Document::build(Size::new(160.0, 120.0), |ui| {
-            ui.element("scroll-parent", ElementSpec::new(Element::Div), |ui| {
-                ui.element("wide-row", ElementSpec::new(Element::Div), |_| {});
+            ui.element("scroll-parent", ElementSpec::div(), |ui| {
+                ui.element("wide-row", ElementSpec::div(), |_| {});
             });
         });
         let output = engine.update(&mut document, &stylesheet);
