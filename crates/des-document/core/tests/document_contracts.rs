@@ -72,7 +72,7 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     );
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run")
-            .on_events([
+            .behavior_hooks([
                 (ElementBehaviorEvent::Click, "run-query"),
                 (ElementBehaviorEvent::ContextMenu, "open-query-menu"),
             ])

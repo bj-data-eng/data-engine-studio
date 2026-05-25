@@ -471,6 +471,33 @@ impl ElementBehaviorHook {
     }
 }
 
+impl<C> From<(ElementBehaviorEvent, C)> for ElementBehaviorHook
+where
+    C: Into<String>,
+{
+    fn from((event, command): (ElementBehaviorEvent, C)) -> Self {
+        Self::on(event, command)
+    }
+}
+
+impl<C> From<(&str, C)> for ElementBehaviorHook
+where
+    C: Into<String>,
+{
+    fn from((event, command): (&str, C)) -> Self {
+        Self::new(event, command)
+    }
+}
+
+impl<C> From<(String, C)> for ElementBehaviorHook
+where
+    C: Into<String>,
+{
+    fn from((event, command): (String, C)) -> Self {
+        Self::new(event, command)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ElementBehaviorEvent {
     Click,
