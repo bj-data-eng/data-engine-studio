@@ -85,7 +85,8 @@ mod view;
 
 pub use css::CssParseError;
 pub use document::{
-    Document, DocumentBuilder, DocumentError, DocumentResult, DocumentWidget, ElementBuilder,
+    Document, DocumentActionWidget, DocumentBuilder, DocumentError, DocumentResult, DocumentWidget,
+    ElementBuilder,
 };
 pub use element::{
     ClassName, Color, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, ElementSpec,
@@ -142,11 +143,11 @@ pub mod prelude {
         AlignContent, AlignItems, AlignSelf, Anchor, AnchorPlacement, BorderStyle, ChangeSet,
         ClassName, Color, ComplexSelector, CompoundSelector, ComputedStyle, ContainerQuery,
         CornerRadii, CssParseError, Direction, Display, Document, DocumentActionFrame,
-        DocumentBuilder, DocumentCommand, DocumentCommandAction, DocumentCommandActionRef,
-        DocumentCommandBinding, DocumentCommandDispatchReport, DocumentCommandRef,
-        DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError, DocumentEvent,
-        DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics, DocumentOutput,
-        DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
+        DocumentActionWidget, DocumentBuilder, DocumentCommand, DocumentCommandAction,
+        DocumentCommandActionRef, DocumentCommandBinding, DocumentCommandDispatchReport,
+        DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
+        DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics,
+        DocumentOutput, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
         DocumentQueryError, DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView,
         DocumentViewBuilder, DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent,
         ElementBehaviorHook, ElementBuilder, ElementId, ElementProjection, ElementSnapshot,

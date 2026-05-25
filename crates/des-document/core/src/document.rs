@@ -8,7 +8,7 @@ use crate::geometry::{
 };
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
 use crate::projection::DocumentProjection;
-use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
+use crate::state::{DocumentCommandRegistry, ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
     ChildPosition, ComputedStyle, StyleMatchContext, StyleResolutionContext, StyleSheet,
     classify_computed_style_change, resolve_style_with_position,
@@ -1353,6 +1353,47 @@ pub trait DocumentWidget {
         stylesheet: StyleSheet,
     ) -> DocumentResult<crate::DocumentView> {
         crate::DocumentView::try_build_widget(viewport, stylesheet, self)
+    }
+}
+
+pub trait DocumentActionWidget<Action>: DocumentWidget {
+    fn push_commands(&self, registry: &mut DocumentCommandRegistry<Action>);
+
+    fn command_registry(&self) -> DocumentCommandRegistry<Action>
+    where
+        Self: Sized,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_commands(&mut registry);
+        registry
+    }
+}
+
+impl<Action> DocumentCommandRegistry<Action> {
+    pub fn bind_widget(mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) -> Self {
+        self.push_widget_commands(widget);
+        self
+    }
+
+    pub fn bind_widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> Self
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.push_widget_commands_many(widgets);
+        self
+    }
+
+    pub fn push_widget_commands(&mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) {
+        widget.push_commands(self);
+    }
+
+    pub fn push_widget_commands_many<'a, W>(&mut self, widgets: impl IntoIterator<Item = &'a W>)
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        for widget in widgets {
+            self.push_widget_commands(widget);
+        }
     }
 }
 

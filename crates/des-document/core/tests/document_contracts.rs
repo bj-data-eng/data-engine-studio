@@ -1,13 +1,13 @@
 use des_document::{
-    AlignItems, Color, CornerRadii, Direction, Document, DocumentBuilder, DocumentCommandAction,
-    DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
-    DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentView, DocumentWidget,
-    Element, ElementBehaviorEvent, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
-    JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis,
-    Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
-    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
-    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget, DocumentBuilder,
+    DocumentCommandAction, DocumentCommandRegistry, DocumentEngine, DocumentEvent,
+    DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection, DocumentProjectionOperation,
+    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId, ElementSpec,
+    ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length,
+    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
+    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
+    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1764,6 +1764,94 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(status.text(), Some("Ready".to_owned()));
     assert!(status.has_class("is-ready"));
     assert!(widget_frame.contains_action(&AppAction::Toggle));
+}
+
+#[test]
+fn document_widgets_can_declare_typed_command_bindings() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum WidgetAction {
+        Toggle,
+        Context,
+        Close,
+    }
+
+    struct ToggleWidget;
+    struct CloseWidget;
+
+    impl DocumentWidget for ToggleWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("toggle")
+                .command("toggle")
+                .on_context_menu("toggle.context")
+                .text("Toggle");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_id("toggle", Style::default().size(96.0, 32.0));
+        }
+    }
+
+    impl DocumentActionWidget<WidgetAction> for ToggleWidget {
+        fn push_commands(&self, registry: &mut DocumentCommandRegistry<WidgetAction>) {
+            registry.push_click("toggle", WidgetAction::Toggle);
+            registry.push_context_menu("toggle.context", WidgetAction::Context);
+        }
+    }
+
+    impl DocumentWidget for CloseWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("close").command("close").text("Close");
+        }
+    }
+
+    impl DocumentActionWidget<WidgetAction> for CloseWidget {
+        fn push_commands(&self, registry: &mut DocumentCommandRegistry<WidgetAction>) {
+            registry.push_click("close", WidgetAction::Close);
+        }
+    }
+
+    let toggle = ToggleWidget;
+    let close = CloseWidget;
+    let registry = DocumentCommandRegistry::new()
+        .bind_widget(&toggle)
+        .bind_widget(&close);
+    let mut pushed = DocumentCommandRegistry::new();
+    pushed.push_widget_commands(&toggle);
+    pushed.push_widget_commands(&close);
+    let mut view = DocumentView::compose(Size::new(320.0, 180.0)).build_with_widgets(
+        [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
+        |ui| {
+            ui.widget(&toggle);
+            ui.widget(&close);
+        },
+    );
+
+    let click_frame = view.update_with_input_actions(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &registry,
+    );
+    let context_frame = view.update_with_input_actions(
+        DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+        &pushed,
+    );
+    let toggle_registry = toggle.command_registry();
+
+    assert_eq!(registry.bindings().len(), 3);
+    assert_eq!(pushed.bindings(), registry.bindings());
+    assert_eq!(toggle_registry.bindings().len(), 2);
+    assert!(click_frame.contains_action(&WidgetAction::Toggle));
+    assert!(!click_frame.contains_action(&WidgetAction::Close));
+    assert!(context_frame.contains_action(&WidgetAction::Context));
+    assert_eq!(
+        click_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .rect()
+            .size,
+        Size::new(96.0, 32.0)
+    );
 }
 
 #[test]
