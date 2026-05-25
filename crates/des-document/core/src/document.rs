@@ -1,6 +1,6 @@
 use crate::element::{
-    ClassName, DocumentNode, Element, ElementId, ElementSpec, Glyph, VisualCloneOptions,
-    VisualElementClone,
+    ClassName, DocumentNode, Element, ElementBehaviorEvent, ElementId, ElementSpec, Glyph,
+    VisualCloneOptions, VisualElementClone,
 };
 use crate::geometry::{
     AlignContent, AlignItems, ClipRect, FlexDirection, FlexWrap, Insets, JustifyContent, Length,
@@ -1277,6 +1277,51 @@ impl ElementBuilder<'_> {
     pub fn behavior_hook(mut self, event: impl Into<String>, command: impl Into<String>) -> Self {
         self.spec = self.spec.behavior_hook(event, command);
         self
+    }
+
+    pub fn on(mut self, event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
+        self.spec = self.spec.on(event, command);
+        self
+    }
+
+    pub fn on_click(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Click, command)
+    }
+
+    pub fn on_context_menu(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::ContextMenu, command)
+    }
+
+    pub fn on_pointer_enter(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerEnter, command)
+    }
+
+    pub fn on_pointer_leave(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerLeave, command)
+    }
+
+    pub fn on_pointer_down(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerDown, command)
+    }
+
+    pub fn on_pointer_up(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerUp, command)
+    }
+
+    pub fn on_drag_start(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::DragStart, command)
+    }
+
+    pub fn on_drag(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Drag, command)
+    }
+
+    pub fn on_drag_end(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::DragEnd, command)
+    }
+
+    pub fn on_scroll(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Scroll, command)
     }
 
     pub fn interactive(mut self) -> Self {

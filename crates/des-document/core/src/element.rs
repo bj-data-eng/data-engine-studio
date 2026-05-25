@@ -1,5 +1,5 @@
 use crate::geometry::Point;
-use crate::state::ResolvedElement;
+use crate::state::{DocumentEventKind, ResolvedElement};
 use crate::table::{TableCellSpec, TableSpec};
 use crate::text::TextContent;
 use std::collections::BTreeMap;
@@ -209,6 +209,53 @@ impl ElementSpec {
         self
     }
 
+    pub fn on(mut self, event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
+        self.behavior_hooks
+            .push(ElementBehaviorHook::on(event, command));
+        self.interactive = true;
+        self
+    }
+
+    pub fn on_click(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Click, command)
+    }
+
+    pub fn on_context_menu(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::ContextMenu, command)
+    }
+
+    pub fn on_pointer_enter(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerEnter, command)
+    }
+
+    pub fn on_pointer_leave(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerLeave, command)
+    }
+
+    pub fn on_pointer_down(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerDown, command)
+    }
+
+    pub fn on_pointer_up(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::PointerUp, command)
+    }
+
+    pub fn on_drag_start(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::DragStart, command)
+    }
+
+    pub fn on_drag(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Drag, command)
+    }
+
+    pub fn on_drag_end(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::DragEnd, command)
+    }
+
+    pub fn on_scroll(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::Scroll, command)
+    }
+
     pub fn interactive(mut self) -> Self {
         self.interactive = true;
         self
@@ -290,6 +337,78 @@ impl ElementBehaviorHook {
             event: event.into(),
             command: command.into(),
         }
+    }
+
+    pub fn on(event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
+        Self::new(event.as_str(), command)
+    }
+
+    pub fn matches_document_event(&self, event: &DocumentEventKind) -> bool {
+        ElementBehaviorEvent::from_name(&self.event)
+            .is_some_and(|hook_event| hook_event.matches_document_event(event))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ElementBehaviorEvent {
+    Click,
+    ContextMenu,
+    PointerEnter,
+    PointerLeave,
+    PointerDown,
+    PointerUp,
+    DragStart,
+    Drag,
+    DragEnd,
+    Scroll,
+}
+
+impl ElementBehaviorEvent {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Click => "click",
+            Self::ContextMenu => "contextmenu",
+            Self::PointerEnter => "pointerenter",
+            Self::PointerLeave => "pointerleave",
+            Self::PointerDown => "pointerdown",
+            Self::PointerUp => "pointerup",
+            Self::DragStart => "dragstart",
+            Self::Drag => "drag",
+            Self::DragEnd => "dragend",
+            Self::Scroll => "scroll",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "click" => Some(Self::Click),
+            "contextmenu" => Some(Self::ContextMenu),
+            "pointerenter" => Some(Self::PointerEnter),
+            "pointerleave" | "pointerout" => Some(Self::PointerLeave),
+            "pointerdown" => Some(Self::PointerDown),
+            "pointerup" => Some(Self::PointerUp),
+            "dragstart" => Some(Self::DragStart),
+            "drag" => Some(Self::Drag),
+            "dragend" => Some(Self::DragEnd),
+            "scroll" | "scrollx" | "scroll-x" | "scrolly" | "scroll-y" => Some(Self::Scroll),
+            _ => None,
+        }
+    }
+
+    pub fn matches_document_event(self, event: &DocumentEventKind) -> bool {
+        matches!(
+            (self, event),
+            (Self::Click, DocumentEventKind::Clicked)
+                | (Self::ContextMenu, DocumentEventKind::ContextRequested)
+                | (Self::PointerEnter, DocumentEventKind::PointerEntered)
+                | (Self::PointerLeave, DocumentEventKind::PointerExited)
+                | (Self::PointerDown, DocumentEventKind::Pressed)
+                | (Self::PointerUp, DocumentEventKind::Released)
+                | (Self::DragStart, DocumentEventKind::DragStarted)
+                | (Self::Drag, DocumentEventKind::DragMoved)
+                | (Self::DragEnd, DocumentEventKind::DragEnded)
+                | (Self::Scroll, DocumentEventKind::Scrolled(_))
+        )
     }
 }
 

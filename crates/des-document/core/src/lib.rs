@@ -25,8 +25,8 @@ mod view;
 pub use css::CssParseError;
 pub use document::{Document, DocumentBuilder, DocumentError, DocumentResult, ElementBuilder};
 pub use element::{
-    ClassName, Color, Element, ElementBehaviorHook, ElementId, ElementSpec, ElementStateSelector,
-    Glyph, VisualCloneOptions, VisualElementClone,
+    ClassName, Color, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, ElementSpec,
+    ElementStateSelector, Glyph, VisualCloneOptions, VisualElementClone,
 };
 pub use engine::DocumentEngine;
 pub use geometry::{
@@ -35,9 +35,9 @@ pub use geometry::{
 };
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
-    ChangeSet, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput, DocumentMetrics,
-    DocumentOutput, DocumentTextSelection, ElementState, PointerInput, ResolvedElement,
-    ResolvedFloating, ScrollChrome, TextSelectionGranularity,
+    ChangeSet, DocumentCommand, DocumentDrag, DocumentEvent, DocumentEventKind, DocumentInput,
+    DocumentMetrics, DocumentOutput, DocumentTextSelection, ElementState, PointerInput,
+    ResolvedElement, ResolvedFloating, ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
     Anchor, AnchorPlacement, BorderStyle, ComplexSelector, ComplexSelectorPart, CompoundSelector,

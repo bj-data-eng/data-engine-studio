@@ -68,6 +68,28 @@ fn document_view_groups_document_stylesheet_and_engine_update() {
 }
 
 #[test]
+fn document_output_exposes_commands_from_typed_behavior_hooks() {
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("run"),
+        Style::default()
+            .width(Length::Px(96.0))
+            .height(Length::Px(32.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").on_click("run-query").text("Run");
+    });
+
+    let output =
+        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let commands = output.commands();
+
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].target, ElementId::new("run"));
+    assert_eq!(commands[0].event, DocumentEventKind::Clicked);
+    assert_eq!(commands[0].command, "run-query");
+}
+
+#[test]
 fn document_builder_and_engine_update_are_front_door_api() {
     let mut document = Document::build(Size::new(320.0, 200.0), |document| {
         document.element(

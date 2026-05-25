@@ -260,12 +260,25 @@ fn html_stylesheet_can_create_ready_to_update_document_view() {
         .to_view(Size::new(320.0, 180.0))
         .expect("HTML bundle should create a document view");
 
-    let output = view.update();
+    let output = view.update_with_input(des_document::DocumentInput {
+        pointer: Some(des_document::PointerInput {
+            position: des_document::Point::new(8.0, 8.0),
+            primary_delta: des_document::Point::ZERO,
+            primary_down: true,
+            primary_pressed: false,
+            primary_clicked: true,
+            primary_click_count: 1,
+            secondary_clicked: false,
+            time_seconds: 0.0,
+        }),
+        scroll_delta: des_document::Point::ZERO,
+    });
     let run = output.snapshot().find("run").unwrap();
 
     assert_eq!(run.rect().size.width, 96.0);
     assert!(run.interactive());
     assert_eq!(run.behavior_hooks()[0].command, "run");
+    assert_eq!(output.commands()[0].command, "run");
 }
 
 #[test]

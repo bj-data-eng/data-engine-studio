@@ -91,6 +91,25 @@ impl DocumentOutput {
         DocumentSnapshot::new(&self.layout)
     }
 
+    pub fn commands(&self) -> Vec<DocumentCommand> {
+        let mut commands = Vec::new();
+        for event in &self.events {
+            let Some(element) = self.layout.find(event.target.as_str()) else {
+                continue;
+            };
+            for hook in &element.behavior_hooks {
+                if hook.matches_document_event(&event.kind) {
+                    commands.push(DocumentCommand {
+                        target: event.target.clone(),
+                        event: event.kind,
+                        command: hook.command.clone(),
+                    });
+                }
+            }
+        }
+        commands
+    }
+
     pub fn selected_text(&self) -> Option<String> {
         let selection = self.text_selection.as_ref()?;
         let frame = self.layout.find(selection.target.as_str())?;
@@ -100,6 +119,13 @@ impl DocumentOutput {
         let text = frame.text.as_ref()?.semantic_text();
         selection.selected_text_from(text)
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentCommand {
+    pub target: ElementId,
+    pub event: DocumentEventKind,
+    pub command: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
