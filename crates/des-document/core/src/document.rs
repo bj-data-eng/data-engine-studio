@@ -1360,9 +1360,7 @@ pub trait DocumentWidget {
 
     /// Pushes this widget's retained-state projection into a caller-owned batch.
     fn push_projection(&self, projection: &mut DocumentProjection) {
-        for (id, patch) in self.projection_patches() {
-            projection.push_patch(id, patch);
-        }
+        projection.patches(self.projection_patches());
     }
 
     /// Builds the stylesheet declared by this widget.

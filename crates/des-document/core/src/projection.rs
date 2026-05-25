@@ -108,6 +108,22 @@ impl DocumentProjection {
         }
     }
 
+    pub fn from_patch(
+        id: impl Into<ElementId>,
+        patch: impl Borrow<ElementProjectionPatch>,
+    ) -> Self {
+        Self::new().set_patch(id, patch)
+    }
+
+    pub fn from_patches<I, Id, Patch>(patches: I) -> Self
+    where
+        I: IntoIterator<Item = (Id, Patch)>,
+        Id: Into<ElementId>,
+        Patch: Borrow<ElementProjectionPatch>,
+    {
+        Self::new().with_patches(patches)
+    }
+
     pub fn element(&mut self, id: impl Into<ElementId>) -> ElementProjection<'_> {
         ElementProjection {
             projection: self,
@@ -302,6 +318,50 @@ impl DocumentProjection {
         patch: impl Borrow<ElementProjectionPatch>,
     ) {
         patch.borrow().apply_to(self.element(id));
+    }
+
+    pub fn patches<I, Id, Patch>(&mut self, patches: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (Id, Patch)>,
+        Id: Into<ElementId>,
+        Patch: Borrow<ElementProjectionPatch>,
+    {
+        for (id, patch) in patches {
+            self.push_patch(id, patch);
+        }
+        self
+    }
+
+    pub fn with_patches<I, Id, Patch>(mut self, patches: I) -> Self
+    where
+        I: IntoIterator<Item = (Id, Patch)>,
+        Id: Into<ElementId>,
+        Patch: Borrow<ElementProjectionPatch>,
+    {
+        self.patches(patches);
+        self
+    }
+
+    pub fn patches_if<I, Id, Patch>(&mut self, patches: I, present: bool) -> &mut Self
+    where
+        I: IntoIterator<Item = (Id, Patch)>,
+        Id: Into<ElementId>,
+        Patch: Borrow<ElementProjectionPatch>,
+    {
+        if present {
+            self.patches(patches);
+        }
+        self
+    }
+
+    pub fn with_patches_if<I, Id, Patch>(mut self, patches: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = (Id, Patch)>,
+        Id: Into<ElementId>,
+        Patch: Borrow<ElementProjectionPatch>,
+    {
+        self.patches_if(patches, present);
+        self
     }
 
     pub fn set_text(mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) -> Self {

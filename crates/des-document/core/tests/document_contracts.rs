@@ -1937,6 +1937,63 @@ fn element_projection_patch_groups_reusable_state_updates() {
 }
 
 #[test]
+fn document_projection_batches_element_patches_fluently() {
+    let ready_patch = ElementProjectionPatch::new()
+        .text("Ready")
+        .data("state", "ready")
+        .add_class("is-ready");
+    let count_patch = ElementProjectionPatch::new().text("42 rows");
+    let skipped_patch = ElementProjectionPatch::new().text("Skipped");
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.div("status").data("state", "pending").children(|ui| {
+            ui.text("status-label", "Pending");
+            ui.text("status-count", "0 rows");
+            ui.text("status-skipped", "Original");
+        });
+    });
+    let mut projection =
+        DocumentProjection::from_patch("status-label", &ready_patch).with_patches([
+            (ElementId::new("status"), ready_patch.clone()),
+            (ElementId::new("status-count"), count_patch.clone()),
+        ]);
+
+    projection
+        .patches([(
+            "status-count",
+            ElementProjectionPatch::new().aria("live", "polite"),
+        )])
+        .patches_if([("status-skipped", skipped_patch.clone())], false);
+    let projection = projection.with_patches_if([("status-skipped", skipped_patch)], false);
+    let report = view.project(&projection).unwrap();
+    let output = view.update();
+    let status = output.snapshot().find("status").unwrap();
+    let label = output.snapshot().find("status-label").unwrap();
+    let count = output.snapshot().find("status-count").unwrap();
+    let skipped = output.snapshot().find("status-skipped").unwrap();
+    let rebuilt = DocumentProjection::from_patches([
+        ("status-label", ElementProjectionPatch::new().text("Again")),
+        (
+            "status-count",
+            ElementProjectionPatch::new().text("43 rows"),
+        ),
+    ]);
+
+    assert_eq!(projection.len(), 8);
+    assert_eq!(report.operations, 8);
+    assert_eq!(report.changed, 8);
+    assert_eq!(label.text(), Some("Ready".to_owned()));
+    assert_eq!(status.text(), Some("Ready".to_owned()));
+    assert_eq!(status.data("state"), Some("ready"));
+    assert!(status.has_class("is-ready"));
+    assert_eq!(count.text(), Some("42 rows".to_owned()));
+    assert_eq!(count.aria("live"), Some("polite"));
+    assert_eq!(skipped.text(), Some("Original".to_owned()));
+    assert_eq!(rebuilt.len(), 2);
+    assert!(rebuilt.has_operation_for("status-label"));
+    assert!(rebuilt.has_operation_for("status-count"));
+}
+
+#[test]
 fn document_projection_expresses_conditional_app_state_without_branching() {
     let show_details = true;
     let show_error = false;
