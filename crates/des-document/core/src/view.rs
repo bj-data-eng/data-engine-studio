@@ -178,6 +178,72 @@ impl<Action> DocumentActionSurface<Action> {
         &mut self.commands
     }
 
+    /// Applies a batch of app-state projections to the paired view.
+    pub fn project(
+        &mut self,
+        projection: &DocumentProjection,
+    ) -> DocumentResult<DocumentProjectionReport> {
+        self.view.project(projection)
+    }
+
+    /// Builds and applies a projection to the paired view in one call.
+    pub fn project_with(
+        &mut self,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<DocumentProjectionReport> {
+        self.view.project_with(project)
+    }
+
+    /// Applies a projection, resolves the view, and collects typed app actions.
+    pub fn project_and_update_actions(
+        &mut self,
+        projection: &DocumentProjection,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_and_update_actions(projection, &self.commands)
+    }
+
+    /// Builds a projection, applies it, resolves the view, and collects typed actions.
+    pub fn project_with_and_update_actions(
+        &mut self,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_with_and_update_actions(project, &self.commands)
+    }
+
+    /// Applies a projection, routes input, and collects typed app actions.
+    pub fn project_and_update_with_input_actions(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_and_update_with_input_actions(projection, input, &self.commands)
+    }
+
+    /// Builds a projection, applies it, routes input, and collects typed actions.
+    pub fn project_with_and_update_with_input_actions(
+        &mut self,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_with_and_update_with_input_actions(input, project, &self.commands)
+    }
+
     /// Resolves the view and collects typed app actions with the paired registry.
     pub fn update_actions(&mut self) -> DocumentActionFrame<Action>
     where

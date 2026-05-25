@@ -1875,6 +1875,19 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .size,
         Size::new(96.0, 32.0)
     );
+
+    let (report, projected_frame) = surface
+        .project_with_and_update_with_input_actions(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("toggle").data("state", "armed");
+            },
+        )
+        .unwrap();
+    let projected_toggle = projected_frame.output().snapshot().find("toggle").unwrap();
+    assert_eq!(report.operations, 1);
+    assert_eq!(projected_toggle.data("state"), Some("armed"));
+    assert!(projected_frame.contains_action(&WidgetAction::Toggle));
 }
 
 #[test]
