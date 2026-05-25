@@ -495,6 +495,39 @@ fn document_view_compose_collects_css_and_widget_styles() {
 }
 
 #[test]
+fn document_view_can_mount_a_widget_with_its_styles() {
+    struct BadgeWidget;
+
+    impl DocumentWidget for BadgeWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div("badge").class("badge").text("Ready");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_rule(
+                StyleSelector::class("badge"),
+                Style::default()
+                    .width(Length::Px(88.0))
+                    .height(Length::Px(24.0))
+                    .background(Color::rgb(220, 238, 255)),
+            );
+        }
+    }
+
+    let widget = BadgeWidget;
+    let mut direct =
+        DocumentView::build_widget(Size::new(320.0, 180.0), StyleSheet::new(), &widget);
+    let mut composed = DocumentView::compose(Size::new(320.0, 180.0)).widget(&widget);
+
+    for output in [direct.update(), composed.update()] {
+        let badge = output.snapshot().find("badge").unwrap();
+        assert_eq!(badge.text(), Some("Ready".to_owned()));
+        assert_eq!(badge.rect().size, Size::new(88.0, 24.0));
+        assert_eq!(badge.style().background, Some(Color::rgb(220, 238, 255)));
+    }
+}
+
+#[test]
 fn document_builder_and_engine_update_are_front_door_api() {
     let mut document = Document::build(Size::new(320.0, 200.0), |document| {
         document.element(

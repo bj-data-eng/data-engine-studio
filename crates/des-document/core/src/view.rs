@@ -33,6 +33,20 @@ impl DocumentView {
         Self::new(Document::build(viewport, build), stylesheet)
     }
 
+    /// Builds a document view around one reusable document widget and collects
+    /// that widget's stylesheet contribution.
+    pub fn build_widget(
+        viewport: Size,
+        mut stylesheet: StyleSheet,
+        widget: &impl DocumentWidget,
+    ) -> Self {
+        widget.push_styles(&mut stylesheet);
+        Self::new(
+            Document::build(viewport, |ui| ui.widget(widget)),
+            stylesheet,
+        )
+    }
+
     /// Starts a composable document view builder for collecting structure,
     /// stylesheet rules, and widget style contributions through one front door.
     pub fn compose(viewport: Size) -> DocumentViewBuilder {
@@ -194,6 +208,14 @@ impl DocumentViewBuilder {
     pub fn widget_styles(mut self, widget: &impl DocumentWidget) -> Self {
         widget.push_styles(&mut self.stylesheet);
         self
+    }
+
+    pub fn widget(mut self, widget: &impl DocumentWidget) -> DocumentView {
+        widget.push_styles(&mut self.stylesheet);
+        DocumentView::new(
+            Document::build(self.viewport, |ui| ui.widget(widget)),
+            self.stylesheet,
+        )
     }
 
     pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {

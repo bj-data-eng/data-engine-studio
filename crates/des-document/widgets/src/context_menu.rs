@@ -318,10 +318,7 @@ mod tests {
         let menu = ContextMenu::new("text-context-menu")
             .at(Point::new(40.0, 24.0))
             .item("copy", "Copy");
-        let mut view = DocumentView::build(Size::new(240.0, 140.0), StyleSheet::new(), |ui| {
-            ui.widget(&menu);
-        });
-        view.push_widget_styles(&menu);
+        let mut view = DocumentView::compose(Size::new(240.0, 140.0)).widget(&menu);
 
         let output = view.update();
 
