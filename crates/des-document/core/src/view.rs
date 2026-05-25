@@ -33,6 +33,12 @@ impl DocumentView {
         Self::new(Document::build(viewport, build), stylesheet)
     }
 
+    /// Starts a composable document view builder for collecting structure,
+    /// stylesheet rules, and widget style contributions through one front door.
+    pub fn compose(viewport: Size) -> DocumentViewBuilder {
+        DocumentViewBuilder::new(viewport)
+    }
+
     /// Returns the retained document.
     pub fn document(&self) -> &Document {
         &self.document
@@ -144,5 +150,53 @@ impl DocumentView {
     /// Splits the view into its owned document, stylesheet, and engine.
     pub fn into_parts(self) -> (Document, StyleSheet, DocumentEngine) {
         (self.document, self.stylesheet, self.engine)
+    }
+}
+
+/// Fluent builder for composing a retained document view.
+///
+/// This keeps the app-facing setup path compact when a surface is assembled
+/// from Rust-authored document structure, parsed CSS, and reusable widget
+/// style contributions.
+pub struct DocumentViewBuilder {
+    viewport: Size,
+    stylesheet: StyleSheet,
+}
+
+impl DocumentViewBuilder {
+    pub fn new(viewport: Size) -> Self {
+        Self {
+            viewport,
+            stylesheet: StyleSheet::new(),
+        }
+    }
+
+    pub fn stylesheet(mut self, stylesheet: StyleSheet) -> Self {
+        self.stylesheet = stylesheet;
+        self
+    }
+
+    pub fn extend_stylesheet(mut self, stylesheet: StyleSheet) -> Self {
+        self.stylesheet.extend(stylesheet);
+        self
+    }
+
+    pub fn css(mut self, css: &str) -> Result<Self, crate::CssParseError> {
+        self.stylesheet.extend_css(css)?;
+        Ok(self)
+    }
+
+    pub fn css_forgiving(mut self, css: &str) -> Result<Self, crate::CssParseError> {
+        self.stylesheet.extend_css_forgiving(css)?;
+        Ok(self)
+    }
+
+    pub fn widget_styles(mut self, widget: &impl DocumentWidget) -> Self {
+        widget.push_styles(&mut self.stylesheet);
+        self
+    }
+
+    pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {
+        DocumentView::new(Document::build(self.viewport, build), self.stylesheet)
     }
 }

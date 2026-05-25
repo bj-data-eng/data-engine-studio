@@ -69,4 +69,4 @@ pub use text::{
     TextRun, TextTransform, TextVerticalAlign, TextWrapMode, WhiteSpace, WhiteSpaceCollapse,
     WordBreak,
 };
-pub use view::DocumentView;
+pub use view::{DocumentView, DocumentViewBuilder};

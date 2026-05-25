@@ -1,12 +1,12 @@
 use des_document::{
-    AlignItems, Color, CornerRadii, Direction, Document, DocumentCommandRegistry, DocumentEngine,
-    DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection, DocumentView,
-    Element, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent,
-    KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    VisualCloneOptions, WhiteSpace,
+    AlignItems, Color, CornerRadii, Direction, Document, DocumentBuilder, DocumentCommandRegistry,
+    DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey,
+    DocumentProjection, DocumentView, DocumentWidget, Element, ElementId, ElementSpec,
+    ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length,
+    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
+    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
+    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -406,6 +406,46 @@ fn document_view_projects_state_and_updates_in_one_fluent_call() {
     assert!(summary.has_class("ready"));
     assert!(!summary.has_class("empty"));
     assert_eq!(summary.style().background, Some(Color::rgb(208, 236, 255)));
+}
+
+#[test]
+fn document_view_compose_collects_css_and_widget_styles() {
+    struct BadgeWidget;
+
+    impl DocumentWidget for BadgeWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div("badge").class("badge").text("Ready");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_rule(
+                StyleSelector::class("badge"),
+                Style::default()
+                    .height(Length::Px(24.0))
+                    .background(Color::rgb(220, 238, 255)),
+            );
+        }
+    }
+
+    let widget = BadgeWidget;
+    let mut view = DocumentView::compose(Size::new(320.0, 180.0))
+        .css(".panel { width: 160px; height: 64px; }")
+        .unwrap()
+        .widget_styles(&widget)
+        .build(|ui| {
+            ui.div("panel").class("panel").children(|ui| {
+                ui.widget(&widget);
+            });
+        });
+
+    let output = view.update();
+    let panel = output.snapshot().find("panel").unwrap();
+    let badge = output.snapshot().find("badge").unwrap();
+
+    assert_eq!(panel.rect().size.width, 160.0);
+    assert_eq!(badge.text(), Some("Ready".to_owned()));
+    assert_eq!(badge.rect().size.height, 24.0);
+    assert_eq!(badge.style().background, Some(Color::rgb(220, 238, 255)));
 }
 
 #[test]
