@@ -178,6 +178,15 @@ impl<Action> DocumentActionSurface<Action> {
         &mut self.commands
     }
 
+    /// Configures the paired command registry and returns the surface.
+    pub fn with_commands(
+        mut self,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> Self {
+        configure(&mut self.commands);
+        self
+    }
+
     /// Applies a batch of app-state projections to the paired view.
     pub fn project(
         &mut self,
@@ -331,6 +340,24 @@ impl DocumentView {
     /// stylesheet rules, and widget style contributions through one front door.
     pub fn compose(viewport: Size) -> DocumentViewBuilder {
         DocumentViewBuilder::new(viewport)
+    }
+
+    /// Consumes the view into an action surface paired with a command registry.
+    pub fn action_surface<Action>(
+        self,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> DocumentActionSurface<Action> {
+        DocumentActionSurface::new(self, commands)
+    }
+
+    /// Consumes the view into an action surface configured in one app-facing hook.
+    pub fn action_surface_with<Action>(
+        self,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> DocumentActionSurface<Action> {
+        let mut commands = DocumentCommandRegistry::new();
+        configure(&mut commands);
+        self.action_surface(commands)
     }
 
     /// Returns the retained document.

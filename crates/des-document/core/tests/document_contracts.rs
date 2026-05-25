@@ -559,6 +559,43 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
 }
 
 #[test]
+fn document_view_can_be_lifted_into_a_configured_action_surface() {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+        Inspect,
+    }
+
+    let stylesheet = StyleSheet::new()
+        .id("run", Style::default().size(96.0, 32.0))
+        .id("inspect", Style::default().size(96.0, 32.0));
+    let view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").on_click("run").text("Run");
+        ui.button("inspect")
+            .on_pointer_enter("inspect")
+            .text("Inspect");
+    });
+    let mut surface = view.action_surface_with(|commands| {
+        commands.push_click("run", AppAction::Run);
+    });
+
+    assert_eq!(surface.commands().bindings().len(), 1);
+
+    surface = surface.with_commands(|commands| {
+        commands.push_pointer_enter("inspect", AppAction::Inspect);
+    });
+
+    let hover_frame =
+        surface.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 40.0)));
+    let click_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+
+    assert_eq!(surface.commands().bindings().len(), 2);
+    assert!(hover_frame.contains_action(&AppAction::Inspect));
+    assert!(click_frame.contains_action(&AppAction::Run));
+}
+
+#[test]
 fn document_action_frame_supports_app_update_loop_queries() {
     #[derive(Clone, Debug, Eq, PartialEq)]
     enum AppAction {
