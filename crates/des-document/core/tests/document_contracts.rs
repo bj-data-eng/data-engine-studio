@@ -1845,19 +1845,13 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let mut pushed = DocumentCommandRegistry::new();
     pushed.push_widget_commands(&toggle);
     pushed.push_widget_commands(&close);
-    let mut view = DocumentView::compose(Size::new(320.0, 180.0)).build_with_widgets(
-        [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
-        |ui| {
-            ui.widget(&toggle);
-            ui.widget(&close);
-        },
-    );
+    let mut surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .action_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>, &close]);
+    let toggle_surface = toggle.action_surface(Size::new(320.0, 180.0));
 
-    let click_frame = view.update_with_input_actions(
-        DocumentInput::primary_click(Point::new(8.0, 8.0)),
-        &registry,
-    );
-    let context_frame = view.update_with_input_actions(
+    let click_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let context_frame = surface.view_mut().update_with_input_actions(
         DocumentInput::secondary_click(Point::new(8.0, 8.0)),
         &pushed,
     );
@@ -1865,7 +1859,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
+    assert_eq!(surface.commands().bindings(), registry.bindings());
     assert_eq!(toggle_registry.bindings().len(), 2);
+    assert_eq!(toggle_surface.commands().bindings().len(), 2);
     assert!(click_frame.contains_action(&WidgetAction::Toggle));
     assert!(!click_frame.contains_action(&WidgetAction::Close));
     assert!(context_frame.contains_action(&WidgetAction::Context));

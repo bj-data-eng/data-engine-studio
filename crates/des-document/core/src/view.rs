@@ -1,7 +1,8 @@
 use crate::{
-    Document, DocumentBuilder, DocumentCommandAction, DocumentCommandRegistry, DocumentEngine,
-    DocumentEventKind, DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport,
-    DocumentResult, DocumentWidget, Size, StyleSheet, TextMeasurer,
+    Document, DocumentActionWidget, DocumentBuilder, DocumentCommandAction,
+    DocumentCommandRegistry, DocumentEngine, DocumentEventKind, DocumentInput, DocumentOutput,
+    DocumentProjection, DocumentProjectionReport, DocumentResult, DocumentWidget, Size, StyleSheet,
+    TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -137,6 +138,78 @@ impl<Action> DocumentActionFrame<Action> {
     /// Consumes the frame and returns only the collected app actions.
     pub fn into_actions(self) -> Vec<DocumentCommandAction<Action>> {
         self.actions
+    }
+}
+
+/// A retained document view paired with the typed command registry that drives it.
+///
+/// Action surfaces are the ergonomic app-facing shape for reusable widgets:
+/// widget structure, styles, projection, and command bindings are mounted
+/// together, then update calls can collect typed app actions without passing the
+/// same registry through every frame.
+pub struct DocumentActionSurface<Action> {
+    pub view: DocumentView,
+    pub commands: DocumentCommandRegistry<Action>,
+}
+
+impl<Action> DocumentActionSurface<Action> {
+    /// Creates an action surface from an already-built view and command registry.
+    pub fn new(view: DocumentView, commands: DocumentCommandRegistry<Action>) -> Self {
+        Self { view, commands }
+    }
+
+    /// Returns the retained document view.
+    pub fn view(&self) -> &DocumentView {
+        &self.view
+    }
+
+    /// Returns the retained document view for app state projection and updates.
+    pub fn view_mut(&mut self) -> &mut DocumentView {
+        &mut self.view
+    }
+
+    /// Returns the typed command registry paired with this view.
+    pub fn commands(&self) -> &DocumentCommandRegistry<Action> {
+        &self.commands
+    }
+
+    /// Returns the typed command registry for app-specific extensions.
+    pub fn commands_mut(&mut self) -> &mut DocumentCommandRegistry<Action> {
+        &mut self.commands
+    }
+
+    /// Resolves the view and collects typed app actions with the paired registry.
+    pub fn update_actions(&mut self) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        self.view.update_actions(&self.commands)
+    }
+
+    /// Routes input, resolves the view, and collects typed app actions.
+    pub fn update_with_input_actions(&mut self, input: DocumentInput) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        self.view.update_with_input_actions(input, &self.commands)
+    }
+
+    /// Routes input with a host text measurer and collects typed app actions.
+    pub fn update_with_input_and_text_measurer_actions(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        self.view
+            .update_with_input_and_text_measurer_actions(input, text_measurer, &self.commands)
+    }
+
+    /// Splits the surface into its owned view and typed command registry.
+    pub fn into_parts(self) -> (DocumentView, DocumentCommandRegistry<Action>) {
+        (self.view, self.commands)
     }
 }
 
@@ -707,6 +780,23 @@ impl DocumentViewBuilder {
             .expect("document widget projection targets rendered elements")
     }
 
+    pub fn action_widget<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+    ) -> DocumentActionSurface<Action> {
+        self.try_action_widget(widget)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_action_widget<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+    ) -> DocumentResult<DocumentActionSurface<Action>> {
+        let view = self.try_widget(widget)?;
+        let commands = DocumentCommandRegistry::new().bind_widget(widget);
+        Ok(DocumentActionSurface::new(view, commands))
+    }
+
     pub fn try_widget(
         mut self,
         widget: &(impl DocumentWidget + ?Sized),
@@ -728,6 +818,30 @@ impl DocumentViewBuilder {
     {
         self.try_widgets(widgets)
             .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn action_widgets<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentActionSurface<Action>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.try_action_widgets(widgets)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_action_widgets<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<DocumentActionSurface<Action>>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        let widgets = widgets.into_iter().collect::<Vec<_>>();
+        let commands = DocumentCommandRegistry::new().bind_widgets(widgets.iter().copied());
+        let view = self.try_widgets(widgets)?;
+        Ok(DocumentActionSurface::new(view, commands))
     }
 
     pub fn try_widgets<'a, W>(

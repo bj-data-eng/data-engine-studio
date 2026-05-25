@@ -52,16 +52,13 @@
 //! }
 //!
 //! let widget = RunButton;
-//! let mut view = DocumentView::compose(Size::new(320.0, 180.0))
+//! let mut surface = DocumentView::compose(Size::new(320.0, 180.0))
 //!     .with_css(".primary { background: rgb(222, 238, 255); }")
 //!     .expect("valid app stylesheet")
-//!     .widget(&widget);
+//!     .action_widget(&widget);
 //!
-//! let registry = DocumentCommandRegistry::new().bind_widget(&widget);
-//! let frame = view.update_with_input_actions(
-//!     DocumentInput::primary_click(Point::new(8.0, 8.0)),
-//!     &registry,
-//! );
+//! let frame =
+//!     surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
 //!
 //! assert_eq!(frame.actions.len(), 1);
 //! assert_eq!(frame.actions[0].action, AppAction::Run);
@@ -136,7 +133,7 @@ pub use text::{
     TextRun, TextTransform, TextVerticalAlign, TextWrapMode, WhiteSpace, WhiteSpaceCollapse,
     WordBreak,
 };
-pub use view::{DocumentActionFrame, DocumentView, DocumentViewBuilder};
+pub use view::{DocumentActionFrame, DocumentActionSurface, DocumentView, DocumentViewBuilder};
 
 /// Common app-facing imports for authoring document UIs.
 ///
@@ -149,25 +146,26 @@ pub mod prelude {
         AlignContent, AlignItems, AlignSelf, Anchor, AnchorPlacement, BorderStyle, ChangeSet,
         ClassName, Color, ComplexSelector, CompoundSelector, ComputedStyle, ContainerQuery,
         CornerRadii, CssParseError, Direction, Display, Document, DocumentActionFrame,
-        DocumentActionWidget, DocumentBuilder, DocumentCommand, DocumentCommandAction,
-        DocumentCommandActionRef, DocumentCommandBinding, DocumentCommandDispatchReport,
-        DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
-        DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics,
-        DocumentOutput, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
-        DocumentQueryError, DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView,
-        DocumentViewBuilder, DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent,
-        ElementBehaviorHook, ElementBuilder, ElementId, ElementProjection, ElementSnapshot,
-        ElementSpec, ElementState, ElementStateSelector, FallbackTextMeasurer, FlexDirection,
-        FlexWrap, FloatingBoundary, FloatingPlacement, FontStretch, FontStyle, FontWeight, Glyph,
-        GridAutoFlow, GridPlacement, GridTemplateArea, GridTemplateComponent, GridTrack, HitResult,
-        InlineTextStyle, Insets, JustifyContent, KeyInput, KeyModifiers, Length, NormalizedText,
-        NthChildFormula, Overflow, OverflowWrap, Point, PointerInput, Position, PositionInsets,
-        Rect, ResolvedElement, ResolvedFloating, ScrollAxis, ScrollChrome, Shadow, Size, Style,
-        StyleCondition, StyleRule, StyleSelector, StyleSheet, TableCellSpec, TableColumnId,
-        TableColumnSpec, TableSpec, TableTrackSize, TextAlign, TextContent, TextDecoration,
-        TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextLayoutRun, TextLayoutStyle,
-        TextMeasurer, TextMeasurerKey, TextOverflow, TextRun, TextSelectionGranularity,
-        TextTransform, TextVerticalAlign, TextWrapMode, Transition, ViewportQuery,
-        VisualCloneOptions, VisualElementClone, WhiteSpace, WhiteSpaceCollapse, WordBreak,
+        DocumentActionSurface, DocumentActionWidget, DocumentBuilder, DocumentCommand,
+        DocumentCommandAction, DocumentCommandActionRef, DocumentCommandBinding,
+        DocumentCommandDispatchReport, DocumentCommandRef, DocumentCommandRegistry, DocumentDrag,
+        DocumentEngine, DocumentError, DocumentEvent, DocumentEventKind, DocumentInput,
+        DocumentKey, DocumentMetrics, DocumentOutput, DocumentProjection,
+        DocumentProjectionOperation, DocumentProjectionReport, DocumentQueryError, DocumentResult,
+        DocumentSnapshot, DocumentTextSelection, DocumentView, DocumentViewBuilder, DocumentWidget,
+        Easing, EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementBuilder,
+        ElementId, ElementProjection, ElementSnapshot, ElementSpec, ElementState,
+        ElementStateSelector, FallbackTextMeasurer, FlexDirection, FlexWrap, FloatingBoundary,
+        FloatingPlacement, FontStretch, FontStyle, FontWeight, Glyph, GridAutoFlow, GridPlacement,
+        GridTemplateArea, GridTemplateComponent, GridTrack, HitResult, InlineTextStyle, Insets,
+        JustifyContent, KeyInput, KeyModifiers, Length, NormalizedText, NthChildFormula, Overflow,
+        OverflowWrap, Point, PointerInput, Position, PositionInsets, Rect, ResolvedElement,
+        ResolvedFloating, ScrollAxis, ScrollChrome, Shadow, Size, Style, StyleCondition, StyleRule,
+        StyleSelector, StyleSheet, TableCellSpec, TableColumnId, TableColumnSpec, TableSpec,
+        TableTrackSize, TextAlign, TextContent, TextDecoration, TextLayoutLine, TextLayoutRequest,
+        TextLayoutResult, TextLayoutRun, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+        TextOverflow, TextRun, TextSelectionGranularity, TextTransform, TextVerticalAlign,
+        TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, VisualElementClone,
+        WhiteSpace, WhiteSpaceCollapse, WordBreak,
     };
 }

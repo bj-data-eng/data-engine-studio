@@ -1367,6 +1367,49 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         self.push_commands(&mut registry);
         registry
     }
+
+    fn action_surface(&self, viewport: Size) -> crate::DocumentActionSurface<Action>
+    where
+        Self: Sized,
+    {
+        self.action_surface_with_stylesheet(viewport, StyleSheet::new())
+    }
+
+    fn try_action_surface(
+        &self,
+        viewport: Size,
+    ) -> DocumentResult<crate::DocumentActionSurface<Action>>
+    where
+        Self: Sized,
+    {
+        self.try_action_surface_with_stylesheet(viewport, StyleSheet::new())
+    }
+
+    fn action_surface_with_stylesheet(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+    ) -> crate::DocumentActionSurface<Action>
+    where
+        Self: Sized,
+    {
+        crate::DocumentView::compose(viewport)
+            .stylesheet(stylesheet)
+            .action_widget(self)
+    }
+
+    fn try_action_surface_with_stylesheet(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+    ) -> DocumentResult<crate::DocumentActionSurface<Action>>
+    where
+        Self: Sized,
+    {
+        crate::DocumentView::compose(viewport)
+            .stylesheet(stylesheet)
+            .try_action_widget(self)
+    }
 }
 
 impl<Action> DocumentCommandRegistry<Action> {
