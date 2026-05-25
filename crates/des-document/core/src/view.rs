@@ -605,6 +605,23 @@ impl DocumentViewBuilder {
         self
     }
 
+    pub fn extend_stylesheet_if(mut self, stylesheet: StyleSheet, present: bool) -> Self {
+        self.stylesheet.extend_if(stylesheet, present);
+        self
+    }
+
+    pub fn when(self, present: bool, configure: impl FnOnce(Self) -> Self) -> Self {
+        if present { configure(self) } else { self }
+    }
+
+    pub fn try_when<E>(
+        self,
+        present: bool,
+        configure: impl FnOnce(Self) -> Result<Self, E>,
+    ) -> Result<Self, E> {
+        if present { configure(self) } else { Ok(self) }
+    }
+
     pub fn css(mut self, css: &str) -> Result<Self, crate::CssParseError> {
         self.stylesheet.extend_css(css)?;
         Ok(self)
@@ -612,6 +629,13 @@ impl DocumentViewBuilder {
 
     pub fn with_css(self, css: &str) -> Result<Self, crate::CssParseError> {
         self.css(css)
+    }
+
+    pub fn css_if(mut self, present: bool, css: &str) -> Result<Self, crate::CssParseError> {
+        if present {
+            self.stylesheet.extend_css(css)?;
+        }
+        Ok(self)
     }
 
     pub fn css_forgiving(mut self, css: &str) -> Result<Self, crate::CssParseError> {
@@ -623,8 +647,30 @@ impl DocumentViewBuilder {
         self.css_forgiving(css)
     }
 
+    pub fn css_forgiving_if(
+        mut self,
+        present: bool,
+        css: &str,
+    ) -> Result<Self, crate::CssParseError> {
+        if present {
+            self.stylesheet.extend_css_forgiving(css)?;
+        }
+        Ok(self)
+    }
+
     pub fn widget_styles(mut self, widget: &(impl DocumentWidget + ?Sized)) -> Self {
         widget.push_styles(&mut self.stylesheet);
+        self
+    }
+
+    pub fn widget_styles_if(
+        mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        present: bool,
+    ) -> Self {
+        if present {
+            widget.push_styles(&mut self.stylesheet);
+        }
         self
     }
 
@@ -634,6 +680,22 @@ impl DocumentViewBuilder {
     {
         for widget in widgets {
             widget.push_styles(&mut self.stylesheet);
+        }
+        self
+    }
+
+    pub fn widget_styles_many_if<'a, W>(
+        mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> Self
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        if present {
+            for widget in widgets {
+                widget.push_styles(&mut self.stylesheet);
+            }
         }
         self
     }

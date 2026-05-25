@@ -1275,6 +1275,7 @@ fn document_view_projects_state_and_updates_in_one_fluent_call() {
 #[test]
 fn document_view_compose_collects_css_and_widget_styles() {
     struct BadgeWidget;
+    struct DisabledWidget;
 
     impl DocumentWidget for BadgeWidget {
         fn render(&self, ui: &mut DocumentBuilder) {
@@ -1298,25 +1299,73 @@ fn document_view_compose_collects_css_and_widget_styles() {
         }
     }
 
+    impl DocumentWidget for DisabledWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div("disabled").class("disabled").empty();
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_class("disabled", Style::default().width(Length::Px(999.0)));
+        }
+    }
+
     let widget = BadgeWidget;
+    let disabled = DisabledWidget;
+    let compact = true;
+    let destructive = false;
     let mut view = DocumentView::compose(Size::new(320.0, 180.0))
         .css(".panel { width: 160px; height: 64px; }")
         .unwrap()
+        .css_if(compact, ".panel { padding: 2px; }")
+        .unwrap()
+        .css_if(destructive, ".panel { width: ; }")
+        .unwrap()
+        .css_forgiving_if(
+            compact,
+            ".panel { unknown-property: 1px; } .tone { height: 28px; }",
+        )
+        .unwrap()
+        .extend_stylesheet_if(
+            StyleSheet::new().class("accent", Style::default().border(Color::rgb(90, 120, 180))),
+            compact,
+        )
+        .extend_stylesheet_if(
+            StyleSheet::new().class("skipped", Style::default().width(Length::Px(999.0))),
+            destructive,
+        )
+        .when(compact, |builder| {
+            builder.extend_stylesheet(
+                StyleSheet::new().class("composed", Style::default().radius(6.0)),
+            )
+        })
+        .try_when(compact, |builder| builder.css(".panel { margin: 1px; }"))
+        .unwrap()
+        .widget_styles_if(&disabled, destructive)
+        .widget_styles_many_if([&widget], compact)
         .build_with_widget(&widget, |ui| {
-            ui.div("panel").class("panel").children(|ui| {
-                ui.widget(&widget);
-            });
+            ui.div("panel")
+                .classes(["panel", "accent", "skipped", "composed"])
+                .children(|ui| {
+                    ui.widget(&widget);
+                    ui.div("tone").class("tone").empty();
+                });
         });
 
     let output = view.update();
     let panel = output.snapshot().find("panel").unwrap();
     let badge = output.snapshot().find("badge").unwrap();
+    let tone = output.snapshot().find("tone").unwrap();
 
     assert_eq!(panel.rect().size.width, 160.0);
+    assert_eq!(panel.style().padding, Insets::all(2.0));
+    assert_eq!(panel.style().margin, Insets::all(1.0));
+    assert_eq!(panel.style().border, Some(Color::rgb(90, 120, 180)));
+    assert_eq!(panel.style().radius, CornerRadii::all(6.0));
     assert_eq!(badge.text(), Some("Ready".to_owned()));
     assert_eq!(badge.data("state"), Some("ready"));
     assert_eq!(badge.rect().size.height, 24.0);
     assert_eq!(badge.style().background, Some(Color::rgb(220, 238, 255)));
+    assert_eq!(tone.rect().size.height, 28.0);
 }
 
 #[test]
