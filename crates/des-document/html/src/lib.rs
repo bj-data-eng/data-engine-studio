@@ -281,6 +281,48 @@ impl HtmlDocument {
             .action_surface_with(configure))
     }
 
+    /// Resolves this HTML tree with an empty stylesheet.
+    pub fn update(&self, viewport: Size) -> HtmlResult<DocumentOutput> {
+        self.to_view(viewport).map(|mut view| view.update())
+    }
+
+    /// Resolves this HTML tree with an empty stylesheet and collects typed Rust actions.
+    pub fn update_actions<Action>(
+        &self,
+        viewport: Size,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.to_view(viewport)
+            .map(|mut view| view.update_actions(registry))
+    }
+
+    /// Routes input through this HTML tree with an empty stylesheet.
+    pub fn update_with_input(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+    ) -> HtmlResult<DocumentOutput> {
+        self.to_view(viewport)
+            .map(|mut view| view.update_with_input(input))
+    }
+
+    /// Routes input through this HTML tree and collects typed Rust actions.
+    pub fn update_with_input_actions<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.to_view(viewport)
+            .map(|mut view| view.update_with_input_actions(input, registry))
+    }
+
     /// Parses CSS and creates an action surface configured with typed Rust commands.
     pub fn to_action_surface_with_css<Action>(
         &self,

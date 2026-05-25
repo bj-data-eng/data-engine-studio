@@ -601,6 +601,61 @@ fn html_document_can_create_ready_to_update_document_view_without_css() {
 }
 
 #[test]
+fn html_document_updates_and_collects_actions_without_css_plumbing() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+        Search,
+    }
+
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <main id="app">
+          <button id="run" on:click="project.run">Run</button>
+          <input id="search" autofocus on:keydown="project.search">
+        </main>
+        "#,
+    )
+    .expect("HTML should parse");
+    let registry = DocumentCommandRegistry::new()
+        .bind_click("project.run", HtmlAction::Run)
+        .bind_key_down("project.search", HtmlAction::Search);
+
+    let output = html
+        .update(Size::new(320.0, 180.0))
+        .expect("HTML should resolve without CSS");
+    let click_frame = html
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+        )
+        .expect("HTML should collect click actions without CSS");
+    let key_frame = html
+        .update_actions(Size::new(320.0, 180.0), &registry)
+        .expect("HTML should collect actions directly after update");
+    let key_input_frame = html
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            &registry,
+        )
+        .expect("HTML should collect keyboard actions without CSS");
+    let input_output = html
+        .update_with_input(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        )
+        .expect("HTML should route input without CSS");
+
+    assert!(output.snapshot().find("app").is_some());
+    assert!(input_output.was_clicked("run"));
+    assert!(click_frame.contains_action(&HtmlAction::Run));
+    assert!(key_input_frame.contains_action(&HtmlAction::Search));
+    assert!(key_frame.is_empty());
+}
+
+#[test]
 fn html_document_can_create_action_surfaces_without_css_plumbing() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {
