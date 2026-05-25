@@ -139,12 +139,28 @@ impl DocumentOutput {
         self.clicked_targets().next()
     }
 
+    pub fn was_clicked(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::Clicked)
+    }
+
+    pub fn was_pressed(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::Pressed)
+    }
+
+    pub fn was_released(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::Released)
+    }
+
     pub fn context_requested_targets(&self) -> impl Iterator<Item = &ElementId> {
         self.event_targets_of_kind(DocumentEventKind::ContextRequested)
     }
 
     pub fn first_context_requested_target(&self) -> Option<&ElementId> {
         self.context_requested_targets().next()
+    }
+
+    pub fn context_requested_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::ContextRequested)
     }
 
     pub fn key_down_events(&self) -> impl Iterator<Item = (&ElementId, KeyInput)> {
@@ -154,11 +170,31 @@ impl DocumentOutput {
         })
     }
 
+    pub fn key_down_for<'a>(&'a self, target: &'a str) -> impl Iterator<Item = KeyInput> + 'a {
+        self.key_down_events()
+            .filter(move |(id, _)| id.as_str() == target)
+            .map(|(_, key)| key)
+    }
+
+    pub fn has_key_down(&self, target: &str, key: KeyInput) -> bool {
+        self.key_down_for(target).any(|event_key| event_key == key)
+    }
+
     pub fn key_up_events(&self) -> impl Iterator<Item = (&ElementId, KeyInput)> {
         self.events.iter().filter_map(|event| match event.kind {
             DocumentEventKind::KeyUp(key) => Some((&event.target, key)),
             _ => None,
         })
+    }
+
+    pub fn key_up_for<'a>(&'a self, target: &'a str) -> impl Iterator<Item = KeyInput> + 'a {
+        self.key_up_events()
+            .filter(move |(id, _)| id.as_str() == target)
+            .map(|(_, key)| key)
+    }
+
+    pub fn has_key_up(&self, target: &str, key: KeyInput) -> bool {
+        self.key_up_for(target).any(|event_key| event_key == key)
     }
 
     pub fn has_event(&self, target: &str, kind: DocumentEventKind) -> bool {

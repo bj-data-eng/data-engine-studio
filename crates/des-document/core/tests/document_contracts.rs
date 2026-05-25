@@ -145,6 +145,9 @@ fn document_output_exposes_interaction_query_helpers() {
         output.first_clicked_target().map(ElementId::as_str),
         Some("run")
     );
+    assert!(output.was_pressed("run"));
+    assert!(output.was_clicked("run"));
+    assert!(!output.was_released("run"));
     assert!(run_events.contains(&&DocumentEvent::pressed("run")));
     assert!(run_events.contains(&&DocumentEvent::clicked("run")));
 }
@@ -177,6 +180,8 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
             .map(ElementId::as_str),
         Some("menu")
     );
+    assert!(context_output.context_requested_for("menu"));
+    assert!(!context_output.context_requested_for("search"));
     assert_eq!(
         key_down_output
             .key_down_events()
@@ -185,12 +190,22 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
         vec![("search", KeyInput::down(DocumentKey::Enter))]
     );
     assert_eq!(
+        key_down_output.key_down_for("search").collect::<Vec<_>>(),
+        vec![KeyInput::down(DocumentKey::Enter)]
+    );
+    assert!(key_down_output.has_key_down("search", KeyInput::down(DocumentKey::Enter)));
+    assert_eq!(
         key_up_output
             .key_up_events()
             .map(|(target, key)| (target.as_str(), key))
             .collect::<Vec<_>>(),
         vec![("search", KeyInput::up(DocumentKey::Enter))]
     );
+    assert_eq!(
+        key_up_output.key_up_for("search").collect::<Vec<_>>(),
+        vec![KeyInput::up(DocumentKey::Enter)]
+    );
+    assert!(key_up_output.has_key_up("search", KeyInput::up(DocumentKey::Enter)));
 }
 
 #[test]
