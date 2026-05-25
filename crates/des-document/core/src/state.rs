@@ -1635,6 +1635,20 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.action_values_for_intent(output, ElementBehaviorEvent::Click)
     }
 
+    pub fn context_menu_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::ContextMenu)
+    }
+
+    pub fn context_menu_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::ContextMenu)
+    }
+
     pub fn pointer_enter_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
@@ -1792,6 +1806,25 @@ impl<Action> DocumentCommandRegistry<Action> {
         Action: Clone,
     {
         self.clicked_action_values(output).cloned().collect()
+    }
+
+    pub fn collect_context_menu_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.context_menu_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_context_menu_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.context_menu_action_values(output).cloned().collect()
     }
 
     pub fn collect_pointer_enter_actions(
@@ -2171,6 +2204,17 @@ impl<Action> DocumentCommandRegistry<Action> {
         Handler: FnMut(DocumentCommandActionRef<'a, Action>),
     {
         self.dispatch_intent(output, ElementBehaviorEvent::Click, handler)
+    }
+
+    pub fn dispatch_context_menu<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::ContextMenu, handler)
     }
 
     pub fn dispatch_pointer_enter<'a, Handler>(

@@ -566,8 +566,17 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     let click_actions = registry.clicked_actions(&click_output).collect::<Vec<_>>();
     let key_actions = registry.command_actions(&key_output).collect::<Vec<_>>();
     let context_actions = registry
-        .command_actions_for_intent(&context_output, ElementBehaviorEvent::ContextMenu)
+        .context_menu_actions(&context_output)
         .collect::<Vec<_>>();
+    let context_values = registry
+        .context_menu_action_values(&context_output)
+        .collect::<Vec<_>>();
+    let context_owned_actions = registry.collect_context_menu_actions(&context_output);
+    let context_owned_values = registry.collect_context_menu_action_values(&context_output);
+    let mut dispatched_context_values = Vec::new();
+    let context_dispatch_report = registry.dispatch_context_menu(&context_output, |action| {
+        dispatched_context_values.push(*action.action);
+    });
     let hover_actions = registry
         .pointer_enter_actions(&hover_output)
         .collect::<Vec<_>>();
@@ -661,6 +670,25 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     assert_eq!(*context_actions[0].action, AppAction::CommitByContextMenu);
     assert!(context_actions[0].is_context_menu());
     assert!(!context_actions[0].is_pointer_enter());
+    assert_eq!(context_values, vec![&AppAction::CommitByContextMenu]);
+    assert_eq!(
+        context_owned_actions,
+        vec![DocumentCommandAction {
+            target: ElementId::new("commit"),
+            event: DocumentEventKind::ContextRequested,
+            command: "commit-menu".to_owned(),
+            action: AppAction::CommitByContextMenu,
+        }]
+    );
+    assert_eq!(context_owned_values, vec![AppAction::CommitByContextMenu]);
+    assert_eq!(
+        context_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(
+        dispatched_context_values,
+        vec![AppAction::CommitByContextMenu]
+    );
     assert_eq!(hover_actions.len(), 1);
     assert_eq!(*hover_actions[0].action, AppAction::CommitByPointerEnter);
     assert!(hover_actions[0].is_pointer_enter());
