@@ -145,6 +145,30 @@ impl DocumentOutput {
         self.event_targets_of_kind(kind).next()
     }
 
+    pub fn pointer_entered_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::PointerEntered)
+    }
+
+    pub fn first_pointer_entered_target(&self) -> Option<&ElementId> {
+        self.pointer_entered_targets().next()
+    }
+
+    pub fn pointer_entered_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::PointerEntered)
+    }
+
+    pub fn pointer_exited_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::PointerExited)
+    }
+
+    pub fn first_pointer_exited_target(&self) -> Option<&ElementId> {
+        self.pointer_exited_targets().next()
+    }
+
+    pub fn pointer_exited_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::PointerExited)
+    }
+
     pub fn clicked_targets(&self) -> impl Iterator<Item = &ElementId> {
         self.event_targets_of_kind(DocumentEventKind::Clicked)
     }

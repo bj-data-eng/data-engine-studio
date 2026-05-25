@@ -175,6 +175,19 @@ fn document_output_exposes_interaction_query_helpers() {
     );
     assert_eq!(
         output
+            .pointer_entered_targets()
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["root", "run"]
+    );
+    assert_eq!(
+        output.first_pointer_entered_target().map(ElementId::as_str),
+        Some("root")
+    );
+    assert!(output.pointer_entered_for("run"));
+    assert!(!output.pointer_exited_for("run"));
+    assert_eq!(
+        output
             .clicked_targets()
             .map(ElementId::as_str)
             .collect::<Vec<_>>(),
@@ -197,6 +210,20 @@ fn document_output_exposes_interaction_query_helpers() {
     assert!(!clicked.is_drag());
     assert!(run_events.contains(&&DocumentEvent::pressed("run")));
     assert!(run_events.contains(&&DocumentEvent::clicked("run")));
+
+    let exit_output = view.update_with_input(DocumentInput::pointer_at(Point::new(180.0, 140.0)));
+    assert_eq!(
+        exit_output
+            .first_pointer_exited_target()
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert!(exit_output.pointer_exited_for("run"));
+    assert!(
+        exit_output
+            .pointer_exited_targets()
+            .any(|target| target.as_str() == "run")
+    );
 }
 
 #[test]
