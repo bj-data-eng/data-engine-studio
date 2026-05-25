@@ -1603,12 +1603,17 @@ fn element_projection_patch_groups_reusable_state_updates() {
     assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
 
     let reset_patch = ElementProjectionPatch::new()
-        .deselect()
-        .disable()
-        .blur()
+        .deselect_if(true)
+        .enable_if(false)
+        .disable_if(true)
+        .blur_if(true)
+        .focus_if(false)
         .data_if("state", "ready", false)
         .aria_if("live", "polite", false)
-        .classes_if(["is-ready", "is-stale"], false);
+        .classes_if(["is-ready", "is-stale"], false)
+        .when(false, |patch| {
+            patch.select().focus().add_class("should-not-apply")
+        });
     let reset_report = view
         .project_with(|projection| {
             projection.element("status").patch(reset_patch);

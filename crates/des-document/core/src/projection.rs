@@ -872,6 +872,13 @@ impl ElementProjectionPatch {
         Self::default()
     }
 
+    pub fn when(mut self, present: bool, project: impl FnOnce(Self) -> Self) -> Self {
+        if present {
+            self = project(self);
+        }
+        self
+    }
+
     pub fn text(mut self, text: impl Into<TextContent>) -> Self {
         self.text = Some(text.into());
         self
@@ -959,12 +966,27 @@ impl ElementProjectionPatch {
         self
     }
 
+    pub fn selected_if(mut self, selected: bool, present: bool) -> Self {
+        if present {
+            self.selected = Some(selected);
+        }
+        self
+    }
+
     pub fn select(self) -> Self {
         self.selected(true)
     }
 
+    pub fn select_if(self, present: bool) -> Self {
+        self.selected_if(true, present)
+    }
+
     pub fn deselect(self) -> Self {
         self.selected(false)
+    }
+
+    pub fn deselect_if(self, present: bool) -> Self {
+        self.selected_if(false, present)
     }
 
     pub fn disabled(mut self, disabled: bool) -> Self {
@@ -972,12 +994,27 @@ impl ElementProjectionPatch {
         self
     }
 
+    pub fn disabled_if(mut self, disabled: bool, present: bool) -> Self {
+        if present {
+            self.disabled = Some(disabled);
+        }
+        self
+    }
+
     pub fn disable(self) -> Self {
         self.disabled(true)
     }
 
+    pub fn disable_if(self, present: bool) -> Self {
+        self.disabled_if(true, present)
+    }
+
     pub fn enable(self) -> Self {
         self.disabled(false)
+    }
+
+    pub fn enable_if(self, present: bool) -> Self {
+        self.disabled_if(false, present)
     }
 
     pub fn focused(mut self, focused: bool) -> Self {
@@ -985,12 +1022,27 @@ impl ElementProjectionPatch {
         self
     }
 
+    pub fn focused_if(mut self, focused: bool, present: bool) -> Self {
+        if present {
+            self.focused = Some(focused);
+        }
+        self
+    }
+
     pub fn focus(self) -> Self {
         self.focused(true)
     }
 
+    pub fn focus_if(self, present: bool) -> Self {
+        self.focused_if(true, present)
+    }
+
     pub fn blur(self) -> Self {
         self.focused(false)
+    }
+
+    pub fn blur_if(self, present: bool) -> Self {
+        self.focused_if(false, present)
     }
 
     pub fn class(mut self, class: impl Into<ClassName>, present: bool) -> Self {
