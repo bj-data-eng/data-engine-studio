@@ -596,6 +596,33 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             },
         )
         .expect("HTML and CSS should configure typed actions for one update");
+    let mapped_empty_frame = html
+        .update_actions_with_css_and_actions(
+            Size::new(240.0, 160.0),
+            ".card { width: 190px; height: 72px; }",
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML and CSS should map command actions for no-input updates");
+    let mapped_click_frame = html
+        .update_with_input_actions_and_css_and_actions(
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".card { width: 186px; height: 72px; }",
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML and CSS should map command actions for one update");
+    let intent_mapped_key_frame = html
+        .update_with_input_actions_and_css_and_intent_actions(
+            Size::new(240.0, 160.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            ".card { width: 187px; height: 72px; }",
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.filter",
+                HtmlAction::Filter,
+            )],
+        )
+        .expect("HTML and CSS should map intent-scoped actions for one update");
     let configured_forgiving_frame = html
         .update_with_input_actions_and_css_forgiving_with(
             Size::new(240.0, 160.0),
@@ -607,6 +634,37 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             },
         )
         .expect("forgiving CSS should configure typed actions for one update");
+    let forgiving_mapped_click_frame = html
+        .update_with_input_actions_and_css_forgiving_and_actions(
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".broken { width: ; } .card { width: 188px; height: 72px; }",
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("forgiving CSS should map command actions for one update");
+    let forgiving_mapped_empty_frame = html
+        .update_actions_with_css_forgiving_and_intent_actions(
+            Size::new(240.0, 160.0),
+            ".broken { width: ; } .card { width: 191px; height: 72px; }",
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.filter",
+                HtmlAction::Filter,
+            )],
+        )
+        .expect("forgiving CSS should map intent actions for no-input updates");
+    let forgiving_intent_mapped_key_frame = html
+        .update_with_input_actions_and_css_forgiving_and_intent_actions(
+            Size::new(240.0, 160.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            ".broken { width: ; } .card { width: 189px; height: 72px; }",
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.filter",
+                HtmlAction::Filter,
+            )],
+        )
+        .expect("forgiving CSS should map intent-scoped actions for one update");
     let mut surface = html
         .to_action_surface_with_css(Size::new(240.0, 160.0), css, |commands| {
             commands.push("project.run", HtmlAction::Run);
@@ -812,6 +870,78 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     assert!(forgiving_frame.contains_action(&HtmlAction::Filter));
     assert!(configured_click_frame.contains_action(&HtmlAction::Run));
     assert!(configured_forgiving_frame.contains_action(&HtmlAction::Filter));
+    assert!(mapped_empty_frame.is_empty());
+    assert_eq!(
+        mapped_empty_frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        190.0
+    );
+    assert!(forgiving_mapped_empty_frame.is_empty());
+    assert_eq!(
+        forgiving_mapped_empty_frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        191.0
+    );
+    assert!(mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        mapped_click_frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        186.0
+    );
+    assert!(intent_mapped_key_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(
+        intent_mapped_key_frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        187.0
+    );
+    assert!(forgiving_mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        forgiving_mapped_click_frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        188.0
+    );
+    assert!(forgiving_intent_mapped_key_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(
+        forgiving_intent_mapped_key_frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        189.0
+    );
     assert!(surface_click.contains_action(&HtmlAction::Run));
     assert!(mapped_surface_click.contains_action(&HtmlAction::Run));
     assert_eq!(
@@ -1023,11 +1153,32 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
             },
         )
         .expect("HTML should configure typed actions for one update");
+    let mapped_click_frame = html
+        .update_with_input_actions_with_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML should map commands for one update");
+    let intent_mapped_key_frame = html
+        .update_with_input_actions_with_intent_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.search",
+                HtmlAction::Search,
+            )],
+        )
+        .expect("HTML should map intent-scoped commands for one update");
     let configured_empty_frame = html
         .update_actions_with(Size::new(320.0, 180.0), |commands| {
             commands.push_click("project.run", HtmlAction::Run);
         })
         .expect("HTML should configure typed actions for a no-input update");
+    let mapped_empty_frame = html
+        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .expect("HTML should map commands for a no-input update");
     let key_input_frame = html
         .update_with_input_actions(
             Size::new(320.0, 180.0),
@@ -1093,7 +1244,10 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(key_input_frame.contains_action(&HtmlAction::Search));
     assert!(configured_key_frame.contains_action(&HtmlAction::Search));
+    assert!(mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert!(intent_mapped_key_frame.contains_action(&HtmlAction::Search));
     assert!(configured_empty_frame.is_empty());
+    assert!(mapped_empty_frame.is_empty());
     assert!(key_frame.is_empty());
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
@@ -1673,11 +1827,32 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             },
         )
         .expect("HTML bundle should configure typed actions for one update");
+    let mapped_click_frame = bundle
+        .update_with_input_actions_with_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML bundle should map commands for one update");
+    let intent_mapped_key_frame = bundle
+        .update_with_input_actions_with_intent_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            [(
+                ElementBehaviorEvent::KeyDown,
+                "project.filter",
+                HtmlAction::Filter,
+            )],
+        )
+        .expect("HTML bundle should map intent-scoped commands for one update");
     let configured_empty_frame = bundle
         .update_actions_with(Size::new(320.0, 180.0), |commands| {
             commands.push("project.run", HtmlAction::Run);
         })
         .expect("HTML bundle should configure typed actions for a no-input update");
+    let mapped_empty_frame = bundle
+        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .expect("HTML bundle should map commands for a no-input update");
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = bundle
         .update_with_input_and_dispatch(
@@ -1732,7 +1907,10 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(key_frame.contains_action(&HtmlAction::Filter));
     assert!(configured_click_frame.contains_action(&HtmlAction::Run));
+    assert!(mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert!(intent_mapped_key_frame.contains_action(&HtmlAction::Filter));
     assert!(configured_empty_frame.is_empty());
+    assert!(mapped_empty_frame.is_empty());
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
@@ -2478,6 +2656,26 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &registry,
         )
         .expect("named document should collect typed actions through the set front door");
+    let mapped_action_frame = set
+        .update_with_input_actions_with_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should map commands through the set front door");
+    let intent_mapped_action_frame = set
+        .update_with_input_actions_with_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            [(
+                ElementBehaviorEvent::ContextMenu,
+                "shared.open",
+                SetAction::Menu,
+            )],
+        )
+        .expect("named document should map intent-scoped commands through the set front door");
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = set
         .update_with_input_and_dispatch(
@@ -2531,6 +2729,13 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     let empty_frame = set
         .update_actions("inline", Size::new(240.0, 160.0), &registry)
         .expect("named document should update and collect actions through the set front door");
+    let mapped_empty_frame = set
+        .update_actions_with_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should map commands during update");
     let mut surface = set
         .to_action_surface_with("inline", Size::new(240.0, 160.0), |commands| {
             commands.push_click("inline.run", SetAction::Run);
@@ -2583,6 +2788,28 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             },
         )
         .expect("named document should configure actions through strict CSS helpers");
+    let css_mapped_frame = set
+        .update_with_input_actions_and_css_and_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            "#inline { width: 154px; height: 32px; }",
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should map actions through strict CSS helpers");
+    let css_intent_mapped_frame = set
+        .update_with_input_actions_and_css_and_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            "#shared { width: 155px; height: 32px; }",
+            [(
+                ElementBehaviorEvent::ContextMenu,
+                "shared.open",
+                SetAction::Menu,
+            )],
+        )
+        .expect("named document should map intent actions through strict CSS helpers");
     let css_forgiving_action_frame = set
         .update_with_input_actions_and_css_forgiving(
             "inline",
@@ -2592,6 +2819,28 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &registry,
         )
         .expect("named document should route input through forgiving CSS action helpers");
+    let css_forgiving_mapped_frame = set
+        .update_with_input_actions_and_css_forgiving_and_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #inline { width: 158px; height: 32px; }",
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should map actions through forgiving CSS helpers");
+    let css_forgiving_intent_mapped_frame = set
+        .update_with_input_actions_and_css_forgiving_and_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #shared { width: 159px; height: 32px; }",
+            [(
+                ElementBehaviorEvent::ContextMenu,
+                "shared.open",
+                SetAction::Menu,
+            )],
+        )
+        .expect("named document should map intent actions through forgiving CSS helpers");
     let mut css_dispatched = Vec::new();
     let (css_dispatch_frame, css_dispatch_report) = set
         .update_with_input_and_css_and_dispatch(
@@ -2974,6 +3223,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         147.0
     );
     assert!(action_frame.contains_action(&SetAction::Run));
+    assert!(mapped_action_frame.contains_action(&SetAction::Run));
+    assert!(
+        intent_mapped_action_frame.contains_action_for_target_intent(
+            "shared",
+            ElementBehaviorEvent::ContextMenu,
+            &SetAction::Menu
+        )
+    );
     assert!(dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![SetAction::Run]);
@@ -2996,6 +3253,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     );
     assert_eq!(configured_dispatched_values, vec![SetAction::Run]);
     assert!(empty_frame.is_empty());
+    assert!(mapped_empty_frame.is_empty());
     assert_eq!(
         mapped_registry.bindings(),
         pushed_mapped_registry.bindings()
@@ -3032,6 +3290,34 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         152.0
     );
+    assert!(css_mapped_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_mapped_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        154.0
+    );
+    assert!(css_intent_mapped_frame.contains_action_for_target_intent(
+        "shared",
+        ElementBehaviorEvent::ContextMenu,
+        &SetAction::Menu
+    ));
+    assert_eq!(
+        css_intent_mapped_frame
+            .output()
+            .snapshot()
+            .find("shared")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        155.0
+    );
     assert!(css_forgiving_action_frame.contains_action(&SetAction::Run));
     assert_eq!(
         css_forgiving_action_frame
@@ -3043,6 +3329,36 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .size
             .width,
         156.0
+    );
+    assert!(css_forgiving_mapped_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_forgiving_mapped_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        158.0
+    );
+    assert!(
+        css_forgiving_intent_mapped_frame.contains_action_for_target_intent(
+            "shared",
+            ElementBehaviorEvent::ContextMenu,
+            &SetAction::Menu
+        )
+    );
+    assert_eq!(
+        css_forgiving_intent_mapped_frame
+            .output()
+            .snapshot()
+            .find("shared")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        159.0
     );
     assert!(css_dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(

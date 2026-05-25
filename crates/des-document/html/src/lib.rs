@@ -1004,6 +1004,34 @@ impl HtmlDocument {
         self.update_actions(viewport, &registry)
     }
 
+    /// Resolves this HTML tree and maps command names to typed Rust actions.
+    pub fn update_actions_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_actions(viewport, &registry)
+    }
+
+    /// Resolves this HTML tree and maps intent-scoped commands to actions.
+    pub fn update_actions_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
+        self.update_actions(viewport, &registry)
+    }
+
     /// Routes input through this HTML tree with an empty stylesheet.
     pub fn update_with_input(
         &self,
@@ -1040,6 +1068,36 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
+        self.update_with_input_actions(viewport, input, &registry)
+    }
+
+    /// Routes input through this HTML tree and maps command names to typed actions.
+    pub fn update_with_input_actions_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_with_input_actions(viewport, input, &registry)
+    }
+
+    /// Routes input through this HTML tree and maps intent-scoped commands.
+    pub fn update_with_input_actions_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions(viewport, input, &registry)
     }
 
@@ -1266,6 +1324,36 @@ impl HtmlDocument {
         self.update_actions_with_css(viewport, css, &registry)
     }
 
+    /// Parses CSS, resolves this HTML tree, and maps command names to actions.
+    pub fn update_actions_with_css_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_actions_with_css(viewport, css, &registry)
+    }
+
+    /// Parses CSS, resolves this HTML tree, and maps intent-scoped commands.
+    pub fn update_actions_with_css_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
+        self.update_actions_with_css(viewport, css, &registry)
+    }
+
     /// Parses forgiving CSS, resolves this HTML tree, and collects typed Rust actions.
     pub fn update_actions_with_css_forgiving<Action>(
         &self,
@@ -1292,6 +1380,36 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
+        self.update_actions_with_css_forgiving(viewport, css, &registry)
+    }
+
+    /// Parses forgiving CSS, resolves this HTML tree, and maps command names.
+    pub fn update_actions_with_css_forgiving_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_actions_with_css_forgiving(viewport, css, &registry)
+    }
+
+    /// Parses forgiving CSS, resolves this HTML tree, and maps intent-scoped commands.
+    pub fn update_actions_with_css_forgiving_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
         self.update_actions_with_css_forgiving(viewport, css, &registry)
     }
 
@@ -1334,6 +1452,38 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
+        self.update_with_input_actions_and_css(viewport, input, css, &registry)
+    }
+
+    /// Parses CSS, routes input, and maps command names to typed Rust actions.
+    pub fn update_with_input_actions_and_css_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_with_input_actions_and_css(viewport, input, css, &registry)
+    }
+
+    /// Parses CSS, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_actions_and_css_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions_and_css(viewport, input, css, &registry)
     }
 
@@ -1446,6 +1596,38 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
+        self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
+    }
+
+    /// Parses forgiving CSS, routes input, and maps command names to actions.
+    pub fn update_with_input_actions_and_css_forgiving_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
+    }
+
+    /// Parses forgiving CSS, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_actions_and_css_forgiving_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
     }
 
@@ -2534,6 +2716,34 @@ impl HtmlStylesheet {
         self.update_actions(viewport, &registry)
     }
 
+    /// Creates a view, resolves it, and maps command names to typed actions.
+    pub fn update_actions_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_actions(viewport, &registry)
+    }
+
+    /// Creates a view, resolves it, and maps intent-scoped commands to actions.
+    pub fn update_actions_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
+        self.update_actions(viewport, &registry)
+    }
+
     /// Creates a view, routes input, and returns the resolved output frame.
     pub fn update_with_input(
         &self,
@@ -2570,6 +2780,36 @@ impl HtmlStylesheet {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
+        self.update_with_input_actions(viewport, input, &registry)
+    }
+
+    /// Creates a view, routes input, and maps command names to typed actions.
+    pub fn update_with_input_actions_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_action_registry(actions);
+        self.update_with_input_actions(viewport, input, &registry)
+    }
+
+    /// Creates a view, routes input, and maps intent-scoped commands.
+    pub fn update_with_input_actions_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions(viewport, input, &registry)
     }
 
@@ -3526,6 +3766,36 @@ impl HtmlSet {
         self.get(name)?.update_actions(viewport, registry)
     }
 
+    /// Resolves a named document and maps command names to typed actions.
+    pub fn update_actions_with_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_actions_with_actions(viewport, actions)
+    }
+
+    /// Resolves a named document and maps intent-scoped commands to actions.
+    pub fn update_actions_with_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_actions_with_intent_actions(viewport, actions)
+    }
+
     /// Routes input through a named HTML document.
     pub fn update_with_input(
         &self,
@@ -3549,6 +3819,38 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_actions(viewport, input, registry)
+    }
+
+    /// Routes input through a named document and maps command names to actions.
+    pub fn update_with_input_actions_with_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_actions_with_actions(viewport, input, actions)
+    }
+
+    /// Routes input through a named document and maps intent-scoped commands.
+    pub fn update_with_input_actions_with_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_actions_with_intent_actions(viewport, input, actions)
     }
 
     /// Routes input through a named HTML document, collects typed actions, and dispatches them.
@@ -3973,6 +4275,40 @@ impl HtmlSet {
             .update_with_input_actions_and_css_with(viewport, input, css, configure)
     }
 
+    /// Parses CSS, routes input through a named document, and maps command names.
+    pub fn update_with_input_actions_and_css_and_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_and_actions(viewport, input, css, actions)
+    }
+
+    /// Parses CSS, routes input through a named document, and maps intent-scoped commands.
+    pub fn update_with_input_actions_and_css_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_and_intent_actions(viewport, input, css, actions)
+    }
+
     /// Parses CSS, routes input, collects typed actions, and dispatches them.
     pub fn update_with_input_and_css_and_dispatch<Action>(
         &self,
@@ -4075,6 +4411,42 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_actions_and_css_forgiving_with(viewport, input, css, configure)
+    }
+
+    /// Parses forgiving CSS, routes input through a named document, and maps command names.
+    pub fn update_with_input_actions_and_css_forgiving_and_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_forgiving_and_actions(viewport, input, css, actions)
+    }
+
+    /// Parses forgiving CSS, routes input through a named document, and maps intent-scoped commands.
+    pub fn update_with_input_actions_and_css_forgiving_and_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_forgiving_and_intent_actions(
+                viewport, input, css, actions,
+            )
     }
 
     /// Parses forgiving CSS, routes input, collects typed actions, and dispatches them.
