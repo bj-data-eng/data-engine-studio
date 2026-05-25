@@ -1310,6 +1310,81 @@ fn document_projection_projects_collections_of_elements_fluently() {
 }
 
 #[test]
+fn document_projection_projects_app_items_with_derived_element_ids() {
+    #[derive(Clone, Copy)]
+    struct Row {
+        id: &'static str,
+        label: &'static str,
+        selected: bool,
+        stale: bool,
+    }
+
+    let rows = [
+        Row {
+            id: "row-alpha",
+            label: "Alpha",
+            selected: false,
+            stale: true,
+        },
+        Row {
+            id: "row-beta",
+            label: "Beta",
+            selected: true,
+            stale: false,
+        },
+    ];
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.div("table").children(|ui| {
+            for row in rows {
+                ui.div(row.id).class("row").text("");
+            }
+        });
+    });
+
+    let projection = DocumentProjection::new()
+        .with_items(
+            rows,
+            |row| row.id,
+            |mut element, row| {
+                element
+                    .text(row.label)
+                    .data("state", if row.stale { "stale" } else { "fresh" })
+                    .class_if("is-selected", row.selected)
+                    .class_if("is-stale", row.stale)
+                    .selected(row.selected);
+            },
+        )
+        .with_items_if(
+            rows,
+            false,
+            |row| row.id,
+            |mut element, _| {
+                element.data("hidden-pass", "should-not-apply");
+            },
+        );
+
+    let report = view.project(&projection).unwrap();
+    let output = view.update();
+    let alpha = output.snapshot().find("row-alpha").unwrap();
+    let beta = output.snapshot().find("row-beta").unwrap();
+
+    assert_eq!(report.operations, 10);
+    assert_eq!(report.changed, 7);
+    assert_eq!(alpha.text(), Some("Alpha".to_owned()));
+    assert_eq!(beta.text(), Some("Beta".to_owned()));
+    assert_eq!(alpha.data("state"), Some("stale"));
+    assert_eq!(beta.data("state"), Some("fresh"));
+    assert!(alpha.has_class("is-stale"));
+    assert!(!alpha.has_class("is-selected"));
+    assert!(beta.has_class("is-selected"));
+    assert!(!beta.has_class("is-stale"));
+    assert!(!alpha.selected());
+    assert!(beta.selected());
+    assert_eq!(alpha.data("hidden-pass"), None);
+    assert_eq!(beta.data("hidden-pass"), None);
+}
+
+#[test]
 fn document_view_projects_state_and_updates_in_one_fluent_call() {
     let stylesheet = StyleSheet::new()
         .rule(

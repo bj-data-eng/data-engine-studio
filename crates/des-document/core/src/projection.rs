@@ -136,6 +136,77 @@ impl DocumentProjection {
         self
     }
 
+    pub fn items<I, Id, IdFor, Project>(
+        &mut self,
+        items: I,
+        mut id_for: IdFor,
+        mut project: Project,
+    ) -> &mut Self
+    where
+        I: IntoIterator,
+        Id: Into<ElementId>,
+        IdFor: FnMut(&I::Item) -> Id,
+        Project: FnMut(ElementProjection<'_>, I::Item),
+    {
+        for item in items {
+            let id = id_for(&item);
+            project(self.element(id), item);
+        }
+        self
+    }
+
+    pub fn with_items<I, Id, IdFor, Project>(
+        mut self,
+        items: I,
+        id_for: IdFor,
+        project: Project,
+    ) -> Self
+    where
+        I: IntoIterator,
+        Id: Into<ElementId>,
+        IdFor: FnMut(&I::Item) -> Id,
+        Project: FnMut(ElementProjection<'_>, I::Item),
+    {
+        self.items(items, id_for, project);
+        self
+    }
+
+    pub fn items_if<I, Id, IdFor, Project>(
+        &mut self,
+        items: I,
+        present: bool,
+        id_for: IdFor,
+        project: Project,
+    ) -> &mut Self
+    where
+        I: IntoIterator,
+        Id: Into<ElementId>,
+        IdFor: FnMut(&I::Item) -> Id,
+        Project: FnMut(ElementProjection<'_>, I::Item),
+    {
+        if present {
+            self.items(items, id_for, project);
+        }
+        self
+    }
+
+    pub fn with_items_if<I, Id, IdFor, Project>(
+        mut self,
+        items: I,
+        present: bool,
+        id_for: IdFor,
+        project: Project,
+    ) -> Self
+    where
+        I: IntoIterator,
+        Id: Into<ElementId>,
+        IdFor: FnMut(&I::Item) -> Id,
+        Project: FnMut(ElementProjection<'_>, I::Item),
+    {
+        self.items_if(items, present, id_for, project);
+        self
+    }
+
     pub fn when(mut self, present: bool, project: impl FnOnce(&mut Self)) -> Self {
         self.project_if(present, project);
         self
