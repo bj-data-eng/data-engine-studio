@@ -320,6 +320,73 @@ fn html_document_can_pair_with_css_without_manual_bundle_plumbing() {
 }
 
 #[test]
+fn html_css_entry_points_can_recover_like_browser_stylesheets() {
+    let html = HtmlDocument::parse_fragment(r#"<section id="panel" class="card">Panel</section>"#)
+        .expect("HTML should parse");
+    let css = r#"
+        .broken {
+          color: rgb(10, 20, );
+        }
+        .card { width: 144px; height: 48px; }
+    "#;
+    let bundle = html
+        .clone()
+        .with_css_forgiving(css)
+        .expect("forgiving CSS should recover valid rules");
+    let mut view = html
+        .to_view_with_css_forgiving(Size::new(240.0, 160.0), css)
+        .expect("forgiving CSS should compose directly into a view");
+
+    let output = view.update();
+    let panel = output.snapshot().find("panel").unwrap();
+
+    assert!(bundle.stylesheet().rule_count() >= 1);
+    assert_eq!(panel.rect().size.width, 144.0);
+    assert_eq!(panel.rect().size.height, 48.0);
+}
+
+#[test]
+fn html_stylesheet_forgiving_constructors_compile_author_assets() {
+    let bundle = HtmlStylesheet::parse_fragment_forgiving(
+        r#"<button id="run" class="primary" on:click="run">Run</button>"#,
+        r#"
+        .discard-me { width: ; }
+        .primary { width: 96px; height: 32px; }
+        "#,
+    )
+    .expect("fragment and forgiving CSS should compile together");
+    let document_bundle = HtmlStylesheet::parse_forgiving(
+        r#"<html><body><main id="app" class="shell">App</main></body></html>"#,
+        r#".bad { width: ; } .shell { width: 200px; height: 80px; }"#,
+    )
+    .expect("document and forgiving CSS should compile together");
+
+    let mut view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("bundle should create a view");
+    let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let run = output.snapshot().find("run").unwrap();
+    let mut document_view = document_bundle
+        .into_view(Size::new(320.0, 180.0))
+        .expect("document bundle should create a view");
+    let document_output = document_view.update();
+
+    assert!(bundle.stylesheet().rule_count() >= 1);
+    assert_eq!(run.rect().size.width, 96.0);
+    assert_eq!(output.commands()[0].command, "run");
+    assert_eq!(
+        document_output
+            .snapshot()
+            .find("app")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        200.0
+    );
+}
+
+#[test]
 fn html_document_can_create_ready_to_update_document_view_without_css() {
     let html = HtmlDocument::parse_fragment(
         r#"<main id="app" class="shell compact" data-workspace="demo" aria-label="Workspace"><button id="run" on:click="project.run">Run</button></main>"#,
@@ -425,6 +492,36 @@ fn html_document_and_stylesheet_load_from_files() {
     let bundle = HtmlStylesheet::load_files(html_fixture.path(), css_fixture.path())
         .expect("HTML+CSS files should load");
     assert!(bundle.stylesheet.rule_count() > 0);
+}
+
+#[test]
+fn html_document_and_forgiving_stylesheet_load_from_files() {
+    let html_fixture = TempHtmlPath::new("des-html-forgiving-document-load", "html");
+    let css_fixture = TempHtmlPath::new("des-html-forgiving-stylesheet-load", "css");
+    fs::write(
+        html_fixture.path(),
+        r#"<section id="loaded" class="card">Loaded</section>"#,
+    )
+    .expect("HTML fixture should be writable");
+    fs::write(
+        css_fixture.path(),
+        r#"
+        .bad { height: ; }
+        .card { width: 88px; height: 24px; }
+        "#,
+    )
+    .expect("CSS fixture should be writable");
+
+    let bundle = HtmlStylesheet::load_files_forgiving(html_fixture.path(), css_fixture.path())
+        .expect("HTML+forgiving CSS files should load");
+    let mut view = bundle
+        .to_view(Size::new(240.0, 160.0))
+        .expect("file-backed bundle should create a view");
+    let output = view.update();
+    let loaded = output.snapshot().find("loaded").unwrap();
+
+    assert_eq!(loaded.rect().size.width, 88.0);
+    assert_eq!(loaded.rect().size.height, 24.0);
 }
 
 #[test]

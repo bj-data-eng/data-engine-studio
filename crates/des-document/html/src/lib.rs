@@ -171,6 +171,11 @@ impl HtmlDocument {
         Ok(self.with_stylesheet(parse_stylesheet(css)?))
     }
 
+    /// Parses CSS with browser-like error recovery and pairs it with this HTML tree.
+    pub fn with_css_forgiving(self, css: &str) -> HtmlResult<HtmlStylesheet> {
+        Ok(self.with_stylesheet(parse_stylesheet_forgiving(css)?))
+    }
+
     /// Creates a ready-to-update document view from this HTML tree and stylesheet.
     pub fn to_view_with_stylesheet(
         &self,
@@ -183,6 +188,15 @@ impl HtmlDocument {
     /// Parses CSS and creates a ready-to-update document view from this HTML tree.
     pub fn to_view_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentView> {
         self.to_view_with_stylesheet(viewport, parse_stylesheet(css)?)
+    }
+
+    /// Parses CSS with browser-like error recovery and creates a document view.
+    pub fn to_view_with_css_forgiving(
+        &self,
+        viewport: Size,
+        css: &str,
+    ) -> HtmlResult<DocumentView> {
+        self.to_view_with_stylesheet(viewport, parse_stylesheet_forgiving(css)?)
     }
 
     /// Emits this parsed HTML tree into a caller-owned document builder.
@@ -227,9 +241,21 @@ impl HtmlStylesheet {
         Ok(Self::new(HtmlDocument::parse(html)?, stylesheet))
     }
 
+    /// Parses an HTML document and forgiving CSS stylesheet into typed inputs.
+    pub fn parse_forgiving(html: &str, css: &str) -> HtmlResult<Self> {
+        let stylesheet = parse_stylesheet_forgiving(css)?;
+        Ok(Self::new(HtmlDocument::parse(html)?, stylesheet))
+    }
+
     /// Parses an HTML fragment and CSS stylesheet into typed document inputs.
     pub fn parse_fragment(html: &str, css: &str) -> HtmlResult<Self> {
         let stylesheet = parse_stylesheet(css)?;
+        Ok(Self::new(HtmlDocument::parse_fragment(html)?, stylesheet))
+    }
+
+    /// Parses an HTML fragment and forgiving CSS stylesheet into typed inputs.
+    pub fn parse_fragment_forgiving(html: &str, css: &str) -> HtmlResult<Self> {
+        let stylesheet = parse_stylesheet_forgiving(css)?;
         Ok(Self::new(HtmlDocument::parse_fragment(html)?, stylesheet))
     }
 
@@ -238,6 +264,17 @@ impl HtmlStylesheet {
         Ok(Self::new(
             HtmlDocument::load(html_path)?,
             parse_stylesheet(&fs::read_to_string(css_path)?)?,
+        ))
+    }
+
+    /// Reads HTML and CSS files, recovering from invalid CSS rules like browsers do.
+    pub fn load_files_forgiving(
+        html_path: impl AsRef<Path>,
+        css_path: impl AsRef<Path>,
+    ) -> HtmlResult<Self> {
+        Ok(Self::new(
+            HtmlDocument::load(html_path)?,
+            parse_stylesheet_forgiving(&fs::read_to_string(css_path)?)?,
         ))
     }
 
@@ -541,6 +578,10 @@ impl HtmlFingerprint {
 
 fn parse_stylesheet(css: &str) -> HtmlResult<StyleSheet> {
     StyleSheet::parse_css(css).map_err(|error| HtmlError::Css(error.to_string()))
+}
+
+fn parse_stylesheet_forgiving(css: &str) -> HtmlResult<StyleSheet> {
+    StyleSheet::parse_css_forgiving(css).map_err(|error| HtmlError::Css(error.to_string()))
 }
 
 fn rcdom_children_to_html(
