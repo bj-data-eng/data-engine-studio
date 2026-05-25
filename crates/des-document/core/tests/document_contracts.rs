@@ -1596,6 +1596,39 @@ fn document_builder_supports_fluent_html_like_elements() {
 }
 
 #[test]
+fn document_builder_supports_fluent_text_nodes() {
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.section("card").class("card").children(|ui| {
+            ui.text_node("title")
+                .classes(["card-title", "copyable"])
+                .aria("label", "Card title")
+                .selectable_text()
+                .text("Ready");
+            ui.text_node("count")
+                .class("metric")
+                .data("kind", "row-count")
+                .text("42 rows");
+        });
+    });
+    let stylesheet = StyleSheet::new()
+        .class("card-title", Style::default().size(120.0, 24.0))
+        .class("metric", Style::default().size(80.0, 20.0));
+    let output = DocumentEngine::default().update(&mut document, &stylesheet);
+    let title = output.snapshot().find("title").unwrap();
+    let count = output.snapshot().find("count").unwrap();
+
+    assert_eq!(title.element(), Element::Text);
+    assert!(title.has_all_classes(["card-title", "copyable"]));
+    assert_eq!(title.aria("label"), Some("Card title"));
+    assert!(title.selectable_text());
+    assert_eq!(title.text(), Some("Ready".to_owned()));
+    assert_eq!(title.rect().size, Size::new(120.0, 24.0));
+    assert_eq!(count.data("kind"), Some("row-count"));
+    assert_eq!(count.text(), Some("42 rows".to_owned()));
+    assert_eq!(count.rect().size, Size::new(80.0, 20.0));
+}
+
+#[test]
 fn update_reports_created_retained_and_removed_elements() {
     let mut engine = DocumentEngine::default();
     let stylesheet = probe_stylesheet();

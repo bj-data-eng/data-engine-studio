@@ -1420,6 +1420,10 @@ impl DocumentBuilder {
         self.text_element(id, ElementSpec::new(Element::Text), text);
     }
 
+    pub fn text_node(&mut self, id: impl Into<ElementId>) -> ElementBuilder<'_> {
+        self.child(id, Element::Text)
+    }
+
     pub fn text_element(
         &mut self,
         id: impl Into<ElementId>,
