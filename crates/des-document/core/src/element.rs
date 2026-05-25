@@ -548,6 +548,18 @@ impl ElementSpec {
         self.disabled(!enabled)
     }
 
+    pub fn disabled_if(self, disabled: bool, present: bool) -> Self {
+        if present {
+            self.disabled(disabled)
+        } else {
+            self
+        }
+    }
+
+    pub fn enabled_if(self, enabled: bool, present: bool) -> Self {
+        if present { self.enabled(enabled) } else { self }
+    }
+
     pub fn disable(self) -> Self {
         self.disabled(true)
     }

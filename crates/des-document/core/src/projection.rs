@@ -707,6 +707,18 @@ impl DocumentProjection {
         self.set_disabled(id, !enabled)
     }
 
+    pub fn set_enabled_if(
+        mut self,
+        id: impl Into<ElementId>,
+        enabled: bool,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.push_enabled(id, enabled);
+        }
+        self
+    }
+
     pub fn disable(self, id: impl Into<ElementId>) -> Self {
         self.set_disabled(id, true)
     }
@@ -737,6 +749,12 @@ impl DocumentProjection {
     pub fn push_enabled(&mut self, id: impl Into<ElementId>, enabled: bool) {
         self.operations
             .push(DocumentProjectionOperation::set_enabled(id, enabled));
+    }
+
+    pub fn push_enabled_if(&mut self, id: impl Into<ElementId>, enabled: bool, present: bool) {
+        if present {
+            self.push_enabled(id, enabled);
+        }
     }
 
     pub fn push_disable_if(&mut self, id: impl Into<ElementId>, present: bool) {
@@ -1210,6 +1228,10 @@ impl ElementProjectionPatch {
         self.disabled(!enabled)
     }
 
+    pub fn enabled_if(self, enabled: bool, present: bool) -> Self {
+        self.disabled_if(!enabled, present)
+    }
+
     pub fn disabled_if(mut self, disabled: bool, present: bool) -> Self {
         if present {
             self.disabled = Some(disabled);
@@ -1533,6 +1555,13 @@ impl ElementProjection<'_> {
 
     pub fn enabled(&mut self, enabled: bool) -> &mut Self {
         self.disabled(!enabled)
+    }
+
+    pub fn enabled_if(&mut self, enabled: bool, present: bool) -> &mut Self {
+        if present {
+            self.enabled(enabled);
+        }
+        self
     }
 
     pub fn disable(&mut self) -> &mut Self {

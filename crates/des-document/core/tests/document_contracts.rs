@@ -2370,7 +2370,7 @@ fn document_projection_batches_app_state_updates() {
     let restore = DocumentProjection::new()
         .select("status")
         .focus("status")
-        .set_enabled("status", true);
+        .set_enabled_if("status", true, true);
     let restore_report = view.project(&restore).unwrap();
     let restore_output = view.update();
     let restore_status = restore_output.snapshot().find("status").unwrap();
@@ -2401,20 +2401,22 @@ fn document_projection_updates_semantic_attributes() {
                 .data("state", "running")
                 .remove_data("ephemeral")
                 .attribute_if("draggable", "true", true)
-                .attribute_if("title", "Idle run", false);
+                .attribute_if("title", "Idle run", false)
+                .enabled_if(false, true);
         })
         .unwrap();
     let output = view.update();
     let run = output.snapshot().find("run").unwrap();
 
-    assert_eq!(report.operations, 6);
-    assert_eq!(report.changed, 5);
+    assert_eq!(report.operations, 7);
+    assert_eq!(report.changed, 6);
     assert_eq!(run.attribute("aria-label"), Some("Query running"));
     assert_eq!(run.attribute("aria-busy"), Some("true"));
     assert_eq!(run.attribute("data-state"), Some("running"));
     assert_eq!(run.attribute("data-ephemeral"), None);
     assert_eq!(run.attribute("draggable"), Some("true"));
     assert_eq!(run.attribute("title"), None);
+    assert!(run.disabled());
 
     let unchanged = DocumentProjection::new()
         .set_aria("run", "label", "Query running")
@@ -2422,10 +2424,11 @@ fn document_projection_updates_semantic_attributes() {
         .set_data("run", "state", "running")
         .remove_data("run", "ephemeral")
         .set_attribute_if("run", "draggable", "true", true)
-        .set_attribute_if("run", "title", "Idle run", false);
+        .set_attribute_if("run", "title", "Idle run", false)
+        .set_enabled_if("run", false, true);
     let unchanged_report = view.project(&unchanged).unwrap();
 
-    assert_eq!(unchanged_report.operations, 6);
+    assert_eq!(unchanged_report.operations, 7);
     assert_eq!(unchanged_report.changed, 0);
 }
 
@@ -2466,7 +2469,7 @@ fn element_projection_patch_groups_reusable_state_updates() {
         })
         .unwrap()
         .select()
-        .enable()
+        .enabled_if(true, true)
         .focus()
         .add_class("is-ready")
         .remove_class("is-stale");
@@ -2589,6 +2592,7 @@ fn element_projection_patch_groups_reusable_state_updates() {
     let reset_patch = ElementProjectionPatch::new()
         .uncheck_if(true)
         .enable_if(false)
+        .enabled_if(true, false)
         .enabled(false)
         .blur_if(true)
         .focus_if(false)
@@ -5745,6 +5749,8 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .aria_if("disabled", "true", false)
             .select_if(selected)
             .enabled(!disabled)
+            .enabled_if(true, show_badge)
+            .enabled_if(false, false)
             .disable_if(disabled)
             .focus_if(focused)
             .value_if("ready", show_badge)
@@ -5890,6 +5896,7 @@ fn document_builder_supports_conditional_authoring_helpers() {
         .checked(true)
         .checked_if(false, false)
         .enabled(true)
+        .enabled_if(false, false)
         .disable_if(false)
         .focus_if(true)
         .selectable_text_if(true)

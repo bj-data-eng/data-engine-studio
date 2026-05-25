@@ -2879,6 +2879,16 @@ impl<'a> ElementBuilder<'a> {
         self
     }
 
+    pub fn enabled_if(mut self, enabled: bool, present: bool) -> Self {
+        self.spec = self.spec.enabled_if(enabled, present);
+        self
+    }
+
+    pub fn disabled_if(mut self, disabled: bool, present: bool) -> Self {
+        self.spec = self.spec.disabled_if(disabled, present);
+        self
+    }
+
     pub fn disable(mut self) -> Self {
         self.spec = self.spec.disable();
         self
