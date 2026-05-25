@@ -2704,6 +2704,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             [("inline.run", SetAction::Run)],
         )
         .expect("named document should map commands through the set front door");
+    let mapped_action_values = set
+        .update_with_input_action_values_with_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should map commands directly to action values");
     let intent_mapped_action_frame = set
         .update_with_input_actions_with_intent_actions(
             "shared",
@@ -2716,6 +2724,18 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             )],
         )
         .expect("named document should map intent-scoped commands through the set front door");
+    let intent_mapped_action_values = set
+        .update_with_input_action_values_with_intent_actions(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            [(
+                ElementBehaviorEvent::ContextMenu,
+                "shared.open",
+                SetAction::Menu,
+            )],
+        )
+        .expect("named document should map intent-scoped commands directly to action values");
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = set
         .update_with_input_and_dispatch(
@@ -3264,6 +3284,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     );
     assert!(action_frame.contains_action(&SetAction::Run));
     assert!(mapped_action_frame.contains_action(&SetAction::Run));
+    assert_eq!(mapped_action_values, vec![SetAction::Run]);
     assert!(
         intent_mapped_action_frame.contains_action_for_target_intent(
             "shared",
@@ -3271,6 +3292,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &SetAction::Menu
         )
     );
+    assert_eq!(intent_mapped_action_values, vec![SetAction::Menu]);
     assert!(dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![SetAction::Run]);
