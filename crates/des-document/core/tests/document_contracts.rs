@@ -1366,9 +1366,14 @@ fn document_mutation_can_set_text_value_and_authored_states() {
 
     assert!(document.set_text("label", "Much longer text").unwrap());
     assert!(document.set_value("control", "updated").unwrap());
+    assert!(document.set_data("control", "state", "busy").unwrap());
+    assert!(document.set_aria("control", "label", "Busy").unwrap());
     assert_eq!(
         document
-            .set_attributes("control", [("data-state", "busy"), ("aria-label", "Busy")])
+            .set_attributes(
+                "control",
+                [("data-phase", "loading"), ("aria-busy", "true")]
+            )
             .unwrap(),
         2
     );
@@ -1391,8 +1396,16 @@ fn document_mutation_can_set_text_value_and_authored_states() {
         Some("busy")
     );
     assert_eq!(
+        control.attributes.get("data-phase").map(String::as_str),
+        Some("loading")
+    );
+    assert_eq!(
         control.attributes.get("aria-label").map(String::as_str),
         Some("Busy")
+    );
+    assert_eq!(
+        control.attributes.get("aria-busy").map(String::as_str),
+        Some("true")
     );
     assert_eq!(control.style.background, Some(Color::rgb(35, 56, 78)));
     assert_eq!(control.style.text_color, Color::rgb(90, 96, 102));
@@ -1401,10 +1414,12 @@ fn document_mutation_can_set_text_value_and_authored_states() {
 
     assert_eq!(
         document
-            .remove_attributes("control", ["data-state", "aria-label", "missing"])
+            .remove_attributes("control", ["data-phase", "aria-busy", "missing"])
             .unwrap(),
         2
     );
+    assert!(document.remove_data("control", "state").unwrap());
+    assert!(document.remove_aria("control", "label").unwrap());
     assert!(document.deselect("control").unwrap());
     assert!(document.enable("control").unwrap());
     assert!(document.blur("control").unwrap());

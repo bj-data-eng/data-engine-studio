@@ -357,6 +357,24 @@ impl Document {
         Ok(changed)
     }
 
+    pub fn set_data(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+    ) -> DocumentResult<bool> {
+        self.set_attribute(id, prefixed_attribute_name("data-", name), value)
+    }
+
+    pub fn set_aria(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+    ) -> DocumentResult<bool> {
+        self.set_attribute(id, prefixed_attribute_name("aria-", name), value)
+    }
+
     pub fn remove_attribute(
         &mut self,
         id: impl Into<ElementId>,
@@ -387,6 +405,22 @@ impl Document {
             changed += usize::from(self.remove_attribute(id.clone(), name)?);
         }
         Ok(changed)
+    }
+
+    pub fn remove_data(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+    ) -> DocumentResult<bool> {
+        self.remove_attribute(id, prefixed_attribute_name("data-", name))
+    }
+
+    pub fn remove_aria(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+    ) -> DocumentResult<bool> {
+        self.remove_attribute(id, prefixed_attribute_name("aria-", name))
     }
 
     pub fn add_class(
@@ -1621,6 +1655,15 @@ fn root_sized_style(mut style: ComputedStyle, viewport: Size) -> ComputedStyle {
     style.width = Length::Px(viewport.width);
     style.height = Length::Px(viewport.height);
     style
+}
+
+fn prefixed_attribute_name(prefix: &str, name: impl AsRef<str>) -> String {
+    let name = name.as_ref();
+    if name.starts_with(prefix) {
+        name.to_owned()
+    } else {
+        format!("{prefix}{name}")
+    }
 }
 
 fn table_grid_columns(table: &TableSpec) -> Vec<GridTemplateComponent<String>> {
