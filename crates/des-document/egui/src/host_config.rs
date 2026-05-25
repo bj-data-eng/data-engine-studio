@@ -168,6 +168,30 @@ fn system_ui_font_candidates() -> Vec<PathBuf> {
     paths
 }
 
+fn monospace_font_candidates() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(windir) = std::env::var_os("WINDIR") {
+        paths.push(
+            PathBuf::from(&windir)
+                .join("Fonts")
+                .join("CascadiaMono.ttf"),
+        );
+        paths.push(
+            PathBuf::from(&windir)
+                .join("Fonts")
+                .join("CascadiaCode.ttf"),
+        );
+        paths.push(PathBuf::from(&windir).join("Fonts").join("consola.ttf"));
+    }
+    paths.push(PathBuf::from(
+        "/System/Library/Fonts/MonacoSupplemental.ttf",
+    ));
+    paths.push(PathBuf::from(
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    ));
+    paths
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,28 +229,4 @@ mod tests {
         assert_eq!(measured.line_count, 1);
         assert_eq!(measured.first_baseline, Some(measured.lines[0].baseline));
     }
-}
-
-fn monospace_font_candidates() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    if let Some(windir) = std::env::var_os("WINDIR") {
-        paths.push(
-            PathBuf::from(&windir)
-                .join("Fonts")
-                .join("CascadiaMono.ttf"),
-        );
-        paths.push(
-            PathBuf::from(&windir)
-                .join("Fonts")
-                .join("CascadiaCode.ttf"),
-        );
-        paths.push(PathBuf::from(&windir).join("Fonts").join("consola.ttf"));
-    }
-    paths.push(PathBuf::from(
-        "/System/Library/Fonts/MonacoSupplemental.ttf",
-    ));
-    paths.push(PathBuf::from(
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-    ));
-    paths
 }

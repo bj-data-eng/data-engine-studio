@@ -959,6 +959,7 @@ impl<NodeContext> LayoutTree<NodeContext> {
         Ok(old_child)
     }
 
+    /// Removes a child from its current parent before reparenting it elsewhere.
     fn detach_child(&mut self, child: NodeId) -> LayoutResult<()> {
         if let Some(previous_parent) = self.parents[child.into()] {
             self.remove_child(previous_parent, child)?;
@@ -967,6 +968,7 @@ impl<NodeContext> LayoutTree<NodeContext> {
         Ok(())
     }
 
+    /// Detaches a node before insertion and adjusts the target index if it moved within one parent.
     fn detach_child_for_insert(
         &mut self,
         parent: NodeId,
@@ -986,6 +988,7 @@ impl<NodeContext> LayoutTree<NodeContext> {
         }
     }
 
+    /// Detaches a replacement node and preserves the intended replace index after reparenting.
     fn detach_child_for_replace(
         &mut self,
         parent: NodeId,
@@ -1005,6 +1008,7 @@ impl<NodeContext> LayoutTree<NodeContext> {
         }
     }
 
+    /// Finds a child's current position in a parent's child list.
     fn child_index(&self, parent: NodeId, child: NodeId) -> LayoutResult<usize> {
         self.children[parent.into()]
             .iter()

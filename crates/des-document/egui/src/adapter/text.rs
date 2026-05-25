@@ -394,8 +394,10 @@ mod tests {
     #[test]
     fn layout_job_max_lines_forces_single_breakable_row() {
         let text = TextContent::plain("truncate me");
-        let mut style = TextLayoutStyle::default();
-        style.max_lines = Some(1);
+        let style = TextLayoutStyle {
+            max_lines: Some(1),
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&text, style);
         let job = layout_job(
             TextLayoutRequest {
@@ -419,9 +421,11 @@ mod tests {
     #[test]
     fn layout_job_maps_text_overflow_ellipsis() {
         let text = TextContent::plain("truncate me");
-        let mut style = TextLayoutStyle::default();
-        style.max_lines = Some(1);
-        style.text_overflow = TextOverflow::Ellipsis;
+        let style = TextLayoutStyle {
+            max_lines: Some(1),
+            text_overflow: TextOverflow::Ellipsis,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&text, style);
         let job = layout_job(
             TextLayoutRequest {
@@ -442,8 +446,10 @@ mod tests {
     #[test]
     fn layout_job_maps_text_alignment() {
         let text = TextContent::plain("aligned");
-        let mut style = TextLayoutStyle::default();
-        style.text_align = TextAlign::End;
+        let style = TextLayoutStyle {
+            text_align: TextAlign::End,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&text, style);
         let job = layout_job(
             TextLayoutRequest {
@@ -480,8 +486,10 @@ mod tests {
             egui::Color32::WHITE,
         );
 
-        let mut style = TextLayoutStyle::default();
-        style.text_align = TextAlign::End;
+        let style = TextLayoutStyle {
+            text_align: TextAlign::End,
+            ..Default::default()
+        };
         let rtl_end = layout_job(
             TextLayoutRequest {
                 text: &normalized,
@@ -502,8 +510,10 @@ mod tests {
     #[test]
     fn layout_job_maps_justified_text_alignment() {
         let text = TextContent::plain("justified text");
-        let mut style = TextLayoutStyle::default();
-        style.text_align = TextAlign::Justify;
+        let style = TextLayoutStyle {
+            text_align: TextAlign::Justify,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&text, style);
         let job = layout_job(
             TextLayoutRequest {

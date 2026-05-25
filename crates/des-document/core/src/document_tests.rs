@@ -181,58 +181,60 @@ fn document_applies_document_style_to_existing_layout_node() {
         .unwrap();
     let original_layout_node = document.layout_node("panel").unwrap();
 
-    let mut style = ComputedStyle::default();
-    style.display = Display::Grid;
-    style.flex_direction = FlexDirection::Row;
-    style.flex_wrap = FlexWrap::Wrap;
-    style.flex_basis = Length::Px(88.0);
-    style.flex_grow = 2.0;
-    style.flex_shrink = 0.5;
-    style.align_content = AlignContent::SpaceAround;
-    style.align_items = AlignItems::FlexEnd;
-    style.align_self = Some(AlignItems::Baseline);
-    style.justify_items = Some(AlignItems::Center);
-    style.justify_self = Some(AlignItems::End);
-    style.justify_content = JustifyContent::SpaceEvenly;
-    style.gap = Length::Px(12.0);
-    style.row_gap = Length::Px(10.0);
-    style.column_gap = Length::Px(14.0);
-    style.grid_template_rows = vec![GridTemplateComponent::Repeat(GridTemplateRepetition {
-        count: RepetitionCount::Count(2),
-        tracks: vec![fr::<_, GridTrack>(1.0)],
-        line_names: vec![vec!["row".to_string()]],
-    })];
-    style.grid_template_columns = vec![
-        GridTemplateComponent::Single(length::<_, GridTrack>(96.0)),
-        GridTemplateComponent::Single(fr::<_, GridTrack>(1.0)),
-    ];
-    style.grid_auto_rows = vec![length::<_, GridTrack>(24.0)];
-    style.grid_auto_columns = vec![fr::<_, GridTrack>(2.0)];
-    style.grid_auto_flow = GridAutoFlow::ColumnDense;
-    style.grid_template_areas = vec![GridTemplateArea {
-        name: "main".to_string(),
-        row_start: 0,
-        row_end: 1,
-        column_start: 0,
-        column_end: 2,
-    }];
-    style.grid_template_column_names = vec![vec!["start".to_string()], vec!["end".to_string()]];
-    style.grid_template_row_names = vec![vec!["top".to_string()], vec!["bottom".to_string()]];
-    style.grid_row = GridPlacementLine {
-        start: line::<GridPlacement>(1),
-        end: GridPlacement::Span(2),
+    let style = ComputedStyle {
+        display: Display::Grid,
+        flex_direction: FlexDirection::Row,
+        flex_wrap: FlexWrap::Wrap,
+        flex_basis: Length::Px(88.0),
+        flex_grow: 2.0,
+        flex_shrink: 0.5,
+        align_content: AlignContent::SpaceAround,
+        align_items: AlignItems::FlexEnd,
+        align_self: Some(AlignItems::Baseline),
+        justify_items: Some(AlignItems::Center),
+        justify_self: Some(AlignItems::End),
+        justify_content: JustifyContent::SpaceEvenly,
+        gap: Length::Px(12.0),
+        row_gap: Length::Px(10.0),
+        column_gap: Length::Px(14.0),
+        grid_template_rows: vec![GridTemplateComponent::Repeat(GridTemplateRepetition {
+            count: RepetitionCount::Count(2),
+            tracks: vec![fr::<_, GridTrack>(1.0)],
+            line_names: vec![vec!["row".to_string()]],
+        })],
+        grid_template_columns: vec![
+            GridTemplateComponent::Single(length::<_, GridTrack>(96.0)),
+            GridTemplateComponent::Single(fr::<_, GridTrack>(1.0)),
+        ],
+        grid_auto_rows: vec![length::<_, GridTrack>(24.0)],
+        grid_auto_columns: vec![fr::<_, GridTrack>(2.0)],
+        grid_auto_flow: GridAutoFlow::ColumnDense,
+        grid_template_areas: vec![GridTemplateArea {
+            name: "main".to_string(),
+            row_start: 0,
+            row_end: 1,
+            column_start: 0,
+            column_end: 2,
+        }],
+        grid_template_column_names: vec![vec!["start".to_string()], vec!["end".to_string()]],
+        grid_template_row_names: vec![vec!["top".to_string()], vec!["bottom".to_string()]],
+        grid_row: GridPlacementLine {
+            start: line::<GridPlacement>(1),
+            end: GridPlacement::Span(2),
+        },
+        grid_column: GridPlacementLine {
+            start: GridPlacement::NamedLine("content".to_string(), 0),
+            end: GridPlacement::NamedSpan("content".to_string(), 2),
+        },
+        margin: Insets::symmetric(8.0, 4.0),
+        padding: Insets::all(6.0),
+        width: Length::Percent(0.5),
+        height: Length::Px(240.0),
+        min_size: Size::new(120.0, 80.0),
+        max_size: Size::new(640.0, 480.0),
+        overflow_x: Overflow::Scroll,
+        ..Default::default()
     };
-    style.grid_column = GridPlacementLine {
-        start: GridPlacement::NamedLine("content".to_string(), 0),
-        end: GridPlacement::NamedSpan("content".to_string(), 2),
-    };
-    style.margin = Insets::symmetric(8.0, 4.0);
-    style.padding = Insets::all(6.0);
-    style.width = Length::Percent(0.5);
-    style.height = Length::Px(240.0);
-    style.min_size = Size::new(120.0, 80.0);
-    style.max_size = Size::new(640.0, 480.0);
-    style.overflow_x = Overflow::Scroll;
 
     document.apply_computed_style("panel", &style).unwrap();
 
@@ -324,9 +326,11 @@ fn document_fill_size_does_not_imply_flex_layout_style() {
         .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
 
-    let mut style = ComputedStyle::default();
-    style.width = Length::Fill;
-    style.height = Length::Fill;
+    let style = ComputedStyle {
+        width: Length::Fill,
+        height: Length::Fill,
+        ..Default::default()
+    };
 
     document.apply_computed_style("panel", &style).unwrap();
 
@@ -400,9 +404,11 @@ fn document_computes_layout_rects_from_retained_graph() {
         .append_element("root", "panel", ElementSpec::new(Element::Div))
         .unwrap();
 
-    let mut style = ComputedStyle::default();
-    style.width = Length::Px(200.0);
-    style.height = Length::Px(100.0);
+    let style = ComputedStyle {
+        width: Length::Px(200.0),
+        height: Length::Px(100.0),
+        ..Default::default()
+    };
     document.apply_computed_style("panel", &style).unwrap();
 
     document.compute_layout().unwrap();
@@ -451,8 +457,10 @@ fn document_resolves_stylesheet_over_retained_elements() {
             Style::default().width(Length::Px(240.0)),
         );
     let mut states = HashMap::new();
-    let mut second_state = ElementState::default();
-    second_state.hovered = true;
+    let second_state = ElementState {
+        hovered: true,
+        ..Default::default()
+    };
     states.insert(ElementId::new("second"), second_state);
 
     document.apply_stylesheet(&stylesheet, &states).unwrap();
@@ -535,8 +543,10 @@ fn css_stylesheet_parser_resolves_supported_selectors_and_properties() {
     )
     .unwrap();
     let mut states = HashMap::new();
-    let mut title_state = ElementState::default();
-    title_state.hovered = true;
+    let title_state = ElementState {
+        hovered: true,
+        ..Default::default()
+    };
     states.insert(ElementId::new("title"), title_state);
 
     document.apply_stylesheet(&stylesheet, &states).unwrap();
@@ -722,8 +732,10 @@ fn css_stylesheet_parser_resolves_descendant_selectors() {
     )
     .unwrap();
     let mut states = HashMap::new();
-    let mut section_state = ElementState::default();
-    section_state.hovered = true;
+    let section_state = ElementState {
+        hovered: true,
+        ..Default::default()
+    };
     states.insert(ElementId::new("section"), section_state);
 
     document.apply_stylesheet(&stylesheet, &states).unwrap();
@@ -861,8 +873,10 @@ fn css_stylesheet_parser_resolves_sibling_combinators() {
     )
     .unwrap();
     let mut states = HashMap::new();
-    let mut marker_state = ElementState::default();
-    marker_state.hovered = true;
+    let marker_state = ElementState {
+        hovered: true,
+        ..Default::default()
+    };
     states.insert(ElementId::new("marker"), marker_state);
 
     document.apply_stylesheet(&stylesheet, &states).unwrap();

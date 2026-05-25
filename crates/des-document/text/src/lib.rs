@@ -2009,8 +2009,10 @@ mod tests {
     fn measures_break_word_as_wrappable_long_token() {
         let mut renderer = renderer();
         let content = TextContent::plain("supercalifragilisticexpialidocious");
-        let mut style = TextLayoutStyle::default();
-        style.overflow_wrap = des_document::OverflowWrap::BreakWord;
+        let style = TextLayoutStyle {
+            overflow_wrap: des_document::OverflowWrap::BreakWord,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
 
         let measured = renderer.measure_text(TextLayoutRequest {
@@ -2053,9 +2055,11 @@ mod tests {
     fn reports_single_line_ellipsis_as_elided() {
         let mut renderer = renderer();
         let content = TextContent::plain("A compact field title should elide when too wide.");
-        let mut style = TextLayoutStyle::default();
-        style.max_lines = Some(1);
-        style.text_overflow = TextOverflow::Ellipsis;
+        let style = TextLayoutStyle {
+            max_lines: Some(1),
+            text_overflow: TextOverflow::Ellipsis,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
         let measured = renderer.measure_text(TextLayoutRequest {
             text: &normalized,

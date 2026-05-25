@@ -1495,14 +1495,12 @@ fn draggable_drag_drop_suppresses_gap_at_original_position() {
         0,
         "hidden placeholders should reserve layout without painting a shadow"
     );
-    assert_eq!(
-        frame(&output, "drag-item-1").style.animate_paint,
-        false,
+    assert!(
+        !frame(&output, "drag-item-1").style.animate_paint,
         "hidden placeholders should snap old paint away without changing layout animation timing"
     );
-    assert_eq!(
-        frame(&output, "drag-item-1").style.animate_shadows,
-        false,
+    assert!(
+        !frame(&output, "drag-item-1").style.animate_shadows,
         "hidden placeholders should explicitly snap shadows away"
     );
     assert!(
@@ -1625,9 +1623,8 @@ fn draggable_drag_drop_styles_are_animated() {
         1,
         "drag overlay should inherit the source item's one soft shadow"
     );
-    assert_eq!(
-        frame(&output, "drag-overlay").style.animate_size,
-        false,
+    assert!(
+        !frame(&output, "drag-overlay").style.animate_size,
         "drag overlay should snap to source size instead of easing in from idle width"
     );
     assert_eq!(

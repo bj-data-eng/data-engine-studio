@@ -513,10 +513,10 @@ impl UiLabState {
         }
         for event in &output.events {
             match event.kind {
-                DocumentEventKind::Pressed => {
-                    if source_item_element_id(event.target.as_str()).is_some() {
-                        ui.ctx().request_repaint();
-                    }
+                DocumentEventKind::Pressed
+                    if source_item_element_id(event.target.as_str()).is_some() =>
+                {
+                    ui.ctx().request_repaint();
                 }
                 DocumentEventKind::ContextRequested => {
                     if let Some(pointer) = pointer

@@ -244,6 +244,7 @@ impl FloatingAxisOffset {
         self
     }
 
+    /// Resolves the mixed absolute and proportional offset terms into pixels.
     fn resolve(self, reference: FloatingRect, floating: Size<f32>) -> f32 {
         self.px
             + self.reference_width * reference.size.width
@@ -1589,6 +1590,7 @@ pub fn shift_origin_into_boundary(
     }
 }
 
+/// Computes the placement origin and then applies configured main/cross-axis offsets.
 fn placed_origin_with_offset(
     reference: FloatingRect,
     floating: Size<f32>,
@@ -1605,6 +1607,7 @@ fn placed_origin_with_offset(
     )
 }
 
+/// Selects the inline fragment that should act as the reference rect.
 fn select_inline_reference(reference: FloatingRect, options: &FloatingOptions) -> FloatingRect {
     let Some(inline) = options.inline.as_ref() else {
         return reference;
@@ -1651,6 +1654,7 @@ fn select_inline_reference(reference: FloatingRect, options: &FloatingOptions) -
     }
 }
 
+/// Expands a floating rect by the provided side-specific padding.
 fn padded_rect(rect: FloatingRect, padding: FloatingPadding) -> FloatingRect {
     FloatingRect::from_xy_size(
         rect.left() - padding.left,
@@ -1660,6 +1664,7 @@ fn padded_rect(rect: FloatingRect, padding: FloatingPadding) -> FloatingRect {
     )
 }
 
+/// Applies reference-matching and available-space size constraints to the floating box.
 fn apply_size_options(
     reference: FloatingRect,
     mut floating: Size<f32>,
@@ -1681,6 +1686,7 @@ fn apply_size_options(
     floating
 }
 
+/// Chooses the best placement from the auto-placement candidate set.
 fn choose_auto_placement(
     reference: FloatingRect,
     floating: Size<f32>,
@@ -1714,6 +1720,7 @@ fn choose_auto_placement(
     best
 }
 
+/// Builds the ordered list of placements that auto-placement should score.
 fn auto_placement_candidates(auto_placement: &FloatingAutoPlacement) -> Vec<FloatingPlacement> {
     if !auto_placement.allowed_placements.is_empty() {
         return auto_placement.allowed_placements.clone();
@@ -1745,6 +1752,7 @@ fn auto_placement_candidates(auto_placement: &FloatingAutoPlacement) -> Vec<Floa
     candidates
 }
 
+/// Scores one auto-placement candidate by available room and overflow penalty.
 fn auto_placement_score(
     reference: FloatingRect,
     side: FloatingSide,
@@ -1775,6 +1783,7 @@ fn auto_placement_score(
     } - overflow_penalty * 4.0
 }
 
+/// Chooses the first fitting fallback placement or the least-overflowing alternative.
 fn choose_fallback_placement(
     reference: FloatingRect,
     floating: Size<f32>,
@@ -1835,6 +1844,7 @@ fn choose_fallback_placement(
     }
 }
 
+/// Builds fallback placements on the axis perpendicular to the preferred side.
 fn perpendicular_fallbacks(
     placement: FloatingPlacement,
     direction: FloatingFallbackAxisSideDirection,
@@ -1877,6 +1887,7 @@ fn perpendicular_fallbacks(
     placements
 }
 
+/// Reduces overflow to the axes that are allowed to trigger flip behavior.
 fn flip_relevant_overflow(
     overflow: FloatingOverflow,
     placement: FloatingPlacement,
@@ -1909,6 +1920,7 @@ fn flip_relevant_overflow(
     relevant
 }
 
+/// Sums only positive overflow distances into a comparable penalty score.
 fn overflow_score(overflow: FloatingOverflow) -> f32 {
     f32_max(overflow.top, 0.0)
         + f32_max(overflow.right, 0.0)
@@ -1916,6 +1928,7 @@ fn overflow_score(overflow: FloatingOverflow) -> f32 {
         + f32_max(overflow.left, 0.0)
 }
 
+/// Computes the space available on one side of the reference inside padded boundaries.
 fn available_size_with_padding(
     reference: FloatingRect,
     side: FloatingSide,
@@ -1946,6 +1959,7 @@ fn available_size_with_padding(
     }
 }
 
+/// Computes the arrow offset within the floating box and how far it missed center.
 fn compute_arrow_data(
     reference: FloatingRect,
     floating: FloatingRect,
@@ -1979,6 +1993,7 @@ fn compute_arrow_data(
     }
 }
 
+/// Classifies whether the reference is hidden or the floating box escaped its boundary.
 fn visibility_state(
     reference: FloatingRect,
     floating: FloatingRect,
@@ -1997,6 +2012,7 @@ fn visibility_state(
     FloatingVisibility::Visible
 }
 
+/// Computes per-strategy hide metadata for reference-hidden and escaped states.
 fn hide_data(
     reference: FloatingRect,
     floating: FloatingRect,
@@ -2033,6 +2049,7 @@ fn hide_data(
     Some(data)
 }
 
+/// Computes optional x-axis bounds that keep shifting tethered to the reference.
 fn limit_shift_bounds_x(
     side: FloatingSide,
     shift: FloatingShift,
@@ -2055,6 +2072,7 @@ fn limit_shift_bounds_x(
     ))
 }
 
+/// Computes optional y-axis bounds that keep shifting tethered to the reference.
 fn limit_shift_bounds_y(
     side: FloatingSide,
     shift: FloatingShift,
@@ -2077,6 +2095,7 @@ fn limit_shift_bounds_y(
     ))
 }
 
+/// Selects the configured shift distance limit that applies to the x axis.
 fn shift_distance_limit_for_x(side: FloatingSide, shift: FloatingShift) -> Option<f32> {
     if side.is_vertical() {
         shift.cross_axis_limit
@@ -2085,6 +2104,7 @@ fn shift_distance_limit_for_x(side: FloatingSide, shift: FloatingShift) -> Optio
     }
 }
 
+/// Selects the configured shift distance limit that applies to the y axis.
 fn shift_distance_limit_for_y(side: FloatingSide, shift: FloatingShift) -> Option<f32> {
     if side.is_vertical() {
         shift.main_axis_limit
@@ -2093,6 +2113,7 @@ fn shift_distance_limit_for_y(side: FloatingSide, shift: FloatingShift) -> Optio
     }
 }
 
+/// Clamps one coordinate to boundary, tether, and distance-limit constraints.
 fn shift_axis_origin(
     value: f32,
     min: f32,
@@ -2116,6 +2137,7 @@ fn shift_axis_origin(
     }
 }
 
+/// Applies alignment-axis compensation after a side flip changes alignment.
 fn update_alignment_axis(origin: &mut Point<f32>, side: FloatingSide, delta: f32) {
     if side.is_vertical() {
         origin.x += delta;
@@ -2124,6 +2146,7 @@ fn update_alignment_axis(origin: &mut Point<f32>, side: FloatingSide, delta: f32
     }
 }
 
+/// Clamps a scalar while treating inverted ranges as a hard lower bound.
 fn clamp(value: f32, min: f32, max: f32) -> f32 {
     if min > max {
         return min;

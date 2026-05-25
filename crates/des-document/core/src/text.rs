@@ -1209,9 +1209,11 @@ mod tests {
                 thickness: None,
             }
         );
-        assert!(TextDecoration::UNDERLINE.underline);
-        assert!(TextDecoration::OVERLINE.overline);
-        assert!(TextDecoration::LINE_THROUGH.line_through);
+        const {
+            assert!(TextDecoration::UNDERLINE.underline);
+            assert!(TextDecoration::OVERLINE.overline);
+            assert!(TextDecoration::LINE_THROUGH.line_through);
+        }
 
         let styled = TextDecoration::UNDERLINE
             .color(Color::rgb(220, 40, 80))
@@ -1234,8 +1236,10 @@ mod tests {
     #[test]
     fn text_transform_changes_layout_text_without_changing_semantic_text() {
         let content = TextContent::plain("Straße title");
-        let mut style = TextLayoutStyle::default();
-        style.text_transform = TextTransform::Uppercase;
+        let style = TextLayoutStyle {
+            text_transform: TextTransform::Uppercase,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
 
         assert_eq!(normalized.semantic_text(), "Straße title");
@@ -1258,8 +1262,10 @@ mod tests {
                 },
             ),
         ]);
-        let mut style = TextLayoutStyle::default();
-        style.text_transform = TextTransform::Capitalize;
+        let style = TextLayoutStyle {
+            text_transform: TextTransform::Capitalize,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
 
         assert_eq!(normalized.semantic_text(), "hello LOUD");
@@ -1291,8 +1297,10 @@ mod tests {
     #[test]
     fn fallback_measurement_respects_anywhere_breaking() {
         let content = TextContent::plain("Supercalifragilistic");
-        let mut style = TextLayoutStyle::default();
-        style.overflow_wrap = OverflowWrap::Anywhere;
+        let style = TextLayoutStyle {
+            overflow_wrap: OverflowWrap::Anywhere,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
         let mut measurer = FallbackTextMeasurer;
 
@@ -1386,8 +1394,10 @@ mod tests {
     #[test]
     fn fallback_measurement_reports_aligned_line_offsets() {
         let content = TextContent::plain("abcd");
-        let mut style = TextLayoutStyle::default();
-        style.text_align = TextAlign::Center;
+        let style = TextLayoutStyle {
+            text_align: TextAlign::Center,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
         let mut measurer = FallbackTextMeasurer;
 
@@ -1534,8 +1544,10 @@ mod tests {
     #[test]
     fn fallback_hit_testing_accounts_for_aligned_line_offsets() {
         let content = TextContent::plain("abcd");
-        let mut style = TextLayoutStyle::default();
-        style.text_align = TextAlign::End;
+        let style = TextLayoutStyle {
+            text_align: TextAlign::End,
+            ..Default::default()
+        };
         let normalized = NormalizedText::from_content(&content, style);
         let mut measurer = FallbackTextMeasurer;
 
