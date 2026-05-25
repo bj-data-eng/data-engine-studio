@@ -315,6 +315,44 @@ impl Document {
         Ok(true)
     }
 
+    pub fn set_attribute(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> DocumentResult<bool> {
+        let id = id.into();
+        let name = name.into();
+        let value = value.into();
+        let element = self.element_mut(&id)?;
+        if element
+            .spec
+            .attributes
+            .get(&name)
+            .is_some_and(|existing| existing == &value)
+        {
+            return Ok(false);
+        }
+        element.spec.attributes.insert(name, value);
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
+    pub fn remove_attribute(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+    ) -> DocumentResult<bool> {
+        let id = id.into();
+        let name = name.into();
+        let element = self.element_mut(&id)?;
+        if element.spec.attributes.remove(&name).is_none() {
+            return Ok(false);
+        }
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+
     pub fn add_class(
         &mut self,
         id: impl Into<ElementId>,

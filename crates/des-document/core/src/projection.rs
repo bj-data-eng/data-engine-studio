@@ -15,6 +15,15 @@ pub enum DocumentProjectionOperation {
         id: ElementId,
         value: String,
     },
+    SetAttribute {
+        id: ElementId,
+        name: String,
+        value: String,
+    },
+    RemoveAttribute {
+        id: ElementId,
+        name: String,
+    },
     SetSelected {
         id: ElementId,
         selected: bool,
@@ -83,6 +92,43 @@ impl DocumentProjection {
             id: id.into(),
             value: value.into(),
         });
+    }
+
+    pub fn set_attribute(
+        mut self,
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.push_attribute(id, name, value);
+        self
+    }
+
+    pub fn push_attribute(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) {
+        self.operations
+            .push(DocumentProjectionOperation::SetAttribute {
+                id: id.into(),
+                name: name.into(),
+                value: value.into(),
+            });
+    }
+
+    pub fn remove_attribute(mut self, id: impl Into<ElementId>, name: impl Into<String>) -> Self {
+        self.push_remove_attribute(id, name);
+        self
+    }
+
+    pub fn push_remove_attribute(&mut self, id: impl Into<ElementId>, name: impl Into<String>) {
+        self.operations
+            .push(DocumentProjectionOperation::RemoveAttribute {
+                id: id.into(),
+                name: name.into(),
+            });
     }
 
     pub fn set_selected(mut self, id: impl Into<ElementId>, selected: bool) -> Self {
@@ -185,6 +231,18 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn attribute(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.projection
+            .push_attribute(self.id.clone(), name.into(), value.into());
+        self
+    }
+
+    pub fn remove_attribute(&mut self, name: impl Into<String>) -> &mut Self {
+        self.projection
+            .push_remove_attribute(self.id.clone(), name.into());
+        self
+    }
+
     pub fn selected(&mut self, selected: bool) -> &mut Self {
         self.projection.push_selected(self.id.clone(), selected);
         self
@@ -212,6 +270,8 @@ impl DocumentProjectionOperation {
         match self {
             Self::SetText { id, .. }
             | Self::SetValue { id, .. }
+            | Self::SetAttribute { id, .. }
+            | Self::RemoveAttribute { id, .. }
             | Self::SetSelected { id, .. }
             | Self::SetDisabled { id, .. }
             | Self::SetFocused { id, .. }
@@ -223,6 +283,12 @@ impl DocumentProjectionOperation {
         match self {
             Self::SetText { id, text } => document.set_text(id.clone(), text.clone()),
             Self::SetValue { id, value } => document.set_value(id.clone(), value.clone()),
+            Self::SetAttribute { id, name, value } => {
+                document.set_attribute(id.clone(), name.clone(), value.clone())
+            }
+            Self::RemoveAttribute { id, name } => {
+                document.remove_attribute(id.clone(), name.clone())
+            }
             Self::SetSelected { id, selected } => document.set_selected(id.clone(), *selected),
             Self::SetDisabled { id, disabled } => document.set_disabled(id.clone(), *disabled),
             Self::SetFocused { id, focused } => document.set_focused(id.clone(), *focused),
