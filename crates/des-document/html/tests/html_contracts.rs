@@ -1055,15 +1055,30 @@ fn html_file_hot_reload_detects_same_mtime_content_changes() {
 
 #[test]
 fn html_set_manages_named_inline_and_file_backed_documents() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum SetAction {
+        Run,
+        Open,
+    }
+
     let fixture = TempHtmlPath::new("des-html-set", "html");
     let path = fixture.path();
-    fs::write(path, "<section id=\"file\">Before</section>")
-        .expect("html fixture should be writable");
+    fs::write(
+        path,
+        "<button id=\"file\" on:click=\"file.open\">Before</button>",
+    )
+    .expect("html fixture should be writable");
 
     let mut set = HtmlSet::new();
-    set.add_fragment("inline", "<section id=\"inline\">Inline</section>")
-        .expect("inline html should parse");
+    set.add_fragment(
+        "inline",
+        "<button id=\"inline\" on:click=\"inline.run\">Inline</button>",
+    )
+    .expect("inline html should parse");
     set.add_file("file", path).expect("file html should parse");
+    let registry = DocumentCommandRegistry::new()
+        .bind_click("inline.run", SetAction::Run)
+        .bind_click("file.open", SetAction::Open);
 
     assert_eq!(set.len(), 2);
     assert!(!set.is_empty());
@@ -1094,8 +1109,52 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
 
     assert_eq!(inline.text(), Some("Inline".to_owned()));
     assert_eq!(inline.rect().size.width, 120.0);
+    let input_output = set
+        .update_with_input(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        )
+        .expect("named document should route input through the set front door");
+    let action_frame = set
+        .update_with_input_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+        )
+        .expect("named document should collect typed actions through the set front door");
+    let empty_frame = set
+        .update_actions("inline", Size::new(240.0, 160.0), &registry)
+        .expect("named document should update and collect actions through the set front door");
+    let mut surface = set
+        .to_action_surface_with("inline", Size::new(240.0, 160.0), |commands| {
+            commands.push_click("inline.run", SetAction::Run);
+        })
+        .expect("named document should build an action surface through the set front door");
+    let surface_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let styled_surface = set
+        .to_action_surface_with_stylesheet(
+            "inline",
+            Size::new(240.0, 160.0),
+            des_document::StyleSheet::parse_css("#inline { width: 132px; height: 32px; }")
+                .expect("CSS should parse"),
+            registry.clone(),
+        )
+        .expect("named document should build a styled action surface through the set front door");
 
-    fs::write(path, "<section id=\"file\">After</section>").expect("html fixture should update");
+    assert!(input_output.was_clicked("inline"));
+    assert!(action_frame.contains_action(&SetAction::Run));
+    assert!(empty_frame.is_empty());
+    assert!(surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(styled_surface.commands().bindings().len(), 2);
+
+    fs::write(
+        path,
+        "<button id=\"file\" on:click=\"file.open\">After</button>",
+    )
+    .expect("html fixture should update");
     let changed = set.reload_changed().expect("html set should reload");
 
     assert_eq!(changed, ["file"]);

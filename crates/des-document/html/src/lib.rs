@@ -1120,9 +1120,91 @@ impl HtmlSet {
             .to_view_with_stylesheet(viewport, stylesheet)
     }
 
+    /// Creates an action surface from a named HTML document and typed commands.
+    pub fn to_action_surface<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?.to_action_surface(viewport, commands)
+    }
+
+    /// Creates an action surface from a named document and configures typed commands in place.
+    pub fn to_action_surface_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?.to_action_surface_with(viewport, configure)
+    }
+
+    /// Creates an action surface from a named document, stylesheet, and typed commands.
+    pub fn to_action_surface_with_stylesheet<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_stylesheet(viewport, stylesheet, commands)
+    }
+
+    /// Creates an action surface from a named document and stylesheet, configuring commands in place.
+    pub fn to_action_surface_with_stylesheet_and<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_stylesheet_and(viewport, stylesheet, configure)
+    }
+
     /// Resolves a named HTML document with an empty stylesheet.
     pub fn update(&self, name: &str, viewport: Size) -> HtmlResult<DocumentOutput> {
         self.to_view(name, viewport).map(|mut view| view.update())
+    }
+
+    /// Resolves a named HTML document and collects typed Rust actions.
+    pub fn update_actions<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.get(name)?.update_actions(viewport, registry)
+    }
+
+    /// Routes input through a named HTML document.
+    pub fn update_with_input(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+    ) -> HtmlResult<DocumentOutput> {
+        self.get(name)?.update_with_input(viewport, input)
+    }
+
+    /// Routes input through a named HTML document and collects typed Rust actions.
+    pub fn update_with_input_actions<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_actions(viewport, input, registry)
     }
 
     /// Resolves a named HTML document with the supplied stylesheet.
