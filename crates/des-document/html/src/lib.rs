@@ -140,7 +140,10 @@ impl HtmlDocument {
         let dom = parse_document(RcDom::default(), Default::default()).one(source);
         let mut diagnostics = Vec::new();
         Ok(Self {
-            children: rcdom_children_to_html(&dom.document.children.borrow(), &mut diagnostics),
+            children: rcdom_document_children_to_html(
+                &dom.document.children.borrow(),
+                &mut diagnostics,
+            ),
             diagnostics,
         })
     }
@@ -3218,7 +3221,7 @@ impl HtmlNode {
     fn write_to_document_builder(&self, builder: &mut DocumentBuilder, path: &[usize]) {
         if self.is_text() {
             if let Some(text) = self.text.as_ref().filter(|text| !text.trim().is_empty()) {
-                builder.text(stable_text_id(path), TextContent::plain(text.trim()));
+                builder.text(stable_text_id(path), TextContent::plain(text.clone()));
             }
             return;
         }
@@ -4873,6 +4876,21 @@ fn rcdom_children_to_html(
     nodes
 }
 
+fn rcdom_document_children_to_html(
+    children: &[Handle],
+    diagnostics: &mut Vec<HtmlDiagnostic>,
+) -> Vec<HtmlNode> {
+    let mut body = None;
+    for child in children {
+        find_body_handle(child, &mut body);
+    }
+    if let Some(body) = body {
+        rcdom_children_to_html(&body.children.borrow(), diagnostics)
+    } else {
+        rcdom_children_to_html(children, diagnostics)
+    }
+}
+
 fn rcdom_fragment_children_to_html(
     children: &[Handle],
     diagnostics: &mut Vec<HtmlDiagnostic>,
@@ -4886,6 +4904,21 @@ fn rcdom_fragment_children_to_html(
             "html" | "body" => nodes = nodes.remove(0).children,
             _ => return nodes,
         }
+    }
+}
+
+fn find_body_handle(handle: &Handle, body: &mut Option<Handle>) {
+    if body.is_some() {
+        return;
+    }
+    if let NodeData::Element { name, .. } = &handle.data
+        && name.local.as_ref() == "body"
+    {
+        *body = Some(handle.clone());
+        return;
+    }
+    for child in handle.children.borrow().iter() {
+        find_body_handle(child, body);
     }
 }
 
@@ -4935,11 +4968,7 @@ fn append_rcdom_node(
                     role = Some(value);
                 } else if let Some(event) = name.strip_prefix("on:") {
                     push_behavior_hook(&tag, &name, event, value, &mut behavior_hooks, diagnostics);
-                } else if let Some(command_event) = name.strip_prefix("data-command") {
-                    let event = command_event
-                        .strip_prefix(':')
-                        .filter(|event| !event.is_empty())
-                        .unwrap_or("click");
+                } else if let Some(event) = command_attribute_event(&name) {
                     push_behavior_hook(
                         &tag,
                         &name,
@@ -5027,7 +5056,112 @@ fn push_behavior_hook(
 }
 
 fn is_javascript_event_attribute(name: &str) -> bool {
-    name.len() > 2 && name.starts_with("on") && !name.starts_with("on:")
+    matches!(
+        name,
+        "onabort"
+            | "onanimationcancel"
+            | "onanimationend"
+            | "onanimationiteration"
+            | "onanimationstart"
+            | "onauxclick"
+            | "onbeforeinput"
+            | "onbeforematch"
+            | "onbeforetoggle"
+            | "onblur"
+            | "oncancel"
+            | "oncanplay"
+            | "oncanplaythrough"
+            | "onchange"
+            | "onclick"
+            | "onclose"
+            | "oncontextmenu"
+            | "oncopy"
+            | "oncuechange"
+            | "oncut"
+            | "ondblclick"
+            | "ondrag"
+            | "ondragend"
+            | "ondragenter"
+            | "ondragleave"
+            | "ondragover"
+            | "ondragstart"
+            | "ondrop"
+            | "ondurationchange"
+            | "onemptied"
+            | "onended"
+            | "onerror"
+            | "onfocus"
+            | "onformdata"
+            | "oninput"
+            | "oninvalid"
+            | "onkeydown"
+            | "onkeypress"
+            | "onkeyup"
+            | "onload"
+            | "onloadeddata"
+            | "onloadedmetadata"
+            | "onloadstart"
+            | "onmousedown"
+            | "onmouseenter"
+            | "onmouseleave"
+            | "onmousemove"
+            | "onmouseout"
+            | "onmouseover"
+            | "onmouseup"
+            | "onpaste"
+            | "onpause"
+            | "onplay"
+            | "onplaying"
+            | "onpointercancel"
+            | "onpointerdown"
+            | "onpointerenter"
+            | "onpointerleave"
+            | "onpointermove"
+            | "onpointerout"
+            | "onpointerover"
+            | "onpointerrawupdate"
+            | "onpointerup"
+            | "onprogress"
+            | "onratechange"
+            | "onreset"
+            | "onresize"
+            | "onscroll"
+            | "onscrollend"
+            | "onsecuritypolicyviolation"
+            | "onseeked"
+            | "onseeking"
+            | "onselect"
+            | "onslotchange"
+            | "onstalled"
+            | "onsubmit"
+            | "onsuspend"
+            | "ontimeupdate"
+            | "ontoggle"
+            | "ontouchcancel"
+            | "ontouchend"
+            | "ontouchmove"
+            | "ontouchstart"
+            | "ontransitioncancel"
+            | "ontransitionend"
+            | "ontransitionrun"
+            | "ontransitionstart"
+            | "onvolumechange"
+            | "onwaiting"
+            | "onwebkitanimationend"
+            | "onwebkitanimationiteration"
+            | "onwebkitanimationstart"
+            | "onwebkittransitionend"
+            | "onwheel"
+    )
+}
+
+fn command_attribute_event(name: &str) -> Option<&str> {
+    if name == "data-command" {
+        Some("click")
+    } else {
+        name.strip_prefix("data-command:")
+            .filter(|event| !event.is_empty())
+    }
 }
 
 fn element_for_tag(tag: &str) -> Element {

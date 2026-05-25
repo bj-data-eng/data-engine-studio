@@ -245,6 +245,45 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
 }
 
 #[test]
+fn html_document_keeps_command_metadata_out_of_behavior_hooks() {
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section>
+          <button id="metadata" data-command-id="project.delete" data-command-kind="danger">Delete</button>
+          <button id="run" data-command=" project.run " data-command:keydown=" project.key ">Run</button>
+        </section>
+        "#,
+    )
+    .expect("HTML should parse command metadata and command hooks");
+
+    let metadata = html.require_by_id("metadata").unwrap();
+    let run = html.require_by_id("run").unwrap();
+
+    assert!(metadata.behavior_hooks.is_empty());
+    assert_eq!(
+        metadata
+            .attributes
+            .get("data-command-id")
+            .map(String::as_str),
+        Some("project.delete")
+    );
+    assert_eq!(
+        metadata
+            .attributes
+            .get("data-command-kind")
+            .map(String::as_str),
+        Some("danger")
+    );
+    assert_eq!(
+        run.behavior_hooks
+            .iter()
+            .map(|hook| (hook.event(), hook.command()))
+            .collect::<Vec<_>>(),
+        [("click", "project.run"), ("keydown", "project.key")]
+    );
+}
+
+#[test]
 fn html_authored_focus_blur_and_selection_hooks_dispatch_to_typed_actions() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {
@@ -361,6 +400,33 @@ fn html_document_parser_keeps_javascript_out_of_runtime() {
             HtmlDiagnosticCode::ScriptElementIgnored,
             HtmlDiagnosticCode::JavaScriptEventAttributeIgnored,
         ]
+    );
+}
+
+#[test]
+fn html_document_preserves_non_handler_on_attributes() {
+    let html = HtmlDocument::parse_fragment(
+        r#"<section once="ready" onboarding="visible" onclick="drop()" on:click="run">Run</section>"#,
+    )
+    .expect("HTML should parse handler and non-handler on attributes");
+    let section = &html.children[0];
+
+    assert_eq!(
+        section.attributes.get("once").map(String::as_str),
+        Some("ready")
+    );
+    assert_eq!(
+        section.attributes.get("onboarding").map(String::as_str),
+        Some("visible")
+    );
+    assert!(!section.attributes.contains_key("onclick"));
+    assert_eq!(section.behavior_hooks[0].command(), "run");
+    assert_eq!(
+        html.diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code)
+            .collect::<Vec<_>>(),
+        vec![HtmlDiagnosticCode::JavaScriptEventAttributeIgnored]
     );
 }
 
@@ -497,6 +563,95 @@ fn html_stylesheet_parses_full_html_documents() {
     assert_eq!(app.element(), Element::Main);
     assert_eq!(app.text(), Some("App".to_owned()));
     assert_eq!(app.rect().size.width, 200.0);
+}
+
+#[test]
+fn html_document_parse_projects_body_without_head_metadata() {
+    let html = HtmlDocument::parse(
+        r#"
+        <!doctype html>
+        <html>
+          <head>
+            <title>Ignored title</title>
+            <meta name="viewport" content="width=device-width">
+            <link rel="stylesheet" href="app.css">
+            <style>.shell { width: 100px; }</style>
+          </head>
+          <body>
+            <main id="app"><section id="content">Ready</section></main>
+          </body>
+        </html>
+        "#,
+    )
+    .expect("full HTML document should parse");
+    let mut document = html
+        .to_document(Size::new(320.0, 180.0))
+        .expect("body HTML should emit a document");
+    let mut engine = DocumentEngine::default();
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let snapshot = output.snapshot();
+
+    assert_eq!(
+        html.children
+            .iter()
+            .map(|child| child.tag.as_str())
+            .collect::<Vec<_>>(),
+        ["main"]
+    );
+    assert!(html.first_by_tag("head").is_none());
+    assert!(html.first_by_tag("title").is_none());
+    assert!(html.first_by_tag("style").is_none());
+    assert!(html.first_by_tag("meta").is_none());
+    assert!(html.first_by_tag("link").is_none());
+    assert!(snapshot.find("app").is_some());
+    assert!(snapshot.find("content").is_some());
+    assert!(snapshot.find("html").is_none());
+    assert!(snapshot.find("head").is_none());
+    assert!(snapshot.find("body").is_none());
+}
+
+#[test]
+fn html_document_parse_fragment_keeps_explicit_html_structure() {
+    let html = HtmlDocument::parse_fragment(
+        r#"<html><head><title>Fragment title</title></head><body><main id="app">App</main></body></html>"#,
+    )
+    .expect("fragment parsing should stay separate from full-document body projection");
+
+    assert_eq!(html.children.len(), 2);
+    assert_eq!(html.children[0].tag, "title");
+    assert_eq!(html.children[1].tag, "main");
+    assert!(html.first_by_tag("title").is_some());
+    assert!(html.find_by_id("app").is_some());
+}
+
+#[test]
+fn html_document_preserves_mixed_content_boundary_spaces() {
+    let html = HtmlDocument::parse_fragment(
+        r#"<p id="message">Hello <span id="target">world</span> again</p>"#,
+    )
+    .expect("mixed inline content should parse");
+    let paragraph = html.require_by_id("message").unwrap();
+    let mut document = html
+        .to_document(Size::new(320.0, 180.0))
+        .expect("mixed content should emit a document");
+    let mut engine = DocumentEngine::default();
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let snapshot = output.snapshot();
+
+    assert_eq!(paragraph.children[0].text.as_deref(), Some("Hello "));
+    assert_eq!(paragraph.children[2].text.as_deref(), Some(" again"));
+    assert_eq!(
+        snapshot.find("html/text-0-0").unwrap().text().as_deref(),
+        Some("Hello ")
+    );
+    assert_eq!(
+        snapshot.find("target").unwrap().text().as_deref(),
+        Some("world")
+    );
+    assert_eq!(
+        snapshot.find("html/text-0-2").unwrap().text().as_deref(),
+        Some(" again")
+    );
 }
 
 #[test]
