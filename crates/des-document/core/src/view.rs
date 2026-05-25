@@ -1132,6 +1132,26 @@ impl<Action> DocumentActionSurface<Action> {
         Ok((projection_report, frame, dispatch_report))
     }
 
+    /// Applies a projection, routes input, and dispatches only typed app action values.
+    pub fn project_and_update_with_input_and_dispatch_action_values(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_and_update_with_input_actions(projection, input)?;
+        let dispatch_report = frame.dispatch_action_values(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
     /// Builds a projection, applies it, routes input, and collects typed actions.
     pub fn project_with_and_update_with_input_actions(
         &mut self,
@@ -1188,6 +1208,26 @@ impl<Action> DocumentActionSurface<Action> {
         let (projection_report, frame) =
             self.project_with_and_update_with_input_actions(input, project)?;
         let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
+    /// Builds a projection, routes input, and dispatches only typed app action values.
+    pub fn project_with_and_update_with_input_and_dispatch_action_values(
+        &mut self,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_with_and_update_with_input_actions(input, project)?;
+        let dispatch_report = frame.dispatch_action_values(handler);
         Ok((projection_report, frame, dispatch_report))
     }
 
@@ -1319,6 +1359,26 @@ impl<Action> DocumentActionSurface<Action> {
         let (projection_report, frame) =
             self.project_widget_and_update_with_input_actions(widget, input)?;
         let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
+    /// Applies a widget projection, routes input, and dispatches only typed app action values.
+    pub fn project_widget_and_update_with_input_and_dispatch_action_values(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_widget_and_update_with_input_actions(widget, input)?;
+        let dispatch_report = frame.dispatch_action_values(handler);
         Ok((projection_report, frame, dispatch_report))
     }
 

@@ -3688,6 +3688,63 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(dispatched_status.has_class("is-dispatched"));
     assert!(dispatch_frame.contains_action(&AppAction::Toggle));
 
+    let explicit_projection = DocumentProjection::new().set_text("status", "Value dispatched");
+    let mut value_dispatched = Vec::new();
+    let (value_dispatch_report, value_dispatch_frame, value_action_report) = widget_surface
+        .project_and_update_with_input_and_dispatch_action_values(
+            &explicit_projection,
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| value_dispatched.push(*action),
+        )
+        .unwrap();
+    let value_dispatched_status = value_dispatch_frame
+        .output()
+        .snapshot()
+        .find("status")
+        .unwrap();
+
+    assert_eq!(value_dispatch_report.operations, 1);
+    assert_eq!(value_dispatch_report.changed, 1);
+    assert_eq!(
+        value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(value_dispatched, vec![AppAction::Toggle]);
+    assert_eq!(
+        value_dispatched_status.text(),
+        Some("Value dispatched".to_owned())
+    );
+    assert!(value_dispatch_frame.contains_action(&AppAction::Toggle));
+
+    let mut projected_value_dispatched = Vec::new();
+    let (projected_value_report, projected_value_frame, projected_value_action_report) =
+        widget_surface
+            .project_with_and_update_with_input_and_dispatch_action_values(
+                DocumentInput::primary_click(Point::new(8.0, 8.0)),
+                |projection| {
+                    projection.element("status").text("Projected value");
+                },
+                |action| projected_value_dispatched.push(*action),
+            )
+            .unwrap();
+
+    assert_eq!(projected_value_report.operations, 1);
+    assert_eq!(projected_value_report.changed, 1);
+    assert_eq!(
+        projected_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_value_dispatched, vec![AppAction::Toggle]);
+    assert_eq!(
+        projected_value_frame
+            .output()
+            .snapshot()
+            .find("status")
+            .unwrap()
+            .text(),
+        Some("Projected value".to_owned())
+    );
+
     let mut widget_dispatched = Vec::new();
     let (widget_dispatch_report, widget_dispatch_frame, widget_action_report) = widget_surface
         .project_widget_and_update_with_input_and_dispatch(
@@ -3713,6 +3770,33 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(widget_dispatched, vec![AppAction::Toggle]);
     assert_eq!(widget_dispatch_status.text(), Some("Waiting".to_owned()));
     assert!(!widget_dispatch_status.has_class("is-ready"));
+
+    let mut widget_value_dispatched = Vec::new();
+    let (widget_value_report, widget_value_frame, widget_value_action_report) = widget_surface
+        .project_widget_and_update_with_input_and_dispatch_action_values(
+            &StatusWidget { ready: true },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| widget_value_dispatched.push(*action),
+        )
+        .unwrap();
+
+    assert_eq!(widget_value_report.operations, 2);
+    assert_eq!(widget_value_report.changed, 2);
+    assert_eq!(
+        widget_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(widget_value_dispatched, vec![AppAction::Toggle]);
+    assert_eq!(
+        widget_value_frame
+            .output()
+            .snapshot()
+            .find("status")
+            .unwrap()
+            .text(),
+        Some("Ready".to_owned())
+    );
+    assert!(widget_value_frame.contains_action(&AppAction::Toggle));
 }
 
 #[test]
