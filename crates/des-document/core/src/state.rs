@@ -110,14 +110,28 @@ impl DocumentOutput {
             .and_then(|id| self.snapshot().find(id.as_str()))
     }
 
+    pub fn first_event(&self) -> Option<&DocumentEvent> {
+        self.events.first()
+    }
+
     pub fn events_for<'a>(&'a self, target: &'a str) -> impl Iterator<Item = &'a DocumentEvent> {
         self.events
             .iter()
             .filter(move |event| event.target.as_str() == target)
     }
 
+    pub fn first_event_for(&self, target: &str) -> Option<&DocumentEvent> {
+        self.events
+            .iter()
+            .find(|event| event.target.as_str() == target)
+    }
+
     pub fn events_of_kind(&self, kind: DocumentEventKind) -> impl Iterator<Item = &DocumentEvent> {
         self.events.iter().filter(move |event| event.kind == kind)
+    }
+
+    pub fn first_event_of_kind(&self, kind: DocumentEventKind) -> Option<&DocumentEvent> {
+        self.events_of_kind(kind).next()
     }
 
     pub fn event_targets_of_kind(

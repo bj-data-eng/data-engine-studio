@@ -116,6 +116,26 @@ fn document_output_exposes_interaction_query_helpers() {
     assert_eq!(output.hit_id().map(ElementId::as_str), Some("run"));
     assert!(output.hit_is("run"));
     assert_eq!(output.hit_element().unwrap().text(), Some("Run".to_owned()));
+    assert_eq!(
+        output.first_event().unwrap(),
+        &DocumentEvent::pointer_entered("root")
+    );
+    assert_eq!(
+        output.first_event_for("run").unwrap(),
+        &DocumentEvent::pointer_entered("run")
+    );
+    assert_eq!(
+        output
+            .first_event_of_kind(DocumentEventKind::Pressed)
+            .unwrap(),
+        &DocumentEvent::pressed("run")
+    );
+    assert_eq!(
+        output
+            .first_event_of_kind(DocumentEventKind::Clicked)
+            .unwrap(),
+        &DocumentEvent::clicked("run")
+    );
     assert!(output.has_event("run", DocumentEventKind::Pressed));
     assert!(output.has_event("run", DocumentEventKind::Clicked));
     assert!(output.has_event_kind(DocumentEventKind::Clicked));
