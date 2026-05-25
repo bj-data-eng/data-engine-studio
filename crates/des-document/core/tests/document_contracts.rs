@@ -92,6 +92,38 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
 }
 
 #[test]
+fn document_output_exposes_interaction_query_helpers() {
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("run"),
+        Style::default()
+            .width(Length::Px(96.0))
+            .height(Length::Px(32.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").text("Run");
+    });
+
+    let output = view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, true, true, 0.0));
+    let run_events = output.events_for("run").collect::<Vec<_>>();
+
+    assert_eq!(output.hit_id().map(ElementId::as_str), Some("run"));
+    assert!(output.hit_is("run"));
+    assert_eq!(output.hit_element().unwrap().text(), Some("Run".to_owned()));
+    assert!(output.has_event("run", DocumentEventKind::Pressed));
+    assert!(output.has_event("run", DocumentEventKind::Clicked));
+    assert!(output.has_event_kind(DocumentEventKind::Clicked));
+    assert_eq!(
+        output
+            .events_of_kind(DocumentEventKind::Clicked)
+            .map(|event| event.target.as_str())
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert!(run_events.contains(&&DocumentEvent::pressed("run")));
+    assert!(run_events.contains(&&DocumentEvent::clicked("run")));
+}
+
+#[test]
 fn document_command_registry_maps_hook_commands_to_typed_actions() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum AppAction {

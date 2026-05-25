@@ -94,6 +94,38 @@ impl DocumentOutput {
         DocumentSnapshot::new(&self.layout)
     }
 
+    pub fn hit_id(&self) -> Option<&ElementId> {
+        self.hit_id.as_ref()
+    }
+
+    pub fn hit_is(&self, id: &str) -> bool {
+        self.hit_id.as_ref().is_some_and(|hit| hit.as_str() == id)
+    }
+
+    pub fn hit_element(&self) -> Option<crate::ElementSnapshot<'_>> {
+        self.hit_id
+            .as_ref()
+            .and_then(|id| self.snapshot().find(id.as_str()))
+    }
+
+    pub fn events_for<'a>(&'a self, target: &'a str) -> impl Iterator<Item = &'a DocumentEvent> {
+        self.events
+            .iter()
+            .filter(move |event| event.target.as_str() == target)
+    }
+
+    pub fn events_of_kind(&self, kind: DocumentEventKind) -> impl Iterator<Item = &DocumentEvent> {
+        self.events.iter().filter(move |event| event.kind == kind)
+    }
+
+    pub fn has_event(&self, target: &str, kind: DocumentEventKind) -> bool {
+        self.events_for(target).any(|event| event.kind == kind)
+    }
+
+    pub fn has_event_kind(&self, kind: DocumentEventKind) -> bool {
+        self.events.iter().any(|event| event.kind == kind)
+    }
+
     pub fn commands(&self) -> Vec<DocumentCommand> {
         self.command_events()
             .map(|command| DocumentCommand {
