@@ -107,6 +107,10 @@ fn document_output_exposes_interaction_query_helpers() {
 
     let output = view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, true, true, 0.0));
     let run_events = output.events_for("run").collect::<Vec<_>>();
+    let clicked = output
+        .events_of_kind(DocumentEventKind::Clicked)
+        .next()
+        .expect("click event should be emitted");
 
     assert_eq!(output.hit_id().map(ElementId::as_str), Some("run"));
     assert!(output.hit_is("run"));
@@ -148,6 +152,14 @@ fn document_output_exposes_interaction_query_helpers() {
     assert!(output.was_pressed("run"));
     assert!(output.was_clicked("run"));
     assert!(!output.was_released("run"));
+    assert_eq!(clicked.target().as_str(), "run");
+    assert!(clicked.target_is("run"));
+    assert_eq!(clicked.kind(), DocumentEventKind::Clicked);
+    assert!(clicked.matches_intent(ElementBehaviorEvent::Click));
+    assert!(clicked.is_click());
+    assert!(!clicked.is_key_down());
+    assert!(!clicked.is_key_up());
+    assert!(!clicked.is_drag());
     assert!(run_events.contains(&&DocumentEvent::pressed("run")));
     assert!(run_events.contains(&&DocumentEvent::clicked("run")));
 }
@@ -5326,6 +5338,12 @@ fn document_engine_captures_primary_pointer_drag() {
         Some("card")
     );
     assert!(output.events.contains(&DocumentEvent::drag_ended("card")));
+    assert!(
+        output
+            .events_of_kind(DocumentEventKind::DragEnded)
+            .next()
+            .is_some_and(DocumentEvent::is_drag)
+    );
     assert_eq!(
         output.first_drag_ended_target().map(ElementId::as_str),
         Some("card")

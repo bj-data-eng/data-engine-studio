@@ -1407,6 +1407,48 @@ impl DocumentEvent {
         }
     }
 
+    /// Returns the element that emitted this event.
+    pub fn target(&self) -> &ElementId {
+        &self.target
+    }
+
+    /// Returns true when this event was emitted by the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
+
+    /// Returns the resolved document event kind.
+    pub fn kind(&self) -> DocumentEventKind {
+        self.kind
+    }
+
+    /// Returns true when this event matches the supplied authored behavior intent.
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        intent.matches_document_event(&self.kind)
+    }
+
+    /// Returns true when this event is click intent.
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this event is key-down intent.
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns true when this event is key-up intent.
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns true when this event is any pointer drag intent.
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+            || self.matches_intent(ElementBehaviorEvent::Drag)
+            || self.matches_intent(ElementBehaviorEvent::DragEnd)
+    }
+
     pub fn pointer_entered(target: impl Into<ElementId>) -> Self {
         Self::new(target, DocumentEventKind::PointerEntered)
     }
