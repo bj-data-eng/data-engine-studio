@@ -134,6 +134,19 @@ impl DocumentOutput {
         self.events_of_kind(kind).next()
     }
 
+    pub fn events_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &DocumentEvent> {
+        self.events
+            .iter()
+            .filter(move |event| event.matches_intent(intent))
+    }
+
+    pub fn first_event_for_intent(&self, intent: ElementBehaviorEvent) -> Option<&DocumentEvent> {
+        self.events_for_intent(intent).next()
+    }
+
     pub fn event_targets_of_kind(
         &self,
         kind: DocumentEventKind,
@@ -143,6 +156,29 @@ impl DocumentOutput {
 
     pub fn first_event_target(&self, kind: DocumentEventKind) -> Option<&ElementId> {
         self.event_targets_of_kind(kind).next()
+    }
+
+    pub fn event_targets_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &ElementId> {
+        self.events_for_intent(intent).map(|event| &event.target)
+    }
+
+    pub fn first_event_target_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&ElementId> {
+        self.event_targets_for_intent(intent).next()
+    }
+
+    pub fn has_event_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        self.events_for_intent(intent).next().is_some()
+    }
+
+    pub fn has_event_for_intent(&self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.events_for(target)
+            .any(|event| event.matches_intent(intent))
     }
 
     pub fn pointer_entered_targets(&self) -> impl Iterator<Item = &ElementId> {

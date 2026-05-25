@@ -167,7 +167,28 @@ fn document_output_exposes_interaction_query_helpers() {
     );
     assert_eq!(
         output
+            .events_for_intent(ElementBehaviorEvent::Click)
+            .map(|event| event.target.as_str())
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        output
+            .first_event_for_intent(ElementBehaviorEvent::Click)
+            .map(DocumentEvent::target)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(
+        output
             .event_targets_of_kind(DocumentEventKind::Clicked)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+    assert_eq!(
+        output
+            .event_targets_for_intent(ElementBehaviorEvent::Click)
             .map(ElementId::as_str)
             .collect::<Vec<_>>(),
         vec!["run"]
@@ -178,6 +199,16 @@ fn document_output_exposes_interaction_query_helpers() {
             .map(ElementId::as_str),
         Some("run")
     );
+    assert_eq!(
+        output
+            .first_event_target_for_intent(ElementBehaviorEvent::Click)
+            .map(ElementId::as_str),
+        Some("run")
+    );
+    assert!(output.has_event_intent(ElementBehaviorEvent::Click));
+    assert!(!output.has_event_intent(ElementBehaviorEvent::KeyDown));
+    assert!(output.has_event_for_intent("run", ElementBehaviorEvent::Click));
+    assert!(!output.has_event_for_intent("run", ElementBehaviorEvent::KeyDown));
     assert_eq!(
         output
             .pointer_entered_targets()
