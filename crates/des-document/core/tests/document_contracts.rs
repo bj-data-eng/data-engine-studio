@@ -2,13 +2,13 @@ use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget, DocumentBuilder,
     DocumentCommandAction, DocumentCommandBinding, DocumentCommandRegistry, DocumentEngine,
     DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection,
-    DocumentProjectionOperation, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
-    ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput,
-    KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
-    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    VisualCloneOptions, WhiteSpace,
+    DocumentProjectionOperation, DocumentProjectionReport, DocumentView, DocumentWidget, Element,
+    ElementBehaviorEvent, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
+    JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis,
+    Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
+    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1606,6 +1606,12 @@ fn document_projection_composes_subprojections_for_app_state() {
 
     assert_eq!(report.operations, 5);
     assert_eq!(report.changed, 5);
+    assert_eq!(report.operation_count(), 5);
+    assert_eq!(report.changed_count(), 5);
+    assert!(!report.is_empty());
+    assert!(report.changed_any());
+    assert!(!report.unchanged());
+    assert!(report.changed_all());
     assert_eq!(
         output.snapshot().find("summary-count").unwrap().text(),
         Some("42 rows".to_owned())
@@ -1619,6 +1625,13 @@ fn document_projection_composes_subprojections_for_app_state() {
     projection.clear();
     assert_eq!(projection.len(), 0);
     assert!(projection.is_empty());
+
+    let empty_report = view.project(&projection).unwrap();
+    assert_eq!(empty_report, DocumentProjectionReport::new(0, 0));
+    assert!(empty_report.is_empty());
+    assert!(!empty_report.changed_any());
+    assert!(empty_report.unchanged());
+    assert!(empty_report.changed_all());
 }
 
 #[test]

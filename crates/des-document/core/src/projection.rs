@@ -49,6 +49,39 @@ pub struct DocumentProjectionReport {
     pub changed: usize,
 }
 
+impl DocumentProjectionReport {
+    pub const fn new(operations: usize, changed: usize) -> Self {
+        Self {
+            operations,
+            changed,
+        }
+    }
+
+    pub const fn operation_count(&self) -> usize {
+        self.operations
+    }
+
+    pub const fn changed_count(&self) -> usize {
+        self.changed
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.operations == 0
+    }
+
+    pub const fn changed_any(&self) -> bool {
+        self.changed > 0
+    }
+
+    pub const fn unchanged(&self) -> bool {
+        self.changed == 0
+    }
+
+    pub const fn changed_all(&self) -> bool {
+        self.changed == self.operations
+    }
+}
+
 impl DocumentProjection {
     pub fn new() -> Self {
         Self::default()
@@ -783,10 +816,7 @@ impl DocumentProjection {
     }
 
     pub fn apply_to(&self, document: &mut Document) -> DocumentResult<DocumentProjectionReport> {
-        let mut report = DocumentProjectionReport {
-            operations: self.operations.len(),
-            changed: 0,
-        };
+        let mut report = DocumentProjectionReport::new(self.operations.len(), 0);
         for operation in &self.operations {
             if operation.apply_to(document)? {
                 report.changed += 1;
