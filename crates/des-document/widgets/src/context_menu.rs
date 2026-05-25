@@ -1,7 +1,7 @@
 use des_document::{
-    DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry, DocumentResult, DocumentView,
-    DocumentWidget, ElementId, FloatingPlacement, FloatingShift, Insets, Length, Point, Size,
-    Style, StyleSelector, StyleSheet,
+    DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry,
+    DocumentInput, DocumentResult, DocumentView, DocumentWidget, ElementId, FloatingPlacement,
+    FloatingShift, Insets, Length, Point, Size, Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -249,6 +249,67 @@ impl ContextMenu {
             .stylesheet(stylesheet)
             .try_widget(self)?;
         Ok(view.action_surface(self.command_registry(action_for)))
+    }
+
+    /// Builds, resolves, and collects typed actions from this menu in one call.
+    pub fn update_actions<Action>(
+        &self,
+        viewport: Size,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.update_actions_with_stylesheet(viewport, StyleSheet::new(), action_for)
+    }
+
+    /// Builds this menu with caller-provided styles and collects typed actions.
+    pub fn update_actions_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?
+            .update_actions())
+    }
+
+    /// Builds this menu, routes input, and collects typed actions in one call.
+    pub fn update_with_input_actions<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.update_with_input_actions_with_stylesheet(
+            viewport,
+            input,
+            StyleSheet::new(),
+            action_for,
+        )
+    }
+
+    /// Builds this menu with caller-provided styles, routes input, and collects typed actions.
+    pub fn update_with_input_actions_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        stylesheet: StyleSheet,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        Ok(self
+            .try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?
+            .update_with_input_actions(input))
     }
 
     /// Pushes typed command bindings for enabled command items into a registry.
@@ -645,6 +706,24 @@ mod tests {
 
         let frame =
             surface.update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let direct_frame = menu
+            .update_with_input_actions(
+                Size::new(240.0, 140.0),
+                DocumentInput::primary_click(Point::new(2.0, 2.0)),
+                |item| match item.command_name() {
+                    Some("copy-selection") => Some(MenuAction::Copy),
+                    Some("rename-selection") => Some(MenuAction::Rename),
+                    _ => None,
+                },
+            )
+            .expect("context menu should update and collect actions directly");
+        let empty_frame = menu
+            .update_actions(Size::new(240.0, 140.0), |item| match item.command_name() {
+                Some("copy-selection") => Some(MenuAction::Copy),
+                Some("rename-selection") => Some(MenuAction::Rename),
+                _ => None,
+            })
+            .expect("context menu should resolve with typed actions directly");
         let copy = frame.output().snapshot().find("copy").unwrap();
         let paste = frame.output().snapshot().find("paste").unwrap();
 
@@ -652,6 +731,8 @@ mod tests {
         assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
         assert!(!paste.interactive());
         assert!(frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(direct_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(empty_frame.is_empty());
         assert!(!frame.contains_action(&MenuAction::Rename));
     }
 
