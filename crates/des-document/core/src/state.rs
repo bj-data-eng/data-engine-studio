@@ -601,6 +601,20 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_binding(mut self, binding: impl Into<DocumentCommandBinding<Action>>) -> Self {
+        self.push_binding(binding);
+        self
+    }
+
+    pub fn bind_binding_if(
+        mut self,
+        binding: impl Into<DocumentCommandBinding<Action>>,
+        present: bool,
+    ) -> Self {
+        self.push_binding_if(binding, present);
+        self
+    }
+
     pub fn bind_click(mut self, command: impl Into<String>, action: Action) -> Self {
         self.push_click(command, action);
         self
@@ -790,6 +804,15 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_bindings<I, B>(mut self, bindings: I) -> Self
+    where
+        I: IntoIterator<Item = B>,
+        B: Into<DocumentCommandBinding<Action>>,
+    {
+        self.push_bindings(bindings);
+        self
+    }
+
     pub fn push(&mut self, command: impl Into<String>, action: Action) {
         self.bindings
             .push(DocumentCommandBinding::new(command, action));
@@ -820,6 +843,20 @@ impl<Action> DocumentCommandRegistry<Action> {
     ) {
         if present {
             self.push_on(event, command, action);
+        }
+    }
+
+    pub fn push_binding(&mut self, binding: impl Into<DocumentCommandBinding<Action>>) {
+        self.bindings.push(binding.into());
+    }
+
+    pub fn push_binding_if(
+        &mut self,
+        binding: impl Into<DocumentCommandBinding<Action>>,
+        present: bool,
+    ) {
+        if present {
+            self.push_binding(binding);
         }
     }
 
@@ -984,6 +1021,14 @@ impl<Action> DocumentCommandRegistry<Action> {
                 .into_iter()
                 .map(|(command, action)| DocumentCommandBinding::new(command, action)),
         );
+    }
+
+    pub fn push_bindings<I, B>(&mut self, bindings: I)
+    where
+        I: IntoIterator<Item = B>,
+        B: Into<DocumentCommandBinding<Action>>,
+    {
+        self.bindings.extend(bindings.into_iter().map(Into::into));
     }
 
     pub fn action_for(&self, command: &str) -> Option<&Action> {
@@ -1222,6 +1267,14 @@ impl<Action> DocumentCommandRegistry<Action> {
         Handler: FnMut(DocumentCommandActionRef<'a, Action>),
     {
         self.dispatch_intent(output, ElementBehaviorEvent::Click, handler)
+    }
+}
+
+impl<Action> std::iter::FromIterator<DocumentCommandBinding<Action>>
+    for DocumentCommandRegistry<Action>
+{
+    fn from_iter<I: IntoIterator<Item = DocumentCommandBinding<Action>>>(iter: I) -> Self {
+        Self::new().bind_bindings(iter)
     }
 }
 

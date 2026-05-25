@@ -1,13 +1,14 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget, DocumentBuilder,
-    DocumentCommandAction, DocumentCommandRegistry, DocumentEngine, DocumentEvent,
-    DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection, DocumentProjectionOperation,
-    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId, ElementSpec,
-    ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length,
-    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
-    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
-    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentCommandAction, DocumentCommandBinding, DocumentCommandRegistry, DocumentEngine,
+    DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection,
+    DocumentProjectionOperation, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
+    ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput,
+    KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -345,10 +346,35 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     });
     let registry = DocumentCommandRegistry::new()
         .bind("commit", AppAction::Fallback)
-        .bind_click("commit", AppAction::CommitByClick)
-        .bind_key_down("commit", AppAction::CommitByKeyboard)
-        .bind_context_menu("commit-menu", AppAction::CommitByContextMenu)
-        .bind_pointer_enter("commit-hover", AppAction::CommitByPointerEnter);
+        .bind_bindings([
+            DocumentCommandBinding::click("commit", AppAction::CommitByClick),
+            DocumentCommandBinding::key_down("commit", AppAction::CommitByKeyboard),
+            DocumentCommandBinding::context_menu("commit-menu", AppAction::CommitByContextMenu),
+            DocumentCommandBinding::pointer_enter("commit-hover", AppAction::CommitByPointerEnter),
+        ])
+        .bind_binding_if(
+            DocumentCommandBinding::pointer_leave("skip-hover-out", AppAction::Fallback),
+            false,
+        );
+    let collected_registry = [
+        DocumentCommandBinding::click("commit", AppAction::CommitByClick),
+        DocumentCommandBinding::key_down("commit", AppAction::CommitByKeyboard),
+    ]
+    .into_iter()
+    .collect::<DocumentCommandRegistry<_>>();
+    let mut pushed_registry = DocumentCommandRegistry::new();
+    pushed_registry.push_binding(DocumentCommandBinding::context_menu(
+        "commit-menu",
+        AppAction::CommitByContextMenu,
+    ));
+    pushed_registry.push_binding_if(
+        DocumentCommandBinding::pointer_enter("commit-hover", AppAction::CommitByPointerEnter),
+        true,
+    );
+    pushed_registry.push_binding_if(
+        DocumentCommandBinding::pointer_leave("skip-hover-out", AppAction::Fallback),
+        false,
+    );
 
     let hover_output = view.update_with_input(pointer_input(
         Point::new(8.0, 8.0),
@@ -375,6 +401,9 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         .collect::<Vec<_>>();
 
     assert_eq!(registry.action_for("commit"), Some(&AppAction::Fallback));
+    assert_eq!(registry.bindings().len(), 5);
+    assert_eq!(collected_registry.bindings().len(), 2);
+    assert_eq!(pushed_registry.bindings().len(), 2);
     assert!(click_output.has_command_intent("commit", ElementBehaviorEvent::Click, "commit"));
     assert!(key_output.has_command_intent("commit", ElementBehaviorEvent::KeyDown, "commit"));
     assert_eq!(
