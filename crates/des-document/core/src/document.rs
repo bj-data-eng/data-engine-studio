@@ -1346,9 +1346,18 @@ pub trait DocumentWidget {
         None
     }
 
+    /// Returns reusable projection patches for widgets that own several elements.
+    ///
+    /// The default preserves the simpler [`DocumentWidget::projection_patch`]
+    /// convention. Multi-element widgets can override this method instead of
+    /// hand-writing [`DocumentWidget::push_projection`].
+    fn projection_patches(&self) -> Vec<(ElementId, ElementProjectionPatch)> {
+        self.projection_patch().into_iter().collect()
+    }
+
     /// Pushes this widget's retained-state projection into a caller-owned batch.
     fn push_projection(&self, projection: &mut DocumentProjection) {
-        if let Some((id, patch)) = self.projection_patch() {
+        for (id, patch) in self.projection_patches() {
             projection.push_patch(id, patch);
         }
     }

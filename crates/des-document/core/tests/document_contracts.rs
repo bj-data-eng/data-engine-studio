@@ -2393,6 +2393,112 @@ fn document_widget_can_declare_single_element_projection_patch() {
 }
 
 #[test]
+fn document_widget_can_declare_multi_element_projection_patches() {
+    struct StatusCard {
+        ready: bool,
+        count: usize,
+    }
+
+    impl DocumentWidget for StatusCard {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div("status-card")
+                .class("status-card")
+                .data("state", "pending")
+                .children(|ui| {
+                    ui.text("status-title", "Pending");
+                    ui.text("status-count", "0 rows");
+                });
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_class("status-card", Style::default().size(180.0, 64.0));
+            stylesheet.push_class(
+                "is-ready",
+                Style::default().background(Color::rgb(205, 239, 221)),
+            );
+        }
+
+        fn projection_patches(&self) -> Vec<(ElementId, ElementProjectionPatch)> {
+            vec![
+                (
+                    ElementId::new("status-card"),
+                    ElementProjectionPatch::new()
+                        .data("state", if self.ready { "ready" } else { "waiting" })
+                        .class_if("is-ready", self.ready)
+                        .disabled_if(false, self.ready),
+                ),
+                (
+                    ElementId::new("status-title"),
+                    ElementProjectionPatch::new().text(if self.ready {
+                        "Ready"
+                    } else {
+                        "Waiting"
+                    }),
+                ),
+                (
+                    ElementId::new("status-count"),
+                    ElementProjectionPatch::new().text(format!("{} rows", self.count)),
+                ),
+            ]
+        }
+    }
+
+    let waiting = StatusCard {
+        ready: false,
+        count: 0,
+    };
+    let ready = StatusCard {
+        ready: true,
+        count: 42,
+    };
+    let waiting_projection = waiting.projection();
+    let mut view = waiting.view(Size::new(320.0, 180.0));
+    let waiting_output = view.update();
+    let waiting_card = waiting_output.snapshot().find("status-card").unwrap();
+
+    assert_eq!(waiting_projection.len(), 4);
+    assert_eq!(waiting_card.data("state"), Some("waiting"));
+    assert!(!waiting_card.has_class("is-ready"));
+    assert_eq!(
+        waiting_output
+            .snapshot()
+            .find("status-title")
+            .unwrap()
+            .text(),
+        Some("Waiting".to_owned())
+    );
+    assert_eq!(
+        waiting_output
+            .snapshot()
+            .find("status-count")
+            .unwrap()
+            .text(),
+        Some("0 rows".to_owned())
+    );
+
+    let (report, ready_output) = view.project_widget_and_update(&ready).unwrap();
+    let ready_card = ready_output.snapshot().find("status-card").unwrap();
+
+    assert_eq!(report.operations, 5);
+    assert_eq!(report.changed, 4);
+    assert_eq!(ready_card.data("state"), Some("ready"));
+    assert!(ready_card.has_class("is-ready"));
+    assert!(!ready_card.disabled());
+    assert_eq!(
+        ready_output.snapshot().find("status-title").unwrap().text(),
+        Some("Ready".to_owned())
+    );
+    assert_eq!(
+        ready_output.snapshot().find("status-count").unwrap().text(),
+        Some("42 rows".to_owned())
+    );
+    assert_eq!(
+        ready_card.style().background,
+        Some(Color::rgb(205, 239, 221))
+    );
+}
+
+#[test]
 fn document_view_widget_composition_can_return_projection_errors() {
     struct BrokenWidget;
 
