@@ -781,6 +781,44 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
             action: AppAction::Run,
         }]
     );
+
+    let mut handled = Vec::new();
+    let report = frame.dispatch(|action| {
+        handled.push((
+            action.target().clone(),
+            action.event(),
+            action.command().to_owned(),
+            action.action().clone(),
+        ));
+    });
+    let mut clicked = Vec::new();
+    let clicked_report = frame.dispatch_clicked(|action| {
+        clicked.push(action.action().clone());
+    });
+    let mut by_target = Vec::new();
+    let target_report = frame.dispatch_for("run", |action| {
+        by_target.push(action.command().to_owned());
+    });
+    let missing_report = frame.dispatch_kind(
+        DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
+        |_| {},
+    );
+
+    assert_eq!(report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(
+        handled,
+        vec![(
+            ElementId::new("run"),
+            DocumentEventKind::Clicked,
+            "run".to_owned(),
+            AppAction::Run,
+        )]
+    );
+    assert_eq!(clicked_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(clicked, vec![AppAction::Run]);
+    assert_eq!(target_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(by_target, vec!["run".to_owned()]);
+    assert_eq!(missing_report, DocumentCommandDispatchReport::new(0, 0, 0));
 }
 
 #[test]

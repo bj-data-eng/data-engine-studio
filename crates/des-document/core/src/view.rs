@@ -1,8 +1,8 @@
 use crate::{
     Document, DocumentActionWidget, DocumentBuilder, DocumentCommandAction,
-    DocumentCommandRegistry, DocumentEngine, DocumentEventKind, DocumentInput, DocumentOutput,
-    DocumentProjection, DocumentProjectionReport, DocumentResult, DocumentWidget,
-    ElementBehaviorEvent, Size, StyleSheet, TextMeasurer,
+    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentEventKind,
+    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentResult,
+    DocumentWidget, ElementBehaviorEvent, Size, StyleSheet, TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -500,6 +500,133 @@ impl<Action> DocumentActionFrame<Action> {
         self.contains_action_for_intent(ElementBehaviorEvent::KeyUp, action)
     }
 
+    /// Dispatches every collected typed action to a handler.
+    ///
+    /// Because a `DocumentActionFrame` only stores commands that already mapped
+    /// to typed actions, the returned report treats every inspected action as
+    /// handled and never reports unhandled commands.
+    pub fn dispatch<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_matching(|_| true, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by one element.
+    pub fn dispatch_for<'a>(
+        &'a self,
+        target: &'a str,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_matching(|action| action.target.as_str() == target, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by one resolved event kind.
+    pub fn dispatch_kind<'a>(
+        &'a self,
+        kind: DocumentEventKind,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_matching(|action| action.event == kind, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by one authored behavior intent.
+    pub fn dispatch_intent<'a>(
+        &'a self,
+        intent: ElementBehaviorEvent,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_matching(|action| action.matches_intent(intent), handler)
+    }
+
+    /// Dispatches collected typed actions emitted by click intent.
+    pub fn dispatch_clicked<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::Click, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by pointer-enter intent.
+    pub fn dispatch_pointer_enter<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::PointerEnter, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by pointer-leave intent.
+    pub fn dispatch_pointer_leave<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::PointerLeave, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by pointer-down intent.
+    pub fn dispatch_pointer_down<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::PointerDown, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by pointer-up intent.
+    pub fn dispatch_pointer_up<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::PointerUp, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by drag-start intent.
+    pub fn dispatch_drag_start<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::DragStart, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by drag-move intent.
+    pub fn dispatch_drag<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::Drag, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by drag-end intent.
+    pub fn dispatch_drag_end<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::DragEnd, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by scroll intent.
+    pub fn dispatch_scroll<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::Scroll, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by key-down intent.
+    pub fn dispatch_key_down<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::KeyDown, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by key-up intent.
+    pub fn dispatch_key_up<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::KeyUp, handler)
+    }
+
     /// Consumes the frame into the resolved output and collected app actions.
     pub fn into_parts(self) -> (DocumentOutput, Vec<DocumentCommandAction<Action>>) {
         (self.output, self.actions)
@@ -508,6 +635,21 @@ impl<Action> DocumentActionFrame<Action> {
     /// Consumes the frame and returns only the collected app actions.
     pub fn into_actions(self) -> Vec<DocumentCommandAction<Action>> {
         self.actions
+    }
+
+    fn dispatch_matching<'a>(
+        &'a self,
+        mut matches: impl FnMut(&DocumentCommandAction<Action>) -> bool,
+        mut handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        let mut handled = 0;
+        for action in &self.actions {
+            if matches(action) {
+                handled += 1;
+                handler(action);
+            }
+        }
+        DocumentCommandDispatchReport::new(handled, handled, 0)
     }
 }
 
