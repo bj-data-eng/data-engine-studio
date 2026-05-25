@@ -188,6 +188,14 @@ impl DocumentProjection {
         self
     }
 
+    pub fn select(self, id: impl Into<ElementId>) -> Self {
+        self.set_selected(id, true)
+    }
+
+    pub fn deselect(self, id: impl Into<ElementId>) -> Self {
+        self.set_selected(id, false)
+    }
+
     pub fn push_selected(&mut self, id: impl Into<ElementId>, selected: bool) {
         self.operations
             .push(DocumentProjectionOperation::SetSelected {
@@ -201,6 +209,14 @@ impl DocumentProjection {
         self
     }
 
+    pub fn disable(self, id: impl Into<ElementId>) -> Self {
+        self.set_disabled(id, true)
+    }
+
+    pub fn enable(self, id: impl Into<ElementId>) -> Self {
+        self.set_disabled(id, false)
+    }
+
     pub fn push_disabled(&mut self, id: impl Into<ElementId>, disabled: bool) {
         self.operations
             .push(DocumentProjectionOperation::SetDisabled {
@@ -212,6 +228,14 @@ impl DocumentProjection {
     pub fn set_focused(mut self, id: impl Into<ElementId>, focused: bool) -> Self {
         self.push_focused(id, focused);
         self
+    }
+
+    pub fn focus(self, id: impl Into<ElementId>) -> Self {
+        self.set_focused(id, true)
+    }
+
+    pub fn blur(self, id: impl Into<ElementId>) -> Self {
+        self.set_focused(id, false)
     }
 
     pub fn push_focused(&mut self, id: impl Into<ElementId>, focused: bool) {
@@ -336,14 +360,38 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn select(&mut self) -> &mut Self {
+        self.selected(true)
+    }
+
+    pub fn deselect(&mut self) -> &mut Self {
+        self.selected(false)
+    }
+
     pub fn disabled(&mut self, disabled: bool) -> &mut Self {
         self.projection.push_disabled(self.id.clone(), disabled);
         self
     }
 
+    pub fn disable(&mut self) -> &mut Self {
+        self.disabled(true)
+    }
+
+    pub fn enable(&mut self) -> &mut Self {
+        self.disabled(false)
+    }
+
     pub fn focused(&mut self, focused: bool) -> &mut Self {
         self.projection.push_focused(self.id.clone(), focused);
         self
+    }
+
+    pub fn focus(&mut self) -> &mut Self {
+        self.focused(true)
+    }
+
+    pub fn blur(&mut self) -> &mut Self {
+        self.focused(false)
     }
 
     pub fn class(&mut self, class: impl Into<ClassName>, present: bool) -> &mut Self {

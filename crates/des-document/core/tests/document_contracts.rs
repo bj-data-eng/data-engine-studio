@@ -477,8 +477,8 @@ fn document_projection_batches_app_state_updates() {
         .with_element("status", |mut status| {
             status
                 .value("ready")
-                .selected(true)
-                .focused(true)
+                .select()
+                .focus()
                 .remove_class("pending")
                 .add_class("ready");
         });
@@ -504,6 +504,34 @@ fn document_projection_batches_app_state_updates() {
 
     assert_eq!(unchanged_report.operations, 6);
     assert_eq!(unchanged_report.changed, 0);
+
+    let reset = DocumentProjection::new()
+        .deselect("status")
+        .blur("status")
+        .disable("status");
+    let reset_report = view.project(&reset).unwrap();
+    let reset_output = view.update();
+    let reset_status = reset_output.snapshot().find("status").unwrap();
+
+    assert_eq!(reset_report.operations, 3);
+    assert_eq!(reset_report.changed, 3);
+    assert!(!reset_status.selected());
+    assert!(!reset_status.focused());
+    assert!(reset_status.disabled());
+
+    let restore = DocumentProjection::new()
+        .select("status")
+        .focus("status")
+        .enable("status");
+    let restore_report = view.project(&restore).unwrap();
+    let restore_output = view.update();
+    let restore_status = restore_output.snapshot().find("status").unwrap();
+
+    assert_eq!(restore_report.operations, 3);
+    assert_eq!(restore_report.changed, 3);
+    assert!(restore_status.selected());
+    assert!(restore_status.focused());
+    assert!(!restore_status.disabled());
 }
 
 #[test]
@@ -570,19 +598,26 @@ fn document_view_projects_state_and_updates_in_one_fluent_call() {
             projection
                 .element("summary")
                 .class("empty", false)
-                .class("ready", true);
+                .class("ready", true)
+                .disable()
+                .enable()
+                .deselect()
+                .blur();
         })
         .unwrap();
     let summary = output.snapshot().find("summary").unwrap();
 
-    assert_eq!(report.operations, 3);
-    assert_eq!(report.changed, 3);
+    assert_eq!(report.operations, 7);
+    assert_eq!(report.changed, 5);
     assert_eq!(
         output.snapshot().find("summary-count").unwrap().text(),
         Some("42 rows".to_owned())
     );
     assert!(summary.has_class("ready"));
     assert!(!summary.has_class("empty"));
+    assert!(!summary.selected());
+    assert!(!summary.focused());
+    assert!(!summary.disabled());
     assert_eq!(summary.style().background, Some(Color::rgb(208, 236, 255)));
 }
 
