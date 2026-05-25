@@ -1,4 +1,7 @@
-use des_document::{DocumentEngine, Element, Size};
+use des_document::{
+    DocumentCommandRegistry, DocumentEngine, DocumentInput, Element, ElementId, Point,
+    PointerInput, Size,
+};
 use des_html::{HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -250,6 +253,31 @@ fn html_stylesheet_parses_html_and_css_together() {
 }
 
 #[test]
+fn html_stylesheet_parses_full_html_documents() {
+    let bundle = HtmlStylesheet::parse(
+        r#"
+        <!doctype html>
+        <html>
+          <head><title>Ignored shell metadata</title></head>
+          <body><main id="app" class="shell">App</main></body>
+        </html>
+        "#,
+        r#".shell { width: 200px; height: 80px; }"#,
+    )
+    .expect("HTML document and CSS should compile together");
+    let mut view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("full HTML bundle should create a document view");
+
+    let output = view.update();
+    let app = output.snapshot().find("app").unwrap();
+
+    assert_eq!(app.element(), Element::Main);
+    assert_eq!(app.text(), Some("App".to_owned()));
+    assert_eq!(app.rect().size.width, 200.0);
+}
+
+#[test]
 fn html_stylesheet_can_create_ready_to_update_document_view() {
     let bundle = HtmlStylesheet::parse_fragment(
         r#"<button id="run" class="primary" on:click="run">Run</button>"#,
@@ -260,26 +288,59 @@ fn html_stylesheet_can_create_ready_to_update_document_view() {
         .to_view(Size::new(320.0, 180.0))
         .expect("HTML bundle should create a document view");
 
-    let output = view.update_with_input(des_document::DocumentInput {
-        pointer: Some(des_document::PointerInput {
-            position: des_document::Point::new(8.0, 8.0),
-            primary_delta: des_document::Point::ZERO,
-            primary_down: true,
-            primary_pressed: false,
-            primary_clicked: true,
-            primary_click_count: 1,
-            secondary_clicked: false,
-            time_seconds: 0.0,
-        }),
-        scroll_delta: des_document::Point::ZERO,
-        keys: Vec::new(),
-    });
+    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
+        position: Point::new(8.0, 8.0),
+        primary_delta: Point::ZERO,
+        primary_down: true,
+        primary_pressed: false,
+        primary_clicked: true,
+        primary_click_count: 1,
+        secondary_clicked: false,
+        time_seconds: 0.0,
+    }));
     let run = output.snapshot().find("run").unwrap();
 
     assert_eq!(run.rect().size.width, 96.0);
     assert!(run.interactive());
     assert_eq!(run.behavior_hooks()[0].command, "run");
     assert_eq!(output.commands()[0].command, "run");
+}
+
+#[test]
+fn html_authored_commands_dispatch_to_typed_rust_actions() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+    }
+
+    let bundle = HtmlStylesheet::parse_fragment(
+        r#"<button id="run" class="primary" data-command="project.run">Run</button>"#,
+        r#".primary { width: 96px; height: 32px; }"#,
+    )
+    .expect("HTML and CSS should compile together");
+    let mut view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML bundle should create a document view");
+    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
+        position: Point::new(8.0, 8.0),
+        primary_delta: Point::ZERO,
+        primary_down: true,
+        primary_pressed: false,
+        primary_clicked: true,
+        primary_click_count: 1,
+        secondary_clicked: false,
+        time_seconds: 0.0,
+    }));
+    let registry = DocumentCommandRegistry::new().bind("project.run", HtmlAction::Run);
+    let mut actions = Vec::new();
+    let report = registry.dispatch(&output, |command| {
+        actions.push((command.target.clone(), *command.action));
+    });
+
+    assert_eq!(report.commands, 1);
+    assert_eq!(report.handled, 1);
+    assert_eq!(report.unhandled, 0);
+    assert_eq!(actions, vec![(ElementId::new("run"), HtmlAction::Run)]);
 }
 
 #[test]

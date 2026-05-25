@@ -138,6 +138,15 @@ pub struct HtmlStylesheet {
 }
 
 impl HtmlStylesheet {
+    /// Parses an HTML document and CSS stylesheet into typed document inputs.
+    pub fn parse(html: &str, css: &str) -> HtmlResult<Self> {
+        let stylesheet = parse_stylesheet(css)?;
+        Ok(Self {
+            html: HtmlDocument::parse(html)?,
+            stylesheet,
+        })
+    }
+
     /// Parses an HTML fragment and CSS stylesheet into typed document inputs.
     pub fn parse_fragment(html: &str, css: &str) -> HtmlResult<Self> {
         let stylesheet = parse_stylesheet(css)?;
