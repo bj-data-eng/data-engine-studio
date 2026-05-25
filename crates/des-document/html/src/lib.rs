@@ -8,7 +8,7 @@
 use des_document::{
     Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry,
     DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView,
-    Element, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
+    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -665,7 +665,7 @@ impl HtmlNode {
         spec = spec.behavior_hooks(
             self.behavior_hooks
                 .iter()
-                .map(|hook| ElementBehaviorHook::new(hook.event.clone(), hook.command.clone())),
+                .map(HtmlBehaviorHook::to_element_hook),
         );
         if let Some(value) = self.attributes.get("value") {
             spec = spec.value(value.clone());
@@ -706,6 +706,46 @@ pub struct HtmlBehaviorHook {
     pub event: String,
     /// Rust command/event intent declared by the author.
     pub command: String,
+}
+
+impl HtmlBehaviorHook {
+    /// Creates a behavior hook from an HTML-authored event name.
+    pub fn new(event: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            event: event.into(),
+            command: command.into(),
+        }
+    }
+
+    /// Creates a behavior hook from a typed document behavior intent.
+    pub fn on(event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
+        Self::new(event.as_str(), command)
+    }
+
+    /// Returns the HTML-authored event name.
+    pub fn event(&self) -> &str {
+        &self.event
+    }
+
+    /// Returns the Rust command name declared by the author.
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+
+    /// Returns the parsed typed event intent when this hook maps to a document intent.
+    pub fn intent(&self) -> Option<ElementBehaviorEvent> {
+        ElementBehaviorEvent::from_name(&self.event)
+    }
+
+    /// Returns true when this hook maps to the supplied document behavior intent.
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        self.intent() == Some(intent)
+    }
+
+    /// Converts the parsed HTML hook into the egui-free document hook contract.
+    pub fn to_element_hook(&self) -> ElementBehaviorHook {
+        ElementBehaviorHook::new(self.event.clone(), self.command.clone())
+    }
 }
 
 /// Non-fatal HTML authoring diagnostic.
@@ -1051,10 +1091,7 @@ fn push_behavior_hook(
         ));
         return;
     }
-    behavior_hooks.push(HtmlBehaviorHook {
-        event: event.to_owned(),
-        command,
-    });
+    behavior_hooks.push(HtmlBehaviorHook::new(event, command));
 }
 
 fn is_javascript_event_attribute(name: &str) -> bool {

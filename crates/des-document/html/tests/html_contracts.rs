@@ -127,8 +127,16 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
     assert_eq!(button.behavior_hooks.len(), 2);
     assert_eq!(button.behavior_hooks[0].event, "click");
     assert_eq!(button.behavior_hooks[0].command, "project.open");
+    assert_eq!(button.behavior_hooks[0].event(), "click");
+    assert_eq!(button.behavior_hooks[0].command(), "project.open");
+    assert_eq!(
+        button.behavior_hooks[0].intent(),
+        Some(ElementBehaviorEvent::Click)
+    );
+    assert!(button.behavior_hooks[0].matches_intent(ElementBehaviorEvent::Click));
     assert_eq!(button.behavior_hooks[1].event, "input");
     assert_eq!(button.behavior_hooks[1].command, "project.filter");
+    assert_eq!(button.behavior_hooks[1].intent(), None);
 }
 
 #[test]
