@@ -1,7 +1,7 @@
 use crate::{
     Document, DocumentBuilder, DocumentCommandAction, DocumentCommandRegistry, DocumentEngine,
-    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentResult,
-    DocumentWidget, Size, StyleSheet, TextMeasurer,
+    DocumentEventKind, DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport,
+    DocumentResult, DocumentWidget, Size, StyleSheet, TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -20,6 +20,78 @@ pub struct DocumentView {
 pub struct DocumentActionFrame<Action> {
     pub output: DocumentOutput,
     pub actions: Vec<DocumentCommandAction<Action>>,
+}
+
+impl<Action> DocumentActionFrame<Action> {
+    /// Returns the resolved document output for rendering and interaction queries.
+    pub fn output(&self) -> &DocumentOutput {
+        &self.output
+    }
+
+    /// Returns the collected typed app actions in document event order.
+    pub fn actions(&self) -> &[DocumentCommandAction<Action>] {
+        &self.actions
+    }
+
+    /// Returns true when this frame collected no typed app actions.
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
+    }
+
+    /// Returns the number of typed app actions collected for this frame.
+    pub fn len(&self) -> usize {
+        self.actions.len()
+    }
+
+    /// Returns the first typed app action, when one was collected.
+    pub fn first_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.actions.first()
+    }
+
+    /// Iterates typed app actions emitted by one element.
+    pub fn actions_for<'a>(
+        &'a self,
+        target: &'a str,
+    ) -> impl Iterator<Item = &'a DocumentCommandAction<Action>> + 'a {
+        self.actions
+            .iter()
+            .filter(move |action| action.target.as_str() == target)
+    }
+
+    /// Iterates typed app actions emitted by one resolved document event kind.
+    pub fn actions_of_kind(
+        &self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions
+            .iter()
+            .filter(move |action| action.event == kind)
+    }
+
+    /// Iterates typed app actions emitted by click intent.
+    pub fn clicked_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_of_kind(DocumentEventKind::Clicked)
+    }
+
+    /// Returns true when the frame contains the supplied typed action.
+    pub fn contains_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.actions
+            .iter()
+            .any(|candidate| &candidate.action == action)
+    }
+
+    /// Consumes the frame into the resolved output and collected app actions.
+    pub fn into_parts(self) -> (DocumentOutput, Vec<DocumentCommandAction<Action>>) {
+        (self.output, self.actions)
+    }
+
+    /// Consumes the frame and returns only the collected app actions.
+    pub fn into_actions(self) -> Vec<DocumentCommandAction<Action>> {
+        self.actions
+    }
 }
 
 impl DocumentView {

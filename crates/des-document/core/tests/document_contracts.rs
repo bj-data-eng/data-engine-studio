@@ -453,6 +453,70 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
 }
 
 #[test]
+fn document_action_frame_supports_app_update_loop_queries() {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+        Cancel,
+    }
+
+    let stylesheet = StyleSheet::new()
+        .id("run", Style::default().size(96.0, 32.0))
+        .id("cancel", Style::default().size(96.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").on_click("run").text("Run");
+        ui.button("cancel")
+            .focused(true)
+            .on_key_down("cancel")
+            .text("Cancel");
+    });
+    let registry = DocumentCommandRegistry::new()
+        .bind_click("run", AppAction::Run)
+        .bind_on(ElementBehaviorEvent::KeyDown, "cancel", AppAction::Cancel);
+
+    let click_frame = view.update_with_input_actions(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &registry,
+    );
+    assert_eq!(
+        click_frame.output().hit_id().map(ElementId::as_str),
+        Some("run")
+    );
+    assert_eq!(click_frame.len(), 1);
+    assert!(!click_frame.is_empty());
+    assert!(click_frame.contains_action(&AppAction::Run));
+    assert_eq!(
+        click_frame.first_action().map(|action| &action.action),
+        Some(&AppAction::Run)
+    );
+    assert_eq!(click_frame.actions_for("run").count(), 1);
+    assert_eq!(click_frame.clicked_actions().count(), 1);
+    assert_eq!(
+        click_frame
+            .actions_of_kind(DocumentEventKind::Clicked)
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
+
+    let key_frame =
+        view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Escape), &registry);
+    assert_eq!(key_frame.actions().len(), 1);
+    assert!(key_frame.contains_action(&AppAction::Cancel));
+    assert_eq!(key_frame.clicked_actions().count(), 0);
+    let (output, actions) = key_frame.into_parts();
+    assert_eq!(
+        output
+            .first_event_target(DocumentEventKind::KeyDown(KeyInput::down(
+                DocumentKey::Escape
+            )))
+            .map(ElementId::as_str),
+        Some("cancel")
+    );
+    assert_eq!(actions[0].action, AppAction::Cancel);
+}
+
+#[test]
 fn document_command_registry_dispatches_typed_actions_with_context() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum AppAction {
