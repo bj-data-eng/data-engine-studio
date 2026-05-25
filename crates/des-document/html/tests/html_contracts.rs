@@ -1362,6 +1362,37 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         .snapshot()
         .find("select")
         .unwrap();
+    let mut projected_dispatched = Vec::new();
+    let (dispatch_report, dispatch_frame, action_report) = bundle
+        .update_with_input_projection_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 32.0)),
+            &projection,
+            &registry,
+            |action| {
+                projected_dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML bundle should project state and dispatch actions in one call");
+    let dispatch_select = dispatch_frame.output().snapshot().find("select").unwrap();
+    let mut projected_with_dispatched = Vec::new();
+    let (dispatch_with_report, dispatch_with_frame, dispatch_with_action_report) = bundle
+        .update_with_input_projected_with_and_dispatch_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("run").text("Dispatch configured");
+            },
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_click("project.select", HtmlAction::Select);
+            },
+            |action| {
+                projected_with_dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML bundle should build projection, configure actions, and dispatch");
+    let dispatch_with_run = dispatch_with_frame.output().snapshot().find("run").unwrap();
 
     assert_eq!(report.operations, 4);
     assert_eq!(report.changed, 4);
@@ -1373,6 +1404,24 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(mapped_report.changed, 1);
     assert!(mapped_select.has_class("is-selected"));
     assert!(mapped_update_frame.contains_clicked_action(&HtmlAction::Select));
+    assert_eq!(dispatch_report.operations, 7);
+    assert_eq!(dispatch_report.changed, 7);
+    assert_eq!(action_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(projected_dispatched, vec![HtmlAction::Select]);
+    assert_eq!(dispatch_select.aria("pressed"), Some("false"));
+    assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Select));
+    assert_eq!(dispatch_with_report.operations, 1);
+    assert_eq!(dispatch_with_report.changed, 1);
+    assert_eq!(
+        dispatch_with_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_with_dispatched, vec![HtmlAction::Run]);
+    assert_eq!(
+        dispatch_with_run.text(),
+        Some("Dispatch configured".to_owned())
+    );
+    assert!(dispatch_with_frame.contains_clicked_action(&HtmlAction::Run));
 
     let projected_registry = bundle.command_action_registry([
         ("project.run", HtmlAction::Run),
