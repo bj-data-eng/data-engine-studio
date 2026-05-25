@@ -1,6 +1,6 @@
 use des_document::{
-    AlignItems, Color, CornerRadii, Direction, Document, DocumentEngine, DocumentEvent,
-    DocumentEventKind, DocumentInput, DocumentView, Element, ElementId, ElementSpec,
+    AlignItems, Color, CornerRadii, Direction, Document, DocumentCommandRegistry, DocumentEngine,
+    DocumentEvent, DocumentEventKind, DocumentInput, DocumentView, Element, ElementId, ElementSpec,
     ElementStateSelector, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput,
     ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
     TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
@@ -87,6 +87,38 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert_eq!(commands[0].target, ElementId::new("run"));
     assert_eq!(commands[0].event, DocumentEventKind::Clicked);
     assert_eq!(commands[0].command, "run-query");
+}
+
+#[test]
+fn document_command_registry_maps_hook_commands_to_typed_actions() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        RunQuery,
+        CancelQuery,
+    }
+
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("run"),
+        Style::default()
+            .width(Length::Px(96.0))
+            .height(Length::Px(32.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").on_click("run-query").text("Run");
+    });
+    let registry = DocumentCommandRegistry::new()
+        .bind("run-query", AppAction::RunQuery)
+        .bind("cancel-query", AppAction::CancelQuery);
+
+    let output =
+        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let actions = registry.command_actions(&output).collect::<Vec<_>>();
+
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0].target, &ElementId::new("run"));
+    assert_eq!(actions[0].event, DocumentEventKind::Clicked);
+    assert_eq!(actions[0].command, "run-query");
+    assert_eq!(*actions[0].action, AppAction::RunQuery);
 }
 
 #[test]

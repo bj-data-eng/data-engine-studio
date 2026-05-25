@@ -15,12 +15,12 @@ use views::{
 };
 
 use des_document::{
-    Color, Document, DocumentDrag, DocumentEngine, DocumentEventKind, DocumentInput,
-    DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec, ElementStateSelector,
-    FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput, Rect, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    TextContent, TextDecoration, TextRun, TextVerticalAlign, VisualCloneOptions,
-    VisualElementClone,
+    Color, Document, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentEventKind,
+    DocumentInput, DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec,
+    ElementStateSelector, FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput,
+    Rect, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
+    TableSpec, TableTrackSize, TextContent, TextDecoration, TextRun, TextVerticalAlign,
+    VisualCloneOptions, VisualElementClone,
 };
 use des_widgets::{
     AutoScrollOptions, AutoScroller, ContextMenu, DropZoneId, SortableDocumentConfig,
@@ -121,6 +121,7 @@ impl LabView {
 pub(crate) struct UiLabState {
     document_engine: DocumentEngine,
     stylesheet: StyleSheet,
+    command_registry: DocumentCommandRegistry<LabAction>,
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
@@ -200,6 +201,7 @@ impl Default for UiLabState {
         Self {
             document_engine: DocumentEngine::default(),
             stylesheet: stylesheet(),
+            command_registry: lab_action_registry(),
             view: LabView::Layout,
             show_optional_card: true,
             dense_mode: false,
@@ -559,8 +561,22 @@ impl UiLabState {
     fn apply_clicked_document_actions(&mut self, ui: &egui::Ui, output: &DocumentOutput) -> bool {
         let mut changed = false;
         let mut handled_commands = Vec::new();
+        let command_actions = self
+            .command_registry
+            .command_actions(output)
+            .filter(|command| command.event == DocumentEventKind::Clicked)
+            .map(|command| (command.target.clone(), command.event, *command.action))
+            .collect::<Vec<_>>();
+        for (target, event, action) in command_actions {
+            self.apply_triggered_lab_action(ui, action);
+            handled_commands.push((target, event));
+            changed = true;
+        }
         for command in output.command_events() {
             if command.event == DocumentEventKind::Clicked
+                && !handled_commands
+                    .iter()
+                    .any(|(target, kind)| *kind == command.event && target == command.target)
                 && let Some(action) = lab_action_for_command(command.command)
             {
                 self.apply_triggered_lab_action(ui, action);
@@ -1244,32 +1260,46 @@ fn lab_action_for_id(id: &str) -> Option<LabAction> {
 
 fn lab_action_for_command(command: &str) -> Option<LabAction> {
     let command = command.trim();
-    match command {
-        "view-layout" => Some(LabAction::SelectView(LabView::Layout)),
-        "view-interaction" => Some(LabAction::SelectView(LabView::Interaction)),
-        "view-draggable" => Some(LabAction::SelectView(LabView::Draggable)),
-        "view-styling" => Some(LabAction::SelectView(LabView::Styling)),
-        "view-animation" => Some(LabAction::SelectView(LabView::Animation)),
-        "view-scrolling" => Some(LabAction::SelectView(LabView::Scrolling)),
-        "view-floating" => Some(LabAction::SelectView(LabView::Floating)),
-        "view-table" => Some(LabAction::SelectView(LabView::Table)),
-        "view-text" => Some(LabAction::SelectView(LabView::Text)),
-        "view-nesting" => Some(LabAction::SelectView(LabView::Nesting)),
-        "view-graph" => Some(LabAction::SelectView(LabView::Graph)),
-        "toggle-optional-card" => Some(LabAction::ToggleOptionalCard),
-        "toggle-density" => Some(LabAction::ToggleDensity),
-        "control-checkbox" => Some(LabAction::ToggleCheckbox),
-        "control-radio-local" => Some(LabAction::SelectRadio(0)),
-        "control-radio-remote" => Some(LabAction::SelectRadio(1)),
-        "control-radio-hybrid" => Some(LabAction::SelectRadio(2)),
-        "control-dropdown" => Some(LabAction::ToggleDropdown),
-        "control-dropdown-option-csv" => Some(LabAction::SelectDropdown(0)),
-        "control-dropdown-option-duckdb" => Some(LabAction::SelectDropdown(1)),
-        "control-dropdown-option-python" => Some(LabAction::SelectDropdown(2)),
-        "loop-action-button" => Some(LabAction::IncrementLoopAction),
-        TEXT_CONTEXT_MENU_COPY_ID => Some(LabAction::CopyTextSelection),
-        _ => shadow_tune_action_for_id(command),
-    }
+    lab_action_registry()
+        .action_for(command)
+        .copied()
+        .or_else(|| shadow_tune_action_for_id(command))
+}
+
+fn lab_action_registry() -> DocumentCommandRegistry<LabAction> {
+    DocumentCommandRegistry::new()
+        .bind("view-layout", LabAction::SelectView(LabView::Layout))
+        .bind(
+            "view-interaction",
+            LabAction::SelectView(LabView::Interaction),
+        )
+        .bind("view-draggable", LabAction::SelectView(LabView::Draggable))
+        .bind("view-styling", LabAction::SelectView(LabView::Styling))
+        .bind("view-animation", LabAction::SelectView(LabView::Animation))
+        .bind("view-scrolling", LabAction::SelectView(LabView::Scrolling))
+        .bind("view-floating", LabAction::SelectView(LabView::Floating))
+        .bind("view-table", LabAction::SelectView(LabView::Table))
+        .bind("view-text", LabAction::SelectView(LabView::Text))
+        .bind("view-nesting", LabAction::SelectView(LabView::Nesting))
+        .bind("view-graph", LabAction::SelectView(LabView::Graph))
+        .bind("toggle-optional-card", LabAction::ToggleOptionalCard)
+        .bind("toggle-density", LabAction::ToggleDensity)
+        .bind("control-checkbox", LabAction::ToggleCheckbox)
+        .bind("control-radio-local", LabAction::SelectRadio(0))
+        .bind("control-radio-remote", LabAction::SelectRadio(1))
+        .bind("control-radio-hybrid", LabAction::SelectRadio(2))
+        .bind("control-dropdown", LabAction::ToggleDropdown)
+        .bind("control-dropdown-option-csv", LabAction::SelectDropdown(0))
+        .bind(
+            "control-dropdown-option-duckdb",
+            LabAction::SelectDropdown(1),
+        )
+        .bind(
+            "control-dropdown-option-python",
+            LabAction::SelectDropdown(2),
+        )
+        .bind("loop-action-button", LabAction::IncrementLoopAction)
+        .bind(TEXT_CONTEXT_MENU_COPY_ID, LabAction::CopyTextSelection)
 }
 
 fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {

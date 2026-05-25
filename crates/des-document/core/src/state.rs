@@ -134,6 +134,85 @@ pub struct DocumentCommandRef<'a> {
     pub command: &'a str,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentCommandBinding<Action> {
+    pub command: String,
+    pub action: Action,
+}
+
+impl<Action> DocumentCommandBinding<Action> {
+    pub fn new(command: impl Into<String>, action: Action) -> Self {
+        Self {
+            command: command.into(),
+            action,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentCommandRegistry<Action> {
+    bindings: Vec<DocumentCommandBinding<Action>>,
+}
+
+impl<Action> Default for DocumentCommandRegistry<Action> {
+    fn default() -> Self {
+        Self {
+            bindings: Vec::new(),
+        }
+    }
+}
+
+impl<Action> DocumentCommandRegistry<Action> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn bind(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push(command, action);
+        self
+    }
+
+    pub fn push(&mut self, command: impl Into<String>, action: Action) {
+        self.bindings
+            .push(DocumentCommandBinding::new(command, action));
+    }
+
+    pub fn action_for(&self, command: &str) -> Option<&Action> {
+        let command = command.trim();
+        self.bindings
+            .iter()
+            .find(|binding| binding.command == command)
+            .map(|binding| &binding.action)
+    }
+
+    pub fn command_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        output.command_events().filter_map(|command| {
+            let action = self.action_for(command.command)?;
+            Some(DocumentCommandActionRef {
+                target: command.target,
+                event: command.event,
+                command: command.command,
+                action,
+            })
+        })
+    }
+
+    pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
+        &self.bindings
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DocumentCommandActionRef<'a, Action> {
+    pub target: &'a ElementId,
+    pub event: DocumentEventKind,
+    pub command: &'a str,
+    pub action: &'a Action,
+}
+
 pub struct DocumentCommandIter<'a> {
     output: &'a DocumentOutput,
     event_index: usize,
