@@ -582,8 +582,16 @@ impl DocumentInput {
         Self::key(KeyInput::down(key))
     }
 
+    pub fn key_down_with_modifiers(key: DocumentKey, modifiers: KeyModifiers) -> Self {
+        Self::key(KeyInput::down_with_modifiers(key, modifiers))
+    }
+
     pub fn key_up(key: DocumentKey) -> Self {
         Self::key(KeyInput::up(key))
+    }
+
+    pub fn key_up_with_modifiers(key: DocumentKey, modifiers: KeyModifiers) -> Self {
+        Self::key(KeyInput::up_with_modifiers(key, modifiers))
     }
 
     pub fn key(key: KeyInput) -> Self {
@@ -725,6 +733,10 @@ impl KeyInput {
         }
     }
 
+    pub fn down_with_modifiers(key: DocumentKey, modifiers: KeyModifiers) -> Self {
+        Self::down(key).with_modifiers(modifiers)
+    }
+
     pub fn up(key: DocumentKey) -> Self {
         Self {
             key,
@@ -733,8 +745,32 @@ impl KeyInput {
         }
     }
 
+    pub fn up_with_modifiers(key: DocumentKey, modifiers: KeyModifiers) -> Self {
+        Self::up(key).with_modifiers(modifiers)
+    }
+
     pub fn with_modifiers(mut self, modifiers: KeyModifiers) -> Self {
         self.modifiers = modifiers;
+        self
+    }
+
+    pub fn alt(mut self) -> Self {
+        self.modifiers = self.modifiers.alt();
+        self
+    }
+
+    pub fn ctrl(mut self) -> Self {
+        self.modifiers = self.modifiers.ctrl();
+        self
+    }
+
+    pub fn shift(mut self) -> Self {
+        self.modifiers = self.modifiers.shift();
+        self
+    }
+
+    pub fn command(mut self) -> Self {
+        self.modifiers = self.modifiers.command();
         self
     }
 }

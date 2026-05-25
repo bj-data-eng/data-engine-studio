@@ -301,11 +301,7 @@ fn keyboard_input_targets_focused_element_and_emits_hook_command() {
             .empty();
     });
 
-    let output = view.update_with_input(DocumentInput {
-        pointer: None,
-        scroll_delta: Point::ZERO,
-        keys: vec![KeyInput::down(DocumentKey::Enter)],
-    });
+    let output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
     let commands = output.commands();
 
     assert_eq!(commands.len(), 1);
@@ -331,11 +327,21 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
         .with_time(1.75);
     let input = DocumentInput::pointer(pointer)
         .with_scroll(Point::new(0.0, -12.0))
-        .with_key(
-            KeyInput::down(DocumentKey::Enter)
-                .with_modifiers(KeyModifiers::new().command().shift()),
-        )
+        .with_key(KeyInput::down(DocumentKey::Enter).command().shift())
         .with_key(KeyInput::up(DocumentKey::Escape));
+    let modified_down =
+        KeyInput::down_with_modifiers(DocumentKey::Character('s'), KeyModifiers::new().command());
+    let modified_up =
+        KeyInput::up_with_modifiers(DocumentKey::Character('s'), KeyModifiers::new().command());
+    let shortcut_input = DocumentInput::key_down_with_modifiers(
+        DocumentKey::Character('s'),
+        KeyModifiers::new().command(),
+    )
+    .with_key(KeyInput::up(DocumentKey::Character('s')).command());
+    let shortcut_release = DocumentInput::key_up_with_modifiers(
+        DocumentKey::Character('s'),
+        KeyModifiers::new().command(),
+    );
 
     assert_eq!(input.pointer, Some(pointer));
     assert_eq!(pointer.position, Point::new(18.0, 27.0));
@@ -350,6 +356,16 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
     assert!(input.keys[0].modifiers.command);
     assert!(input.keys[0].modifiers.shift);
     assert_eq!(input.keys[1], KeyInput::up(DocumentKey::Escape));
+    assert_eq!(
+        modified_down,
+        KeyInput::down(DocumentKey::Character('s')).command()
+    );
+    assert_eq!(
+        modified_up,
+        KeyInput::up(DocumentKey::Character('s')).command()
+    );
+    assert_eq!(shortcut_input.keys, vec![modified_down, modified_up]);
+    assert_eq!(shortcut_release.keys, vec![modified_up]);
 
     let click = PointerInput::at(Point::new(4.0, 5.0)).primary_clicked();
     let press = PointerInput::at(Point::new(4.0, 5.0)).primary_press();
