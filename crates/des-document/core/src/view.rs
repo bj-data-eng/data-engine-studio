@@ -1,8 +1,8 @@
 use crate::{
     Document, DocumentActionWidget, DocumentBuilder, DocumentCommandAction,
     DocumentCommandRegistry, DocumentEngine, DocumentEventKind, DocumentInput, DocumentOutput,
-    DocumentProjection, DocumentProjectionReport, DocumentResult, DocumentWidget, Size, StyleSheet,
-    TextMeasurer,
+    DocumentProjection, DocumentProjectionReport, DocumentResult, DocumentWidget,
+    ElementBehaviorEvent, Size, StyleSheet, TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -84,14 +84,34 @@ impl<Action> DocumentActionFrame<Action> {
         self.actions.iter().find(|action| action.event == kind)
     }
 
+    /// Iterates typed app actions emitted by one authored behavior intent.
+    pub fn actions_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions
+            .iter()
+            .filter(move |action| action.matches_intent(intent))
+    }
+
+    /// Returns the first typed app action emitted by one authored behavior intent.
+    pub fn first_action_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentCommandAction<Action>> {
+        self.actions
+            .iter()
+            .find(|action| action.matches_intent(intent))
+    }
+
     /// Iterates typed app actions emitted by click intent.
     pub fn clicked_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
-        self.actions_of_kind(DocumentEventKind::Clicked)
+        self.actions_for_intent(ElementBehaviorEvent::Click)
     }
 
     /// Returns the first typed app action emitted by click intent.
     pub fn first_clicked_action(&self) -> Option<&DocumentCommandAction<Action>> {
-        self.first_action_of_kind(DocumentEventKind::Clicked)
+        self.first_action_for_intent(ElementBehaviorEvent::Click)
     }
 
     /// Returns true when the frame contains the supplied typed action.
@@ -122,12 +142,21 @@ impl<Action> DocumentActionFrame<Action> {
             .any(|candidate| &candidate.action == action)
     }
 
+    /// Returns true when the supplied behavior intent emitted the supplied typed action.
+    pub fn contains_action_for_intent(&self, intent: ElementBehaviorEvent, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.actions_for_intent(intent)
+            .any(|candidate| &candidate.action == action)
+    }
+
     /// Returns true when click intent emitted the supplied typed action.
     pub fn contains_clicked_action(&self, action: &Action) -> bool
     where
         Action: PartialEq,
     {
-        self.contains_action_of_kind(DocumentEventKind::Clicked, action)
+        self.contains_action_for_intent(ElementBehaviorEvent::Click, action)
     }
 
     /// Consumes the frame into the resolved output and collected app actions.

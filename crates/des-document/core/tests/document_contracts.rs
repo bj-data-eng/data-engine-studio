@@ -671,6 +671,22 @@ fn document_action_frame_supports_app_update_loop_queries() {
         view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Escape), &registry);
     assert_eq!(key_frame.actions().len(), 1);
     assert!(key_frame.contains_action(&AppAction::Cancel));
+    assert_eq!(
+        key_frame
+            .actions_for_intent(ElementBehaviorEvent::KeyDown)
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["cancel"]
+    );
+    assert_eq!(
+        key_frame
+            .first_action_for_intent(ElementBehaviorEvent::KeyDown)
+            .map(|action| &action.action),
+        Some(&AppAction::Cancel)
+    );
+    assert!(
+        key_frame.contains_action_for_intent(ElementBehaviorEvent::KeyDown, &AppAction::Cancel)
+    );
     assert_eq!(key_frame.clicked_actions().count(), 0);
     assert_eq!(key_frame.first_clicked_action(), None);
     let (output, actions) = key_frame.into_parts();
