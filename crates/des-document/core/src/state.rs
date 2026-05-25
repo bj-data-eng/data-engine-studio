@@ -139,6 +139,22 @@ impl DocumentOutput {
         self.clicked_targets().next()
     }
 
+    pub fn pressed_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::Pressed)
+    }
+
+    pub fn first_pressed_target(&self) -> Option<&ElementId> {
+        self.pressed_targets().next()
+    }
+
+    pub fn released_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::Released)
+    }
+
+    pub fn first_released_target(&self) -> Option<&ElementId> {
+        self.released_targets().next()
+    }
+
     pub fn was_clicked(&self, target: &str) -> bool {
         self.has_event(target, DocumentEventKind::Clicked)
     }
@@ -161,6 +177,78 @@ impl DocumentOutput {
 
     pub fn context_requested_for(&self, target: &str) -> bool {
         self.has_event(target, DocumentEventKind::ContextRequested)
+    }
+
+    pub fn drag_started_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::DragStarted)
+    }
+
+    pub fn first_drag_started_target(&self) -> Option<&ElementId> {
+        self.drag_started_targets().next()
+    }
+
+    pub fn drag_moved_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::DragMoved)
+    }
+
+    pub fn first_drag_moved_target(&self) -> Option<&ElementId> {
+        self.drag_moved_targets().next()
+    }
+
+    pub fn drag_ended_targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.event_targets_of_kind(DocumentEventKind::DragEnded)
+    }
+
+    pub fn first_drag_ended_target(&self) -> Option<&ElementId> {
+        self.drag_ended_targets().next()
+    }
+
+    pub fn drag_started_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::DragStarted)
+    }
+
+    pub fn drag_moved_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::DragMoved)
+    }
+
+    pub fn drag_ended_for(&self, target: &str) -> bool {
+        self.has_event(target, DocumentEventKind::DragEnded)
+    }
+
+    pub fn active_drag(&self) -> Option<&DocumentDrag> {
+        self.active_drag.as_ref()
+    }
+
+    pub fn completed_drag(&self) -> Option<&DocumentDrag> {
+        self.completed_drag.as_ref()
+    }
+
+    pub fn has_active_drag(&self) -> bool {
+        self.active_drag.is_some()
+    }
+
+    pub fn has_completed_drag(&self) -> bool {
+        self.completed_drag.is_some()
+    }
+
+    pub fn active_drag_target(&self) -> Option<&ElementId> {
+        self.active_drag.as_ref().map(|drag| &drag.target)
+    }
+
+    pub fn completed_drag_target(&self) -> Option<&ElementId> {
+        self.completed_drag.as_ref().map(|drag| &drag.target)
+    }
+
+    pub fn active_drag_target_is(&self, target: &str) -> bool {
+        self.active_drag
+            .as_ref()
+            .is_some_and(|drag| drag.target_is(target))
+    }
+
+    pub fn completed_drag_target_is(&self, target: &str) -> bool {
+        self.completed_drag
+            .as_ref()
+            .is_some_and(|drag| drag.target_is(target))
     }
 
     pub fn key_down_events(&self) -> impl Iterator<Item = (&ElementId, KeyInput)> {
@@ -1391,6 +1479,18 @@ pub struct DocumentDrag {
     pub current: Point,
     pub delta: Point,
     pub pointer_offset: Point,
+}
+
+impl DocumentDrag {
+    /// Returns the element whose pointer drag is active or completed.
+    pub fn target(&self) -> &ElementId {
+        &self.target
+    }
+
+    /// Returns true when this drag belongs to the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
