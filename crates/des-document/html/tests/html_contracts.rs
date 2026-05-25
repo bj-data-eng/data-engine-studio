@@ -1197,6 +1197,18 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     let mapped_empty_frame = html
         .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
         .expect("HTML should map commands for a no-input update");
+    let mapped_empty_values = html
+        .update_action_values_with_actions(
+            Size::new(320.0, 180.0),
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML should map no-input commands directly to action values");
+    let intent_mapped_empty_values = html
+        .update_action_values_with_intent_actions(
+            Size::new(320.0, 180.0),
+            [(ElementBehaviorEvent::Click, "project.run", HtmlAction::Run)],
+        )
+        .expect("HTML should map no-input intent commands directly to action values");
     let key_input_frame = html
         .update_with_input_actions(
             Size::new(320.0, 180.0),
@@ -1268,6 +1280,8 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     assert_eq!(intent_mapped_key_values, vec![HtmlAction::Search]);
     assert!(configured_empty_frame.is_empty());
     assert!(mapped_empty_frame.is_empty());
+    assert!(mapped_empty_values.is_empty());
+    assert!(intent_mapped_empty_values.is_empty());
     assert!(key_frame.is_empty());
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
@@ -1891,6 +1905,18 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     let mapped_empty_frame = bundle
         .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
         .expect("HTML bundle should map commands for a no-input update");
+    let mapped_empty_values = bundle
+        .update_action_values_with_actions(
+            Size::new(320.0, 180.0),
+            [("project.run", HtmlAction::Run)],
+        )
+        .expect("HTML bundle should map no-input commands directly to action values");
+    let intent_mapped_empty_values = bundle
+        .update_action_values_with_intent_actions(
+            Size::new(320.0, 180.0),
+            [(ElementBehaviorEvent::Click, "project.run", HtmlAction::Run)],
+        )
+        .expect("HTML bundle should map no-input intent commands directly to action values");
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = bundle
         .update_with_input_and_dispatch(
@@ -1951,6 +1977,8 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     assert_eq!(intent_mapped_key_values, vec![HtmlAction::Filter]);
     assert!(configured_empty_frame.is_empty());
     assert!(mapped_empty_frame.is_empty());
+    assert!(mapped_empty_values.is_empty());
+    assert!(intent_mapped_empty_values.is_empty());
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
@@ -2796,6 +2824,20 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             [("inline.run", SetAction::Run)],
         )
         .expect("named document should map commands during update");
+    let mapped_empty_values = set
+        .update_action_values_with_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            [("inline.run", SetAction::Run)],
+        )
+        .expect("named document should map no-input commands directly to action values");
+    let intent_mapped_empty_values = set
+        .update_action_values_with_intent_actions(
+            "inline",
+            Size::new(240.0, 160.0),
+            [(ElementBehaviorEvent::Click, "inline.run", SetAction::Run)],
+        )
+        .expect("named document should map no-input intent commands directly to action values");
     let mut surface = set
         .to_action_surface_with("inline", Size::new(240.0, 160.0), |commands| {
             commands.push_click("inline.run", SetAction::Run);
@@ -3316,6 +3358,8 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert_eq!(configured_dispatched_values, vec![SetAction::Run]);
     assert!(empty_frame.is_empty());
     assert!(mapped_empty_frame.is_empty());
+    assert!(mapped_empty_values.is_empty());
+    assert!(intent_mapped_empty_values.is_empty());
     assert_eq!(
         mapped_registry.bindings(),
         pushed_mapped_registry.bindings()

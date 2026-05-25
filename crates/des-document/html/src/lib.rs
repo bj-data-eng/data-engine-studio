@@ -2822,6 +2822,20 @@ impl HtmlStylesheet {
         self.update_actions(viewport, &registry)
     }
 
+    /// Creates a view, resolves it, and returns only typed action values.
+    pub fn update_action_values_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_actions_with_actions(viewport, actions)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
     /// Creates a view, resolves it, and maps intent-scoped commands to actions.
     pub fn update_actions_with_intent_actions<Action, Command>(
         &self,
@@ -2834,6 +2848,20 @@ impl HtmlStylesheet {
     {
         let registry = self.command_intent_action_registry(actions);
         self.update_actions(viewport, &registry)
+    }
+
+    /// Creates a view, resolves it, and returns values mapped by intent and command.
+    pub fn update_action_values_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_actions_with_intent_actions(viewport, actions)
+            .map(DocumentActionFrame::into_action_values)
     }
 
     /// Creates a view, routes input, and returns the resolved output frame.
@@ -3903,6 +3931,21 @@ impl HtmlSet {
             .update_actions_with_actions(viewport, actions)
     }
 
+    /// Resolves a named document and returns only typed action values.
+    pub fn update_action_values_with_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_action_values_with_actions(viewport, actions)
+    }
+
     /// Resolves a named document and maps intent-scoped commands to actions.
     pub fn update_actions_with_intent_actions<Action, Command>(
         &self,
@@ -3916,6 +3959,21 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_actions_with_intent_actions(viewport, actions)
+    }
+
+    /// Resolves a named document and returns values mapped by intent and command.
+    pub fn update_action_values_with_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .update_action_values_with_intent_actions(viewport, actions)
     }
 
     /// Routes input through a named HTML document.
