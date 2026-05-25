@@ -142,11 +142,14 @@ fn document_projection_batches_app_state_updates() {
     });
     let projection = DocumentProjection::new()
         .set_text("status-label", "Ready")
-        .set_value("status", "ready")
-        .set_selected("status", true)
-        .set_focused("status", true)
-        .set_class("status", "pending", false)
-        .set_class("status", "ready", true);
+        .with_element("status", |mut status| {
+            status
+                .value("ready")
+                .selected(true)
+                .focused(true)
+                .class("pending", false)
+                .class("ready", true);
+        });
 
     let report = view.project(&projection).unwrap();
     let output = view.update();

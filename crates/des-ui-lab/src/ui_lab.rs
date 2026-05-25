@@ -1010,54 +1010,47 @@ impl UiLabState {
     }
 
     fn interaction_projection(&self) -> DocumentProjection {
-        let mut projection = DocumentProjection::new()
-            .set_text(
-                "loop-button-result",
-                format!("Button events received: {}", self.loop_action_count),
-            )
-            .set_value(
-                "loop-button-result-box",
-                format!("button-count={}", self.loop_action_count),
-            )
-            .set_text(
-                "loop-checkbox-result",
-                if self.checkbox_enabled {
-                    "Profiling: enabled by checkbox"
-                } else {
-                    "Profiling: disabled by checkbox"
-                },
-            )
-            .set_selected("loop-checkbox-result-box", self.checkbox_enabled)
-            .set_text(
-                "loop-radio-result",
-                format!(
-                    "Runtime target: {}",
-                    ["Local runtime", "Remote worker", "Hybrid"][self.radio_choice]
-                ),
-            )
-            .set_text(
-                "loop-dropdown-result",
-                format!(
-                    "Source adapter: {}",
-                    ["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]
-                ),
-            )
-            .set_text(
-                "loop-summary-result",
-                format!(
-                    "{} | {} | {} | {} click{}",
-                    if self.checkbox_enabled {
-                        "profile on"
-                    } else {
-                        "profile off"
-                    },
-                    ["local", "remote", "hybrid"][self.radio_choice],
-                    ["csv", "duckdb", "python"][self.dropdown_choice],
-                    self.loop_action_count,
-                    if self.loop_action_count == 1 { "" } else { "s" }
-                ),
-            )
-            .set_focused("loop-summary-result-box", self.loop_action_count > 0);
+        let mut projection = DocumentProjection::new();
+        projection.element("loop-button-result").text(format!(
+            "Button events received: {}",
+            self.loop_action_count
+        ));
+        projection
+            .element("loop-button-result-box")
+            .value(format!("button-count={}", self.loop_action_count));
+        projection
+            .element("loop-checkbox-result")
+            .text(if self.checkbox_enabled {
+                "Profiling: enabled by checkbox"
+            } else {
+                "Profiling: disabled by checkbox"
+            });
+        projection
+            .element("loop-checkbox-result-box")
+            .selected(self.checkbox_enabled);
+        projection.element("loop-radio-result").text(format!(
+            "Runtime target: {}",
+            ["Local runtime", "Remote worker", "Hybrid"][self.radio_choice]
+        ));
+        projection.element("loop-dropdown-result").text(format!(
+            "Source adapter: {}",
+            ["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]
+        ));
+        projection.element("loop-summary-result").text(format!(
+            "{} | {} | {} | {} click{}",
+            if self.checkbox_enabled {
+                "profile on"
+            } else {
+                "profile off"
+            },
+            ["local", "remote", "hybrid"][self.radio_choice],
+            ["csv", "duckdb", "python"][self.dropdown_choice],
+            self.loop_action_count,
+            if self.loop_action_count == 1 { "" } else { "s" }
+        ));
+        projection
+            .element("loop-summary-result-box")
+            .focused(self.loop_action_count > 0);
         for (index, class) in [
             "loop-runtime-local",
             "loop-runtime-remote",
@@ -1066,7 +1059,9 @@ impl UiLabState {
         .iter()
         .enumerate()
         {
-            projection.push_class("loop-radio-result-box", *class, self.radio_choice == index);
+            projection
+                .element("loop-radio-result-box")
+                .class(*class, self.radio_choice == index);
         }
 
         for (index, class) in [
@@ -1077,11 +1072,9 @@ impl UiLabState {
         .iter()
         .enumerate()
         {
-            projection.push_class(
-                "loop-dropdown-result-box",
-                *class,
-                self.dropdown_choice == index,
-            );
+            projection
+                .element("loop-dropdown-result-box")
+                .class(*class, self.dropdown_choice == index);
         }
         projection
     }

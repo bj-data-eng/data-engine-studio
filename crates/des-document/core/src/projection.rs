@@ -45,6 +45,22 @@ impl DocumentProjection {
         Self::default()
     }
 
+    pub fn element(&mut self, id: impl Into<ElementId>) -> ElementProjection<'_> {
+        ElementProjection {
+            projection: self,
+            id: id.into(),
+        }
+    }
+
+    pub fn with_element(
+        mut self,
+        id: impl Into<ElementId>,
+        project: impl FnOnce(ElementProjection<'_>),
+    ) -> Self {
+        project(self.element(id));
+        self
+    }
+
     pub fn set_text(mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) -> Self {
         self.push_text(id, text);
         self
@@ -150,6 +166,44 @@ impl DocumentProjection {
             }
         }
         Ok(report)
+    }
+}
+
+pub struct ElementProjection<'a> {
+    projection: &'a mut DocumentProjection,
+    id: ElementId,
+}
+
+impl ElementProjection<'_> {
+    pub fn text(&mut self, text: impl Into<TextContent>) -> &mut Self {
+        self.projection.push_text(self.id.clone(), text);
+        self
+    }
+
+    pub fn value(&mut self, value: impl Into<String>) -> &mut Self {
+        self.projection.push_value(self.id.clone(), value);
+        self
+    }
+
+    pub fn selected(&mut self, selected: bool) -> &mut Self {
+        self.projection.push_selected(self.id.clone(), selected);
+        self
+    }
+
+    pub fn disabled(&mut self, disabled: bool) -> &mut Self {
+        self.projection.push_disabled(self.id.clone(), disabled);
+        self
+    }
+
+    pub fn focused(&mut self, focused: bool) -> &mut Self {
+        self.projection.push_focused(self.id.clone(), focused);
+        self
+    }
+
+    pub fn class(&mut self, class: impl Into<ClassName>, present: bool) -> &mut Self {
+        self.projection
+            .push_class(self.id.clone(), class.into(), present);
+        self
     }
 }
 

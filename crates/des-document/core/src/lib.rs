@@ -36,7 +36,9 @@ pub use geometry::{
     AlignContent, AlignItems, AlignSelf, ClipRect, CornerRadii, FlexDirection, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, Position, PositionInsets, Rect, ScrollAxis, Size,
 };
-pub use projection::{DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport};
+pub use projection::{
+    DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport, ElementProjection,
+};
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentCommand, DocumentCommandActionRef, DocumentCommandBinding,
