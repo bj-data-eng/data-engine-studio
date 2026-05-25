@@ -2673,6 +2673,11 @@ impl<Action> DocumentCommandAction<Action> {
         &self.action
     }
 
+    /// Consumes this command action and returns only the typed app action.
+    pub fn into_action(self) -> Action {
+        self.action
+    }
+
     /// Returns true when this action was emitted by the supplied behavior intent.
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
         intent.matches_document_event(&self.event)

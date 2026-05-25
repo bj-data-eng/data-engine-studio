@@ -7,7 +7,7 @@ use crate::geometry::{
     Overflow, Point, Position, Rect as DocumentRect, Size,
 };
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
-use crate::projection::{DocumentProjection, ElementProjectionPatch};
+use crate::projection::{DocumentProjection, DocumentProjectionReport, ElementProjectionPatch};
 use crate::state::{
     DocumentCommandAction, DocumentCommandBinding, DocumentCommandDispatchReport,
     DocumentCommandRegistry, DocumentInput, ElementState, ResolvedElement, ResolvedFloating,
@@ -1423,6 +1423,27 @@ pub trait DocumentWidget {
         let mut projection = DocumentProjection::new();
         self.push_projection(&mut projection);
         projection
+    }
+
+    /// Builds the retained document structure declared by this widget.
+    ///
+    /// This is the lightest egui-free contract surface for widget tests: it
+    /// proves the widget's element ids, roles, classes, hooks, and authored
+    /// structure without resolving layout or creating a view.
+    fn document(&self, viewport: Size) -> Document {
+        Document::build(viewport, |ui| {
+            ui.widget(self);
+        })
+    }
+
+    /// Builds this widget's retained document structure and applies its projection.
+    fn projected_document(
+        &self,
+        viewport: Size,
+    ) -> DocumentResult<(DocumentProjectionReport, Document)> {
+        let mut document = self.document(viewport);
+        let report = self.projection().apply_to(&mut document)?;
+        Ok((report, document))
     }
 
     /// Creates a ready-to-update document view containing this widget.

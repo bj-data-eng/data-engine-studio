@@ -766,6 +766,14 @@ impl<Action> DocumentActionFrame<Action> {
         self.actions
     }
 
+    /// Consumes the frame and returns only the typed app action values.
+    pub fn into_action_values(self) -> Vec<Action> {
+        self.actions
+            .into_iter()
+            .map(DocumentCommandAction::into_action)
+            .collect()
+    }
+
     /// Consumes the frame and returns only the resolved document output.
     pub fn into_output(self) -> DocumentOutput {
         self.output

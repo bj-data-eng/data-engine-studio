@@ -1795,6 +1795,11 @@ fn document_action_frame_supports_app_update_loop_queries() {
     assert!(!actions[0].is_key_up());
     assert!(!actions[0].is_drag());
 
+    let key_values = view
+        .update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter), &registry)
+        .into_action_values();
+    assert_eq!(key_values, vec![AppAction::Cancel]);
+
     let hover_frame =
         view.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 72.0)), &registry);
     assert_eq!(hover_frame.pointer_enter_actions().count(), 1);
@@ -3479,14 +3484,32 @@ fn document_widget_trait_builds_views_through_its_front_door() {
     let boxed: Box<dyn DocumentWidget> = Box::new(BadgeWidget { ready: true });
     let widget_stylesheet = widget.stylesheet();
     let widget_projection = widget.projection();
+    let widget_document = widget.document(Size::new(240.0, 120.0));
+    let (projected_report, mut projected_document) =
+        widget.projected_document(Size::new(240.0, 120.0)).unwrap();
     let boxed_stylesheet = boxed.stylesheet();
     let boxed_projection = boxed.projection();
+    let boxed_document = boxed.document(Size::new(240.0, 120.0));
+    let (boxed_projected_report, mut boxed_projected_document) =
+        boxed.projected_document(Size::new(240.0, 120.0)).unwrap();
     let mut boxed_view = boxed.try_view(Size::new(240.0, 120.0)).unwrap();
 
     assert_eq!(widget_stylesheet.rule_count(), 2);
     assert_eq!(boxed_stylesheet.rule_count(), 2);
     assert_eq!(widget_projection.len(), 2);
     assert_eq!(boxed_projection.len(), 2);
+    assert_eq!(
+        widget_document.children("root").unwrap(),
+        vec![ElementId::new("badge")]
+    );
+    assert_eq!(
+        boxed_document.children("root").unwrap(),
+        vec![ElementId::new("badge")]
+    );
+    assert_eq!(projected_report.operations, 2);
+    assert_eq!(projected_report.changed, 2);
+    assert_eq!(boxed_projected_report.operations, 2);
+    assert_eq!(boxed_projected_report.changed, 2);
     assert_eq!(
         widget_projection
             .operations()
@@ -3504,6 +3527,24 @@ fn document_widget_trait_builds_views_through_its_front_door() {
     assert_eq!(
         direct_badge.style().background,
         Some(Color::rgb(205, 239, 221))
+    );
+
+    let projected_output =
+        DocumentEngine::default().update(&mut projected_document, &widget_stylesheet);
+    assert_eq!(
+        projected_output.snapshot().find("badge").unwrap().text(),
+        Some("Ready".to_owned())
+    );
+
+    let boxed_projected_output =
+        DocumentEngine::default().update(&mut boxed_projected_document, &boxed_stylesheet);
+    assert_eq!(
+        boxed_projected_output
+            .snapshot()
+            .find("badge")
+            .unwrap()
+            .text(),
+        Some("Ready".to_owned())
     );
 
     let styled_output = with_stylesheet.update();
