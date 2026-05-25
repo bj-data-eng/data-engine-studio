@@ -749,18 +749,11 @@ fn document_view_can_mount_a_widget_with_its_styles() {
 #[test]
 fn document_builder_and_engine_update_are_front_door_api() {
     let mut document = Document::build(Size::new(320.0, 200.0), |document| {
-        document.element(
-            "panel",
-            ElementSpec::new(Element::Div).class("panel"),
-            |document| {
-                document.text("label", "Hello");
-            },
-        );
+        document.element("panel", ElementSpec::div().class("panel"), |document| {
+            document.text_element("label", ElementSpec::text(), "Hello");
+        });
     });
-    let stylesheet = StyleSheet::new().rule(
-        StyleSelector::class("panel"),
-        Style::default().size(120.0, 48.0),
-    );
+    let stylesheet = StyleSheet::new().class("panel", Style::default().size(120.0, 48.0));
     let mut engine = DocumentEngine::default();
 
     let output = engine.update(&mut document, &stylesheet);
@@ -799,10 +792,7 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         }
 
         fn push_styles(&self, stylesheet: &mut StyleSheet) {
-            stylesheet.push_rule(
-                StyleSelector::class("badge"),
-                Style::default().size(72.0, 28.0),
-            );
+            stylesheet.push_class("badge", Style::default().size(72.0, 28.0));
         }
     }
 
@@ -1177,9 +1167,7 @@ fn document_mutation_can_set_text_value_and_authored_states() {
         ui.text("label", "Short");
         ui.element(
             "control",
-            ElementSpec::new(Element::Button)
-                .interactive()
-                .value("initial"),
+            ElementSpec::button().interactive().value("initial"),
             |_| {},
         );
     });

@@ -165,6 +165,16 @@ pub struct ElementSpec {
     pub initial_scroll: Option<Point>,
 }
 
+macro_rules! element_spec_constructors {
+    ($($name:ident => $element:expr),+ $(,)?) => {
+        $(
+            pub fn $name() -> Self {
+                Self::new($element)
+            }
+        )+
+    };
+}
+
 impl ElementSpec {
     pub fn new(element: Element) -> Self {
         Self {
@@ -185,6 +195,43 @@ impl ElementSpec {
             table_cell: None,
             initial_scroll: None,
         }
+    }
+
+    element_spec_constructors! {
+        root => Element::Root,
+        div => Element::Div,
+        span => Element::Span,
+        main => Element::Main,
+        section => Element::Section,
+        article => Element::Article,
+        header => Element::Header,
+        footer => Element::Footer,
+        nav => Element::Nav,
+        aside => Element::Aside,
+        p => Element::P,
+        h1 => Element::H1,
+        h2 => Element::H2,
+        h3 => Element::H3,
+        h4 => Element::H4,
+        h5 => Element::H5,
+        h6 => Element::H6,
+        text => Element::Text,
+        button => Element::Button,
+        input => Element::Input,
+        checkbox => Element::Checkbox,
+        radio => Element::Radio,
+        select => Element::Select,
+        option => Element::Option,
+        textarea => Element::Textarea,
+        label => Element::Label,
+        canvas => Element::Canvas,
+        icon => Element::Icon,
+        table_element => Element::Table,
+        thead => Element::Thead,
+        tbody => Element::Tbody,
+        tr => Element::Tr,
+        th => Element::Th,
+        td => Element::Td,
     }
 
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
