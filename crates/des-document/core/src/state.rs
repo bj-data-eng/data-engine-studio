@@ -118,6 +118,13 @@ impl DocumentOutput {
         self.events.iter().filter(move |event| event.kind == kind)
     }
 
+    pub fn event_targets_of_kind(
+        &self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = &ElementId> {
+        self.events_of_kind(kind).map(|event| &event.target)
+    }
+
     pub fn has_event(&self, target: &str, kind: DocumentEventKind) -> bool {
         self.events_for(target).any(|event| event.kind == kind)
     }
@@ -150,6 +157,52 @@ impl DocumentOutput {
     ) -> impl Iterator<Item = DocumentCommandRef<'_>> {
         self.command_events()
             .filter(move |command| command.event == kind)
+    }
+
+    pub fn commands_for<'a>(
+        &'a self,
+        target: &'a str,
+    ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
+        self.command_events()
+            .filter(move |command| command.target.as_str() == target)
+    }
+
+    pub fn has_command(&self, target: &str, command: &str) -> bool {
+        self.commands_for(target)
+            .any(|event| event.command == command)
+    }
+
+    pub fn has_command_kind(&self, target: &str, kind: DocumentEventKind, command: &str) -> bool {
+        self.commands_for(target)
+            .any(|event| event.event == kind && event.command == command)
+    }
+
+    pub fn text_selection(&self) -> Option<&DocumentTextSelection> {
+        self.text_selection.as_ref()
+    }
+
+    pub fn has_text_selection(&self) -> bool {
+        self.text_selection
+            .as_ref()
+            .is_some_and(|selection| !selection.is_empty())
+    }
+
+    pub fn text_selection_is_active(&self) -> bool {
+        self.text_selection
+            .as_ref()
+            .is_some_and(|selection| selection.active)
+    }
+
+    pub fn text_selection_target(&self) -> Option<&ElementId> {
+        self.text_selection
+            .as_ref()
+            .map(|selection| &selection.target)
+    }
+
+    pub fn text_selection_range(&self) -> Option<std::ops::Range<usize>> {
+        self.text_selection
+            .as_ref()
+            .map(DocumentTextSelection::char_range)
     }
 
     pub fn selected_text(&self) -> Option<String> {

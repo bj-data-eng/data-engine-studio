@@ -121,6 +121,13 @@ fn document_output_exposes_interaction_query_helpers() {
             .collect::<Vec<_>>(),
         vec!["run"]
     );
+    assert_eq!(
+        output
+            .event_targets_of_kind(DocumentEventKind::Clicked)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["run"]
+    );
     assert!(run_events.contains(&&DocumentEvent::pressed("run")));
     assert!(run_events.contains(&&DocumentEvent::clicked("run")));
 }
@@ -166,6 +173,16 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert_eq!(clicked_actions[0].command, "run-query");
     assert_eq!(clicked_commands.len(), 1);
     assert_eq!(clicked_commands[0].command, "run-query");
+    assert_eq!(
+        output
+            .commands_for("run")
+            .map(|command| command.command)
+            .collect::<Vec<_>>(),
+        vec!["run-query"]
+    );
+    assert!(output.has_command("run", "run-query"));
+    assert!(output.has_command_kind("run", DocumentEventKind::Clicked, "run-query"));
+    assert!(!output.has_command("cancel", "cancel-query"));
 
     let collected = [
         ("run-query", AppAction::RunQuery),
@@ -2464,7 +2481,14 @@ fn selectable_text_exposes_selected_text_for_copy() {
         },
     );
 
-    assert_eq!(output.text_selection.as_ref().unwrap().char_range(), 0..8);
+    assert_eq!(output.text_selection().unwrap().char_range(), 0..8);
+    assert_eq!(output.text_selection_range(), Some(0..8));
+    assert_eq!(
+        output.text_selection_target().map(ElementId::as_str),
+        Some("label")
+    );
+    assert!(output.has_text_selection());
+    assert!(output.text_selection_is_active());
     assert_eq!(output.selected_text().as_deref(), Some("Customer"));
     assert!(output.snapshot().find("label").unwrap().selectable_text());
     assert!(output.snapshot().find("label").unwrap().copyable_text());
