@@ -864,12 +864,23 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         surface.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 40.0)));
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut dispatched = Vec::new();
+    let (dispatch_frame, dispatch_report) = surface.update_with_input_and_dispatch(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        |action| {
+            dispatched.push(action.action().clone());
+        },
+    );
 
     assert_eq!(surface.commands().bindings().len(), 2);
     assert!(hover_frame.contains_action(&AppAction::Inspect));
     assert!(click_frame.contains_action(&AppAction::Run));
+    assert!(dispatch_frame.contains_clicked_action(&AppAction::Run));
+    assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![AppAction::Run]);
 
     let mut text_measurer = FixedTextMeasurer;
+    let mut measured_dispatched = Vec::new();
     let (report, measured_frame) = surface
         .project_with_and_update_with_input_and_text_measurer_actions(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -880,12 +891,26 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         )
         .unwrap();
     let measured_run = measured_frame.output().snapshot().find("run").unwrap();
+    let (measured_dispatch_frame, measured_dispatch_report) = surface
+        .update_with_input_and_text_measurer_and_dispatch(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut text_measurer,
+            |action| {
+                measured_dispatched.push(action.action().clone());
+            },
+        );
 
     assert_eq!(report.operations, 1);
     assert_eq!(report.changed, 1);
     assert_eq!(measured_run.text(), Some("Run projected".to_owned()));
     assert_eq!(measured_run.rect().size.width, 64.0);
     assert!(measured_frame.contains_action(&AppAction::Run));
+    assert!(measured_dispatch_frame.contains_action(&AppAction::Run));
+    assert_eq!(
+        measured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(measured_dispatched, vec![AppAction::Run]);
 }
 
 #[test]

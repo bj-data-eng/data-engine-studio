@@ -953,12 +953,39 @@ impl<Action> DocumentActionSurface<Action> {
         self.view.update_actions(&self.commands)
     }
 
+    /// Resolves the view, collects typed app actions, and dispatches them.
+    pub fn update_and_dispatch(
+        &mut self,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
+    where
+        Action: Clone,
+    {
+        let frame = self.update_actions();
+        let report = frame.dispatch(handler);
+        (frame, report)
+    }
+
     /// Routes input, resolves the view, and collects typed app actions.
     pub fn update_with_input_actions(&mut self, input: DocumentInput) -> DocumentActionFrame<Action>
     where
         Action: Clone,
     {
         self.view.update_with_input_actions(input, &self.commands)
+    }
+
+    /// Routes input, collects typed app actions, and dispatches them.
+    pub fn update_with_input_and_dispatch(
+        &mut self,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions(input);
+        let report = frame.dispatch(handler);
+        (frame, report)
     }
 
     /// Routes input with a host text measurer and collects typed app actions.
@@ -972,6 +999,21 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .update_with_input_and_text_measurer_actions(input, text_measurer, &self.commands)
+    }
+
+    /// Routes input with a host text measurer, collects actions, and dispatches them.
+    pub fn update_with_input_and_text_measurer_and_dispatch(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_and_text_measurer_actions(input, text_measurer);
+        let report = frame.dispatch(handler);
+        (frame, report)
     }
 
     /// Splits the surface into its owned view and typed command registry.
