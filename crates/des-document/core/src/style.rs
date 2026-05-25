@@ -2064,6 +2064,40 @@ impl StyleSheet {
         self
     }
 
+    pub fn element(self, element: Element, style: Style) -> Self {
+        self.rule(StyleSelector::element(element), style)
+    }
+
+    pub fn class(self, class: impl Into<ClassName>, style: Style) -> Self {
+        self.rule(StyleSelector::class(class), style)
+    }
+
+    pub fn id(self, id: impl Into<ElementId>, style: Style) -> Self {
+        self.rule(StyleSelector::id(id), style)
+    }
+
+    pub fn state(self, state: ElementStateSelector, style: Style) -> Self {
+        self.rule(StyleSelector::State(state), style)
+    }
+
+    pub fn class_state(
+        self,
+        class: impl Into<ClassName>,
+        state: ElementStateSelector,
+        style: Style,
+    ) -> Self {
+        self.rule(StyleSelector::class_state(class, state), style)
+    }
+
+    pub fn id_state(
+        self,
+        id: impl Into<ElementId>,
+        state: ElementStateSelector,
+        style: Style,
+    ) -> Self {
+        self.rule(StyleSelector::id_state(id, state), style)
+    }
+
     pub fn rules<I>(mut self, rules: I) -> Self
     where
         I: IntoIterator<Item = (StyleSelector, Style)>,
@@ -2136,6 +2170,40 @@ impl StyleSheet {
 
     pub fn push_rule(&mut self, selector: StyleSelector, style: Style) {
         self.push_style_rule(StyleRule::new(selector, style));
+    }
+
+    pub fn push_element(&mut self, element: Element, style: Style) {
+        self.push_rule(StyleSelector::element(element), style);
+    }
+
+    pub fn push_class(&mut self, class: impl Into<ClassName>, style: Style) {
+        self.push_rule(StyleSelector::class(class), style);
+    }
+
+    pub fn push_id(&mut self, id: impl Into<ElementId>, style: Style) {
+        self.push_rule(StyleSelector::id(id), style);
+    }
+
+    pub fn push_state(&mut self, state: ElementStateSelector, style: Style) {
+        self.push_rule(StyleSelector::State(state), style);
+    }
+
+    pub fn push_class_state(
+        &mut self,
+        class: impl Into<ClassName>,
+        state: ElementStateSelector,
+        style: Style,
+    ) {
+        self.push_rule(StyleSelector::class_state(class, state), style);
+    }
+
+    pub fn push_id_state(
+        &mut self,
+        id: impl Into<ElementId>,
+        state: ElementStateSelector,
+        style: Style,
+    ) {
+        self.push_rule(StyleSelector::id_state(id, state), style);
     }
 
     pub fn push_conditional_rule(

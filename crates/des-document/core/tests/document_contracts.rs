@@ -648,8 +648,8 @@ fn document_view_compose_collects_css_and_widget_styles() {
         }
 
         fn push_styles(&self, stylesheet: &mut StyleSheet) {
-            stylesheet.push_rule(
-                StyleSelector::class("badge"),
+            stylesheet.push_class(
+                "badge",
                 Style::default()
                     .height(Length::Px(24.0))
                     .background(Color::rgb(220, 238, 255)),
@@ -829,16 +829,16 @@ fn document_prelude_exposes_common_app_authoring_surface() {
 #[test]
 fn stylesheet_composes_typed_rules_and_css_fluently() {
     let stylesheet = StyleSheet::new()
-        .rules([
-            (
-                StyleSelector::class("panel"),
-                Style::default().height(Length::Px(48.0)),
-            ),
-            (
-                StyleSelector::class("accent"),
-                Style::default().background(Color::rgb(220, 238, 255)),
-            ),
-        ])
+        .element(Element::Div, Style::default().radius(4.0))
+        .class("panel", Style::default().height(Length::Px(48.0)))
+        .class(
+            "accent",
+            Style::default().background(Color::rgb(220, 238, 255)),
+        )
+        .id(
+            "title",
+            Style::default().padding(Insets::symmetric(4.0, 0.0)),
+        )
         .with_css(".panel { width: 120px; }")
         .expect("strict CSS should compose")
         .extended(
@@ -863,8 +863,10 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
 
     assert_eq!(panel.rect().size, Size::new(120.0, 48.0));
     assert_eq!(panel.style().background, Some(Color::rgb(220, 238, 255)));
+    assert_eq!(panel.style().radius, CornerRadii::all(4.0));
     assert_eq!(title.rect().size, Size::new(80.0, 20.0));
-    assert!(view.stylesheet().rule_count() >= 4);
+    assert_eq!(title.style().padding.left, 4.0);
+    assert!(view.stylesheet().rule_count() >= 6);
 }
 
 #[test]
@@ -1050,21 +1052,31 @@ fn visual_clone_preserves_visual_subtree_with_rewritten_ids() {
 fn style_rules_resolve_element_class_state_and_id_in_order() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
-        .rule(
-            StyleSelector::Element(Element::Div),
+        .element(
+            Element::Div,
             Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20)),
         )
-        .rule(
-            StyleSelector::class("selected"),
+        .class(
+            "selected",
             Style::default().background(Color::rgb(35, 56, 78)),
         )
-        .rule(
-            StyleSelector::State(ElementStateSelector::Hovered),
+        .state(
+            ElementStateSelector::Hovered,
             Style::default().background(Color::rgb(40, 70, 95)),
         )
-        .rule(StyleSelector::id("card"), Style::default().radius(7.0));
+        .id("card", Style::default().radius(7.0))
+        .class_state(
+            "selected",
+            ElementStateSelector::Hovered,
+            Style::default().border(Color::rgb(90, 180, 240)),
+        )
+        .id_state(
+            "card",
+            ElementStateSelector::Hovered,
+            Style::default().border_width(2.0),
+        );
     let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.element(
             "card",
@@ -1097,6 +1109,8 @@ fn style_rules_resolve_element_class_state_and_id_in_order() {
 
     assert_eq!(card.style.background, Some(Color::rgb(40, 70, 95)));
     assert_eq!(card.style.radius, CornerRadii::all(7.0));
+    assert_eq!(card.style.border, Some(Color::rgb(90, 180, 240)));
+    assert_eq!(card.style.border_width, Insets::all(2.0));
 }
 
 #[test]
