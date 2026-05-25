@@ -1313,12 +1313,10 @@ fn cursor_icon_for_output(output: &DocumentOutput) -> Option<egui::CursorIcon> {
     if output.active_drag.is_some() {
         return Some(egui::CursorIcon::PointingHand);
     }
-    if output.hit_id.as_ref().is_some_and(|id| {
-        output
-            .snapshot()
-            .find(id.as_str())
-            .is_some_and(|frame| frame.has_class("drag-handle"))
-    }) {
+    if output
+        .hit_element()
+        .is_some_and(|frame| frame.has_class("drag-handle"))
+    {
         return Some(egui::CursorIcon::PointingHand);
     }
     None

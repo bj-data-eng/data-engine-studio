@@ -21,6 +21,10 @@ impl<'a> DocumentSnapshot<'a> {
         find_element(self.root, id).map(|element| ElementSnapshot { element })
     }
 
+    pub fn contains(&self, id: &str) -> bool {
+        self.find(id).is_some()
+    }
+
     pub fn hit_test(&self, point: Point) -> Option<HitResult<'a>> {
         let path = self.path_at(point)?;
         path.last().copied().map(|target| HitResult {
@@ -89,6 +93,26 @@ impl<'a> ElementSnapshot<'a> {
         self.element.attributes.get(name).map(String::as_str)
     }
 
+    pub fn data(&self, name: &str) -> Option<&str> {
+        self.attribute(&prefixed_attribute_name("data-", name))
+    }
+
+    pub fn aria(&self, name: &str) -> Option<&str> {
+        self.attribute(&prefixed_attribute_name("aria-", name))
+    }
+
+    pub fn has_attribute(&self, name: &str, value: &str) -> bool {
+        self.attribute(name) == Some(value)
+    }
+
+    pub fn has_data(&self, name: &str, value: &str) -> bool {
+        self.data(name) == Some(value)
+    }
+
+    pub fn has_aria(&self, name: &str, value: &str) -> bool {
+        self.aria(name) == Some(value)
+    }
+
     pub fn behavior_hooks(&self) -> &[crate::ElementBehaviorHook] {
         &self.element.behavior_hooks
     }
@@ -98,6 +122,14 @@ impl<'a> ElementSnapshot<'a> {
             .classes
             .iter()
             .any(|element_class| element_class.as_str() == class)
+    }
+
+    pub fn has_all_classes<'b>(&self, classes: impl IntoIterator<Item = &'b str>) -> bool {
+        classes.into_iter().all(|class| self.has_class(class))
+    }
+
+    pub fn has_any_class<'b>(&self, classes: impl IntoIterator<Item = &'b str>) -> bool {
+        classes.into_iter().any(|class| self.has_class(class))
     }
 
     pub fn rect(&self) -> Rect {
@@ -179,6 +211,14 @@ fn find_element<'a>(element: &'a ResolvedElement, id: &str) -> Option<&'a Resolv
         .children
         .iter()
         .find_map(|child| find_element(child, id))
+}
+
+fn prefixed_attribute_name(prefix: &str, name: &str) -> String {
+    if name.starts_with(prefix) {
+        name.to_owned()
+    } else {
+        format!("{prefix}{name}")
+    }
 }
 
 fn collect_elements<'a>(

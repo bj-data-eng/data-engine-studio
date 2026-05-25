@@ -946,7 +946,9 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
         ui.element(
             "drop-target",
             ElementSpec::new(Element::Div)
-                .class("drop-zone")
+                .classes(["drop-zone", "accepts-files"])
+                .data("state", "ready")
+                .aria("label", "Drop target")
                 .value("target-a")
                 .interactive(),
             |ui| {
@@ -961,8 +963,16 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     let drop_target = snapshot.find("drop-target").unwrap();
 
     assert_eq!(snapshot.root().id().as_str(), "root");
+    assert!(snapshot.contains("drop-target"));
+    assert!(!snapshot.contains("missing"));
     assert_eq!(drop_target.element(), Element::Div);
     assert!(drop_target.has_class("drop-zone"));
+    assert!(drop_target.has_all_classes(["drop-zone", "accepts-files"]));
+    assert!(drop_target.has_any_class(["missing", "accepts-files"]));
+    assert_eq!(drop_target.data("state"), Some("ready"));
+    assert_eq!(drop_target.aria("label"), Some("Drop target"));
+    assert!(drop_target.has_data("state", "ready"));
+    assert!(drop_target.has_aria("label", "Drop target"));
     assert_eq!(drop_target.value(), Some("target-a"));
     assert!(drop_target.interactive());
     assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
