@@ -58,6 +58,13 @@ impl<Action> DocumentActionFrame<Action> {
             .filter(move |action| action.target.as_str() == target)
     }
 
+    /// Returns the first typed app action emitted by one element.
+    pub fn first_action_for(&self, target: &str) -> Option<&DocumentCommandAction<Action>> {
+        self.actions
+            .iter()
+            .find(|action| action.target.as_str() == target)
+    }
+
     /// Iterates typed app actions emitted by one resolved document event kind.
     pub fn actions_of_kind(
         &self,
@@ -68,9 +75,22 @@ impl<Action> DocumentActionFrame<Action> {
             .filter(move |action| action.event == kind)
     }
 
+    /// Returns the first typed app action emitted by one resolved document event kind.
+    pub fn first_action_of_kind(
+        &self,
+        kind: DocumentEventKind,
+    ) -> Option<&DocumentCommandAction<Action>> {
+        self.actions.iter().find(|action| action.event == kind)
+    }
+
     /// Iterates typed app actions emitted by click intent.
     pub fn clicked_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_of_kind(DocumentEventKind::Clicked)
+    }
+
+    /// Returns the first typed app action emitted by click intent.
+    pub fn first_clicked_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_of_kind(DocumentEventKind::Clicked)
     }
 
     /// Returns true when the frame contains the supplied typed action.
@@ -81,6 +101,32 @@ impl<Action> DocumentActionFrame<Action> {
         self.actions
             .iter()
             .any(|candidate| &candidate.action == action)
+    }
+
+    /// Returns true when the supplied element emitted the supplied typed action.
+    pub fn contains_action_for(&self, target: &str, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.actions_for(target)
+            .any(|candidate| &candidate.action == action)
+    }
+
+    /// Returns true when the supplied event kind emitted the supplied typed action.
+    pub fn contains_action_of_kind(&self, kind: DocumentEventKind, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.actions_of_kind(kind)
+            .any(|candidate| &candidate.action == action)
+    }
+
+    /// Returns true when click intent emitted the supplied typed action.
+    pub fn contains_clicked_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_of_kind(DocumentEventKind::Clicked, action)
     }
 
     /// Consumes the frame into the resolved output and collected app actions.

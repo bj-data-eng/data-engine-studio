@@ -571,7 +571,22 @@ fn document_action_frame_supports_app_update_loop_queries() {
         Some(&AppAction::Run)
     );
     assert_eq!(click_frame.actions_for("run").count(), 1);
+    assert_eq!(
+        click_frame
+            .first_action_for("run")
+            .map(|action| &action.action),
+        Some(&AppAction::Run)
+    );
+    assert!(click_frame.contains_action_for("run", &AppAction::Run));
+    assert!(!click_frame.contains_action_for("cancel", &AppAction::Run));
     assert_eq!(click_frame.clicked_actions().count(), 1);
+    assert_eq!(
+        click_frame
+            .first_clicked_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Run)
+    );
+    assert!(click_frame.contains_clicked_action(&AppAction::Run));
     assert_eq!(
         click_frame
             .actions_of_kind(DocumentEventKind::Clicked)
@@ -579,12 +594,14 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .collect::<Vec<_>>(),
         vec!["run"]
     );
+    assert!(click_frame.contains_action_of_kind(DocumentEventKind::Clicked, &AppAction::Run));
 
     let key_frame =
         view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Escape), &registry);
     assert_eq!(key_frame.actions().len(), 1);
     assert!(key_frame.contains_action(&AppAction::Cancel));
     assert_eq!(key_frame.clicked_actions().count(), 0);
+    assert_eq!(key_frame.first_clicked_action(), None);
     let (output, actions) = key_frame.into_parts();
     assert_eq!(
         output
