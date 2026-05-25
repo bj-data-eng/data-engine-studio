@@ -268,6 +268,93 @@ impl<'a> ElementSnapshot<'a> {
     pub fn visual_clone(&self) -> VisualElementClone {
         VisualElementClone::from_resolved(self.element)
     }
+
+    pub fn children(&self) -> Vec<ElementSnapshot<'a>> {
+        self.element
+            .children
+            .iter()
+            .map(|element| ElementSnapshot { element })
+            .collect()
+    }
+
+    pub fn child_count(&self) -> usize {
+        self.element.children.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.element.children.is_empty()
+    }
+
+    pub fn find(&self, id: &str) -> Option<ElementSnapshot<'a>> {
+        find_element(self.element, id).map(|element| ElementSnapshot { element })
+    }
+
+    pub fn require(&self, id: &str) -> Result<ElementSnapshot<'a>, DocumentQueryError> {
+        self.find(id).ok_or_else(|| DocumentQueryError::missing(id))
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.find(id).is_some()
+    }
+
+    pub fn elements_with_class(&self, class: impl Into<ClassName>) -> Vec<ElementSnapshot<'a>> {
+        let class = class.into();
+        let mut elements = Vec::new();
+        collect_elements(self.element, &mut elements, &mut |element| {
+            element
+                .classes
+                .iter()
+                .any(|element_class| element_class == &class)
+        });
+        elements
+    }
+
+    pub fn contains_class(&self, class: impl Into<ClassName>) -> bool {
+        let class = class.into();
+        find_matching_element(self.element, &mut |element| {
+            element
+                .classes
+                .iter()
+                .any(|element_class| element_class == &class)
+        })
+        .is_some()
+    }
+
+    pub fn first_with_class(&self, class: impl Into<ClassName>) -> Option<ElementSnapshot<'a>> {
+        let class = class.into();
+        find_matching_element(self.element, &mut |element| {
+            element
+                .classes
+                .iter()
+                .any(|element_class| element_class == &class)
+        })
+        .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_with_class(&self, class: impl Into<ClassName>) -> usize {
+        self.elements_with_class(class).len()
+    }
+
+    pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
+        let mut elements = Vec::new();
+        collect_elements(self.element, &mut elements, &mut |element| {
+            element.element == target
+        });
+        elements
+    }
+
+    pub fn contains_element(&self, target: Element) -> bool {
+        find_matching_element(self.element, &mut |element| element.element == target).is_some()
+    }
+
+    pub fn first_by_element(&self, target: Element) -> Option<ElementSnapshot<'a>> {
+        find_matching_element(self.element, &mut |element| element.element == target)
+            .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_by_element(&self, target: Element) -> usize {
+        self.elements_by_element(target).len()
+    }
 }
 
 #[derive(Clone, Debug)]

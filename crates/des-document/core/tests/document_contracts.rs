@@ -1440,6 +1440,11 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
                 .interactive(),
             |ui| {
                 ui.text("drop-label", "Drop here");
+                ui.element(
+                    "drop-helper",
+                    ElementSpec::new(Element::Div).class("drop-helper"),
+                    |_| {},
+                );
             },
         );
         ui.element("plain-card", ElementSpec::new(Element::Div), |_| {});
@@ -1470,6 +1475,32 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(drop_target.value(), Some("target-a"));
     assert!(drop_target.interactive());
     assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
+    assert_eq!(drop_target.child_count(), 2);
+    assert!(!drop_target.is_empty());
+    assert!(drop_target.contains("drop-label"));
+    assert!(drop_target.require("missing-child").is_err());
+    assert_eq!(
+        drop_target
+            .children()
+            .into_iter()
+            .map(|child| child.id().as_str().to_owned())
+            .collect::<Vec<_>>(),
+        vec!["drop-label", "drop-helper"]
+    );
+    assert!(
+        drop_target
+            .find("drop-helper")
+            .unwrap()
+            .has_class("drop-helper")
+    );
+    assert_eq!(drop_target.elements_with_class("drop-helper").len(), 1);
+    assert!(drop_target.contains_class("drop-zone"));
+    assert_eq!(drop_target.count_by_element(Element::Text), 1);
+    assert!(
+        drop_target
+            .first_by_element(Element::Text)
+            .is_some_and(|element| element.id_is("drop-label"))
+    );
     assert_eq!(
         snapshot.require("drop-label").unwrap().text(),
         Some("Drop here".to_string())
@@ -1482,14 +1513,14 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
             .is_some_and(|element| element.id_is("drop-target"))
     );
     assert_eq!(snapshot.count_with_class("drop-zone"), 1);
-    assert_eq!(snapshot.elements_by_element(Element::Div).len(), 2);
+    assert_eq!(snapshot.elements_by_element(Element::Div).len(), 3);
     assert!(snapshot.contains_element(Element::Div));
     assert!(
         snapshot
             .first_by_element(Element::Div)
             .is_some_and(|element| element.id_is("drop-target"))
     );
-    assert_eq!(snapshot.count_by_element(Element::Div), 2);
+    assert_eq!(snapshot.count_by_element(Element::Div), 3);
 }
 
 #[test]
