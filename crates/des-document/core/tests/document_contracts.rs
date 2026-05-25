@@ -798,6 +798,71 @@ fn document_projection_updates_semantic_attributes() {
 }
 
 #[test]
+fn document_projection_expresses_conditional_app_state_without_branching() {
+    let stylesheet = StyleSheet::new()
+        .class(
+            "is-ready",
+            Style::default().background(Color::rgb(205, 239, 221)),
+        )
+        .class(
+            "is-loading",
+            Style::default().background(Color::rgb(255, 238, 190)),
+        )
+        .class(
+            "is-stale",
+            Style::default().border(Color::rgb(180, 120, 80)),
+        );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.div("status")
+            .classes(["is-loading", "is-stale"])
+            .data("busy", "true")
+            .aria("busy", "true")
+            .children(|ui| {
+                ui.text("status-label", "Loading");
+            });
+    });
+
+    let report = view
+        .project_with(|projection| {
+            projection
+                .element("status")
+                .class_if("is-ready", true)
+                .classes_if(["is-loading", "is-stale"], false)
+                .data_if("busy", "true", false)
+                .aria_if("busy", "false", true);
+        })
+        .unwrap();
+    let output = view.update();
+    let status = output.snapshot().find("status").unwrap();
+
+    assert_eq!(report.operations, 5);
+    assert_eq!(report.changed, 5);
+    assert!(status.has_class("is-ready"));
+    assert!(!status.has_class("is-loading"));
+    assert!(!status.has_class("is-stale"));
+    assert_eq!(status.data("busy"), None);
+    assert_eq!(status.aria("busy"), Some("false"));
+    assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
+
+    let reset = DocumentProjection::new()
+        .class_if("status", "is-ready", false)
+        .classes_if("status", ["is-loading", "is-stale"], true)
+        .set_data_if("status", "busy", "true", true)
+        .set_aria_if("status", "busy", "false", false);
+    let reset_report = view.project(&reset).unwrap();
+    let reset_output = view.update();
+    let reset_status = reset_output.snapshot().find("status").unwrap();
+
+    assert_eq!(reset_report.operations, 5);
+    assert_eq!(reset_report.changed, 5);
+    assert!(!reset_status.has_class("is-ready"));
+    assert!(reset_status.has_class("is-loading"));
+    assert!(reset_status.has_class("is-stale"));
+    assert_eq!(reset_status.data("busy"), Some("true"));
+    assert_eq!(reset_status.aria("busy"), None);
+}
+
+#[test]
 fn document_view_projects_state_and_updates_in_one_fluent_call() {
     let stylesheet = StyleSheet::new()
         .rule(

@@ -158,6 +158,34 @@ impl DocumentProjection {
         self.push_attribute(id, prefixed_attribute_name("data-", name), value);
     }
 
+    pub fn set_data_if(
+        self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.set_data(id, name, value)
+        } else {
+            self.remove_data(id, name)
+        }
+    }
+
+    pub fn push_data_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) {
+        if present {
+            self.push_data(id, name, value);
+        } else {
+            self.push_remove_data(id, name);
+        }
+    }
+
     pub fn set_aria(
         self,
         id: impl Into<ElementId>,
@@ -174,6 +202,34 @@ impl DocumentProjection {
         value: impl Into<String>,
     ) {
         self.push_attribute(id, prefixed_attribute_name("aria-", name), value);
+    }
+
+    pub fn set_aria_if(
+        self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.set_aria(id, name, value)
+        } else {
+            self.remove_aria(id, name)
+        }
+    }
+
+    pub fn push_aria_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) {
+        if present {
+            self.push_aria(id, name, value);
+        } else {
+            self.push_remove_aria(id, name);
+        }
     }
 
     pub fn remove_attribute(mut self, id: impl Into<ElementId>, name: impl Into<String>) -> Self {
@@ -315,8 +371,26 @@ impl DocumentProjection {
         self.set_class(id, class, true)
     }
 
+    pub fn class_if(
+        self,
+        id: impl Into<ElementId>,
+        class: impl Into<ClassName>,
+        present: bool,
+    ) -> Self {
+        self.set_class(id, class, present)
+    }
+
     pub fn push_add_class(&mut self, id: impl Into<ElementId>, class: impl Into<ClassName>) {
         self.push_class(id, class, true);
+    }
+
+    pub fn push_class_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        class: impl Into<ClassName>,
+        present: bool,
+    ) {
+        self.push_class(id, class, present);
     }
 
     pub fn add_classes<I, C>(mut self, id: impl Into<ElementId>, classes: I) -> Self
@@ -328,6 +402,15 @@ impl DocumentProjection {
         self
     }
 
+    pub fn classes_if<I, C>(mut self, id: impl Into<ElementId>, classes: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.push_classes_if(id, classes, present);
+        self
+    }
+
     pub fn push_add_classes<I, C>(&mut self, id: impl Into<ElementId>, classes: I)
     where
         I: IntoIterator<Item = C>,
@@ -336,6 +419,17 @@ impl DocumentProjection {
         let id = id.into();
         for class in classes {
             self.push_class(id.clone(), class, true);
+        }
+    }
+
+    pub fn push_classes_if<I, C>(&mut self, id: impl Into<ElementId>, classes: I, present: bool)
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        let id = id.into();
+        for class in classes {
+            self.push_class(id.clone(), class, present);
         }
     }
 
@@ -426,8 +520,30 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn data_if(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> &mut Self {
+        self.projection
+            .push_data_if(self.id.clone(), name, value, present);
+        self
+    }
+
     pub fn aria(&mut self, name: impl AsRef<str>, value: impl Into<String>) -> &mut Self {
         self.projection.push_aria(self.id.clone(), name, value);
+        self
+    }
+
+    pub fn aria_if(
+        &mut self,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> &mut Self {
+        self.projection
+            .push_aria_if(self.id.clone(), name, value, present);
         self
     }
 
@@ -507,12 +623,28 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn class_if(&mut self, class: impl Into<ClassName>, present: bool) -> &mut Self {
+        self.projection
+            .push_class_if(self.id.clone(), class, present);
+        self
+    }
+
     pub fn add_classes<I, C>(&mut self, classes: I) -> &mut Self
     where
         I: IntoIterator<Item = C>,
         C: Into<ClassName>,
     {
         self.projection.push_add_classes(self.id.clone(), classes);
+        self
+    }
+
+    pub fn classes_if<I, C>(&mut self, classes: I, present: bool) -> &mut Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.projection
+            .push_classes_if(self.id.clone(), classes, present);
         self
     }
 
