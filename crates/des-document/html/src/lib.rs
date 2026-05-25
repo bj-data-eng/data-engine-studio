@@ -6,7 +6,8 @@
 //! JavaScript and does not embed template logic in HTML.
 
 use des_document::{
-    Document, DocumentBuilder, DocumentView, Element, ElementSpec, Size, StyleSheet, TextContent,
+    Document, DocumentBuilder, DocumentView, Element, ElementBehaviorHook, ElementSpec, Size,
+    StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -115,6 +116,14 @@ impl HtmlDocument {
         Ok(Document::build(viewport, |document| {
             self.write_to_document_builder(document);
         }))
+    }
+
+    /// Creates a ready-to-update retained document view with an empty stylesheet.
+    pub fn to_view(&self, viewport: Size) -> HtmlResult<DocumentView> {
+        Ok(DocumentView::new(
+            self.to_document(viewport)?,
+            StyleSheet::new(),
+        ))
     }
 
     /// Emits this parsed HTML tree into a caller-owned document builder.
@@ -234,19 +243,16 @@ impl HtmlNode {
             .id
             .clone()
             .unwrap_or_else(|| stable_element_id(&self.tag, path));
-        let mut spec = ElementSpec::new(element_for_tag(&self.tag));
-        for class in &self.classes {
-            spec = spec.class(class.clone());
-        }
+        let mut spec = ElementSpec::new(element_for_tag(&self.tag)).classes(self.classes.clone());
         if let Some(role) = &self.role {
             spec = spec.role(role.clone());
         }
-        for (name, value) in &self.attributes {
-            spec = spec.attribute(name.clone(), value.clone());
-        }
-        for hook in &self.behavior_hooks {
-            spec = spec.behavior_hook(hook.event.clone(), hook.command.clone());
-        }
+        spec = spec.attributes(self.attributes.clone());
+        spec = spec.behavior_hooks(
+            self.behavior_hooks
+                .iter()
+                .map(|hook| ElementBehaviorHook::new(hook.event.clone(), hook.command.clone())),
+        );
         if let Some(value) = self.attributes.get("value") {
             spec = spec.value(value.clone());
         }

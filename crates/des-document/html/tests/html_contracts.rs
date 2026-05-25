@@ -307,6 +307,36 @@ fn html_stylesheet_can_create_ready_to_update_document_view() {
 }
 
 #[test]
+fn html_document_can_create_ready_to_update_document_view_without_css() {
+    let html = HtmlDocument::parse_fragment(
+        r#"<main id="app" class="shell compact" data-workspace="demo" aria-label="Workspace"><button id="run" on:click="project.run">Run</button></main>"#,
+    )
+    .expect("HTML should parse");
+    let mut view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML document should create a document view");
+
+    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
+        position: Point::new(0.0, 0.0),
+        primary_delta: Point::ZERO,
+        primary_down: true,
+        primary_pressed: false,
+        primary_clicked: true,
+        primary_click_count: 1,
+        secondary_clicked: false,
+        time_seconds: 0.0,
+    }));
+    let app = output.snapshot().find("app").unwrap();
+    let run = output.snapshot().find("run").unwrap();
+
+    assert!(app.has_all_classes(["shell", "compact"]));
+    assert_eq!(app.data("workspace"), Some("demo"));
+    assert_eq!(app.aria("label"), Some("Workspace"));
+    assert!(run.interactive());
+    assert_eq!(output.commands()[0].command, "project.run");
+}
+
+#[test]
 fn html_authored_commands_dispatch_to_typed_rust_actions() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {
