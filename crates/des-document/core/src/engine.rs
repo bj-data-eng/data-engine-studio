@@ -1002,12 +1002,27 @@ fn text_selection_events(
 ) -> Vec<DocumentEvent> {
     match (previous, current) {
         (None, None) => Vec::new(),
-        (None, Some(current)) => vec![DocumentEvent::selection_started(current.target.clone())],
-        (Some(previous), None) => vec![DocumentEvent::selection_ended(previous.target.clone())],
-        (Some(previous), Some(current)) if previous.target != current.target => vec![
-            DocumentEvent::selection_ended(previous.target.clone()),
-            DocumentEvent::selection_started(current.target.clone()),
-        ],
+        (None, Some(current)) if current.active => {
+            vec![DocumentEvent::selection_started(current.target.clone())]
+        }
+        (None, Some(_)) => Vec::new(),
+        (Some(previous), None) if previous.active => {
+            vec![DocumentEvent::selection_ended(previous.target.clone())]
+        }
+        (Some(_), None) => Vec::new(),
+        (Some(previous), Some(current)) if previous.target != current.target => {
+            let mut events = Vec::new();
+            if previous.active {
+                events.push(DocumentEvent::selection_ended(previous.target.clone()));
+            }
+            if current.active {
+                events.push(DocumentEvent::selection_started(current.target.clone()));
+            }
+            events
+        }
+        (Some(previous), Some(current)) if !previous.active && current.active => {
+            vec![DocumentEvent::selection_started(current.target.clone())]
+        }
         (Some(previous), Some(current)) if previous.active && !current.active => {
             vec![DocumentEvent::selection_ended(current.target.clone())]
         }

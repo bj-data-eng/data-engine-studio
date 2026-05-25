@@ -8242,6 +8242,94 @@ fn selectable_text_tracks_pointer_selection_points() {
 }
 
 #[test]
+fn selectable_text_restarts_after_inactive_retained_selection() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("label"),
+        Style::default()
+            .width(Length::Px(160.0))
+            .white_space(WhiteSpace::Pre),
+    );
+    let mut document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(Element::Text).selectable_text(),
+            "Customer analytics",
+        );
+    });
+    let point = Point::new(24.0, 4.0);
+
+    let started = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::pointer(PointerInput::at(point).primary_down()),
+    );
+    let ended = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::pointer(PointerInput::at(point)),
+    );
+    let restarted = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::pointer(PointerInput::at(point).primary_down()),
+    );
+
+    assert!(started.selection_started_for("label"));
+    assert!(ended.selection_ended_for("label"));
+    assert!(
+        ended
+            .text_selection()
+            .is_some_and(|selection| !selection.active)
+    );
+    assert!(restarted.selection_started_for("label"));
+    assert!(!restarted.selection_ended_for("label"));
+    assert!(
+        restarted
+            .text_selection()
+            .is_some_and(|selection| selection.active)
+    );
+}
+
+#[test]
+fn selectable_text_clear_after_release_does_not_emit_duplicate_end() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .id("label", Style::default().width(Length::Px(160.0)))
+        .id("outside", Style::default().size(80.0, 32.0));
+    let mut document = Document::build(Size::new(240.0, 160.0), |ui| {
+        ui.text_element(
+            "label",
+            ElementSpec::new(Element::Text).selectable_text(),
+            "Customer analytics",
+        );
+        ui.button("outside").text("Outside");
+    });
+    let label_point = Point::new(24.0, 4.0);
+    let outside_point = Point::new(8.0, 48.0);
+
+    engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::pointer(PointerInput::at(label_point).primary_down()),
+    );
+    let ended = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::pointer(PointerInput::at(label_point)),
+    );
+    let cleared = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::pointer(PointerInput::at(outside_point).primary_down()),
+    );
+
+    assert!(ended.selection_ended_for("label"));
+    assert!(!cleared.selection_ended_for("label"));
+    assert!(!cleared.has_text_selection());
+}
+
+#[test]
 fn selectable_text_exposes_selected_text_for_copy() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new().rule(
