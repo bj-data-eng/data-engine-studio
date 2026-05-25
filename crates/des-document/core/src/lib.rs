@@ -55,16 +55,9 @@
 //! })
 //! .expect("projection applies to retained document state");
 //!
-//! let output = view.update_with_input(DocumentInput::pointer(PointerInput {
-//!     position: Point::new(8.0, 8.0),
-//!     primary_delta: Point::new(0.0, 0.0),
-//!     primary_down: false,
-//!     primary_pressed: false,
-//!     primary_clicked: true,
-//!     primary_click_count: 1,
-//!     secondary_clicked: false,
-//!     time_seconds: 0.0,
-//! }));
+//! let output = view.update_with_input(DocumentInput::pointer(
+//!     PointerInput::at(Point::new(8.0, 8.0)).primary_clicked(),
+//! ));
 //!
 //! let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
 //! let actions = registry

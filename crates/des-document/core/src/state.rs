@@ -586,6 +586,85 @@ pub struct PointerInput {
     pub time_seconds: f64,
 }
 
+impl PointerInput {
+    pub fn new(position: Point, time_seconds: f64) -> Self {
+        Self {
+            position,
+            primary_delta: Point::ZERO,
+            primary_down: false,
+            primary_pressed: false,
+            primary_clicked: false,
+            primary_click_count: 0,
+            secondary_clicked: false,
+            time_seconds,
+        }
+    }
+
+    pub fn at(position: Point) -> Self {
+        Self::new(position, 0.0)
+    }
+
+    pub fn with_position(mut self, position: Point) -> Self {
+        self.position = position;
+        self
+    }
+
+    pub fn with_time(mut self, time_seconds: f64) -> Self {
+        self.time_seconds = time_seconds;
+        self
+    }
+
+    pub fn with_primary_delta(mut self, primary_delta: Point) -> Self {
+        self.primary_delta = primary_delta;
+        self
+    }
+
+    pub fn with_primary_down(mut self, primary_down: bool) -> Self {
+        self.primary_down = primary_down;
+        self
+    }
+
+    pub fn with_primary_pressed(mut self, primary_pressed: bool) -> Self {
+        self.primary_pressed = primary_pressed;
+        self
+    }
+
+    pub fn with_primary_clicked(mut self, click_count: u8) -> Self {
+        self.primary_clicked = click_count > 0;
+        self.primary_click_count = click_count;
+        self
+    }
+
+    pub fn with_secondary_clicked(mut self, secondary_clicked: bool) -> Self {
+        self.secondary_clicked = secondary_clicked;
+        self
+    }
+
+    pub fn primary_down(self) -> Self {
+        self.with_primary_down(true)
+    }
+
+    pub fn primary_pressed(self) -> Self {
+        self.with_primary_pressed(true)
+    }
+
+    pub fn primary_clicked(self) -> Self {
+        self.with_primary_clicked(1)
+    }
+
+    pub fn primary_double_clicked(self) -> Self {
+        self.with_primary_clicked(2)
+    }
+
+    pub fn primary_triple_clicked(self) -> Self {
+        self.with_primary_clicked(3)
+    }
+
+    pub fn secondary_clicked(self) -> Self {
+        self.with_secondary_clicked(true)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct KeyInput {
     pub key: DocumentKey,

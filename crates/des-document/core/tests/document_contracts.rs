@@ -24,20 +24,12 @@ fn pointer_input(
     primary_clicked: bool,
     time_seconds: f64,
 ) -> DocumentInput {
-    DocumentInput {
-        pointer: Some(PointerInput {
-            position,
-            primary_delta: Point::ZERO,
-            primary_down,
-            primary_pressed,
-            primary_clicked,
-            primary_click_count: u8::from(primary_clicked),
-            secondary_clicked: false,
-            time_seconds,
-        }),
-        scroll_delta: Point::ZERO,
-        keys: Vec::new(),
-    }
+    DocumentInput::pointer(
+        PointerInput::new(position, time_seconds)
+            .with_primary_down(primary_down)
+            .with_primary_pressed(primary_pressed)
+            .with_primary_clicked(u8::from(primary_clicked)),
+    )
 }
 
 #[test]
@@ -331,16 +323,12 @@ fn keyboard_input_targets_focused_element_and_emits_hook_command() {
 
 #[test]
 fn document_input_builders_express_host_intent_without_struct_literals() {
-    let pointer = PointerInput {
-        position: Point::new(16.0, 24.0),
-        primary_delta: Point::ZERO,
-        primary_down: true,
-        primary_pressed: true,
-        primary_clicked: false,
-        primary_click_count: 0,
-        secondary_clicked: false,
-        time_seconds: 1.5,
-    };
+    let pointer = PointerInput::new(Point::new(16.0, 24.0), 1.5)
+        .with_primary_delta(Point::new(2.0, 3.0))
+        .primary_down()
+        .primary_pressed()
+        .with_position(Point::new(18.0, 27.0))
+        .with_time(1.75);
     let input = DocumentInput::pointer(pointer)
         .with_scroll(Point::new(0.0, -12.0))
         .with_key(
@@ -350,6 +338,11 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
         .with_key(KeyInput::up(DocumentKey::Escape));
 
     assert_eq!(input.pointer, Some(pointer));
+    assert_eq!(pointer.position, Point::new(18.0, 27.0));
+    assert_eq!(pointer.primary_delta, Point::new(2.0, 3.0));
+    assert_eq!(pointer.time_seconds, 1.75);
+    assert!(pointer.primary_down);
+    assert!(pointer.primary_pressed);
     assert_eq!(input.scroll_delta, Point::new(0.0, -12.0));
     assert_eq!(input.keys.len(), 2);
     assert_eq!(input.keys[0].key, DocumentKey::Enter);
@@ -357,6 +350,17 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
     assert!(input.keys[0].modifiers.command);
     assert!(input.keys[0].modifiers.shift);
     assert_eq!(input.keys[1], KeyInput::up(DocumentKey::Escape));
+
+    let click = PointerInput::at(Point::new(4.0, 5.0)).primary_clicked();
+    let double_click = PointerInput::at(Point::new(4.0, 5.0)).primary_double_clicked();
+    let triple_click = PointerInput::at(Point::new(4.0, 5.0)).primary_triple_clicked();
+    let context_click = PointerInput::at(Point::new(4.0, 5.0)).secondary_clicked();
+
+    assert_eq!(click.primary_click_count, 1);
+    assert_eq!(double_click.primary_click_count, 2);
+    assert_eq!(triple_click.primary_click_count, 3);
+    assert!(click.primary_clicked);
+    assert!(context_click.secondary_clicked);
 }
 
 #[test]
@@ -630,16 +634,11 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         .with_css(".primary { background: rgb(220, 238, 255); }")
         .expect("CSS should compose from the prelude")
         .widget(&widget);
-    let output = view.update_with_input(DocumentInput::pointer(PointerInput {
-        position: Point::new(8.0, 8.0),
-        primary_delta: Point::ZERO,
-        primary_down: true,
-        primary_pressed: false,
-        primary_clicked: true,
-        primary_click_count: 1,
-        secondary_clicked: false,
-        time_seconds: 0.0,
-    }));
+    let output = view.update_with_input(DocumentInput::pointer(
+        PointerInput::at(Point::new(8.0, 8.0))
+            .primary_down()
+            .primary_clicked(),
+    ));
     let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
     let actions = registry
         .command_actions_of_kind(&output, DocumentEventKind::Clicked)
