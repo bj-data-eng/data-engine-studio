@@ -3,8 +3,28 @@ use des_document::{DocumentEngine, DocumentOutput, Point};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SortableItemId(pub usize);
 
+impl SortableItemId {
+    pub fn new(index: usize) -> Self {
+        Self(index)
+    }
+
+    pub fn index(self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DropZoneId(pub usize);
+
+impl DropZoneId {
+    pub fn new(index: usize) -> Self {
+        Self(index)
+    }
+
+    pub fn index(self) -> usize {
+        self.0
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DropEdge {
@@ -59,11 +79,23 @@ impl SortableDocumentConfig {
             .map(SortableItemId)
     }
 
+    pub fn item_element_id(&self, item: SortableItemId) -> String {
+        format!("{}{}", self.item_id_prefix, item.index())
+    }
+
+    pub fn handle_element_id(&self, item: SortableItemId) -> String {
+        format!("{}{}", self.handle_id_prefix, item.index())
+    }
+
     pub fn zone_for_element_id(&self, id: &str) -> Option<DropZoneId> {
         id.strip_prefix(&self.zone_id_prefix)
             .and_then(|suffix| suffix.parse::<usize>().ok())
             .filter(|index| *index < self.zone_count)
             .map(DropZoneId)
+    }
+
+    pub fn zone_element_id(&self, zone: DropZoneId) -> String {
+        format!("{}{}", self.zone_id_prefix, zone.index())
     }
 
     pub fn drop_zone_at(&self, output: &DocumentOutput, point: Point) -> Option<DropZoneId> {
@@ -309,17 +341,20 @@ mod tests {
     #[test]
     fn document_config_maps_item_and_zone_ids() {
         let config = SortableDocumentConfig::new("item", "zone", "item-", "handle-", "zone-", 3, 6);
+        let item = SortableItemId::new(2);
+        let handle = SortableItemId::new(1);
+        let zone = DropZoneId::new(5);
 
-        assert_eq!(
-            config.item_for_element_id("item-2"),
-            Some(SortableItemId(2))
-        );
-        assert_eq!(
-            config.item_for_element_id("handle-1"),
-            Some(SortableItemId(1))
-        );
+        assert_eq!(item.index(), 2);
+        assert_eq!(handle.index(), 1);
+        assert_eq!(zone.index(), 5);
+        assert_eq!(config.item_element_id(item), "item-2");
+        assert_eq!(config.handle_element_id(handle), "handle-1");
+        assert_eq!(config.zone_element_id(zone), "zone-5");
+        assert_eq!(config.item_for_element_id("item-2"), Some(item));
+        assert_eq!(config.item_for_element_id("handle-1"), Some(handle));
         assert_eq!(config.item_for_element_id("item-3"), None);
-        assert_eq!(config.zone_for_element_id("zone-5"), Some(DropZoneId(5)));
+        assert_eq!(config.zone_for_element_id("zone-5"), Some(zone));
         assert_eq!(config.zone_for_element_id("zone-6"), None);
     }
 }
