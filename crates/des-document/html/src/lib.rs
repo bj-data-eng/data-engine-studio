@@ -6,9 +6,9 @@
 //! JavaScript and does not embed template logic in HTML.
 
 use des_document::{
-    Document, DocumentActionFrame, DocumentBuilder, DocumentCommandRegistry, DocumentInput,
-    DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView, Element,
-    ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
+    Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry,
+    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView,
+    Element, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -397,6 +397,30 @@ impl HtmlStylesheet {
         Ok(DocumentView::new(
             self.html.to_document(viewport)?,
             self.stylesheet,
+        ))
+    }
+
+    /// Creates a ready-to-update action surface from parsed HTML/CSS and typed Rust commands.
+    pub fn to_action_surface<Action>(
+        &self,
+        viewport: Size,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(DocumentActionSurface::new(
+            self.to_view(viewport)?,
+            commands,
+        ))
+    }
+
+    /// Consumes the parsed HTML/CSS into an action surface paired with typed Rust commands.
+    pub fn into_action_surface<Action>(
+        self,
+        viewport: Size,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(DocumentActionSurface::new(
+            self.into_view(viewport)?,
+            commands,
         ))
     }
 

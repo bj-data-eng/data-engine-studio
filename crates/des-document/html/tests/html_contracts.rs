@@ -691,16 +691,15 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     assert_eq!(bundle.stylesheet().rule_count(), 1);
 
     let registry = DocumentCommandRegistry::new().bind("project.run", HtmlAction::Run);
-    let mut view = bundle
-        .into_view(Size::new(320.0, 180.0))
-        .expect("prelude-authored HTML should create a document view");
-    let frame: DocumentActionFrame<HtmlAction> = view.update_with_input_actions(
-        DocumentInput::primary_click(Point::new(8.0, 8.0)),
-        &registry,
-    );
+    let mut surface = bundle
+        .into_action_surface(Size::new(320.0, 180.0), registry)
+        .expect("prelude-authored HTML should create an action surface");
+    let frame: DocumentActionFrame<HtmlAction> =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let run = frame.output.snapshot().find("run").unwrap();
 
     assert_eq!(run.rect().size.width, 96.0);
+    assert_eq!(surface.commands().bindings().len(), 1);
     assert_eq!(frame.actions.len(), 1);
     assert_eq!(frame.actions[0].action, HtmlAction::Run);
     assert_eq!(frame.actions[0].target, ElementId::new("run"));
