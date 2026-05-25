@@ -118,6 +118,28 @@ impl DocumentProjection {
             });
     }
 
+    pub fn set_attributes<I, K, V>(mut self, id: impl Into<ElementId>, attributes: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.push_attributes(id, attributes);
+        self
+    }
+
+    pub fn push_attributes<I, K, V>(&mut self, id: impl Into<ElementId>, attributes: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let id = id.into();
+        for (name, value) in attributes {
+            self.push_attribute(id.clone(), name, value);
+        }
+    }
+
     pub fn set_data(
         self,
         id: impl Into<ElementId>,
@@ -165,6 +187,26 @@ impl DocumentProjection {
                 id: id.into(),
                 name: name.into(),
             });
+    }
+
+    pub fn remove_attributes<I, K>(mut self, id: impl Into<ElementId>, names: I) -> Self
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        self.push_remove_attributes(id, names);
+        self
+    }
+
+    pub fn push_remove_attributes<I, K>(&mut self, id: impl Into<ElementId>, names: I)
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        let id = id.into();
+        for name in names {
+            self.push_remove_attribute(id.clone(), name);
+        }
     }
 
     pub fn remove_data(self, id: impl Into<ElementId>, name: impl AsRef<str>) -> Self {
@@ -277,12 +319,52 @@ impl DocumentProjection {
         self.push_class(id, class, true);
     }
 
+    pub fn add_classes<I, C>(mut self, id: impl Into<ElementId>, classes: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.push_add_classes(id, classes);
+        self
+    }
+
+    pub fn push_add_classes<I, C>(&mut self, id: impl Into<ElementId>, classes: I)
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        let id = id.into();
+        for class in classes {
+            self.push_class(id.clone(), class, true);
+        }
+    }
+
     pub fn remove_class(self, id: impl Into<ElementId>, class: impl Into<ClassName>) -> Self {
         self.set_class(id, class, false)
     }
 
     pub fn push_remove_class(&mut self, id: impl Into<ElementId>, class: impl Into<ClassName>) {
         self.push_class(id, class, false);
+    }
+
+    pub fn remove_classes<I, C>(mut self, id: impl Into<ElementId>, classes: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.push_remove_classes(id, classes);
+        self
+    }
+
+    pub fn push_remove_classes<I, C>(&mut self, id: impl Into<ElementId>, classes: I)
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        let id = id.into();
+        for class in classes {
+            self.push_class(id.clone(), class, false);
+        }
     }
 
     pub fn operations(&self) -> &[DocumentProjectionOperation] {
@@ -329,6 +411,16 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn attributes<I, K, V>(&mut self, attributes: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.projection.push_attributes(self.id.clone(), attributes);
+        self
+    }
+
     pub fn data(&mut self, name: impl AsRef<str>, value: impl Into<String>) -> &mut Self {
         self.projection.push_data(self.id.clone(), name, value);
         self
@@ -342,6 +434,16 @@ impl ElementProjection<'_> {
     pub fn remove_attribute(&mut self, name: impl Into<String>) -> &mut Self {
         self.projection
             .push_remove_attribute(self.id.clone(), name.into());
+        self
+    }
+
+    pub fn remove_attributes<I, K>(&mut self, names: I) -> &mut Self
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        self.projection
+            .push_remove_attributes(self.id.clone(), names);
         self
     }
 
@@ -405,8 +507,27 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn add_classes<I, C>(&mut self, classes: I) -> &mut Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.projection.push_add_classes(self.id.clone(), classes);
+        self
+    }
+
     pub fn remove_class(&mut self, class: impl Into<ClassName>) -> &mut Self {
         self.projection.push_remove_class(self.id.clone(), class);
+        self
+    }
+
+    pub fn remove_classes<I, C>(&mut self, classes: I) -> &mut Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.projection
+            .push_remove_classes(self.id.clone(), classes);
         self
     }
 }

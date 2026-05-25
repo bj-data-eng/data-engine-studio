@@ -475,18 +475,20 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
 #[test]
 fn document_projection_batches_app_state_updates() {
     let stylesheet = StyleSheet::new()
-        .rule(
-            StyleSelector::class("ready"),
+        .class(
+            "ready",
             Style::default().background(Color::rgb(205, 239, 221)),
         )
-        .rule(
-            StyleSelector::class("pending"),
+        .class(
+            "pending",
             Style::default().background(Color::rgb(255, 238, 190)),
-        );
+        )
+        .class("active", Style::default().border(Color::rgb(80, 130, 180)));
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.div("status")
-            .class("pending")
+            .classes(["pending", "stale"])
             .selected(false)
+            .attribute("data-old-status", "pending")
             .children(|ui| {
                 ui.text("status-label", "Pending");
             });
@@ -496,47 +498,64 @@ fn document_projection_batches_app_state_updates() {
         .with_element("status", |mut status| {
             status
                 .value("ready")
+                .attributes([("data-status", "ready"), ("aria-label", "Ready status")])
                 .select()
                 .focus()
-                .remove_class("pending")
-                .add_class("ready");
-        });
+                .remove_attributes(["data-old-status"])
+                .remove_classes(["pending", "stale"])
+                .add_classes(["ready", "active"]);
+        })
+        .add_classes("status", ["hydrated"]);
 
     let report = view.project(&projection).unwrap();
     let output = view.update();
     let status = output.snapshot().find("status").unwrap();
 
-    assert_eq!(report.operations, 6);
-    assert_eq!(report.changed, 6);
+    assert_eq!(report.operations, 12);
+    assert_eq!(report.changed, 12);
     assert_eq!(
         output.snapshot().find("status-label").unwrap().text(),
         Some("Ready".to_owned())
     );
     assert_eq!(status.value(), Some("ready"));
+    assert_eq!(status.attribute("data-status"), Some("ready"));
+    assert_eq!(status.attribute("aria-label"), Some("Ready status"));
+    assert_eq!(status.attribute("data-old-status"), None);
     assert!(status.selected());
     assert!(status.focused());
     assert!(status.has_class("ready"));
+    assert!(status.has_class("active"));
+    assert!(status.has_class("hydrated"));
     assert!(!status.has_class("pending"));
+    assert!(!status.has_class("stale"));
     assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
+    assert_eq!(status.style().border, Some(Color::rgb(80, 130, 180)));
 
     let unchanged_report = view.project(&projection).unwrap();
 
-    assert_eq!(unchanged_report.operations, 6);
+    assert_eq!(unchanged_report.operations, 12);
     assert_eq!(unchanged_report.changed, 0);
 
     let reset = DocumentProjection::new()
         .deselect("status")
         .blur("status")
-        .disable("status");
+        .disable("status")
+        .remove_attributes("status", ["data-status", "aria-label"])
+        .remove_classes("status", ["ready", "active", "hydrated"]);
     let reset_report = view.project(&reset).unwrap();
     let reset_output = view.update();
     let reset_status = reset_output.snapshot().find("status").unwrap();
 
-    assert_eq!(reset_report.operations, 3);
-    assert_eq!(reset_report.changed, 3);
+    assert_eq!(reset_report.operations, 8);
+    assert_eq!(reset_report.changed, 8);
     assert!(!reset_status.selected());
     assert!(!reset_status.focused());
     assert!(reset_status.disabled());
+    assert_eq!(reset_status.attribute("data-status"), None);
+    assert_eq!(reset_status.attribute("aria-label"), None);
+    assert!(!reset_status.has_class("ready"));
+    assert!(!reset_status.has_class("active"));
+    assert!(!reset_status.has_class("hydrated"));
 
     let restore = DocumentProjection::new()
         .select("status")
