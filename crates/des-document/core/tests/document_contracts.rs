@@ -3908,6 +3908,20 @@ fn document_widgets_can_declare_typed_command_bindings() {
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             |action| directly_dispatched_values.push(*action),
         );
+    let mut try_directly_dispatched_values = Vec::new();
+    let (try_direct_value_dispatch_frame, try_direct_value_dispatch_report) = toggle
+        .try_update_with_input_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| try_directly_dispatched_values.push(*action),
+        )
+        .expect("widget should dispatch typed action values with explicit projection errors");
+    let mut idle_dispatched_values = Vec::new();
+    let (idle_value_dispatch_frame, idle_value_dispatch_report) = toggle
+        .try_update_and_dispatch_action_values(Size::new(320.0, 180.0), |action| {
+            idle_dispatched_values.push(*action);
+        })
+        .expect("idle widget value dispatch should return projection errors explicitly");
     let mut css_dispatched_actions = Vec::new();
     let (css_dispatch_frame, css_dispatch_report) = toggle
         .update_with_input_and_css_and_dispatch(
@@ -4055,6 +4069,18 @@ fn document_widgets_can_declare_typed_command_bindings() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(directly_dispatched_values, vec![WidgetAction::Toggle]);
+    assert!(try_direct_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        try_direct_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(try_directly_dispatched_values, vec![WidgetAction::Toggle]);
+    assert!(idle_value_dispatch_frame.is_empty());
+    assert_eq!(
+        idle_value_dispatch_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(idle_dispatched_values.is_empty());
     assert!(css_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
         css_dispatch_report,
