@@ -2245,25 +2245,35 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let boxed_toggle: Box<dyn DocumentActionWidget<WidgetAction>> = Box::new(ToggleWidget);
     let registry = DocumentCommandRegistry::new()
         .bind_widget(&toggle)
-        .bind_widget(&close);
+        .bind_widget_if(&close, true)
+        .bind_widget_if(&close, false)
+        .bind_widgets_if([&close as &dyn DocumentActionWidget<WidgetAction>], false);
     let mut pushed = DocumentCommandRegistry::new();
     pushed.push_widget_commands(&toggle);
-    pushed.push_widget_commands(&close);
+    pushed.push_widget_commands_if(&close, true);
+    pushed.push_widget_commands_if(&close, false);
+    pushed.push_widget_commands_many_if([&close as &dyn DocumentActionWidget<WidgetAction>], false);
     let mut manual_surface =
         DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
             ui.widget(&toggle);
             ui.widget(&close);
         })
         .action_surface(DocumentCommandRegistry::new())
-        .bind_widget(&toggle);
-    manual_surface.push_widget_commands(&close);
+        .bind_widget(&toggle)
+        .bind_widget_if(&close, false);
+    manual_surface.push_widget_commands_if(&close, true);
+    manual_surface.push_widget_commands_if(&close, false);
     let mut many_surface = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
         ui.widget(&toggle);
         ui.widget(&close);
     })
     .action_surface(DocumentCommandRegistry::new())
-    .bind_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>]);
-    many_surface.push_widget_commands_many([&close as &dyn DocumentActionWidget<WidgetAction>]);
+    .bind_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>])
+    .bind_widgets_if([&close as &dyn DocumentActionWidget<WidgetAction>], false);
+    many_surface
+        .push_widget_commands_many_if([&close as &dyn DocumentActionWidget<WidgetAction>], true);
+    many_surface
+        .push_widget_commands_many_if([&close as &dyn DocumentActionWidget<WidgetAction>], false);
     let mut surface = DocumentView::compose(Size::new(320.0, 180.0))
         .action_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>, &close]);
     let toggle_surface = toggle.action_surface(Size::new(320.0, 180.0));

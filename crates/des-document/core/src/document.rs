@@ -1434,6 +1434,15 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_widget_if(
+        mut self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+    ) -> Self {
+        self.push_widget_commands_if(widget, present);
+        self
+    }
+
     pub fn bind_widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> Self
     where
         W: DocumentActionWidget<Action> + ?Sized + 'a,
@@ -1442,8 +1451,30 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_widgets_if<'a, W>(
+        mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> Self
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.push_widget_commands_many_if(widgets, present);
+        self
+    }
+
     pub fn push_widget_commands(&mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) {
         widget.push_commands(self);
+    }
+
+    pub fn push_widget_commands_if(
+        &mut self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+    ) {
+        if present {
+            self.push_widget_commands(widget);
+        }
     }
 
     pub fn push_widget_commands_many<'a, W>(&mut self, widgets: impl IntoIterator<Item = &'a W>)
@@ -1452,6 +1483,18 @@ impl<Action> DocumentCommandRegistry<Action> {
     {
         for widget in widgets {
             self.push_widget_commands(widget);
+        }
+    }
+
+    pub fn push_widget_commands_many_if<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        if present {
+            self.push_widget_commands_many(widgets);
         }
     }
 }

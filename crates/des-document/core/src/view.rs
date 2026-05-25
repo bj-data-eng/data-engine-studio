@@ -222,6 +222,16 @@ impl<Action> DocumentActionSurface<Action> {
         self
     }
 
+    /// Conditionally adds command bindings declared by a reusable action widget.
+    pub fn bind_widget_if(
+        mut self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+    ) -> Self {
+        self.push_widget_commands_if(widget, present);
+        self
+    }
+
     /// Adds command bindings declared by a collection of reusable action widgets.
     pub fn bind_widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> Self
     where
@@ -231,9 +241,31 @@ impl<Action> DocumentActionSurface<Action> {
         self
     }
 
+    /// Conditionally adds command bindings declared by reusable action widgets.
+    pub fn bind_widgets_if<'a, W>(
+        mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> Self
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.push_widget_commands_many_if(widgets, present);
+        self
+    }
+
     /// Adds command bindings declared by a reusable action widget.
     pub fn push_widget_commands(&mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) {
         self.commands.push_widget_commands(widget);
+    }
+
+    /// Conditionally adds command bindings declared by a reusable action widget.
+    pub fn push_widget_commands_if(
+        &mut self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+    ) {
+        self.commands.push_widget_commands_if(widget, present);
     }
 
     /// Adds command bindings declared by a collection of reusable action widgets.
@@ -242,6 +274,17 @@ impl<Action> DocumentActionSurface<Action> {
         W: DocumentActionWidget<Action> + ?Sized + 'a,
     {
         self.commands.push_widget_commands_many(widgets);
+    }
+
+    /// Conditionally adds command bindings declared by reusable action widgets.
+    pub fn push_widget_commands_many_if<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.commands.push_widget_commands_many_if(widgets, present);
     }
 
     /// Applies a batch of app-state projections to the paired view.
