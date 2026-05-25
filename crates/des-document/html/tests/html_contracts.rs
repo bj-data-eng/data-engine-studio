@@ -240,6 +240,44 @@ fn html_document_emits_typed_document_nodes_with_stable_ids() {
 }
 
 #[test]
+fn html_document_maps_browser_boolean_state_attributes() {
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section id="form">
+          <button id="save" disabled on:click="save">Save</button>
+          <select id="mode"><option id="fast" selected>Fast</option></select>
+          <input id="filter" autofocus value="ready">
+        </section>
+        "#,
+    )
+    .expect("HTML should parse browser boolean attributes");
+    let mut document = html
+        .to_document(Size::new(320.0, 180.0))
+        .expect("HTML should emit a document");
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &des_document::StyleSheet::new());
+    let snapshot = output.snapshot();
+    let save = snapshot.find("save").expect("button id should be retained");
+    let fast = snapshot.find("fast").expect("option id should be retained");
+    let filter = snapshot
+        .find("filter")
+        .expect("input id should be retained");
+
+    assert!(save.disabled());
+    assert!(!save.interactive());
+    assert!(save.has_behavior_hook(ElementBehaviorEvent::Click, "save"));
+    assert_eq!(save.attribute("disabled"), Some(""));
+    assert!(fast.selected());
+    assert_eq!(fast.attribute("selected"), Some(""));
+    assert!(filter.focused());
+    assert_eq!(filter.value(), Some("ready"));
+    assert_eq!(snapshot.count_disabled(), 1);
+    assert_eq!(snapshot.count_selected(), 1);
+    assert_eq!(snapshot.count_focused(), 1);
+}
+
+#[test]
 fn html_stylesheet_parses_html_and_css_together() {
     let bundle = HtmlStylesheet::parse_fragment(
         r#"<section id="panel" class="card">Panel</section>"#,

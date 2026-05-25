@@ -694,6 +694,12 @@ impl HtmlNode {
         if let Some(value) = self.attributes.get("value") {
             spec = spec.value(value.clone());
         }
+        if self.attributes.contains_key("disabled") {
+            spec = spec.disabled(true);
+        }
+        if self.attributes.contains_key("selected") {
+            spec = spec.selected(true);
+        }
         if self.attributes.contains_key("autofocus") {
             spec = spec.focused(true);
         }
