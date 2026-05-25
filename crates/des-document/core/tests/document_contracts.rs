@@ -1,15 +1,16 @@
 use des_document::{
-    AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget, DocumentBuilder,
-    DocumentCommandAction, DocumentCommandBinding, DocumentCommandDispatchReport,
-    DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
-    DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentProjectionOperationKind,
-    DocumentProjectionReport, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
-    ElementBehaviorHook, ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector,
-    FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point,
-    PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
-    TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextLayoutRequest, TextLayoutResult,
-    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget,
+    DocumentAuthoringError, DocumentBuilder, DocumentCommandAction, DocumentCommandBinding,
+    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentEvent,
+    DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection, DocumentProjectionOperation,
+    DocumentProjectionOperationKind, DocumentProjectionReport, DocumentView, DocumentWidget,
+    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, ElementProjectionPatch,
+    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
+    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextContent,
+    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -3426,24 +3427,48 @@ fn document_widgets_can_declare_typed_command_bindings() {
             "#toggle { background: rgb(220, 238, 255); }",
         )
         .expect("widget CSS should parse");
+    let mut try_css_view = toggle
+        .try_view_with_css(
+            Size::new(320.0, 180.0),
+            "#toggle { border-color: rgb(28, 78, 120); }",
+        )
+        .expect("widget CSS and projection should be valid");
     let mut forgiving_css_view = toggle
         .view_with_css_forgiving(
             Size::new(320.0, 180.0),
             ".ignored { unknown-property: yes; } .toggle { border-color: rgb(40, 80, 120); }",
         )
         .expect("forgiving widget CSS should keep supported rules");
+    let mut try_forgiving_css_view = toggle
+        .try_view_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { border-color: rgb(48, 88, 128); }",
+        )
+        .expect("forgiving widget CSS and projection should be valid");
     let mut css_surface = toggle
         .action_surface_with_css(
             Size::new(320.0, 180.0),
             ".toggle { background: rgb(230, 245, 236); }",
         )
         .expect("widget action CSS should parse");
+    let mut try_css_surface = toggle
+        .try_action_surface_with_css(
+            Size::new(320.0, 180.0),
+            ".toggle { background: rgb(218, 242, 232); }",
+        )
+        .expect("widget action CSS and projection should be valid");
     let mut forgiving_css_surface = toggle
         .action_surface_with_css_forgiving(
             Size::new(320.0, 180.0),
             ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 232, 255); }",
         )
         .expect("forgiving widget action CSS should keep supported rules");
+    let mut try_forgiving_css_surface = toggle
+        .try_action_surface_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 230, 250); }",
+        )
+        .expect("forgiving widget action CSS and projection should be valid");
 
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
@@ -3452,10 +3477,16 @@ fn document_widgets_can_declare_typed_command_bindings() {
         &pushed,
     );
     let css_output = css_view.update();
+    let try_css_output = try_css_view.update();
     let forgiving_css_output = forgiving_css_view.update();
+    let try_forgiving_css_output = try_forgiving_css_view.update();
     let css_surface_frame =
         css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let try_css_surface_frame = try_css_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let forgiving_css_surface_frame = forgiving_css_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let try_forgiving_css_surface_frame = try_forgiving_css_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let toggle_commands = toggle.commands();
     let boxed_toggle_commands = boxed_toggle.commands();
@@ -3503,6 +3534,15 @@ fn document_widgets_can_declare_typed_command_bindings() {
         Some(Color::rgb(220, 238, 255))
     );
     assert_eq!(
+        try_css_output
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .border,
+        Some(Color::rgb(28, 78, 120))
+    );
+    assert_eq!(
         forgiving_css_output
             .snapshot()
             .find("toggle")
@@ -3510,6 +3550,15 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .style()
             .border,
         Some(Color::rgb(40, 80, 120))
+    );
+    assert_eq!(
+        try_forgiving_css_output
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .border,
+        Some(Color::rgb(48, 88, 128))
     );
     assert!(css_surface_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
@@ -3522,6 +3571,17 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(230, 245, 236))
     );
+    assert!(try_css_surface_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        try_css_surface_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(218, 242, 232))
+    );
     assert!(forgiving_css_surface_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
         forgiving_css_surface_frame
@@ -3532,6 +3592,17 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .style()
             .background,
         Some(Color::rgb(240, 232, 255))
+    );
+    assert!(try_forgiving_css_surface_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        try_forgiving_css_surface_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(236, 230, 250))
     );
     assert!(direct_toggle_frame.contains_action(&WidgetAction::Toggle));
     assert!(try_direct_toggle_frame.contains_action(&WidgetAction::Toggle));
@@ -3602,6 +3673,71 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert!(mixed_frame.output().snapshot().find("toolbar").is_some());
     assert_eq!(mixed_surface.commands().bindings(), registry.bindings());
     assert!(mixed_frame.contains_action(&WidgetAction::Toggle));
+}
+
+#[test]
+fn document_widget_css_helpers_return_authoring_errors_without_panics() {
+    #[derive(Clone, Copy)]
+    enum WidgetAction {
+        Toggle,
+    }
+
+    struct BrokenWidget;
+
+    impl DocumentWidget for BrokenWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("rendered").command("toggle").text("Rendered");
+        }
+
+        fn push_projection(&self, projection: &mut DocumentProjection) {
+            projection.element("missing").text("Projected");
+        }
+    }
+
+    impl DocumentActionWidget<WidgetAction> for BrokenWidget {
+        fn push_commands(&self, registry: &mut DocumentCommandRegistry<WidgetAction>) {
+            registry.push_click("toggle", WidgetAction::Toggle);
+        }
+    }
+
+    let widget = BrokenWidget;
+    let css_error = match widget.try_view_with_css(Size::new(320.0, 180.0), "/* unclosed") {
+        Ok(_) => panic!("strict widget CSS parse errors should be returned"),
+        Err(error) => error,
+    };
+    let projection_error =
+        match widget.try_view_with_css(Size::new(320.0, 180.0), "#rendered { width: 120px; }") {
+            Ok(_) => panic!("widget projection errors should be returned after CSS parses"),
+            Err(error) => error,
+        };
+    let action_projection_error = match widget
+        .try_action_surface_with_css(Size::new(320.0, 180.0), "#rendered { width: 120px; }")
+    {
+        Ok(_) => panic!("action widget projection errors should be returned after CSS parses"),
+        Err(error) => error,
+    };
+    let forgiving_projection_error = match widget.try_action_surface_with_css_forgiving(
+        Size::new(320.0, 180.0),
+        ".ignored { unknown-property: yes; } #rendered { width: 120px; }",
+    ) {
+        Ok(_) => panic!("forgiving CSS should still report widget projection errors"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(css_error, DocumentAuthoringError::Css(_)));
+    assert!(matches!(
+        projection_error,
+        DocumentAuthoringError::Document(_)
+    ));
+    assert!(matches!(
+        action_projection_error,
+        DocumentAuthoringError::Document(_)
+    ));
+    assert!(matches!(
+        forgiving_projection_error,
+        DocumentAuthoringError::Document(_)
+    ));
+    assert!(projection_error.to_string().contains("missing"));
 }
 
 #[test]

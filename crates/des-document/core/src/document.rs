@@ -35,6 +35,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub type DocumentResult<T> = Result<T, DocumentError>;
+pub type DocumentAuthoringResult<T> = Result<T, DocumentAuthoringError>;
 
 static NEXT_DOCUMENT_INSTANCE_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -106,6 +107,37 @@ impl std::fmt::Display for DocumentError {
 }
 
 impl std::error::Error for DocumentError {}
+
+/// Error returned by app-facing authoring helpers that combine CSS parsing
+/// with document/widget contract validation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DocumentAuthoringError {
+    Css(crate::CssParseError),
+    Document(DocumentError),
+}
+
+impl std::fmt::Display for DocumentAuthoringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Css(error) => write!(f, "CSS authoring error: {error}"),
+            Self::Document(error) => write!(f, "document authoring error: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for DocumentAuthoringError {}
+
+impl From<crate::CssParseError> for DocumentAuthoringError {
+    fn from(error: crate::CssParseError) -> Self {
+        Self::Css(error)
+    }
+}
+
+impl From<DocumentError> for DocumentAuthoringError {
+    fn from(error: DocumentError) -> Self {
+        Self::Document(error)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct DocumentElement {
@@ -1405,6 +1437,19 @@ pub trait DocumentWidget {
         Ok(self.view_with_stylesheet(viewport, stylesheet))
     }
 
+    /// Creates a CSS-backed view, returning CSS and widget projection errors explicitly.
+    fn try_view_with_css(
+        &self,
+        viewport: Size,
+        css: &str,
+    ) -> DocumentAuthoringResult<crate::DocumentView>
+    where
+        Self: Sized,
+    {
+        let stylesheet = StyleSheet::from_css(css)?;
+        Ok(self.try_view_with_stylesheet(viewport, stylesheet)?)
+    }
+
     /// Creates a document view containing this widget and browser-forgiving CSS rules.
     fn view_with_css_forgiving(
         &self,
@@ -1416,6 +1461,19 @@ pub trait DocumentWidget {
     {
         let stylesheet = StyleSheet::from_css_forgiving(css)?;
         Ok(self.view_with_stylesheet(viewport, stylesheet))
+    }
+
+    /// Creates a forgiving CSS-backed view, returning all authoring errors explicitly.
+    fn try_view_with_css_forgiving(
+        &self,
+        viewport: Size,
+        css: &str,
+    ) -> DocumentAuthoringResult<crate::DocumentView>
+    where
+        Self: Sized,
+    {
+        let stylesheet = StyleSheet::from_css_forgiving(css)?;
+        Ok(self.try_view_with_stylesheet(viewport, stylesheet)?)
     }
 
     /// Creates a styled view containing this widget, returning projection errors explicitly.
@@ -1619,6 +1677,19 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         Ok(self.action_surface_with_stylesheet(viewport, stylesheet))
     }
 
+    /// Creates a CSS-backed action surface, returning all authoring errors explicitly.
+    fn try_action_surface_with_css(
+        &self,
+        viewport: Size,
+        css: &str,
+    ) -> DocumentAuthoringResult<crate::DocumentActionSurface<Action>>
+    where
+        Self: Sized,
+    {
+        let stylesheet = StyleSheet::from_css(css)?;
+        Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet)?)
+    }
+
     /// Creates an action surface containing this widget and browser-forgiving CSS rules.
     fn action_surface_with_css_forgiving(
         &self,
@@ -1630,6 +1701,19 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
     {
         let stylesheet = StyleSheet::from_css_forgiving(css)?;
         Ok(self.action_surface_with_stylesheet(viewport, stylesheet))
+    }
+
+    /// Creates a forgiving CSS-backed action surface, returning all authoring errors explicitly.
+    fn try_action_surface_with_css_forgiving(
+        &self,
+        viewport: Size,
+        css: &str,
+    ) -> DocumentAuthoringResult<crate::DocumentActionSurface<Action>>
+    where
+        Self: Sized,
+    {
+        let stylesheet = StyleSheet::from_css_forgiving(css)?;
+        Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet)?)
     }
 
     /// Creates a styled action surface, returning projection errors explicitly.
