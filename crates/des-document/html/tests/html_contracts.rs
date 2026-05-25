@@ -869,6 +869,15 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
             },
         )
         .expect("HTML should dispatch typed actions without CSS");
+    let mut dispatched_values = Vec::new();
+    let (value_dispatch_frame, value_dispatch_report) = html
+        .update_with_input_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| dispatched_values.push(*action),
+        )
+        .expect("HTML should dispatch typed action values without CSS");
     let mut configured_dispatched = Vec::new();
     let (configured_dispatch_frame, configured_dispatch_report) = html
         .update_with_input_and_dispatch_with(
@@ -883,6 +892,18 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
             },
         )
         .expect("HTML should configure and dispatch typed actions without CSS");
+    let mut configured_dispatched_values = Vec::new();
+    let (configured_value_dispatch_frame, configured_value_dispatch_report) = html
+        .update_with_input_and_dispatch_action_values_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+                commands.push_key_down("project.search", HtmlAction::Search);
+            },
+            |action| configured_dispatched_values.push(*action),
+        )
+        .expect("HTML should configure and dispatch typed action values without CSS");
     let input_output = html
         .update_with_input(
             Size::new(320.0, 180.0),
@@ -900,12 +921,24 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
+    assert!(value_dispatch_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(dispatched_values, vec![HtmlAction::Run]);
     assert!(configured_dispatch_frame.contains_action(&HtmlAction::Search));
     assert_eq!(
         configured_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(configured_dispatched, vec![HtmlAction::Search]);
+    assert!(configured_value_dispatch_frame.contains_action(&HtmlAction::Search));
+    assert_eq!(
+        configured_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched_values, vec![HtmlAction::Search]);
 }
 
 #[test]
@@ -976,6 +1009,21 @@ fn html_document_projects_state_without_css_plumbing() {
         )
         .expect("HTML document should project state and dispatch actions without CSS");
     let dispatch_run = dispatch_frame.output().snapshot().find("run").unwrap();
+    let mut value_dispatched = Vec::new();
+    let (value_dispatch_report, value_dispatch_frame, value_action_report) = html
+        .update_with_input_projection_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &projection,
+            &registry,
+            |action| value_dispatched.push(*action),
+        )
+        .expect("HTML document should project state and dispatch action values without CSS");
+    let value_dispatch_run = value_dispatch_frame
+        .output()
+        .snapshot()
+        .find("run")
+        .unwrap();
     let mut configured_dispatched = Vec::new();
     let (configured_report, configured_frame, configured_action_report) = html
         .update_with_input_projected_with_and_dispatch_with(
@@ -993,6 +1041,25 @@ fn html_document_projects_state_without_css_plumbing() {
         )
         .expect("HTML document should build projection, configure actions, and dispatch");
     let configured_run = configured_frame.output().snapshot().find("run").unwrap();
+    let mut configured_value_dispatched = Vec::new();
+    let (configured_value_report, configured_value_frame, configured_value_action_report) = html
+        .update_with_input_projected_with_and_dispatch_action_values_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("run").text("Configured value");
+            },
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+            },
+            |action| configured_value_dispatched.push(*action),
+        )
+        .expect("HTML document should build projection, configure actions, and dispatch values");
+    let configured_value_run = configured_value_frame
+        .output()
+        .snapshot()
+        .find("run")
+        .unwrap();
 
     assert_eq!(dispatch_report.operations, 3);
     assert_eq!(dispatch_report.changed, 3);
@@ -1000,6 +1067,15 @@ fn html_document_projects_state_without_css_plumbing() {
     assert_eq!(action_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
     assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(value_dispatch_report.operations, 3);
+    assert_eq!(value_dispatch_report.changed, 3);
+    assert_eq!(value_dispatch_run.text(), Some("Ready".to_owned()));
+    assert_eq!(
+        value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(value_dispatched, vec![HtmlAction::Run]);
+    assert!(value_dispatch_frame.contains_clicked_action(&HtmlAction::Run));
     assert_eq!(configured_report.operations, 1);
     assert_eq!(configured_report.changed, 1);
     assert_eq!(configured_run.text(), Some("Configured".to_owned()));
@@ -1009,6 +1085,18 @@ fn html_document_projects_state_without_css_plumbing() {
     );
     assert_eq!(configured_dispatched, vec![HtmlAction::Run]);
     assert!(configured_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(configured_value_report.operations, 1);
+    assert_eq!(configured_value_report.changed, 1);
+    assert_eq!(
+        configured_value_run.text(),
+        Some("Configured value".to_owned())
+    );
+    assert_eq!(
+        configured_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_value_dispatched, vec![HtmlAction::Run]);
+    assert!(configured_value_frame.contains_clicked_action(&HtmlAction::Run));
 
     let (surface_report, mut surface) = html
         .to_action_surface_projected_with_actions(
