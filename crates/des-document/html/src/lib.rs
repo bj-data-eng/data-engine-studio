@@ -926,6 +926,19 @@ impl HtmlDocument {
             .action_surface_with(configure))
     }
 
+    /// Conditionally parses CSS and creates an action surface with typed Rust commands.
+    pub fn to_action_surface_with_css_if<Action>(
+        &self,
+        viewport: Size,
+        present: bool,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_css_if(viewport, present, css)?
+            .action_surface_with(configure))
+    }
+
     /// Parses forgiving CSS and creates an action surface with typed Rust commands.
     pub fn to_action_surface_with_css_forgiving<Action>(
         &self,
@@ -935,6 +948,19 @@ impl HtmlDocument {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         Ok(self
             .to_view_with_css_forgiving(viewport, css)?
+            .action_surface_with(configure))
+    }
+
+    /// Conditionally parses forgiving CSS and creates an action surface.
+    pub fn to_action_surface_with_css_forgiving_if<Action>(
+        &self,
+        viewport: Size,
+        present: bool,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_css_forgiving_if(viewport, present, css)?
             .action_surface_with(configure))
     }
 
@@ -2857,6 +2883,19 @@ impl HtmlSet {
             .to_action_surface_with_css(viewport, css, configure)
     }
 
+    /// Conditionally parses CSS and creates an action surface for a named document.
+    pub fn to_action_surface_with_css_if<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        present: bool,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_css_if(viewport, present, css, configure)
+    }
+
     /// Parses forgiving CSS and creates an action surface for a named document.
     pub fn to_action_surface_with_css_forgiving<Action>(
         &self,
@@ -2867,6 +2906,19 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         self.get(name)?
             .to_action_surface_with_css_forgiving(viewport, css, configure)
+    }
+
+    /// Conditionally parses forgiving CSS and creates an action surface for a named document.
+    pub fn to_action_surface_with_css_forgiving_if<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        present: bool,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_css_forgiving_if(viewport, present, css, configure)
     }
 
     /// Resolves a named HTML document with an empty stylesheet.

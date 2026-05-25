@@ -615,6 +615,18 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("HTML and CSS should create a typed action surface directly");
     let surface_click =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut skipped_surface = html
+        .to_action_surface_with_css_if(
+            Size::new(240.0, 160.0),
+            false,
+            ".card { width: ; }",
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+            },
+        )
+        .expect("skipped action-surface CSS should not parse");
+    let skipped_surface_click = skipped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut forgiving_surface = html
         .to_action_surface_with_css_forgiving(
             Size::new(240.0, 160.0),
@@ -627,6 +639,18 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("forgiving CSS should create a typed action surface directly");
     let surface_key =
         forgiving_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
+    let mut skipped_forgiving_surface = html
+        .to_action_surface_with_css_forgiving_if(
+            Size::new(240.0, 160.0),
+            false,
+            "/* unclosed",
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+            },
+        )
+        .expect("skipped forgiving action-surface CSS should not parse");
+    let skipped_forgiving_surface_click = skipped_forgiving_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = html
         .update_with_input_and_css_and_dispatch(
@@ -688,6 +712,17 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     assert!(configured_forgiving_frame.contains_action(&HtmlAction::Filter));
     assert!(surface_click.contains_action(&HtmlAction::Run));
     assert!(surface_key.contains_action(&HtmlAction::Filter));
+    assert!(skipped_surface_click.contains_action(&HtmlAction::Run));
+    assert!(skipped_forgiving_surface_click.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        skipped_surface_click
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .element(),
+        Element::Section
+    );
     assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
@@ -2163,6 +2198,19 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build strict CSS action surfaces");
     let css_surface_frame =
         css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut skipped_css_surface = set
+        .to_action_surface_with_css_if(
+            "inline",
+            Size::new(240.0, 160.0),
+            false,
+            "#inline { width: ; }",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+        )
+        .expect("named skipped strict CSS action surface should not parse");
+    let skipped_css_surface_frame = skipped_css_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut css_forgiving_surface = set
         .to_action_surface_with_css_forgiving(
             "inline",
@@ -2174,6 +2222,19 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should build forgiving CSS action surfaces");
     let css_forgiving_surface_frame = css_forgiving_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut skipped_css_forgiving_surface = set
+        .to_action_surface_with_css_forgiving_if(
+            "inline",
+            Size::new(240.0, 160.0),
+            false,
+            "/* unclosed",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+        )
+        .expect("named skipped forgiving CSS action surface should not parse");
+    let skipped_css_forgiving_surface_frame = skipped_css_forgiving_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let (project_report, projected_output) = set
         .update_projected_with("inline", Size::new(240.0, 160.0), |projection| {
@@ -2444,6 +2505,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         160.0
     );
+    assert!(skipped_css_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        skipped_css_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .element(),
+        Element::Button
+    );
     assert!(css_forgiving_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(
         css_forgiving_surface_frame
@@ -2455,6 +2526,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .size
             .width,
         164.0
+    );
+    assert!(skipped_css_forgiving_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        skipped_css_forgiving_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .element(),
+        Element::Button
     );
     assert_eq!(project_report.operations, 2);
     assert_eq!(project_report.changed, 2);
