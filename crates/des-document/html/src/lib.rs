@@ -2099,6 +2099,29 @@ impl HtmlStylesheet {
         Ok(view.project_and_update_with_input_and_dispatch(projection, input, registry, handler)?)
     }
 
+    /// Creates a projected styled view, routes input, and dispatches only action values.
+    pub fn update_with_input_projection_and_dispatch_action_values<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let mut view = self.to_view(viewport)?;
+        let (projection_report, frame) =
+            view.project_and_update_with_input_actions(projection, input, registry)?;
+        let dispatch_report = frame.dispatch_action_values(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
     /// Creates a projected view, configures typed actions, routes input, and dispatches them.
     pub fn update_with_input_projection_and_dispatch_with<Action>(
         &self,
@@ -2118,6 +2141,29 @@ impl HtmlStylesheet {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_projection_and_dispatch(
+            viewport, input, projection, &registry, handler,
+        )
+    }
+
+    /// Creates a projected styled view, configures actions, and dispatches values.
+    pub fn update_with_input_projection_and_dispatch_action_values_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_projection_and_dispatch_action_values(
             viewport, input, projection, &registry, handler,
         )
     }
@@ -2205,6 +2251,33 @@ impl HtmlStylesheet {
         )
     }
 
+    /// Builds projection in place, routes input, and dispatches only action values.
+    pub fn update_with_input_projected_with_and_dispatch_action_values<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_projection_and_dispatch_action_values(
+            viewport,
+            input,
+            &projection,
+            registry,
+            handler,
+        )
+    }
+
     /// Builds projection in place, configures typed actions, routes input, and dispatches them.
     pub fn update_with_input_projected_with_and_dispatch_with<Action>(
         &self,
@@ -2224,6 +2297,33 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_input_projection_and_dispatch_with(
+            viewport,
+            input,
+            &projection,
+            configure,
+            handler,
+        )
+    }
+
+    /// Builds projection in place, configures typed actions, and dispatches values.
+    pub fn update_with_input_projected_with_and_dispatch_action_values_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_projection_and_dispatch_action_values_with(
             viewport,
             input,
             &projection,
@@ -2352,6 +2452,22 @@ impl HtmlStylesheet {
         Ok((frame, report))
     }
 
+    /// Creates a styled view, routes input, and dispatches only typed action values.
+    pub fn update_with_input_and_dispatch_action_values<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions(viewport, input, registry)?;
+        let report = frame.dispatch_action_values(handler);
+        Ok((frame, report))
+    }
+
     /// Creates a view, configures typed actions in one hook, routes input, and dispatches them.
     pub fn update_with_input_and_dispatch_with<Action>(
         &self,
@@ -2366,6 +2482,22 @@ impl HtmlStylesheet {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_and_dispatch(viewport, input, &registry, handler)
+    }
+
+    /// Creates a styled view, configures typed actions, and dispatches action values.
+    pub fn update_with_input_and_dispatch_action_values_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_dispatch_action_values(viewport, input, &registry, handler)
     }
 }
 
@@ -3234,6 +3366,22 @@ impl HtmlSet {
             .update_with_input_and_dispatch(viewport, input, registry, handler)
     }
 
+    /// Routes input through a named document and dispatches only typed action values.
+    pub fn update_with_input_and_dispatch_action_values<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_dispatch_action_values(viewport, input, registry, handler)
+    }
+
     /// Routes input through a named document, configures typed actions, and dispatches them.
     pub fn update_with_input_and_dispatch_with<Action>(
         &self,
@@ -3248,6 +3396,22 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_and_dispatch_with(viewport, input, configure, handler)
+    }
+
+    /// Routes input through a named document, configures actions, and dispatches values.
+    pub fn update_with_input_and_dispatch_action_values_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_dispatch_action_values_with(viewport, input, configure, handler)
     }
 
     /// Applies projection and resolves a named HTML document.
@@ -3326,6 +3490,29 @@ impl HtmlSet {
         )
     }
 
+    /// Applies projection, routes input, and dispatches only typed action values.
+    pub fn update_with_input_projection_and_dispatch_action_values<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_projection_and_dispatch_action_values(
+                viewport, input, projection, registry, handler,
+            )
+    }
+
     /// Applies projection, configures typed actions, routes input, and dispatches them.
     pub fn update_with_input_projection_and_dispatch_with<Action>(
         &self,
@@ -3345,6 +3532,29 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_projection_and_dispatch_with(
+                viewport, input, projection, configure, handler,
+            )
+    }
+
+    /// Applies projection, configures typed actions, and dispatches action values.
+    pub fn update_with_input_projection_and_dispatch_action_values_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_projection_and_dispatch_action_values_with(
                 viewport, input, projection, configure, handler,
             )
     }
@@ -3406,6 +3616,29 @@ impl HtmlSet {
             )
     }
 
+    /// Builds projection in place, routes input, and dispatches only action values.
+    pub fn update_with_input_projected_with_and_dispatch_action_values<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_projected_with_and_dispatch_action_values(
+                viewport, input, project, registry, handler,
+            )
+    }
+
     /// Builds projection in place, configures typed actions, routes input, and dispatches them.
     pub fn update_with_input_projected_with_and_dispatch_with<Action>(
         &self,
@@ -3425,6 +3658,29 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_projected_with_and_dispatch_with(
+                viewport, input, project, configure, handler,
+            )
+    }
+
+    /// Builds projection in place, configures actions, and dispatches action values.
+    pub fn update_with_input_projected_with_and_dispatch_action_values_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_projected_with_and_dispatch_action_values_with(
                 viewport, input, project, configure, handler,
             )
     }

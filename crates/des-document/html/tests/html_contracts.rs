@@ -1512,6 +1512,15 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             },
         )
         .expect("HTML bundle should dispatch typed actions directly");
+    let mut dispatched_values = Vec::new();
+    let (value_dispatch_frame, value_dispatch_report) = bundle
+        .update_with_input_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| dispatched_values.push(*action),
+        )
+        .expect("HTML bundle should dispatch typed action values directly");
     let mut configured_dispatched = Vec::new();
     let (configured_dispatch_frame, configured_dispatch_report) = bundle
         .update_with_input_and_dispatch_with(
@@ -1526,6 +1535,18 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             },
         )
         .expect("HTML bundle should configure and dispatch typed actions directly");
+    let mut configured_dispatched_values = Vec::new();
+    let (configured_value_dispatch_frame, configured_value_dispatch_report) = bundle
+        .update_with_input_and_dispatch_action_values_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+            |action| configured_dispatched_values.push(*action),
+        )
+        .expect("HTML bundle should configure and dispatch typed action values directly");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -1538,12 +1559,24 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     assert!(dispatch_frame.contains_action(&HtmlAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
+    assert!(value_dispatch_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(
+        value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(dispatched_values, vec![HtmlAction::Run]);
     assert!(configured_dispatch_frame.contains_action(&HtmlAction::Filter));
     assert_eq!(
         configured_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(configured_dispatched, vec![HtmlAction::Filter]);
+    assert!(configured_value_dispatch_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(
+        configured_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched_values, vec![HtmlAction::Filter]);
     assert_eq!(
         click_frame
             .output()
@@ -1662,6 +1695,21 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         )
         .expect("HTML bundle should project state and dispatch actions in one call");
     let dispatch_select = dispatch_frame.output().snapshot().find("select").unwrap();
+    let mut projected_value_dispatched = Vec::new();
+    let (value_dispatch_report, value_dispatch_frame, value_action_report) = bundle
+        .update_with_input_projection_and_dispatch_action_values(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 32.0)),
+            &projection,
+            &registry,
+            |action| projected_value_dispatched.push(*action),
+        )
+        .expect("HTML bundle should project state and dispatch action values in one call");
+    let value_dispatch_select = value_dispatch_frame
+        .output()
+        .snapshot()
+        .find("select")
+        .unwrap();
     let mut projected_with_dispatched = Vec::new();
     let (dispatch_with_report, dispatch_with_frame, dispatch_with_action_report) = bundle
         .update_with_input_projected_with_and_dispatch_with(
@@ -1680,6 +1728,27 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         )
         .expect("HTML bundle should build projection, configure actions, and dispatch");
     let dispatch_with_run = dispatch_with_frame.output().snapshot().find("run").unwrap();
+    let mut projected_with_value_dispatched = Vec::new();
+    let (dispatch_with_value_report, dispatch_with_value_frame, dispatch_with_value_action_report) =
+        bundle
+            .update_with_input_projected_with_and_dispatch_action_values_with(
+                Size::new(320.0, 180.0),
+                DocumentInput::primary_click(Point::new(8.0, 8.0)),
+                |projection| {
+                    projection.element("run").text("Dispatch value");
+                },
+                |commands| {
+                    commands.push("project.run", HtmlAction::Run);
+                    commands.push_click("project.select", HtmlAction::Select);
+                },
+                |action| projected_with_value_dispatched.push(*action),
+            )
+            .expect("HTML bundle should build projection and dispatch action values");
+    let dispatch_with_value_run = dispatch_with_value_frame
+        .output()
+        .snapshot()
+        .find("run")
+        .unwrap();
 
     assert_eq!(report.operations, 4);
     assert_eq!(report.changed, 4);
@@ -1697,6 +1766,15 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(projected_dispatched, vec![HtmlAction::Select]);
     assert_eq!(dispatch_select.aria("pressed"), Some("false"));
     assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Select));
+    assert_eq!(value_dispatch_report.operations, 7);
+    assert_eq!(value_dispatch_report.changed, 7);
+    assert_eq!(
+        value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_value_dispatched, vec![HtmlAction::Select]);
+    assert_eq!(value_dispatch_select.aria("pressed"), Some("false"));
+    assert!(value_dispatch_frame.contains_clicked_action(&HtmlAction::Select));
     assert_eq!(dispatch_with_report.operations, 1);
     assert_eq!(dispatch_with_report.changed, 1);
     assert_eq!(
@@ -1709,6 +1787,18 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         Some("Dispatch configured".to_owned())
     );
     assert!(dispatch_with_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(dispatch_with_value_report.operations, 1);
+    assert_eq!(dispatch_with_value_report.changed, 1);
+    assert_eq!(
+        dispatch_with_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_with_value_dispatched, vec![HtmlAction::Run]);
+    assert_eq!(
+        dispatch_with_value_run.text(),
+        Some("Dispatch value".to_owned())
+    );
+    assert!(dispatch_with_value_frame.contains_clicked_action(&HtmlAction::Run));
 
     let projected_registry = bundle.command_action_registry([
         ("project.run", HtmlAction::Run),
@@ -2223,6 +2313,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             },
         )
         .expect("named document should dispatch typed actions through the set front door");
+    let mut dispatched_values = Vec::new();
+    let (value_dispatch_frame, value_dispatch_report) = set
+        .update_with_input_and_dispatch_action_values(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| dispatched_values.push(*action),
+        )
+        .expect("named document should dispatch typed action values through the set front door");
     let mut configured_dispatched = Vec::new();
     let (configured_dispatch_frame, configured_dispatch_report) = set
         .update_with_input_and_dispatch_with(
@@ -2239,6 +2339,18 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect(
             "named document should configure and dispatch typed actions through the set front door",
         );
+    let mut configured_dispatched_values = Vec::new();
+    let (configured_value_dispatch_frame, configured_value_dispatch_report) = set
+        .update_with_input_and_dispatch_action_values_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+            |action| configured_dispatched_values.push(*action),
+        )
+        .expect("named document should configure and dispatch typed action values");
     let empty_frame = set
         .update_actions("inline", Size::new(240.0, 160.0), &registry)
         .expect("named document should update and collect actions through the set front door");
@@ -2453,6 +2565,19 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             },
         )
         .expect("named document should project state and dispatch actions");
+    let mut projected_value_dispatched = Vec::new();
+    let (value_project_report, value_project_frame, value_project_action_report) = set
+        .update_with_input_projected_with_and_dispatch_action_values(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("inline").text("Value dispatched");
+            },
+            &registry,
+            |action| projected_value_dispatched.push(*action),
+        )
+        .expect("named document should project state and dispatch action values");
     let mut configured_projected_dispatched = Vec::new();
     let (
         configured_dispatch_project_report,
@@ -2474,6 +2599,25 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             },
         )
         .expect("named document should configure projected dispatch actions");
+    let mut configured_projected_value_dispatched = Vec::new();
+    let (
+        configured_value_project_report,
+        configured_value_project_frame,
+        configured_value_project_action_report,
+    ) = set
+        .update_with_input_projected_with_and_dispatch_action_values_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("inline").text("Configured value");
+            },
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+            |action| configured_projected_value_dispatched.push(*action),
+        )
+        .expect("named document should configure projected value dispatch actions");
     let (intent_project_report, intent_project_frame) = set
         .update_with_input_projected_with_and_intent_actions(
             "shared",
@@ -2551,12 +2695,24 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert!(dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![SetAction::Run]);
+    assert!(value_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(dispatched_values, vec![SetAction::Run]);
     assert!(configured_dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(
         configured_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(configured_dispatched, vec![SetAction::Run]);
+    assert!(configured_value_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        configured_value_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched_values, vec![SetAction::Run]);
     assert!(empty_frame.is_empty());
     assert_eq!(
         mapped_registry.bindings(),
@@ -2752,6 +2908,23 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .text(),
         Some("Dispatched".to_owned())
     );
+    assert_eq!(value_project_report.operations, 1);
+    assert_eq!(value_project_report.changed, 1);
+    assert!(value_project_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        value_project_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_value_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        value_project_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .text(),
+        Some("Value dispatched".to_owned())
+    );
     assert_eq!(configured_dispatch_project_report.operations, 1);
     assert_eq!(configured_dispatch_project_report.changed, 1);
     assert!(configured_dispatch_project_frame.contains_action(&SetAction::Run));
@@ -2768,6 +2941,23 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .unwrap()
             .text(),
         Some("Configured dispatch".to_owned())
+    );
+    assert_eq!(configured_value_project_report.operations, 1);
+    assert_eq!(configured_value_project_report.changed, 1);
+    assert!(configured_value_project_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        configured_value_project_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_projected_value_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        configured_value_project_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .text(),
+        Some("Configured value".to_owned())
     );
     assert_eq!(intent_project_report.operations, 1);
     assert_eq!(intent_project_report.changed, 1);
