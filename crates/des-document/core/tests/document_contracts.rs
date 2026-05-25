@@ -1286,7 +1286,7 @@ fn document_prelude_exposes_common_app_authoring_surface() {
             ui.button("run")
                 .classes(["badge", "primary"])
                 .aria("label", "Run")
-                .on_click("run")
+                .command("run")
                 .text("Run");
         }
 
@@ -1300,17 +1300,44 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         .with_css(".primary { background: rgb(220, 238, 255); }")
         .expect("CSS should compose from the prelude")
         .widget(&widget);
-    let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
-    let actions = registry.clicked_actions(&output).collect::<Vec<_>>();
-    let run = output.snapshot().find("run").unwrap();
+    let frame = view.update_with_input_actions(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &registry,
+    );
+    let run = frame.output.snapshot().find("run").unwrap();
+    let inline = InlineTextStyle {
+        font_weight: Some(FontWeight::BOLD),
+        font_stretch: Some(FontStretch::CONDENSED),
+        font_style: Some(FontStyle::Italic),
+        ..InlineTextStyle::default()
+    };
+    let text_style = TextLayoutStyle {
+        white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
+        overflow_wrap: OverflowWrap::Anywhere,
+        word_break: WordBreak::BreakAll,
+        ..TextLayoutStyle::default()
+    };
+    let _normalized: Option<NormalizedText> = None;
+    let _layout_line: Option<TextLayoutLine> = None;
+    let _layout_run: Option<TextLayoutRun> = None;
+    let _measurer_key: Option<TextMeasurerKey> = None;
 
-    assert_eq!(actions.len(), 1);
-    assert_eq!(*actions[0].action, AppAction::Run);
+    assert_eq!(frame.actions.len(), 1);
+    assert_eq!(frame.actions[0].action, AppAction::Run);
     assert!(run.has_all_classes(["badge", "primary"]));
     assert_eq!(run.aria("label"), Some("Run"));
     assert_eq!(run.rect().size, Size::new(72.0, 28.0));
     assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
+    assert_eq!(inline.font_weight, Some(FontWeight::BOLD));
+    assert_eq!(inline.font_stretch, Some(FontStretch::CONDENSED));
+    assert_eq!(inline.font_style, Some(FontStyle::Italic));
+    assert_eq!(
+        text_style.white_space_collapse,
+        WhiteSpaceCollapse::PreserveBreaks
+    );
+    assert_eq!(text_style.overflow_wrap, OverflowWrap::Anywhere);
+    assert_eq!(text_style.word_break, WordBreak::BreakAll);
 }
 
 #[test]

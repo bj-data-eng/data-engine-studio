@@ -29,7 +29,7 @@
 //!         ui.button("run")
 //!             .classes(["control", "primary"])
 //!             .aria("label", "Run query")
-//!             .on_click("run")
+//!             .command("run")
 //!             .text("Run");
 //!     }
 //!
@@ -41,7 +41,7 @@
 //!         projection
 //!             .element("run")
 //!             .data("state", "ready")
-//!             .add_class("is-ready");
+//!             .class_if("is-ready", true);
 //!     }
 //! }
 //!
@@ -51,13 +51,14 @@
 //!     .expect("valid app stylesheet")
 //!     .widget(&widget);
 //!
-//! let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-//!
 //! let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
-//! let actions = registry.clicked_actions(&output).collect::<Vec<_>>();
+//! let frame = view.update_with_input_actions(
+//!     DocumentInput::primary_click(Point::new(8.0, 8.0)),
+//!     &registry,
+//! );
 //!
-//! assert_eq!(actions.len(), 1);
-//! assert_eq!(*actions[0].action, AppAction::Run);
+//! assert_eq!(frame.actions.len(), 1);
+//! assert_eq!(frame.actions[0].action, AppAction::Run);
 //! ```
 //!
 //! HTML/CSS entry points live in the sibling `des-html` crate and produce the
@@ -150,15 +151,16 @@ pub mod prelude {
         DocumentViewBuilder, DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent,
         ElementBehaviorHook, ElementBuilder, ElementId, ElementProjection, ElementSnapshot,
         ElementSpec, ElementState, ElementStateSelector, FallbackTextMeasurer, FlexDirection,
-        FlexWrap, FloatingBoundary, FloatingPlacement, Glyph, GridAutoFlow, GridPlacement,
-        GridTemplateArea, GridTemplateComponent, GridTrack, HitResult, InlineTextStyle, Insets,
-        JustifyContent, KeyInput, KeyModifiers, Length, NthChildFormula, Overflow, Point,
-        PointerInput, Position, PositionInsets, Rect, ResolvedElement, ResolvedFloating,
-        ScrollAxis, ScrollChrome, Shadow, Size, Style, StyleCondition, StyleRule, StyleSelector,
-        StyleSheet, TableCellSpec, TableColumnId, TableColumnSpec, TableSpec, TableTrackSize,
-        TextAlign, TextContent, TextDecoration, TextLayoutRequest, TextLayoutResult,
-        TextLayoutStyle, TextMeasurer, TextOverflow, TextRun, TextSelectionGranularity,
+        FlexWrap, FloatingBoundary, FloatingPlacement, FontStretch, FontStyle, FontWeight, Glyph,
+        GridAutoFlow, GridPlacement, GridTemplateArea, GridTemplateComponent, GridTrack, HitResult,
+        InlineTextStyle, Insets, JustifyContent, KeyInput, KeyModifiers, Length, NormalizedText,
+        NthChildFormula, Overflow, OverflowWrap, Point, PointerInput, Position, PositionInsets,
+        Rect, ResolvedElement, ResolvedFloating, ScrollAxis, ScrollChrome, Shadow, Size, Style,
+        StyleCondition, StyleRule, StyleSelector, StyleSheet, TableCellSpec, TableColumnId,
+        TableColumnSpec, TableSpec, TableTrackSize, TextAlign, TextContent, TextDecoration,
+        TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextLayoutRun, TextLayoutStyle,
+        TextMeasurer, TextMeasurerKey, TextOverflow, TextRun, TextSelectionGranularity,
         TextTransform, TextVerticalAlign, TextWrapMode, Transition, ViewportQuery,
-        VisualCloneOptions, VisualElementClone, WhiteSpace,
+        VisualCloneOptions, VisualElementClone, WhiteSpace, WhiteSpaceCollapse, WordBreak,
     };
 }
