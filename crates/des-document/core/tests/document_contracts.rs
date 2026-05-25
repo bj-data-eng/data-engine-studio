@@ -3172,6 +3172,7 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert!(drop_target.has_any_class(["missing", "accepts-files"]));
     assert_eq!(drop_target.data("state"), Some("ready"));
     assert_eq!(drop_target.aria("label"), Some("Drop target"));
+    assert!(drop_target.has_attribute("data-state", "ready"));
     assert!(drop_target.has_data("state", "ready"));
     assert!(drop_target.has_aria("label", "Drop target"));
     assert_eq!(drop_target.value(), Some("target-a"));
@@ -3197,6 +3198,33 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     );
     assert_eq!(drop_target.elements_with_class("drop-helper").len(), 1);
     assert!(drop_target.contains_class("drop-zone"));
+    assert_eq!(
+        drop_target
+            .elements_with_attribute("data-state", "ready")
+            .len(),
+        1
+    );
+    assert!(drop_target.contains_attribute("data-state", "ready"));
+    assert!(drop_target.contains_data("state", "ready"));
+    assert!(drop_target.contains_aria("label", "Drop target"));
+    assert!(
+        drop_target
+            .first_with_attribute("data-state", "ready")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        drop_target
+            .first_with_data("state", "ready")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        drop_target
+            .first_with_aria("label", "Drop target")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert_eq!(drop_target.count_with_attribute("data-state", "ready"), 1);
+    assert_eq!(drop_target.count_with_data("state", "ready"), 1);
+    assert_eq!(drop_target.count_with_aria("label", "Drop target"), 1);
     assert_eq!(drop_target.count_by_element(Element::Text), 1);
     assert!(
         drop_target
@@ -3215,6 +3243,35 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
             .is_some_and(|element| element.id_is("drop-target"))
     );
     assert_eq!(snapshot.count_with_class("drop-zone"), 1);
+    assert_eq!(
+        snapshot
+            .elements_with_attribute("data-state", "ready")
+            .len(),
+        1
+    );
+    assert_eq!(snapshot.elements_with_data("state", "ready").len(), 1);
+    assert_eq!(snapshot.elements_with_aria("label", "Drop target").len(), 1);
+    assert!(snapshot.contains_attribute("data-state", "ready"));
+    assert!(snapshot.contains_data("state", "ready"));
+    assert!(snapshot.contains_aria("label", "Drop target"));
+    assert!(
+        snapshot
+            .first_with_attribute("data-state", "ready")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        snapshot
+            .first_with_data("state", "ready")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        snapshot
+            .first_with_aria("label", "Drop target")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert_eq!(snapshot.count_with_attribute("data-state", "ready"), 1);
+    assert_eq!(snapshot.count_with_data("state", "ready"), 1);
+    assert_eq!(snapshot.count_with_aria("label", "Drop target"), 1);
     assert_eq!(snapshot.elements_by_element(Element::Div).len(), 3);
     assert!(snapshot.contains_element(Element::Div));
     assert!(

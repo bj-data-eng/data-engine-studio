@@ -107,6 +107,103 @@ impl<'a> DocumentSnapshot<'a> {
         self.elements_with_class(class).len()
     }
 
+    pub fn elements_with_attribute(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Vec<ElementSnapshot<'a>> {
+        let name = name.as_ref();
+        let value = value.as_ref();
+        let mut elements = Vec::new();
+        collect_elements(self.root, &mut elements, &mut |element| {
+            element
+                .attributes
+                .get(name)
+                .is_some_and(|found| found == value)
+        });
+        elements
+    }
+
+    pub fn contains_attribute(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> bool {
+        let name = name.as_ref();
+        let value = value.as_ref();
+        find_matching_element(self.root, &mut |element| {
+            element
+                .attributes
+                .get(name)
+                .is_some_and(|found| found == value)
+        })
+        .is_some()
+    }
+
+    pub fn first_with_attribute(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Option<ElementSnapshot<'a>> {
+        let name = name.as_ref();
+        let value = value.as_ref();
+        find_matching_element(self.root, &mut |element| {
+            element
+                .attributes
+                .get(name)
+                .is_some_and(|found| found == value)
+        })
+        .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_with_attribute(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
+        self.elements_with_attribute(name, value).len()
+    }
+
+    pub fn elements_with_data(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Vec<ElementSnapshot<'a>> {
+        self.elements_with_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn contains_data(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> bool {
+        self.contains_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn first_with_data(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Option<ElementSnapshot<'a>> {
+        self.first_with_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn count_with_data(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
+        self.count_with_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn elements_with_aria(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Vec<ElementSnapshot<'a>> {
+        self.elements_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn contains_aria(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> bool {
+        self.contains_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn first_with_aria(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Option<ElementSnapshot<'a>> {
+        self.first_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn count_with_aria(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
+        self.count_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
     pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
         let mut elements = Vec::new();
         collect_elements(self.root, &mut elements, &mut |element| {
@@ -333,6 +430,103 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn count_with_class(&self, class: impl Into<ClassName>) -> usize {
         self.elements_with_class(class).len()
+    }
+
+    pub fn elements_with_attribute(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Vec<ElementSnapshot<'a>> {
+        let name = name.as_ref();
+        let value = value.as_ref();
+        let mut elements = Vec::new();
+        collect_elements(self.element, &mut elements, &mut |element| {
+            element
+                .attributes
+                .get(name)
+                .is_some_and(|found| found == value)
+        });
+        elements
+    }
+
+    pub fn contains_attribute(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> bool {
+        let name = name.as_ref();
+        let value = value.as_ref();
+        find_matching_element(self.element, &mut |element| {
+            element
+                .attributes
+                .get(name)
+                .is_some_and(|found| found == value)
+        })
+        .is_some()
+    }
+
+    pub fn first_with_attribute(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Option<ElementSnapshot<'a>> {
+        let name = name.as_ref();
+        let value = value.as_ref();
+        find_matching_element(self.element, &mut |element| {
+            element
+                .attributes
+                .get(name)
+                .is_some_and(|found| found == value)
+        })
+        .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_with_attribute(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
+        self.elements_with_attribute(name, value).len()
+    }
+
+    pub fn elements_with_data(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Vec<ElementSnapshot<'a>> {
+        self.elements_with_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn contains_data(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> bool {
+        self.contains_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn first_with_data(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Option<ElementSnapshot<'a>> {
+        self.first_with_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn count_with_data(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
+        self.count_with_attribute(prefixed_attribute_name("data-", name.as_ref()), value)
+    }
+
+    pub fn elements_with_aria(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Vec<ElementSnapshot<'a>> {
+        self.elements_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn contains_aria(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> bool {
+        self.contains_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn first_with_aria(
+        &self,
+        name: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Option<ElementSnapshot<'a>> {
+        self.first_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn count_with_aria(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
+        self.count_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
     }
 
     pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
