@@ -1964,6 +1964,31 @@ impl HtmlStylesheet {
         Ok(self)
     }
 
+    /// Finds the first parsed HTML node with the supplied id.
+    pub fn find_by_id(&self, id: &str) -> Option<&HtmlNode> {
+        self.html.find_by_id(id)
+    }
+
+    /// Returns the first parsed HTML node with the supplied id, or an explicit HTML error.
+    pub fn require_by_id(&self, id: &str) -> HtmlResult<&HtmlNode> {
+        self.html.require_by_id(id)
+    }
+
+    /// Finds the first parsed HTML node with the supplied tag name.
+    pub fn first_by_tag(&self, tag: &str) -> Option<&HtmlNode> {
+        self.html.first_by_tag(tag)
+    }
+
+    /// Returns parsed HTML nodes with the supplied tag name in document order.
+    pub fn nodes_by_tag(&self, tag: &str) -> Vec<&HtmlNode> {
+        self.html.nodes_by_tag(tag)
+    }
+
+    /// Returns parsed HTML nodes with the supplied class in document order.
+    pub fn nodes_with_class(&self, class: &str) -> Vec<&HtmlNode> {
+        self.html.nodes_with_class(class)
+    }
+
     /// Returns Rust behavior hooks declared by the parsed HTML in document order.
     pub fn behavior_hooks(&self) -> Vec<&HtmlBehaviorHook> {
         self.html.behavior_hooks()

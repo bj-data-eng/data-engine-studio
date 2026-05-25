@@ -1688,6 +1688,37 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
 
     let hooks = bundle.behavior_hooks();
     assert_eq!(hooks.len(), 3);
+    assert_eq!(
+        bundle
+            .require_by_id("panel")
+            .unwrap()
+            .first_by_tag("button")
+            .unwrap()
+            .id
+            .as_deref(),
+        Some("run")
+    );
+    assert_eq!(
+        bundle
+            .find_by_id("commit")
+            .and_then(|node| node.id.as_deref()),
+        Some("commit")
+    );
+    assert_eq!(
+        bundle
+            .first_by_tag("button")
+            .and_then(|node| node.id.as_deref()),
+        Some("run")
+    );
+    assert_eq!(bundle.nodes_by_tag("button").len(), 2);
+    assert_eq!(bundle.nodes_with_class("primary").len(), 1);
+    assert!(
+        bundle
+            .require_by_id("missing")
+            .expect_err("missing bundled nodes should return explicit HTML errors")
+            .to_string()
+            .contains("missing html node with id `missing`")
+    );
     assert!(hooks.iter().any(|hook| {
         hook.command() == "project.commit" && hook.matches_intent(ElementBehaviorEvent::KeyDown)
     }));
