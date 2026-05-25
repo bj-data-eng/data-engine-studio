@@ -34,10 +34,7 @@
 //!     }
 //!
 //!     fn push_styles(&self, stylesheet: &mut StyleSheet) {
-//!         stylesheet.push_rule(
-//!             StyleSelector::class("control"),
-//!             Style::default().size(96.0, 36.0),
-//!         );
+//!         stylesheet.push_class("control", Style::default().size(96.0, 36.0));
 //!     }
 //! }
 //!
@@ -58,9 +55,7 @@
 //! let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
 //!
 //! let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
-//! let actions = registry
-//!     .command_actions_of_kind(&output, DocumentEventKind::Clicked)
-//!     .collect::<Vec<_>>();
+//! let actions = registry.clicked_actions(&output).collect::<Vec<_>>();
 //!
 //! assert_eq!(actions.len(), 1);
 //! assert_eq!(*actions[0].action, AppAction::Run);

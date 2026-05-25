@@ -157,8 +157,9 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     let output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
     let actions = registry.command_actions(&output).collect::<Vec<_>>();
-    let clicked_actions = registry
-        .command_actions_of_kind(&output, DocumentEventKind::Clicked)
+    let clicked_actions = registry.clicked_actions(&output).collect::<Vec<_>>();
+    let run_actions = registry
+        .command_actions_for(&output, "run")
         .collect::<Vec<_>>();
     let clicked_commands = output
         .commands_of_kind(DocumentEventKind::Clicked)
@@ -171,6 +172,8 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert_eq!(*actions[0].action, AppAction::RunQuery);
     assert_eq!(clicked_actions.len(), 1);
     assert_eq!(clicked_actions[0].command, "run-query");
+    assert_eq!(run_actions.len(), 1);
+    assert_eq!(*run_actions[0].action, AppAction::RunQuery);
     assert_eq!(clicked_commands.len(), 1);
     assert_eq!(clicked_commands[0].command, "run-query");
     assert_eq!(
@@ -257,15 +260,14 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
     });
     let unknown_report = registry.dispatch(&unknown_output, |_| {});
     let mut clicked_only = Vec::new();
-    let clicked_only_report =
-        registry.dispatch_kind(&click_output, DocumentEventKind::Clicked, |command| {
-            clicked_only.push((
-                command.target.clone(),
-                command.event,
-                command.command.to_owned(),
-                *command.action,
-            ));
-        });
+    let clicked_only_report = registry.dispatch_clicked(&click_output, |command| {
+        clicked_only.push((
+            command.target.clone(),
+            command.event,
+            command.command.to_owned(),
+            *command.action,
+        ));
+    });
     let key_only_report = registry.dispatch_kind(
         &click_output,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Escape)),
@@ -803,9 +805,7 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         .widget(&widget);
     let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
-    let actions = registry
-        .command_actions_of_kind(&output, DocumentEventKind::Clicked)
-        .collect::<Vec<_>>();
+    let actions = registry.clicked_actions(&output).collect::<Vec<_>>();
     let run = output.snapshot().find("run").unwrap();
 
     assert_eq!(actions.len(), 1);

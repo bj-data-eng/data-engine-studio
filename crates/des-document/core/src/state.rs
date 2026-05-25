@@ -333,6 +333,22 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn command_actions_for<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+        target: &'a str,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions(output)
+            .filter(move |command| command.target.as_str() == target)
+    }
+
+    pub fn clicked_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_of_kind(output, DocumentEventKind::Clicked)
+    }
+
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
         &self.bindings
     }
@@ -388,6 +404,17 @@ impl<Action> DocumentCommandRegistry<Action> {
             });
         }
         report
+    }
+
+    pub fn dispatch_clicked<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_kind(output, DocumentEventKind::Clicked, handler)
     }
 }
 
