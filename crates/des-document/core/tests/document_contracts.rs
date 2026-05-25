@@ -714,7 +714,7 @@ fn document_view_compose_collects_css_and_widget_styles() {
 
     impl DocumentWidget for BadgeWidget {
         fn render(&self, ui: &mut DocumentBuilder) {
-            ui.div("badge").class("badge").text("Ready");
+            ui.div("badge").class("badge").text("Pending");
         }
 
         fn push_styles(&self, stylesheet: &mut StyleSheet) {
@@ -725,14 +725,20 @@ fn document_view_compose_collects_css_and_widget_styles() {
                     .background(Color::rgb(220, 238, 255)),
             );
         }
+
+        fn push_projection(&self, projection: &mut DocumentProjection) {
+            projection
+                .element("badge")
+                .text("Ready")
+                .data("state", "ready");
+        }
     }
 
     let widget = BadgeWidget;
     let mut view = DocumentView::compose(Size::new(320.0, 180.0))
         .css(".panel { width: 160px; height: 64px; }")
         .unwrap()
-        .widget_styles(&widget)
-        .build(|ui| {
+        .build_with_widget(&widget, |ui| {
             ui.div("panel").class("panel").children(|ui| {
                 ui.widget(&widget);
             });
@@ -744,6 +750,7 @@ fn document_view_compose_collects_css_and_widget_styles() {
 
     assert_eq!(panel.rect().size.width, 160.0);
     assert_eq!(badge.text(), Some("Ready".to_owned()));
+    assert_eq!(badge.data("state"), Some("ready"));
     assert_eq!(badge.rect().size.height, 24.0);
     assert_eq!(badge.style().background, Some(Color::rgb(220, 238, 255)));
 }

@@ -319,6 +319,36 @@ impl DocumentViewBuilder {
         view
     }
 
+    pub fn build_with_widget(
+        mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentView {
+        widget.push_styles(&mut self.stylesheet);
+        let mut view = self.build(build);
+        view.project_widget(widget)
+            .expect("document widget projection targets rendered elements");
+        view
+    }
+
+    pub fn build_with_widgets<'a, W>(
+        mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentView
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        let widgets = widgets.into_iter().collect::<Vec<_>>();
+        for widget in &widgets {
+            widget.push_styles(&mut self.stylesheet);
+        }
+        let mut view = self.build(build);
+        view.project_widgets(widgets)
+            .expect("document widget projection targets rendered elements");
+        view
+    }
+
     pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {
         DocumentView::new(Document::build(self.viewport, build), self.stylesheet)
     }

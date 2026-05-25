@@ -36,6 +36,13 @@
 //!     fn push_styles(&self, stylesheet: &mut StyleSheet) {
 //!         stylesheet.push_class("control", Style::default().size(96.0, 36.0));
 //!     }
+//!
+//!     fn push_projection(&self, projection: &mut DocumentProjection) {
+//!         projection
+//!             .element("run")
+//!             .data("state", "ready")
+//!             .add_class("is-ready");
+//!     }
 //! }
 //!
 //! let widget = RunButton;
@@ -43,14 +50,6 @@
 //!     .with_css(".primary { background: rgb(222, 238, 255); }")
 //!     .expect("valid app stylesheet")
 //!     .widget(&widget);
-//!
-//! view.project_with(|projection| {
-//!     projection
-//!         .element("run")
-//!         .data("state", "ready")
-//!         .add_class("is-ready");
-//! })
-//! .expect("projection applies to retained document state");
 //!
 //! let output = view.update_with_input(DocumentInput::primary_click(Point::new(8.0, 8.0)));
 //!
