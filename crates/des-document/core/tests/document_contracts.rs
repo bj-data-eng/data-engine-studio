@@ -2083,9 +2083,17 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
             "accent",
             Style::default().background(Color::rgb(220, 238, 255)),
         )
+        .classes(
+            ["compact", "frame"],
+            Style::default().border(Color::rgb(90, 120, 180)),
+        )
         .id(
             "title",
             Style::default().padding(Insets::symmetric(4.0, 0.0)),
+        )
+        .ids(
+            ["title", "subtitle"],
+            Style::default().height(Length::Px(20.0)),
         )
         .with_css(".panel { width: 120px; }")
         .expect("strict CSS should compose")
@@ -2100,7 +2108,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
         })
         .extended(
             StyleSheet::from_css_forgiving(
-                ".panel { unknown-property: 1px; } .title { width: 80px; height: 20px; }",
+                ".panel { unknown-property: 1px; } .title { width: 80px; }",
             )
             .expect("forgiving CSS should keep valid rules"),
         )
@@ -2116,6 +2124,11 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     mutable_stylesheet
         .style_if(true, |stylesheet| {
             stylesheet.push_class("mutable", Style::default().height(Length::Px(12.0)));
+            stylesheet.push_classes(
+                ["mutable-a", "mutable-b"],
+                Style::default().width(Length::Px(12.0)),
+            );
+            stylesheet.push_ids(["mutable-title"], Style::default().height(Length::Px(14.0)));
         })
         .extend_if(
             StyleSheet::new().class("ignored", Style::default().width(Length::Px(999.0))),
@@ -2144,7 +2157,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert_eq!(panel.style().radius, CornerRadii::all(4.0));
     assert_eq!(title.rect().size, Size::new(80.0, 20.0));
     assert_eq!(title.style().padding.left, 4.0);
-    assert_eq!(mutable_stylesheet.rule_count(), 1);
+    assert_eq!(mutable_stylesheet.rule_count(), 4);
     assert!(view.stylesheet().rule_count() >= 6);
 }
 

@@ -2072,8 +2072,26 @@ impl StyleSheet {
         self.rule(StyleSelector::class(class), style)
     }
 
+    pub fn classes<I, C>(mut self, classes: I, style: Style) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.push_classes(classes, style);
+        self
+    }
+
     pub fn id(self, id: impl Into<ElementId>, style: Style) -> Self {
         self.rule(StyleSelector::id(id), style)
+    }
+
+    pub fn ids<I, Id>(mut self, ids: I, style: Style) -> Self
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        self.push_ids(ids, style);
+        self
     }
 
     pub fn state(self, state: ElementStateSelector, style: Style) -> Self {
@@ -2192,8 +2210,28 @@ impl StyleSheet {
         self.push_rule(StyleSelector::class(class), style);
     }
 
+    pub fn push_classes<I, C>(&mut self, classes: I, style: Style)
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        for class in classes {
+            self.push_class(class, style.clone());
+        }
+    }
+
     pub fn push_id(&mut self, id: impl Into<ElementId>, style: Style) {
         self.push_rule(StyleSelector::id(id), style);
+    }
+
+    pub fn push_ids<I, Id>(&mut self, ids: I, style: Style)
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        for id in ids {
+            self.push_id(id, style.clone());
+        }
     }
 
     pub fn push_state(&mut self, state: ElementStateSelector, style: Style) {
