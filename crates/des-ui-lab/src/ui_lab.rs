@@ -563,8 +563,7 @@ impl UiLabState {
         let mut handled_commands = Vec::new();
         let command_actions = self
             .command_registry
-            .command_actions(output)
-            .filter(|command| command.event == DocumentEventKind::Clicked)
+            .command_actions_of_kind(output, DocumentEventKind::Clicked)
             .map(|command| (command.target.clone(), command.event, *command.action))
             .collect::<Vec<_>>();
         for (target, event, action) in command_actions {
@@ -572,11 +571,10 @@ impl UiLabState {
             handled_commands.push((target, event));
             changed = true;
         }
-        for command in output.command_events() {
-            if command.event == DocumentEventKind::Clicked
-                && !handled_commands
-                    .iter()
-                    .any(|(target, kind)| *kind == command.event && target == command.target)
+        for command in output.commands_of_kind(DocumentEventKind::Clicked) {
+            if !handled_commands
+                .iter()
+                .any(|(target, kind)| *kind == command.event && target == command.target)
                 && let Some(action) = lab_action_for_command(command.command)
             {
                 self.apply_triggered_lab_action(ui, action);

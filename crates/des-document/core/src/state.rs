@@ -144,6 +144,14 @@ impl DocumentOutput {
         }
     }
 
+    pub fn commands_of_kind(
+        &self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = DocumentCommandRef<'_>> {
+        self.command_events()
+            .filter(move |command| command.event == kind)
+    }
+
     pub fn selected_text(&self) -> Option<String> {
         let selection = self.text_selection.as_ref()?;
         let frame = self.layout.find(selection.target.as_str())?;
@@ -235,6 +243,22 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn command_actions_of_kind<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        output.commands_of_kind(kind).filter_map(|command| {
+            let action = self.action_for(command.command)?;
+            Some(DocumentCommandActionRef {
+                target: command.target,
+                event: command.event,
+                command: command.command,
+                action,
+            })
+        })
+    }
+
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
         &self.bindings
     }
@@ -249,6 +273,33 @@ impl<Action> DocumentCommandRegistry<Action> {
     {
         let mut report = DocumentCommandDispatchReport::default();
         for command in output.command_events() {
+            report.commands += 1;
+            let Some(action) = self.action_for(command.command) else {
+                report.unhandled += 1;
+                continue;
+            };
+            report.handled += 1;
+            handler(DocumentCommandActionRef {
+                target: command.target,
+                event: command.event,
+                command: command.command,
+                action,
+            });
+        }
+        report
+    }
+
+    pub fn dispatch_kind<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        kind: DocumentEventKind,
+        mut handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        let mut report = DocumentCommandDispatchReport::default();
+        for command in output.commands_of_kind(kind) {
             report.commands += 1;
             let Some(action) = self.action_for(command.command) else {
                 report.unhandled += 1;
