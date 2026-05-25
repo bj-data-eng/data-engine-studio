@@ -881,6 +881,26 @@ impl HtmlSet {
         Self::default()
     }
 
+    /// Returns the number of named HTML documents in the set.
+    pub fn len(&self) -> usize {
+        self.documents.len()
+    }
+
+    /// Returns true when the set contains no named HTML documents.
+    pub fn is_empty(&self) -> bool {
+        self.documents.is_empty()
+    }
+
+    /// Returns true when the set contains a document with this name.
+    pub fn contains(&self, name: &str) -> bool {
+        self.documents.contains_key(name)
+    }
+
+    /// Iterates document names in deterministic order.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.documents.keys().map(String::as_str)
+    }
+
     /// Adds or replaces an inline parsed HTML fragment.
     pub fn add_fragment(&mut self, name: impl Into<String>, source: &str) -> HtmlResult<()> {
         self.documents.insert(
@@ -908,6 +928,43 @@ impl HtmlSet {
                 column: 1,
                 message: format!("missing html document `{name}`"),
             })
+    }
+
+    /// Creates a retained document from a named HTML document.
+    pub fn to_document(&self, name: &str, viewport: Size) -> HtmlResult<Document> {
+        self.get(name)?.to_document(viewport)
+    }
+
+    /// Creates a ready-to-update document view from a named HTML document.
+    pub fn to_view(&self, name: &str, viewport: Size) -> HtmlResult<DocumentView> {
+        self.get(name)?.to_view(viewport)
+    }
+
+    /// Creates a ready-to-update document view from a named document and stylesheet.
+    pub fn to_view_with_stylesheet(
+        &self,
+        name: &str,
+        viewport: Size,
+        stylesheet: StyleSheet,
+    ) -> HtmlResult<DocumentView> {
+        self.get(name)?
+            .to_view_with_stylesheet(viewport, stylesheet)
+    }
+
+    /// Resolves a named HTML document with an empty stylesheet.
+    pub fn update(&self, name: &str, viewport: Size) -> HtmlResult<DocumentOutput> {
+        self.to_view(name, viewport).map(|mut view| view.update())
+    }
+
+    /// Resolves a named HTML document with the supplied stylesheet.
+    pub fn update_with_stylesheet(
+        &self,
+        name: &str,
+        viewport: Size,
+        stylesheet: StyleSheet,
+    ) -> HtmlResult<DocumentOutput> {
+        self.to_view_with_stylesheet(name, viewport, stylesheet)
+            .map(|mut view| view.update())
     }
 
     /// Re-reads file-backed HTML documents and returns names that changed.

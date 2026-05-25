@@ -906,6 +906,10 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("inline html should parse");
     set.add_file("file", path).expect("file html should parse");
 
+    assert_eq!(set.len(), 2);
+    assert!(!set.is_empty());
+    assert!(set.contains("inline"));
+    assert_eq!(set.names().collect::<Vec<_>>(), ["file", "inline"]);
     assert!(
         set.get("inline")
             .expect("inline document should exist")
@@ -920,6 +924,18 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .iter()
             .any(|node| node.find_by_id("file").is_some())
     );
+    let output = set
+        .update_with_stylesheet(
+            "inline",
+            Size::new(240.0, 160.0),
+            des_document::StyleSheet::parse_css("#inline { width: 120px; height: 32px; }")
+                .expect("CSS should parse"),
+        )
+        .expect("named document should resolve through the set front door");
+    let inline = output.snapshot().find("inline").unwrap();
+
+    assert_eq!(inline.text(), Some("Inline".to_owned()));
+    assert_eq!(inline.rect().size.width, 120.0);
 
     fs::write(path, "<section id=\"file\">After</section>").expect("html fixture should update");
     let changed = set.reload_changed().expect("html set should reload");
