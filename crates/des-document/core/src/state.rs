@@ -826,6 +826,24 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_on_many<I, Command>(mut self, bindings: I) -> Self
+    where
+        I: IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+        Command: Into<String>,
+    {
+        self.push_on_many(bindings);
+        self
+    }
+
+    pub fn bind_on_many_if<I, Command>(mut self, bindings: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+        Command: Into<String>,
+    {
+        self.push_on_many_if(bindings, present);
+        self
+    }
+
     pub fn bind_binding(mut self, binding: impl Into<DocumentCommandBinding<Action>>) -> Self {
         self.push_binding(binding);
         self
@@ -1086,6 +1104,28 @@ impl<Action> DocumentCommandRegistry<Action> {
     ) {
         if present {
             self.push_on(event, command, action);
+        }
+    }
+
+    pub fn push_on_many<I, Command>(&mut self, bindings: I)
+    where
+        I: IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+        Command: Into<String>,
+    {
+        self.bindings.extend(
+            bindings
+                .into_iter()
+                .map(|(event, command, action)| DocumentCommandBinding::on(event, command, action)),
+        );
+    }
+
+    pub fn push_on_many_if<I, Command>(&mut self, bindings: I, present: bool)
+    where
+        I: IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+        Command: Into<String>,
+    {
+        if present {
+            self.push_on_many(bindings);
         }
     }
 

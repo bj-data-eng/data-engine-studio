@@ -656,6 +656,7 @@ fn document_command_registry_supports_conditional_action_bindings() {
         Cancel,
         RunKey,
         CancelKey,
+        Menu,
     }
 
     let stylesheet = StyleSheet::new().id(
@@ -668,6 +669,7 @@ fn document_command_registry_supports_conditional_action_bindings() {
         ui.button("run")
             .focused(true)
             .command("run")
+            .on_context_menu("run")
             .on_key_down_if("run-key", true)
             .on_key_up_if("skip-key-up", false)
             .text("Run");
@@ -683,6 +685,14 @@ fn document_command_registry_supports_conditional_action_bindings() {
             false,
         )
         .bind_many_if([("run-batch-active", AppAction::Run)], true)
+        .bind_on_many([
+            (ElementBehaviorEvent::Click, "shared", AppAction::Run),
+            (ElementBehaviorEvent::ContextMenu, "run", AppAction::Menu),
+        ])
+        .bind_on_many_if(
+            [(ElementBehaviorEvent::Click, "ignored", AppAction::Cancel)],
+            false,
+        )
         .bind_key_down_if("run-key", AppAction::RunKey, true)
         .bind_key_down_if("cancel-key", AppAction::CancelKey, false)
         .bind_bindings_if(
@@ -697,12 +707,21 @@ fn document_command_registry_supports_conditional_action_bindings() {
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
         &registry,
     );
+    let context_frame = view.update_with_input_actions(
+        DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+        &registry,
+    );
     let key_frame =
         view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter), &registry);
 
-    assert_eq!(registry.bindings().len(), 3);
+    assert_eq!(registry.bindings().len(), 5);
     assert!(click_frame.contains_action(&AppAction::Run));
     assert!(!click_frame.contains_action(&AppAction::Cancel));
+    assert!(context_frame.contains_action_for_target_intent(
+        "run",
+        ElementBehaviorEvent::ContextMenu,
+        &AppAction::Menu
+    ));
     assert!(key_frame.contains_action(&AppAction::RunKey));
     assert!(!key_frame.contains_action(&AppAction::CancelKey));
 
@@ -710,6 +729,18 @@ fn document_command_registry_supports_conditional_action_bindings() {
     pushed.push_click_if("run", AppAction::Run, true);
     pushed.push_click_if("cancel", AppAction::Cancel, false);
     pushed.push_many_if([("ignored", AppAction::Cancel)], false);
+    pushed.push_on_many([
+        (ElementBehaviorEvent::Click, "shared", AppAction::Run),
+        (ElementBehaviorEvent::ContextMenu, "run", AppAction::Menu),
+    ]);
+    pushed.push_on_many_if(
+        [(
+            ElementBehaviorEvent::PointerEnter,
+            "ignored",
+            AppAction::Cancel,
+        )],
+        false,
+    );
     pushed.push_bindings_if(
         [DocumentCommandBinding::context_menu(
             "run-menu",
@@ -719,7 +750,7 @@ fn document_command_registry_supports_conditional_action_bindings() {
     );
     pushed.push_key_up_if("cancel-key", AppAction::CancelKey, false);
 
-    assert_eq!(pushed.bindings().len(), 2);
+    assert_eq!(pushed.bindings().len(), 4);
     assert_eq!(
         pushed.bindings()[0].event,
         Some(ElementBehaviorEvent::Click)
@@ -728,9 +759,21 @@ fn document_command_registry_supports_conditional_action_bindings() {
     assert_eq!(pushed.bindings()[0].action, AppAction::Run);
     assert_eq!(
         pushed.bindings()[1].event,
+        Some(ElementBehaviorEvent::Click)
+    );
+    assert_eq!(pushed.bindings()[1].command, "shared");
+    assert_eq!(pushed.bindings()[1].action, AppAction::Run);
+    assert_eq!(
+        pushed.bindings()[2].event,
         Some(ElementBehaviorEvent::ContextMenu)
     );
-    assert_eq!(pushed.bindings()[1].command, "run-menu");
+    assert_eq!(pushed.bindings()[2].command, "run");
+    assert_eq!(pushed.bindings()[2].action, AppAction::Menu);
+    assert_eq!(
+        pushed.bindings()[3].event,
+        Some(ElementBehaviorEvent::ContextMenu)
+    );
+    assert_eq!(pushed.bindings()[3].command, "run-menu");
     assert_eq!(pushed.action_for("cancel"), None);
 }
 
