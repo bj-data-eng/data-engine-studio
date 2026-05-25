@@ -6,8 +6,9 @@
 //! JavaScript and does not embed template logic in HTML.
 
 use des_document::{
-    Document, DocumentBuilder, DocumentView, Element, ElementBehaviorHook, ElementSpec, Size,
-    StyleSheet, TextContent,
+    Document, DocumentActionFrame, DocumentBuilder, DocumentCommandRegistry, DocumentInput,
+    DocumentOutput, DocumentView, Element, ElementBehaviorHook, ElementSpec, Size, StyleSheet,
+    TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -293,6 +294,47 @@ impl HtmlStylesheet {
             self.stylesheet,
         ))
     }
+
+    /// Creates a view, resolves the document, and returns the first output frame.
+    pub fn update(&self, viewport: Size) -> HtmlResult<DocumentOutput> {
+        Ok(self.to_view(viewport)?.update())
+    }
+
+    /// Creates a view, resolves the document, and collects typed Rust actions.
+    pub fn update_actions<Action>(
+        &self,
+        viewport: Size,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        Ok(self.to_view(viewport)?.update_actions(registry))
+    }
+
+    /// Creates a view, routes input, and returns the resolved output frame.
+    pub fn update_with_input(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+    ) -> HtmlResult<DocumentOutput> {
+        Ok(self.to_view(viewport)?.update_with_input(input))
+    }
+
+    /// Creates a view, routes input, and collects typed Rust actions.
+    pub fn update_with_input_actions<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        Ok(self
+            .to_view(viewport)?
+            .update_with_input_actions(input, registry))
+    }
 }
 
 /// A parsed HTML element or text node.
@@ -360,6 +402,9 @@ impl HtmlNode {
         );
         if let Some(value) = self.attributes.get("value") {
             spec = spec.value(value.clone());
+        }
+        if self.attributes.contains_key("autofocus") {
+            spec = spec.focused(true);
         }
         if !self.behavior_hooks.is_empty()
             || self.attributes.contains_key("data-command")

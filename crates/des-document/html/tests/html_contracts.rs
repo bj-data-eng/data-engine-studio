@@ -436,6 +436,81 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
 }
 
 #[test]
+fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+        Filter,
+    }
+
+    let bundle = HtmlStylesheet::parse_fragment(
+        r#"
+        <section id="panel" class="card">
+          <button id="run" class="primary" data-command="project.run">Run</button>
+          <input id="filter" value="active" autofocus on:keydown="project.filter">
+        </section>
+        "#,
+        r#"
+        .card { width: 220px; height: 96px; }
+        .primary { width: 96px; height: 32px; }
+        "#,
+    )
+    .expect("HTML and CSS should compile together");
+    let registry = DocumentCommandRegistry::new()
+        .bind("project.run", HtmlAction::Run)
+        .bind_on(
+            des_document::ElementBehaviorEvent::KeyDown,
+            "project.filter",
+            HtmlAction::Filter,
+        );
+
+    let output = bundle
+        .update(Size::new(320.0, 180.0))
+        .expect("HTML bundle should resolve directly");
+    let click_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+        )
+        .expect("HTML bundle should collect click actions directly");
+    let key_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(des_document::DocumentKey::Enter),
+            &registry,
+        )
+        .expect("HTML bundle should collect keyboard actions directly");
+
+    assert_eq!(
+        output.snapshot().find("panel").unwrap().rect().size.width,
+        220.0
+    );
+    assert!(click_frame.contains_action(&HtmlAction::Run));
+    assert!(key_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(
+        click_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        96.0
+    );
+    assert_eq!(
+        key_frame
+            .output()
+            .snapshot()
+            .find("filter")
+            .unwrap()
+            .value(),
+        Some("active")
+    );
+}
+
+#[test]
 fn html_prelude_exposes_browser_document_authoring_surface() {
     use des_html::prelude::*;
 
