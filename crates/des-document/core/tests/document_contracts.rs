@@ -198,6 +198,55 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
 }
 
 #[test]
+fn document_command_registry_can_scope_actions_by_authored_event_intent() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        CommitByClick,
+        CommitByKeyboard,
+        Fallback,
+    }
+
+    let stylesheet = StyleSheet::new().id(
+        "commit",
+        Style::default()
+            .width(Length::Px(120.0))
+            .height(Length::Px(36.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("commit")
+            .focused(true)
+            .on_click("commit")
+            .on_key_down("commit")
+            .text("Commit");
+    });
+    let registry = DocumentCommandRegistry::new()
+        .bind("commit", AppAction::Fallback)
+        .bind_click("commit", AppAction::CommitByClick)
+        .bind_on(
+            ElementBehaviorEvent::KeyDown,
+            "commit",
+            AppAction::CommitByKeyboard,
+        );
+
+    let click_output =
+        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
+    let click_actions = registry.command_actions(&click_output).collect::<Vec<_>>();
+    let key_actions = registry.command_actions(&key_output).collect::<Vec<_>>();
+
+    assert_eq!(registry.action_for("commit"), Some(&AppAction::Fallback));
+    assert_eq!(click_actions.len(), 1);
+    assert_eq!(*click_actions[0].action, AppAction::CommitByClick);
+    assert_eq!(click_actions[0].event, DocumentEventKind::Clicked);
+    assert_eq!(key_actions.len(), 1);
+    assert_eq!(*key_actions[0].action, AppAction::CommitByKeyboard);
+    assert_eq!(
+        key_actions[0].event,
+        DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter))
+    );
+}
+
+#[test]
 fn document_command_registry_dispatches_typed_actions_with_context() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum AppAction {

@@ -1,4 +1,6 @@
-use crate::element::{ClassName, Color, Element, ElementBehaviorHook, ElementId, Glyph};
+use crate::element::{
+    ClassName, Color, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, Glyph,
+};
 use crate::geometry::{ClipRect, Point, Rect, ScrollAxis, Size};
 use crate::query::DocumentSnapshot;
 use crate::style::{
@@ -232,6 +234,7 @@ pub struct DocumentCommandRef<'a> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocumentCommandBinding<Action> {
+    pub event: Option<ElementBehaviorEvent>,
     pub command: String,
     pub action: Action,
 }
@@ -239,9 +242,29 @@ pub struct DocumentCommandBinding<Action> {
 impl<Action> DocumentCommandBinding<Action> {
     pub fn new(command: impl Into<String>, action: Action) -> Self {
         Self {
+            event: None,
             command: command.into(),
             action,
         }
+    }
+
+    pub fn on(event: ElementBehaviorEvent, command: impl Into<String>, action: Action) -> Self {
+        Self {
+            event: Some(event),
+            command: command.into(),
+            action,
+        }
+    }
+
+    pub fn click(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::Click, command, action)
+    }
+
+    fn matches(&self, command: DocumentCommandRef<'_>) -> bool {
+        self.command == command.command.trim()
+            && self
+                .event
+                .is_none_or(|event| event.matches_document_event(&command.event))
     }
 }
 
@@ -268,6 +291,21 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_on(
+        mut self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        action: Action,
+    ) -> Self {
+        self.push_on(event, command, action);
+        self
+    }
+
+    pub fn bind_click(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_click(command, action);
+        self
+    }
+
     pub fn bind_many<I, Command>(mut self, bindings: I) -> Self
     where
         I: IntoIterator<Item = (Command, Action)>,
@@ -280,6 +318,21 @@ impl<Action> DocumentCommandRegistry<Action> {
     pub fn push(&mut self, command: impl Into<String>, action: Action) {
         self.bindings
             .push(DocumentCommandBinding::new(command, action));
+    }
+
+    pub fn push_on(
+        &mut self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        action: Action,
+    ) {
+        self.bindings
+            .push(DocumentCommandBinding::on(event, command, action));
+    }
+
+    pub fn push_click(&mut self, command: impl Into<String>, action: Action) {
+        self.bindings
+            .push(DocumentCommandBinding::click(command, action));
     }
 
     pub fn push_many<I, Command>(&mut self, bindings: I)
@@ -298,7 +351,19 @@ impl<Action> DocumentCommandRegistry<Action> {
         let command = command.trim();
         self.bindings
             .iter()
-            .find(|binding| binding.command == command)
+            .find(|binding| binding.event.is_none() && binding.command == command)
+            .map(|binding| &binding.action)
+    }
+
+    pub fn action_for_event(&self, command: DocumentCommandRef<'_>) -> Option<&Action> {
+        self.bindings
+            .iter()
+            .find(|binding| binding.event.is_some() && binding.matches(command))
+            .or_else(|| {
+                self.bindings
+                    .iter()
+                    .find(|binding| binding.event.is_none() && binding.matches(command))
+            })
             .map(|binding| &binding.action)
     }
 
@@ -307,7 +372,7 @@ impl<Action> DocumentCommandRegistry<Action> {
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         output.command_events().filter_map(|command| {
-            let action = self.action_for(command.command)?;
+            let action = self.action_for_event(command)?;
             Some(DocumentCommandActionRef {
                 target: command.target,
                 event: command.event,
@@ -323,7 +388,7 @@ impl<Action> DocumentCommandRegistry<Action> {
         kind: DocumentEventKind,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         output.commands_of_kind(kind).filter_map(|command| {
-            let action = self.action_for(command.command)?;
+            let action = self.action_for_event(command)?;
             Some(DocumentCommandActionRef {
                 target: command.target,
                 event: command.event,
@@ -364,7 +429,7 @@ impl<Action> DocumentCommandRegistry<Action> {
         let mut report = DocumentCommandDispatchReport::default();
         for command in output.command_events() {
             report.commands += 1;
-            let Some(action) = self.action_for(command.command) else {
+            let Some(action) = self.action_for_event(command) else {
                 report.unhandled += 1;
                 continue;
             };
@@ -391,7 +456,7 @@ impl<Action> DocumentCommandRegistry<Action> {
         let mut report = DocumentCommandDispatchReport::default();
         for command in output.commands_of_kind(kind) {
             report.commands += 1;
-            let Some(action) = self.action_for(command.command) else {
+            let Some(action) = self.action_for_event(command) else {
                 report.unhandled += 1;
                 continue;
             };
