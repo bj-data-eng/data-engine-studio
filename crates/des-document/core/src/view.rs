@@ -109,6 +109,28 @@ impl DocumentView {
         self.project_and_update(&projection)
     }
 
+    /// Applies a projection, routes input, and resolves the updated document.
+    pub fn project_and_update_with_input(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let report = self.project(projection)?;
+        let output = self.update_with_input(input);
+        Ok((report, output))
+    }
+
+    /// Builds a projection, applies it, routes input, and resolves the document.
+    pub fn project_with_and_update_with_input(
+        &mut self,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project_and_update_with_input(&projection, input)
+    }
+
     /// Applies app-state projections declared by a reusable document widget.
     pub fn project_widget(
         &mut self,
@@ -152,6 +174,31 @@ impl DocumentView {
     {
         let report = self.project_widgets(widgets)?;
         let output = self.update();
+        Ok((report, output))
+    }
+
+    /// Applies a widget projection, routes input, and resolves the document.
+    pub fn project_widget_and_update_with_input(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let report = self.project_widget(widget)?;
+        let output = self.update_with_input(input);
+        Ok((report, output))
+    }
+
+    /// Applies widget projections, routes input, and resolves the document.
+    pub fn project_widgets_and_update_with_input<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        let report = self.project_widgets(widgets)?;
+        let output = self.update_with_input(input);
         Ok((report, output))
     }
 

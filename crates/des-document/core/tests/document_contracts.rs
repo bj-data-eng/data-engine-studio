@@ -742,6 +742,24 @@ fn document_view_projects_state_and_updates_in_one_fluent_call() {
     assert!(!summary.focused());
     assert!(!summary.disabled());
     assert_eq!(summary.style().background, Some(Color::rgb(208, 236, 255)));
+
+    let (report, output) = view
+        .project_with_and_update_with_input(
+            pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0),
+            |projection| {
+                projection
+                    .element("summary")
+                    .data("refresh", "clicked")
+                    .select();
+            },
+        )
+        .unwrap();
+    let summary = output.snapshot().find("summary").unwrap();
+
+    assert_eq!(report.operations, 2);
+    assert_eq!(report.changed, 2);
+    assert_eq!(summary.data("refresh"), Some("clicked"));
+    assert!(summary.selected());
 }
 
 #[test]
@@ -920,8 +938,12 @@ fn document_widgets_can_project_retained_state_through_the_view_front_door() {
     assert!(status.has_class("is-ready"));
     assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
 
-    let output =
-        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let (_, output) = view
+        .project_widget_and_update_with_input(
+            &ready,
+            pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0),
+        )
+        .unwrap();
     assert!(output.has_command("status", "status.toggle"));
 }
 
