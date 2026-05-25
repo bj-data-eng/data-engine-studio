@@ -354,14 +354,41 @@ impl HtmlDocument {
         HtmlStylesheet::new(self, stylesheet)
     }
 
+    /// Conditionally pairs this parsed HTML tree with typed stylesheet rules.
+    pub fn with_stylesheet_if(self, stylesheet: StyleSheet, present: bool) -> HtmlStylesheet {
+        if present {
+            self.with_stylesheet(stylesheet)
+        } else {
+            self.with_stylesheet(StyleSheet::new())
+        }
+    }
+
     /// Parses CSS and pairs it with this parsed HTML tree.
     pub fn with_css(self, css: &str) -> HtmlResult<HtmlStylesheet> {
         Ok(self.with_stylesheet(parse_stylesheet(css)?))
     }
 
+    /// Conditionally parses CSS and pairs it with this parsed HTML tree.
+    pub fn with_css_if(self, present: bool, css: &str) -> HtmlResult<HtmlStylesheet> {
+        if present {
+            self.with_css(css)
+        } else {
+            Ok(self.with_stylesheet(StyleSheet::new()))
+        }
+    }
+
     /// Parses CSS with browser-like error recovery and pairs it with this HTML tree.
     pub fn with_css_forgiving(self, css: &str) -> HtmlResult<HtmlStylesheet> {
         Ok(self.with_stylesheet(parse_stylesheet_forgiving(css)?))
+    }
+
+    /// Conditionally parses forgiving CSS and pairs it with this HTML tree.
+    pub fn with_css_forgiving_if(self, present: bool, css: &str) -> HtmlResult<HtmlStylesheet> {
+        if present {
+            self.with_css_forgiving(css)
+        } else {
+            Ok(self.with_stylesheet(StyleSheet::new()))
+        }
     }
 
     /// Creates a ready-to-update document view from this HTML tree and stylesheet.
@@ -373,9 +400,37 @@ impl HtmlDocument {
         Ok(DocumentView::new(self.to_document(viewport)?, stylesheet))
     }
 
+    /// Conditionally creates a view with typed stylesheet rules.
+    pub fn to_view_with_stylesheet_if(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        present: bool,
+    ) -> HtmlResult<DocumentView> {
+        if present {
+            self.to_view_with_stylesheet(viewport, stylesheet)
+        } else {
+            self.to_view(viewport)
+        }
+    }
+
     /// Parses CSS and creates a ready-to-update document view from this HTML tree.
     pub fn to_view_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentView> {
         self.to_view_with_stylesheet(viewport, parse_stylesheet(css)?)
+    }
+
+    /// Conditionally parses CSS and creates a ready-to-update document view.
+    pub fn to_view_with_css_if(
+        &self,
+        viewport: Size,
+        present: bool,
+        css: &str,
+    ) -> HtmlResult<DocumentView> {
+        if present {
+            self.to_view_with_css(viewport, css)
+        } else {
+            self.to_view(viewport)
+        }
     }
 
     /// Parses CSS with browser-like error recovery and creates a document view.
@@ -385,6 +440,20 @@ impl HtmlDocument {
         css: &str,
     ) -> HtmlResult<DocumentView> {
         self.to_view_with_stylesheet(viewport, parse_stylesheet_forgiving(css)?)
+    }
+
+    /// Conditionally parses forgiving CSS and creates a ready-to-update document view.
+    pub fn to_view_with_css_forgiving_if(
+        &self,
+        viewport: Size,
+        present: bool,
+        css: &str,
+    ) -> HtmlResult<DocumentView> {
+        if present {
+            self.to_view_with_css_forgiving(viewport, css)
+        } else {
+            self.to_view(viewport)
+        }
     }
 
     /// Creates an action surface from this HTML tree and typed Rust commands.

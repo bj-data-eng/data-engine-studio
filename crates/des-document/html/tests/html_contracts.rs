@@ -1,6 +1,7 @@
 use des_document::{
     DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentInput,
-    DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Point, Size,
+    DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Length, Point, Size,
+    Style, StyleSheet,
 };
 use des_html::{
     HtmlBehaviorHook, HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet,
@@ -435,19 +436,79 @@ fn html_document_can_pair_with_css_without_manual_bundle_plumbing() {
         .clone()
         .with_css(r#".card { width: 144px; height: 48px; }"#)
         .expect("CSS should parse onto HTML");
+    let typed_bundle = html.clone().with_stylesheet_if(
+        StyleSheet::new().class("card", Style::default().radius(4.0)),
+        true,
+    );
+    let skipped_typed_bundle = html.clone().with_stylesheet_if(
+        StyleSheet::new().class("skipped", Style::default().radius(99.0)),
+        false,
+    );
+    let conditional_bundle = html
+        .clone()
+        .with_css_if(true, r#".card { padding: 2px; }"#)
+        .expect("conditional CSS should parse onto HTML");
+    let skipped_conditional_bundle = html
+        .clone()
+        .with_css_if(false, r#".card { width: ; }"#)
+        .expect("skipped conditional CSS should not parse");
+    let forgiving_bundle = html
+        .clone()
+        .with_css_forgiving_if(
+            true,
+            r#".card { unknown-property: 1px; } .card { margin: 1px; }"#,
+        )
+        .expect("conditional forgiving CSS should parse onto HTML");
+    let skipped_forgiving_bundle = html
+        .clone()
+        .with_css_forgiving_if(false, "/* unclosed")
+        .expect("skipped forgiving CSS should not parse");
     let mut view = html
         .to_view_with_css(
             Size::new(240.0, 160.0),
             r#".card { width: 120px; height: 40px; }"#,
         )
         .expect("HTML and CSS should compose directly into a view");
+    let mut typed_view = html
+        .to_view_with_stylesheet_if(
+            Size::new(240.0, 160.0),
+            StyleSheet::new().class("card", Style::default().height(Length::Px(36.0))),
+            true,
+        )
+        .expect("conditional typed stylesheet should compose directly into a view");
+    let mut skipped_view = html
+        .to_view_with_css_if(Size::new(240.0, 160.0), false, r#".card { width: ; }"#)
+        .expect("skipped view CSS should not parse");
+    let mut forgiving_view = html
+        .to_view_with_css_forgiving_if(
+            Size::new(240.0, 160.0),
+            true,
+            r#".card { unknown-property: 1px; } .card { width: 132px; }"#,
+        )
+        .expect("conditional forgiving view CSS should compose");
 
     let output = view.update();
+    let typed_output = typed_view.update();
+    let skipped_output = skipped_view.update();
+    let forgiving_output = forgiving_view.update();
     let panel = output.snapshot().find("panel").unwrap();
+    let typed_panel = typed_output.snapshot().find("panel").unwrap();
+    let skipped_panel = skipped_output.snapshot().find("panel").unwrap();
+    let forgiving_panel = forgiving_output.snapshot().find("panel").unwrap();
 
     assert_eq!(bundle.stylesheet.rule_count(), 1);
+    assert_eq!(typed_bundle.stylesheet().rule_count(), 1);
+    assert_eq!(skipped_typed_bundle.stylesheet().rule_count(), 0);
+    assert_eq!(conditional_bundle.stylesheet().rule_count(), 1);
+    assert_eq!(skipped_conditional_bundle.stylesheet().rule_count(), 0);
+    assert!(forgiving_bundle.stylesheet().rule_count() >= 1);
+    assert!(forgiving_bundle.stylesheet().has_rule_for_class("card"));
+    assert_eq!(skipped_forgiving_bundle.stylesheet().rule_count(), 0);
     assert_eq!(panel.rect().size.width, 120.0);
     assert_eq!(panel.rect().size.height, 40.0);
+    assert_eq!(typed_panel.rect().size.height, 36.0);
+    assert_eq!(skipped_panel.element(), Element::Section);
+    assert_eq!(forgiving_panel.rect().size.width, 132.0);
 }
 
 #[test]
