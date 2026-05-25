@@ -2904,6 +2904,11 @@ impl<'a> ElementBuilder<'a> {
         self
     }
 
+    pub fn enable_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.enable_if(present);
+        self
+    }
+
     pub fn focused(mut self, focused: bool) -> Self {
         self.spec.focused = focused;
         self
@@ -2921,6 +2926,11 @@ impl<'a> ElementBuilder<'a> {
 
     pub fn focus_if(mut self, present: bool) -> Self {
         self.spec = self.spec.focus_if(present);
+        self
+    }
+
+    pub fn blur_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.blur_if(present);
         self
     }
 

@@ -5752,7 +5752,9 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .enabled_if(true, show_badge)
             .enabled_if(false, false)
             .disable_if(disabled)
+            .enable_if(show_badge)
             .focus_if(focused)
+            .blur_if(false)
             .value_if("ready", show_badge)
             .text("Run");
         ui.p("description")
@@ -5898,7 +5900,9 @@ fn document_builder_supports_conditional_authoring_helpers() {
         .enabled(true)
         .enabled_if(false, false)
         .disable_if(false)
+        .enable_if(true)
         .focus_if(true)
+        .blur_if(false)
         .selectable_text_if(true)
         .copyable_text_if(false, false)
         .value_if("demo", true);

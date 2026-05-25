@@ -572,6 +572,10 @@ impl ElementSpec {
         if present { self.disable() } else { self }
     }
 
+    pub fn enable_if(self, present: bool) -> Self {
+        if present { self.enable() } else { self }
+    }
+
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
         self
@@ -587,6 +591,10 @@ impl ElementSpec {
 
     pub fn focus_if(self, present: bool) -> Self {
         if present { self.focus() } else { self }
+    }
+
+    pub fn blur_if(self, present: bool) -> Self {
+        if present { self.blur() } else { self }
     }
 
     pub fn selectable_text(mut self) -> Self {
