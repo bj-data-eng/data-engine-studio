@@ -2,7 +2,7 @@ use crate::element::{
     ClassName, Color, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, Glyph,
 };
 use crate::geometry::{ClipRect, Point, Rect, ScrollAxis, Size};
-use crate::query::DocumentSnapshot;
+use crate::query::{DocumentSnapshot, ElementSnapshot};
 use crate::style::{
     ComputedStyle, FloatingHideData, FloatingPlacement, FloatingVisibility, Transition,
 };
@@ -108,6 +108,31 @@ impl DocumentOutput {
         self.hit_id
             .as_ref()
             .and_then(|id| self.snapshot().find(id.as_str()))
+    }
+
+    pub fn focused_elements(&self) -> Vec<ElementSnapshot<'_>> {
+        self.snapshot().focused_elements()
+    }
+
+    pub fn first_focused(&self) -> Option<ElementSnapshot<'_>> {
+        self.snapshot().first_focused()
+    }
+
+    pub fn focused_target(&self) -> Option<&ElementId> {
+        focused_element(&self.layout).map(|element| &element.id)
+    }
+
+    pub fn focused_target_is(&self, target: &str) -> bool {
+        self.first_focused()
+            .is_some_and(|element| element.id_is(target))
+    }
+
+    pub fn contains_focused(&self) -> bool {
+        self.first_focused().is_some()
+    }
+
+    pub fn count_focused(&self) -> usize {
+        self.focused_elements().len()
     }
 
     pub fn first_event(&self) -> Option<&DocumentEvent> {
@@ -549,6 +574,13 @@ impl DocumentOutput {
         }
         self.selected_text()
     }
+}
+
+fn focused_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
+    if element.focused {
+        return Some(element);
+    }
+    element.children.iter().find_map(focused_element)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

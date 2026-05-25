@@ -299,6 +299,28 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
     let key_down_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
     let key_up_output = view.update_with_input(DocumentInput::key_up(DocumentKey::Enter));
 
+    assert!(context_output.contains_focused());
+    assert_eq!(context_output.count_focused(), 1);
+    assert_eq!(
+        context_output.focused_target().map(ElementId::as_str),
+        Some("search")
+    );
+    assert!(context_output.focused_target_is("search"));
+    assert!(!context_output.focused_target_is("menu"));
+    assert_eq!(
+        context_output
+            .first_focused()
+            .map(|element| element.id().as_str().to_owned()),
+        Some("search".to_owned())
+    );
+    assert_eq!(
+        context_output
+            .focused_elements()
+            .into_iter()
+            .map(|element| element.id().as_str().to_owned())
+            .collect::<Vec<_>>(),
+        vec!["search"]
+    );
     assert_eq!(
         context_output
             .context_requested_targets()
