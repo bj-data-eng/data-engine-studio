@@ -1067,6 +1067,8 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     enum AppAction {
         Run,
         Inspect,
+        Menu,
+        Hidden,
     }
 
     struct FixedTextMeasurer;
@@ -1083,7 +1085,8 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
 
     let stylesheet = StyleSheet::new()
         .id("run", Style::default().height(Length::Px(32.0)))
-        .id("inspect", Style::default().size(96.0, 32.0));
+        .id("inspect", Style::default().size(96.0, 32.0))
+        .id("menu", Style::default().size(96.0, 32.0));
     let view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run")
             .class("run-action")
@@ -1093,16 +1096,38 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
             .class("inspect-action")
             .on_pointer_enter("inspect")
             .text("Inspect");
+        ui.button("menu")
+            .class("menu-action")
+            .on_context_menu("menu.open")
+            .text("Menu");
     });
-    let mut surface = view.action_surface_with(|commands| {
-        commands.push_click("run", AppAction::Run);
-    });
+    let mut surface = view
+        .action_surface(DocumentCommandRegistry::new())
+        .bind("run", AppAction::Run)
+        .bind_on(
+            ElementBehaviorEvent::PointerEnter,
+            "inspect",
+            AppAction::Inspect,
+        )
+        .bind_if("hidden", AppAction::Hidden, false)
+        .bind_many([("unused", AppAction::Hidden)])
+        .bind_many_if([("skipped", AppAction::Hidden)], false)
+        .bind_on_many([(
+            ElementBehaviorEvent::ContextMenu,
+            "menu.open",
+            AppAction::Menu,
+        )])
+        .bind_on_many_if(
+            [(
+                ElementBehaviorEvent::Click,
+                "skipped-click",
+                AppAction::Hidden,
+            )],
+            false,
+        );
 
-    assert_eq!(surface.commands().bindings().len(), 1);
+    assert_eq!(surface.commands().bindings().len(), 4);
 
-    surface = surface.with_commands(|commands| {
-        commands.push_pointer_enter("inspect", AppAction::Inspect);
-    });
     surface = surface
         .with_css(".run-action { background: rgb(220, 238, 255); }")
         .expect("strict CSS should extend a configured action surface")
@@ -1122,6 +1147,8 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         surface.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 40.0)));
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let context_frame =
+        surface.update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 72.0)));
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = surface.update_with_input_and_dispatch(
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -1136,10 +1163,14 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
             |action| dispatched_values.push(action.clone()),
         );
 
-    assert_eq!(surface.commands().bindings().len(), 2);
+    assert_eq!(surface.commands().bindings().len(), 4);
     assert!(surface.stylesheet().has_rule_for_class("run-action"));
     assert!(hover_frame.contains_action(&AppAction::Inspect));
     assert!(click_frame.contains_action(&AppAction::Run));
+    assert!(
+        context_frame
+            .contains_action_for_intent(ElementBehaviorEvent::ContextMenu, &AppAction::Menu)
+    );
     assert!(dispatch_frame.contains_clicked_action(&AppAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![AppAction::Run]);

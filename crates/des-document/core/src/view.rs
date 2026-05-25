@@ -891,6 +891,91 @@ impl<Action> DocumentActionSurface<Action> {
         self
     }
 
+    /// Adds one command binding and returns the surface.
+    pub fn bind(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.commands.push(command, action);
+        self
+    }
+
+    /// Conditionally adds one command binding and returns the surface.
+    pub fn bind_if(mut self, command: impl Into<String>, action: Action, present: bool) -> Self {
+        self.commands.push_if(command, action, present);
+        self
+    }
+
+    /// Adds one intent-scoped command binding and returns the surface.
+    pub fn bind_on(
+        mut self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        action: Action,
+    ) -> Self {
+        self.commands.push_on(event, command, action);
+        self
+    }
+
+    /// Conditionally adds one intent-scoped command binding and returns the surface.
+    pub fn bind_on_if(
+        mut self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.commands.push_on_if(event, command, action, present);
+        self
+    }
+
+    /// Adds command bindings and returns the surface.
+    pub fn bind_many<Command>(
+        mut self,
+        bindings: impl IntoIterator<Item = (Command, Action)>,
+    ) -> Self
+    where
+        Command: Into<String>,
+    {
+        self.commands.push_many(bindings);
+        self
+    }
+
+    /// Conditionally adds command bindings and returns the surface.
+    pub fn bind_many_if<Command>(
+        mut self,
+        bindings: impl IntoIterator<Item = (Command, Action)>,
+        present: bool,
+    ) -> Self
+    where
+        Command: Into<String>,
+    {
+        self.commands.push_many_if(bindings, present);
+        self
+    }
+
+    /// Adds intent-scoped command bindings and returns the surface.
+    pub fn bind_on_many<Command>(
+        mut self,
+        bindings: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> Self
+    where
+        Command: Into<String>,
+    {
+        self.commands.push_on_many(bindings);
+        self
+    }
+
+    /// Conditionally adds intent-scoped command bindings and returns the surface.
+    pub fn bind_on_many_if<Command>(
+        mut self,
+        bindings: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+        present: bool,
+    ) -> Self
+    where
+        Command: Into<String>,
+    {
+        self.commands.push_on_many_if(bindings, present);
+        self
+    }
+
     /// Adds command bindings declared by a reusable action widget.
     pub fn bind_widget(mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) -> Self {
         self.push_widget_commands(widget);
