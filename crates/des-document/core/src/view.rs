@@ -203,6 +203,25 @@ impl<Action> DocumentActionSurface<Action> {
         self.view.project_with(project)
     }
 
+    /// Applies app-state projections declared by a reusable document widget.
+    pub fn project_widget(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<DocumentProjectionReport> {
+        self.view.project_widget(widget)
+    }
+
+    /// Applies app-state projections declared by a collection of widgets.
+    pub fn project_widgets<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<DocumentProjectionReport>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.view.project_widgets(widgets)
+    }
+
     /// Applies a projection, resolves the view, and collects typed app actions.
     pub fn project_and_update_actions(
         &mut self,
@@ -225,6 +244,31 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .project_with_and_update_actions(project, &self.commands)
+    }
+
+    /// Applies a widget projection, resolves the view, and collects typed app actions.
+    pub fn project_widget_and_update_actions(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_widget_and_update_actions(widget, &self.commands)
+    }
+
+    /// Applies widget projections, resolves the view, and collects typed app actions.
+    pub fn project_widgets_and_update_actions<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+    {
+        self.view
+            .project_widgets_and_update_actions(widgets, &self.commands)
     }
 
     /// Applies a projection, routes input, and collects typed app actions.
@@ -251,6 +295,33 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .project_with_and_update_with_input_actions(input, project, &self.commands)
+    }
+
+    /// Applies a widget projection, routes input, and collects typed app actions.
+    pub fn project_widget_and_update_with_input_actions(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_widget_and_update_with_input_actions(widget, input, &self.commands)
+    }
+
+    /// Applies widget projections, routes input, and collects typed app actions.
+    pub fn project_widgets_and_update_with_input_actions<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+    {
+        self.view
+            .project_widgets_and_update_with_input_actions(widgets, input, &self.commands)
     }
 
     /// Resolves the view and collects typed app actions with the paired registry.

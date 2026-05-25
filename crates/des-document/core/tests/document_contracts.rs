@@ -1902,6 +1902,12 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
         }
     }
 
+    impl DocumentActionWidget<AppAction> for StatusWidget {
+        fn push_commands(&self, registry: &mut DocumentCommandRegistry<AppAction>) {
+            registry.push_click("status.toggle", AppAction::Toggle);
+        }
+    }
+
     let registry = DocumentCommandRegistry::new()
         .bind("refresh", AppAction::Refresh)
         .bind("status.toggle", AppAction::Toggle);
@@ -1947,6 +1953,22 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(status.text(), Some("Ready".to_owned()));
     assert!(status.has_class("is-ready"));
     assert!(widget_frame.contains_action(&AppAction::Toggle));
+
+    let mut widget_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .action_widget(&StatusWidget { ready: false });
+    let (surface_report, surface_frame) = widget_surface
+        .project_widget_and_update_with_input_actions(
+            &StatusWidget { ready: true },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        )
+        .unwrap();
+    let surface_status = surface_frame.output().snapshot().find("status").unwrap();
+
+    assert_eq!(surface_report.operations, 2);
+    assert_eq!(surface_report.changed, 2);
+    assert_eq!(surface_status.text(), Some("Ready".to_owned()));
+    assert!(surface_status.has_class("is-ready"));
+    assert!(surface_frame.contains_action(&AppAction::Toggle));
 }
 
 #[test]
