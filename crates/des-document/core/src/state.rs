@@ -1276,6 +1276,20 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::Click)
     }
 
+    pub fn pointer_enter_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::PointerEnter)
+    }
+
+    pub fn pointer_leave_actions<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        self.command_actions_for_intent(output, ElementBehaviorEvent::PointerLeave)
+    }
+
     pub fn collect_clicked_actions(
         &self,
         output: &DocumentOutput,
@@ -1284,6 +1298,30 @@ impl<Action> DocumentCommandRegistry<Action> {
         Action: Clone,
     {
         self.clicked_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_pointer_enter_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.pointer_enter_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
+    pub fn collect_pointer_leave_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.pointer_leave_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
     }
@@ -1381,6 +1419,28 @@ impl<Action> DocumentCommandRegistry<Action> {
         Handler: FnMut(DocumentCommandActionRef<'a, Action>),
     {
         self.dispatch_intent(output, ElementBehaviorEvent::Click, handler)
+    }
+
+    pub fn dispatch_pointer_enter<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::PointerEnter, handler)
+    }
+
+    pub fn dispatch_pointer_leave<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        self.dispatch_intent(output, ElementBehaviorEvent::PointerLeave, handler)
     }
 }
 

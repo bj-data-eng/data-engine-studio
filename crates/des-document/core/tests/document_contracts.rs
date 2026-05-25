@@ -406,6 +406,7 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         CommitByKeyboard,
         CommitByContextMenu,
         CommitByPointerEnter,
+        CommitByPointerLeave,
         Fallback,
     }
 
@@ -422,6 +423,7 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
             .on_key_down("commit")
             .on_context_menu("commit-menu")
             .on_pointer_enter("commit-hover")
+            .on_pointer_leave("commit-hover-out")
             .text("Commit");
     });
     let registry = DocumentCommandRegistry::new()
@@ -431,6 +433,10 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
             DocumentCommandBinding::key_down("commit", AppAction::CommitByKeyboard),
             DocumentCommandBinding::context_menu("commit-menu", AppAction::CommitByContextMenu),
             DocumentCommandBinding::pointer_enter("commit-hover", AppAction::CommitByPointerEnter),
+            DocumentCommandBinding::pointer_leave(
+                "commit-hover-out",
+                AppAction::CommitByPointerLeave,
+            ),
         ])
         .bind_binding_if(
             DocumentCommandBinding::pointer_leave("skip-hover-out", AppAction::Fallback),
@@ -465,6 +471,7 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     ));
     let click_output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let leave_output = view.update_with_input(DocumentInput::pointer_at(Point::new(180.0, 120.0)));
     let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
     let context_output =
         view.update_with_input(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
@@ -474,14 +481,17 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         .command_actions_for_intent(&context_output, ElementBehaviorEvent::ContextMenu)
         .collect::<Vec<_>>();
     let hover_actions = registry
-        .command_actions_for_intent(&hover_output, ElementBehaviorEvent::PointerEnter)
+        .pointer_enter_actions(&hover_output)
+        .collect::<Vec<_>>();
+    let leave_actions = registry
+        .pointer_leave_actions(&leave_output)
         .collect::<Vec<_>>();
     let key_intent_actions = registry
         .command_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown)
         .collect::<Vec<_>>();
 
     assert_eq!(registry.action_for("commit"), Some(&AppAction::Fallback));
-    assert_eq!(registry.bindings().len(), 5);
+    assert_eq!(registry.bindings().len(), 6);
     assert_eq!(collected_registry.bindings().len(), 2);
     assert_eq!(pushed_registry.bindings().len(), 2);
     assert!(click_output.has_command_intent("commit", ElementBehaviorEvent::Click, "commit"));
@@ -508,6 +518,8 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     assert_eq!(*context_actions[0].action, AppAction::CommitByContextMenu);
     assert_eq!(hover_actions.len(), 1);
     assert_eq!(*hover_actions[0].action, AppAction::CommitByPointerEnter);
+    assert_eq!(leave_actions.len(), 1);
+    assert_eq!(*leave_actions[0].action, AppAction::CommitByPointerLeave);
 }
 
 #[test]
@@ -602,6 +614,7 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     enum AppAction {
         CommitByClick,
         CommitByKeyboard,
+        Inspect,
         Fallback,
     }
 
@@ -616,17 +629,20 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
             .focused(true)
             .on_click("commit")
             .on_key_down("commit")
+            .on_pointer_enter("inspect")
             .text("Commit");
     });
     let registry = DocumentCommandRegistry::new()
         .bind("commit", AppAction::Fallback)
         .bind_click("commit", AppAction::CommitByClick)
+        .bind_pointer_enter("inspect", AppAction::Inspect)
         .bind_on(
             ElementBehaviorEvent::KeyDown,
             "commit",
             AppAction::CommitByKeyboard,
         );
 
+    let hover_output = view.update_with_input(DocumentInput::pointer_at(Point::new(8.0, 8.0)));
     let click_output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
     let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
@@ -635,6 +651,7 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     let clicked_actions = registry.collect_clicked_actions(&click_output);
     let key_actions =
         registry.collect_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
+    let hover_actions = registry.collect_pointer_enter_actions(&hover_output);
     let commit_actions = registry.collect_actions_for(&click_output, "commit");
 
     assert_eq!(
@@ -655,6 +672,15 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
             event: DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
             command: "commit".to_owned(),
             action: AppAction::CommitByKeyboard,
+        }]
+    );
+    assert_eq!(
+        hover_actions,
+        vec![DocumentCommandAction {
+            target: ElementId::new("commit"),
+            event: DocumentEventKind::PointerEntered,
+            command: "inspect".to_owned(),
+            action: AppAction::Inspect,
         }]
     );
 }
@@ -768,21 +794,30 @@ fn document_action_frame_supports_app_update_loop_queries() {
     enum AppAction {
         Run,
         Cancel,
+        Inspect,
+        Uninspect,
     }
 
     let stylesheet = StyleSheet::new()
         .id("run", Style::default().size(96.0, 32.0))
-        .id("cancel", Style::default().size(96.0, 32.0));
+        .id("cancel", Style::default().size(96.0, 32.0))
+        .id("inspect", Style::default().size(96.0, 32.0));
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run").on_click("run").text("Run");
         ui.button("cancel")
             .focused(true)
             .on_key_down("cancel")
             .text("Cancel");
+        ui.button("inspect")
+            .on_pointer_enter("inspect")
+            .on_pointer_leave("uninspect")
+            .text("Inspect");
     });
     let registry = DocumentCommandRegistry::new()
         .bind_click("run", AppAction::Run)
-        .bind_on(ElementBehaviorEvent::KeyDown, "cancel", AppAction::Cancel);
+        .bind_on(ElementBehaviorEvent::KeyDown, "cancel", AppAction::Cancel)
+        .bind_pointer_enter("inspect", AppAction::Inspect)
+        .bind_pointer_leave("uninspect", AppAction::Uninspect);
 
     let click_frame = view.update_with_input_actions(
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -866,6 +901,29 @@ fn document_action_frame_supports_app_update_loop_queries() {
         Some("cancel")
     );
     assert_eq!(actions[0].action, AppAction::Cancel);
+
+    let hover_frame =
+        view.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 72.0)), &registry);
+    assert_eq!(hover_frame.pointer_enter_actions().count(), 1);
+    assert_eq!(
+        hover_frame
+            .first_pointer_enter_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Inspect)
+    );
+    assert!(hover_frame.contains_pointer_enter_action(&AppAction::Inspect));
+    let leave_frame = view.update_with_input_actions(
+        DocumentInput::pointer_at(Point::new(180.0, 120.0)),
+        &registry,
+    );
+    assert_eq!(leave_frame.pointer_leave_actions().count(), 1);
+    assert_eq!(
+        leave_frame
+            .first_pointer_leave_action()
+            .map(|action| &action.action),
+        Some(&AppAction::Uninspect)
+    );
+    assert!(leave_frame.contains_pointer_leave_action(&AppAction::Uninspect));
 }
 
 #[test]

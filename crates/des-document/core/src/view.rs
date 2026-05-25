@@ -114,6 +114,26 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_for_intent(ElementBehaviorEvent::Click)
     }
 
+    /// Iterates typed app actions emitted by pointer-enter intent.
+    pub fn pointer_enter_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns the first typed app action emitted by pointer-enter intent.
+    pub fn first_pointer_enter_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Iterates typed app actions emitted by pointer-leave intent.
+    pub fn pointer_leave_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    /// Returns the first typed app action emitted by pointer-leave intent.
+    pub fn first_pointer_leave_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
     /// Returns true when the frame contains the supplied typed action.
     pub fn contains_action(&self, action: &Action) -> bool
     where
@@ -157,6 +177,22 @@ impl<Action> DocumentActionFrame<Action> {
         Action: PartialEq,
     {
         self.contains_action_for_intent(ElementBehaviorEvent::Click, action)
+    }
+
+    /// Returns true when pointer-enter intent emitted the supplied typed action.
+    pub fn contains_pointer_enter_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::PointerEnter, action)
+    }
+
+    /// Returns true when pointer-leave intent emitted the supplied typed action.
+    pub fn contains_pointer_leave_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::PointerLeave, action)
     }
 
     /// Consumes the frame into the resolved output and collected app actions.
