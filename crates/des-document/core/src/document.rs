@@ -1311,7 +1311,16 @@ impl DocumentBuilder {
 
 impl ElementBuilder<'_> {
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
-        self.spec.classes.push(class.into());
+        self.spec = self.spec.class(class);
+        self
+    }
+
+    pub fn classes<I, C>(mut self, classes: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.spec = self.spec.classes(classes);
         self
     }
 
@@ -1321,7 +1330,27 @@ impl ElementBuilder<'_> {
     }
 
     pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.spec.attributes.insert(name.into(), value.into());
+        self.spec = self.spec.attribute(name, value);
+        self
+    }
+
+    pub fn attributes<I, K, V>(mut self, attributes: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.spec = self.spec.attributes(attributes);
+        self
+    }
+
+    pub fn data(mut self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
+        self.spec = self.spec.data(name, value);
+        self
+    }
+
+    pub fn aria(mut self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
+        self.spec = self.spec.aria(name, value);
         self
     }
 

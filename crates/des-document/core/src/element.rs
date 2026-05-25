@@ -192,6 +192,15 @@ impl ElementSpec {
         self
     }
 
+    pub fn classes<I, C>(mut self, classes: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.classes.extend(classes.into_iter().map(Into::into));
+        self
+    }
+
     pub fn role(mut self, role: impl Into<String>) -> Self {
         self.role = Some(role.into());
         self
@@ -200,6 +209,28 @@ impl ElementSpec {
     pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.attributes.insert(name.into(), value.into());
         self
+    }
+
+    pub fn attributes<I, K, V>(mut self, attributes: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.attributes.extend(
+            attributes
+                .into_iter()
+                .map(|(name, value)| (name.into(), value.into())),
+        );
+        self
+    }
+
+    pub fn data(self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
+        self.attribute(prefixed_attribute_name("data-", name), value)
+    }
+
+    pub fn aria(self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
+        self.attribute(prefixed_attribute_name("aria-", name), value)
     }
 
     pub fn behavior_hook(mut self, event: impl Into<String>, command: impl Into<String>) -> Self {
@@ -330,6 +361,15 @@ impl ElementSpec {
     pub fn table_cell(mut self, table_cell: TableCellSpec) -> Self {
         self.table_cell = Some(table_cell);
         self
+    }
+}
+
+fn prefixed_attribute_name(prefix: &str, name: impl AsRef<str>) -> String {
+    let name = name.as_ref();
+    if name.starts_with(prefix) {
+        name.to_owned()
+    } else {
+        format!("{prefix}{name}")
     }
 }
 

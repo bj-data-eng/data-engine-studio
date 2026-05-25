@@ -515,14 +515,22 @@ fn document_builder_and_engine_update_are_front_door_api() {
 #[test]
 fn document_builder_supports_fluent_html_like_elements() {
     let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
-        ui.main("app").class("workspace").children(|ui| {
-            ui.header("topbar").class("topbar").children(|ui| {
-                ui.h1("title").text("Data Engine Studio");
+        ui.main("app")
+            .classes(["workspace", "workspace-shell"])
+            .role("application")
+            .data("view", "document")
+            .aria("label", "Workspace")
+            .children(|ui| {
+                ui.header("topbar")
+                    .classes(["topbar", "primary-region"])
+                    .attributes([("data-region", "chrome"), ("aria-label", "Top bar")])
+                    .children(|ui| {
+                        ui.h1("title").text("Data Engine Studio");
+                    });
+                ui.div("content").class("content").children(|ui| {
+                    ui.button("run").class("primary").text("Run");
+                });
             });
-            ui.div("content").class("content").children(|ui| {
-                ui.button("run").class("primary").text("Run");
-            });
-        });
     });
     let stylesheet = StyleSheet::new()
         .rule(
@@ -540,6 +548,34 @@ fn document_builder_supports_fluent_html_like_elements() {
     let run = output.layout.find("run").unwrap();
 
     assert_eq!(app.element, Element::Main);
+    assert!(
+        app.classes
+            .iter()
+            .any(|class| class.as_str() == "workspace")
+    );
+    assert!(
+        app.classes
+            .iter()
+            .any(|class| class.as_str() == "workspace-shell")
+    );
+    assert_eq!(app.role.as_deref(), Some("application"));
+    assert_eq!(
+        app.attributes.get("data-view").map(String::as_str),
+        Some("document")
+    );
+    assert_eq!(
+        app.attributes.get("aria-label").map(String::as_str),
+        Some("Workspace")
+    );
+    let topbar = output.layout.find("topbar").unwrap();
+    assert_eq!(
+        topbar.attributes.get("data-region").map(String::as_str),
+        Some("chrome")
+    );
+    assert_eq!(
+        topbar.attributes.get("aria-label").map(String::as_str),
+        Some("Top bar")
+    );
     assert_eq!(run.element, Element::Button);
     assert_eq!(
         run.text.as_ref().map(|text| text.semantic_text()),
