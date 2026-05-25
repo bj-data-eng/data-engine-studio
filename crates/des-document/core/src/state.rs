@@ -313,11 +313,75 @@ pub struct DocumentCommand {
     pub command: String,
 }
 
+impl DocumentCommand {
+    /// Returns the element that emitted this command.
+    pub fn target(&self) -> &ElementId {
+        &self.target
+    }
+
+    /// Returns true when this command was emitted by the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
+
+    /// Returns the resolved document event that emitted this command.
+    pub fn event(&self) -> DocumentEventKind {
+        self.event
+    }
+
+    /// Returns the authored command name.
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+
+    /// Returns true when this command was emitted by the supplied behavior intent.
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this command was emitted by click intent.
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DocumentCommandRef<'a> {
     pub target: &'a ElementId,
     pub event: DocumentEventKind,
     pub command: &'a str,
+}
+
+impl DocumentCommandRef<'_> {
+    /// Returns the element that emitted this command.
+    pub fn target(&self) -> &ElementId {
+        self.target
+    }
+
+    /// Returns true when this command was emitted by the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
+
+    /// Returns the resolved document event that emitted this command.
+    pub fn event(&self) -> DocumentEventKind {
+        self.event
+    }
+
+    /// Returns the authored command name.
+    pub fn command(&self) -> &str {
+        self.command
+    }
+
+    /// Returns true when this command was emitted by the supplied behavior intent.
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this command was emitted by click intent.
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1090,12 +1154,102 @@ pub struct DocumentCommandActionRef<'a, Action> {
     pub action: &'a Action,
 }
 
+impl<Action> DocumentCommandActionRef<'_, Action> {
+    /// Returns the element that emitted this action.
+    pub fn target(&self) -> &ElementId {
+        self.target
+    }
+
+    /// Returns true when this action was emitted by the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
+
+    /// Returns the resolved document event that emitted this action.
+    pub fn event(&self) -> DocumentEventKind {
+        self.event
+    }
+
+    /// Returns the authored command name that mapped to this action.
+    pub fn command(&self) -> &str {
+        self.command
+    }
+
+    /// Returns the typed app action mapped from this command.
+    pub fn action(&self) -> &Action {
+        self.action
+    }
+
+    /// Returns true when this action was emitted by the supplied behavior intent.
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this action was emitted by click intent.
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this command mapped to the supplied typed app action.
+    pub fn is_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.action == action
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocumentCommandAction<Action> {
     pub target: ElementId,
     pub event: DocumentEventKind,
     pub command: String,
     pub action: Action,
+}
+
+impl<Action> DocumentCommandAction<Action> {
+    /// Returns the element that emitted this action.
+    pub fn target(&self) -> &ElementId {
+        &self.target
+    }
+
+    /// Returns true when this action was emitted by the supplied element id.
+    pub fn target_is(&self, target: &str) -> bool {
+        self.target.as_str() == target
+    }
+
+    /// Returns the resolved document event that emitted this action.
+    pub fn event(&self) -> DocumentEventKind {
+        self.event
+    }
+
+    /// Returns the authored command name that mapped to this action.
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+
+    /// Returns the typed app action mapped from this command.
+    pub fn action(&self) -> &Action {
+        &self.action
+    }
+
+    /// Returns true when this action was emitted by the supplied behavior intent.
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this action was emitted by click intent.
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this command mapped to the supplied typed app action.
+    pub fn is_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        &self.action == action
+    }
 }
 
 impl<Action: Clone> From<DocumentCommandActionRef<'_, Action>> for DocumentCommandAction<Action> {

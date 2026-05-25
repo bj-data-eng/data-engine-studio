@@ -583,6 +583,15 @@ fn document_action_frame_supports_app_update_loop_queries() {
         click_frame.first_action().map(|action| &action.action),
         Some(&AppAction::Run)
     );
+    let click_action = click_frame.first_action().unwrap();
+    assert_eq!(click_action.target().as_str(), "run");
+    assert!(click_action.target_is("run"));
+    assert_eq!(click_action.event(), DocumentEventKind::Clicked);
+    assert_eq!(click_action.command(), "run");
+    assert_eq!(click_action.action(), &AppAction::Run);
+    assert!(click_action.matches_intent(ElementBehaviorEvent::Click));
+    assert!(click_action.is_click());
+    assert!(click_action.is_action(&AppAction::Run));
     assert_eq!(click_frame.actions_for("run").count(), 1);
     assert_eq!(
         click_frame
@@ -673,6 +682,14 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
         unhandled_view.update_with_input(DocumentInput::key_down(DocumentKey::Escape));
     let mut handled = Vec::new();
     let click_report = registry.dispatch(&click_output, |command| {
+        assert_eq!(command.target().as_str(), "run");
+        assert!(command.target_is("run"));
+        assert_eq!(command.event(), DocumentEventKind::Clicked);
+        assert_eq!(command.command(), "run-query");
+        assert_eq!(command.action(), &AppAction::RunQuery);
+        assert!(command.matches_intent(ElementBehaviorEvent::Click));
+        assert!(command.is_click());
+        assert!(command.is_action(&AppAction::RunQuery));
         handled.push((
             command.target.clone(),
             command.event,
@@ -786,16 +803,26 @@ fn keyboard_input_targets_focused_element_and_emits_hook_command() {
     let commands = output.commands();
 
     assert_eq!(commands.len(), 1);
-    assert_eq!(commands[0].target, ElementId::new("search"));
+    let command = &commands[0];
+    assert_eq!(command.target, ElementId::new("search"));
+    assert_eq!(command.target().as_str(), "search");
+    assert!(command.target_is("search"));
     assert_eq!(
-        commands[0].event,
+        command.event,
         DocumentEventKind::KeyDown(KeyInput {
             key: DocumentKey::Enter,
             modifiers: KeyModifiers::default(),
             pressed: true,
         })
     );
-    assert_eq!(commands[0].command, "submit-search");
+    assert_eq!(
+        command.event(),
+        DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter))
+    );
+    assert_eq!(command.command, "submit-search");
+    assert_eq!(command.command(), "submit-search");
+    assert!(command.matches_intent(ElementBehaviorEvent::KeyDown));
+    assert!(!command.is_click());
 }
 
 #[test]
