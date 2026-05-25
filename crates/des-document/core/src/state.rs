@@ -856,12 +856,30 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_many_if<I, Command>(mut self, bindings: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = (Command, Action)>,
+        Command: Into<String>,
+    {
+        self.push_many_if(bindings, present);
+        self
+    }
+
     pub fn bind_bindings<I, B>(mut self, bindings: I) -> Self
     where
         I: IntoIterator<Item = B>,
         B: Into<DocumentCommandBinding<Action>>,
     {
         self.push_bindings(bindings);
+        self
+    }
+
+    pub fn bind_bindings_if<I, B>(mut self, bindings: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = B>,
+        B: Into<DocumentCommandBinding<Action>>,
+    {
+        self.push_bindings_if(bindings, present);
         self
     }
 
@@ -1075,12 +1093,32 @@ impl<Action> DocumentCommandRegistry<Action> {
         );
     }
 
+    pub fn push_many_if<I, Command>(&mut self, bindings: I, present: bool)
+    where
+        I: IntoIterator<Item = (Command, Action)>,
+        Command: Into<String>,
+    {
+        if present {
+            self.push_many(bindings);
+        }
+    }
+
     pub fn push_bindings<I, B>(&mut self, bindings: I)
     where
         I: IntoIterator<Item = B>,
         B: Into<DocumentCommandBinding<Action>>,
     {
         self.bindings.extend(bindings.into_iter().map(Into::into));
+    }
+
+    pub fn push_bindings_if<I, B>(&mut self, bindings: I, present: bool)
+    where
+        I: IntoIterator<Item = B>,
+        B: Into<DocumentCommandBinding<Action>>,
+    {
+        if present {
+            self.push_bindings(bindings);
+        }
     }
 
     pub fn action_for(&self, command: &str) -> Option<&Action> {

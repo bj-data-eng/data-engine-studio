@@ -510,8 +510,23 @@ fn document_command_registry_supports_conditional_action_bindings() {
     let registry = DocumentCommandRegistry::new()
         .bind_if("run", AppAction::Run, true)
         .bind_if("cancel", AppAction::Cancel, false)
+        .bind_many_if(
+            [
+                ("run-batch", AppAction::Run),
+                ("cancel-batch", AppAction::Cancel),
+            ],
+            false,
+        )
+        .bind_many_if([("run-batch-active", AppAction::Run)], true)
         .bind_key_down_if("run-key", AppAction::RunKey, true)
-        .bind_key_down_if("cancel-key", AppAction::CancelKey, false);
+        .bind_key_down_if("cancel-key", AppAction::CancelKey, false)
+        .bind_bindings_if(
+            [DocumentCommandBinding::key_up(
+                "skip-key-up",
+                AppAction::CancelKey,
+            )],
+            false,
+        );
 
     let click_frame = view.update_with_input_actions(
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -520,7 +535,7 @@ fn document_command_registry_supports_conditional_action_bindings() {
     let key_frame =
         view.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter), &registry);
 
-    assert_eq!(registry.bindings().len(), 2);
+    assert_eq!(registry.bindings().len(), 3);
     assert!(click_frame.contains_action(&AppAction::Run));
     assert!(!click_frame.contains_action(&AppAction::Cancel));
     assert!(key_frame.contains_action(&AppAction::RunKey));
@@ -529,15 +544,28 @@ fn document_command_registry_supports_conditional_action_bindings() {
     let mut pushed = DocumentCommandRegistry::new();
     pushed.push_click_if("run", AppAction::Run, true);
     pushed.push_click_if("cancel", AppAction::Cancel, false);
+    pushed.push_many_if([("ignored", AppAction::Cancel)], false);
+    pushed.push_bindings_if(
+        [DocumentCommandBinding::context_menu(
+            "run-menu",
+            AppAction::Run,
+        )],
+        true,
+    );
     pushed.push_key_up_if("cancel-key", AppAction::CancelKey, false);
 
-    assert_eq!(pushed.bindings().len(), 1);
+    assert_eq!(pushed.bindings().len(), 2);
     assert_eq!(
         pushed.bindings()[0].event,
         Some(ElementBehaviorEvent::Click)
     );
     assert_eq!(pushed.bindings()[0].command, "run");
     assert_eq!(pushed.bindings()[0].action, AppAction::Run);
+    assert_eq!(
+        pushed.bindings()[1].event,
+        Some(ElementBehaviorEvent::ContextMenu)
+    );
+    assert_eq!(pushed.bindings()[1].command, "run-menu");
     assert_eq!(pushed.action_for("cancel"), None);
 }
 
