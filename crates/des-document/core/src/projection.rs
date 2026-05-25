@@ -621,6 +621,32 @@ impl DocumentProjection {
         self
     }
 
+    pub fn set_checked(self, id: impl Into<ElementId>, checked: bool) -> Self {
+        self.set_selected(id, checked)
+    }
+
+    pub fn check(self, id: impl Into<ElementId>) -> Self {
+        self.set_checked(id, true)
+    }
+
+    pub fn check_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_checked(id, true);
+        }
+        self
+    }
+
+    pub fn uncheck(self, id: impl Into<ElementId>) -> Self {
+        self.set_checked(id, false)
+    }
+
+    pub fn uncheck_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_checked(id, false);
+        }
+        self
+    }
+
     pub fn select(self, id: impl Into<ElementId>) -> Self {
         self.set_selected(id, true)
     }
@@ -646,6 +672,18 @@ impl DocumentProjection {
     pub fn push_selected(&mut self, id: impl Into<ElementId>, selected: bool) {
         self.operations
             .push(DocumentProjectionOperation::set_selected(id, selected));
+    }
+
+    pub fn push_checked(&mut self, id: impl Into<ElementId>, checked: bool) {
+        self.push_selected(id, checked);
+    }
+
+    pub fn push_check_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        self.push_select_if(id, present);
+    }
+
+    pub fn push_uncheck_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        self.push_deselect_if(id, present);
     }
 
     pub fn push_select_if(&mut self, id: impl Into<ElementId>, present: bool) {
@@ -1116,11 +1154,35 @@ impl ElementProjectionPatch {
         self
     }
 
+    pub fn checked(self, checked: bool) -> Self {
+        self.selected(checked)
+    }
+
     pub fn selected_if(mut self, selected: bool, present: bool) -> Self {
         if present {
             self.selected = Some(selected);
         }
         self
+    }
+
+    pub fn checked_if(self, checked: bool, present: bool) -> Self {
+        self.selected_if(checked, present)
+    }
+
+    pub fn check(self) -> Self {
+        self.checked(true)
+    }
+
+    pub fn check_if(self, present: bool) -> Self {
+        self.checked_if(true, present)
+    }
+
+    pub fn uncheck(self) -> Self {
+        self.checked(false)
+    }
+
+    pub fn uncheck_if(self, present: bool) -> Self {
+        self.checked_if(false, present)
     }
 
     pub fn select(self) -> Self {
@@ -1409,6 +1471,39 @@ impl ElementProjection<'_> {
         self
     }
 
+    pub fn checked(&mut self, checked: bool) -> &mut Self {
+        self.selected(checked)
+    }
+
+    pub fn checked_if(&mut self, checked: bool, present: bool) -> &mut Self {
+        if present {
+            self.checked(checked);
+        }
+        self
+    }
+
+    pub fn check(&mut self) -> &mut Self {
+        self.checked(true)
+    }
+
+    pub fn check_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.check();
+        }
+        self
+    }
+
+    pub fn uncheck(&mut self) -> &mut Self {
+        self.checked(false)
+    }
+
+    pub fn uncheck_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.uncheck();
+        }
+        self
+    }
+
     pub fn select(&mut self) -> &mut Self {
         self.selected(true)
     }
@@ -1591,6 +1686,10 @@ impl DocumentProjectionOperation {
         }
     }
 
+    pub fn set_checked(id: impl Into<ElementId>, checked: bool) -> Self {
+        Self::set_selected(id, checked)
+    }
+
     pub fn set_disabled(id: impl Into<ElementId>, disabled: bool) -> Self {
         Self::SetDisabled {
             id: id.into(),
@@ -1696,8 +1795,16 @@ impl DocumentProjectionOperation {
         }
     }
 
+    pub fn checked(&self) -> Option<bool> {
+        self.selected()
+    }
+
     pub fn sets_selected(&self, selected: bool) -> bool {
         self.selected() == Some(selected)
+    }
+
+    pub fn sets_checked(&self, checked: bool) -> bool {
+        self.checked() == Some(checked)
     }
 
     pub fn disabled(&self) -> Option<bool> {

@@ -554,6 +554,18 @@ impl Document {
         Ok(true)
     }
 
+    pub fn set_checked(&mut self, id: impl Into<ElementId>, checked: bool) -> DocumentResult<bool> {
+        self.set_selected(id, checked)
+    }
+
+    pub fn check(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_checked(id, true)
+    }
+
+    pub fn uncheck(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_checked(id, false)
+    }
+
     pub fn select(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
         self.set_selected(id, true)
     }
@@ -2772,6 +2784,36 @@ impl<'a> ElementBuilder<'a> {
 
     pub fn selected(mut self, selected: bool) -> Self {
         self.spec.selected = selected;
+        self
+    }
+
+    pub fn checked(mut self, checked: bool) -> Self {
+        self.spec = self.spec.checked(checked);
+        self
+    }
+
+    pub fn check(mut self) -> Self {
+        self.spec = self.spec.check();
+        self
+    }
+
+    pub fn check_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.check_if(present);
+        self
+    }
+
+    pub fn uncheck(mut self) -> Self {
+        self.spec = self.spec.uncheck();
+        self
+    }
+
+    pub fn uncheck_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.uncheck_if(present);
+        self
+    }
+
+    pub fn checked_if(mut self, checked: bool, present: bool) -> Self {
+        self.spec = self.spec.checked_if(checked, present);
         self
     }
 

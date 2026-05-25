@@ -2239,7 +2239,7 @@ fn document_projection_batches_app_state_updates() {
             status
                 .value("ready")
                 .attributes([("data-status", "ready"), ("aria-label", "Ready status")])
-                .select()
+                .check()
                 .focus()
                 .remove_attributes(["data-old-status"])
                 .remove_classes(["pending", "stale"])
@@ -2424,6 +2424,9 @@ fn element_projection_patch_groups_reusable_state_updates() {
     let selected = status_operations
         .iter()
         .find_map(|operation| operation.selected());
+    let checked = status_operations
+        .iter()
+        .find_map(|operation| operation.checked());
     let disabled = status_operations
         .iter()
         .find_map(|operation| operation.disabled());
@@ -2462,10 +2465,16 @@ fn element_projection_patch_groups_reusable_state_updates() {
             .any(|operation| operation.removes_attribute("data-ephemeral"))
     );
     assert_eq!(selected, Some(true));
+    assert_eq!(checked, Some(true));
     assert!(
         status_operations
             .iter()
             .any(|operation| operation.sets_selected(true))
+    );
+    assert!(
+        status_operations
+            .iter()
+            .any(|operation| operation.sets_checked(true))
     );
     assert_eq!(disabled, Some(false));
     assert!(
@@ -2499,6 +2508,7 @@ fn element_projection_patch_groups_reusable_state_updates() {
     assert_eq!(status.aria("live"), Some("polite"));
     assert_eq!(status.aria("atomic"), Some("true"));
     assert!(status.selected());
+    assert!(status.checked());
     assert!(!status.disabled());
     assert!(status.focused());
     assert!(status.has_class("is-ready"));
@@ -2507,7 +2517,7 @@ fn element_projection_patch_groups_reusable_state_updates() {
     assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
 
     let reset_patch = ElementProjectionPatch::new()
-        .deselect_if(true)
+        .uncheck_if(true)
         .enable_if(false)
         .enabled(false)
         .blur_if(true)
@@ -2529,6 +2539,7 @@ fn element_projection_patch_groups_reusable_state_updates() {
     assert_eq!(reset_report.operations, 7);
     assert_eq!(reset_report.changed, 6);
     assert!(!reset_status.selected());
+    assert!(!reset_status.checked());
     assert!(reset_status.disabled());
     assert!(!reset_status.focused());
     assert_eq!(reset_status.data("state"), None);
@@ -2663,14 +2674,14 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
         .classes_if("status", ["is-loading", "is-stale"], true)
         .set_data_if("status", "busy", "true", true)
         .set_aria_if("status", "busy", "false", false)
-        .select_if("status", true)
+        .check_if("status", true)
         .disable_if("status", false)
         .focus_if("details", true)
         .with_element_if("details", show_details, |mut details| {
             details
                 .text("Loading details")
                 .class_if("is-ready", false)
-                .select_if(true)
+                .check_if(true)
                 .disable_if(false)
                 .focus_if(true);
         })
@@ -2702,12 +2713,12 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
     assert!(!reset_details.has_class("has-error"));
 
     let clear_state = DocumentProjection::new()
-        .deselect_if("status", true)
+        .uncheck_if("status", true)
         .enable_if("status", true)
         .blur_if("details", true)
         .select_if("details", false)
         .with_element("details", |mut details| {
-            details.deselect_if(true).enable_if(true).blur_if(true);
+            details.uncheck_if(true).enable_if(true).blur_if(true);
         });
     let clear_report = view.project(&clear_state).unwrap();
     let clear_output = view.update();
@@ -5622,6 +5633,10 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .selectable_text_if(selectable)
             .copyable_text_if(false, disabled)
             .text("Ready to run.");
+        ui.checkbox("confirm")
+            .checked(show_badge)
+            .checked_if(false, disabled)
+            .text("Confirm");
         ui.child_with("child-with", Element::Div, |node| {
             node.class("manual-child").text("Built through child_with");
         })
@@ -5681,6 +5696,7 @@ fn document_builder_supports_conditional_authoring_helpers() {
     let output = DocumentEngine::default().update(&mut document, &stylesheet);
     let run = output.snapshot().find("run").unwrap();
     let description = output.snapshot().find("description").unwrap();
+    let confirm = output.snapshot().find("confirm").unwrap();
 
     assert!(run.has_all_classes(["control", "is-visible", "has-icon", "is-primary"]));
     assert!(!run.has_class("is-disabled"));
@@ -5693,9 +5709,12 @@ fn document_builder_supports_conditional_authoring_helpers() {
     assert_eq!(run.aria("label"), Some("Run"));
     assert_eq!(run.aria("disabled"), None);
     assert!(run.selected());
+    assert!(run.checked());
     assert!(!run.disabled());
     assert!(run.focused());
     assert_eq!(run.value(), Some("ready"));
+    assert!(confirm.checked());
+    assert!(confirm.selected());
     assert!(description.selectable_text());
     assert!(description.copyable_text());
     assert_eq!(run.rect().size, Size::new(96.0, 32.0));
@@ -5748,6 +5767,8 @@ fn document_builder_supports_conditional_authoring_helpers() {
         .data_if("mode", "demo", true)
         .aria_if("hidden", "true", false)
         .selected_if(true)
+        .checked(true)
+        .checked_if(false, false)
         .enabled(true)
         .disable_if(false)
         .focus_if(true)
@@ -6215,6 +6236,9 @@ fn document_mutation_can_set_text_value_and_authored_states() {
     assert!(document.remove_data("control", "state").unwrap());
     assert!(document.remove_aria("control", "label").unwrap());
     assert!(document.deselect("control").unwrap());
+    assert!(document.check("control").unwrap());
+    assert!(document.uncheck("control").unwrap());
+    assert!(!document.set_checked("control", false).unwrap());
     assert!(document.set_enabled("control", true).unwrap());
     assert!(!document.set_enabled("control", true).unwrap());
     assert!(document.blur("control").unwrap());

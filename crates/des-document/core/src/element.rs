@@ -507,6 +507,30 @@ impl ElementSpec {
         self
     }
 
+    pub fn checked(self, checked: bool) -> Self {
+        self.selected(checked)
+    }
+
+    pub fn check(self) -> Self {
+        self.checked(true)
+    }
+
+    pub fn check_if(self, present: bool) -> Self {
+        self.checked_if(true, present)
+    }
+
+    pub fn uncheck(self) -> Self {
+        self.checked(false)
+    }
+
+    pub fn uncheck_if(self, present: bool) -> Self {
+        self.checked_if(false, present)
+    }
+
+    pub fn checked_if(self, checked: bool, present: bool) -> Self {
+        if present { self.checked(checked) } else { self }
+    }
+
     pub fn deselect(self) -> Self {
         self.selected(false)
     }

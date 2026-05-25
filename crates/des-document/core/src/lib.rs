@@ -22,38 +22,55 @@
 //!     Run,
 //! }
 //!
-//! struct RunButton {
+//! struct QueryToolbar {
 //!     ready: bool,
 //! }
 //!
-//! impl DocumentWidget for RunButton {
+//! impl DocumentWidget for QueryToolbar {
 //!     fn render(&self, ui: &mut DocumentBuilder) {
-//!         ui.button("run")
-//!             .classes(["control", "primary"])
-//!             .aria("label", "Run query")
-//!             .command("run")
-//!             .text("Run");
+//!         ui.header("query-toolbar")
+//!             .class("toolbar")
+//!             .children(|ui| {
+//!                 ui.button("run-query")
+//!                     .classes(["button", "primary"])
+//!                     .enabled(self.ready)
+//!                     .aria("label", "Run query")
+//!                     .command("query.run")
+//!                     .text(if self.ready { "Run" } else { "Waiting" });
+//!
+//!                 ui.button("query-menu")
+//!                     .class("icon-button")
+//!                     .on_context_menu("query.menu")
+//!                     .text("Menu");
+//!             });
 //!     }
 //!
 //!     fn push_styles(&self, stylesheet: &mut StyleSheet) {
-//!         stylesheet.push_class("control", Style::default().size(96.0, 36.0));
+//!         stylesheet
+//!             .extend_css_forgiving(
+//!                 ".toolbar { display: flex; gap: 8px; padding: 12px; }
+//!                  .button { width: 96px; height: 32px; }
+//!                  .icon-button { width: 72px; height: 32px; }",
+//!             )
+//!             .expect("widget CSS should parse");
 //!     }
 //!
 //!     fn push_projection(&self, projection: &mut DocumentProjection) {
 //!         projection
-//!             .element("run")
+//!             .element("run-query")
 //!             .data("state", if self.ready { "ready" } else { "waiting" })
-//!             .class_if("is-ready", self.ready);
+//!             .class_if("is-ready", self.ready)
+//!             .enabled(self.ready);
 //!     }
 //! }
 //!
-//! impl DocumentActionWidget<AppAction> for RunButton {
+//! impl DocumentActionWidget<AppAction> for QueryToolbar {
 //!     fn push_commands(&self, registry: &mut DocumentCommandRegistry<AppAction>) {
-//!         registry.push_click("run", AppAction::Run);
+//!         registry.push_click("query.run", AppAction::Run);
 //!     }
 //! }
 //!
-//! let widget = RunButton { ready: false };
+//! let widget = QueryToolbar { ready: false };
 //! let mut surface = widget
 //!     .action_surface_with_css(
 //!         Size::new(320.0, 180.0),
@@ -64,21 +81,22 @@
 //! let mut actions = Vec::new();
 //! let (projection, frame, dispatch) = surface
 //!     .project_with_and_update_with_input_and_dispatch_action_values(
-//!         DocumentInput::primary_click(Point::new(8.0, 8.0)),
+//!         DocumentInput::primary_click(Point::new(20.0, 20.0)),
 //!         |projection| {
 //!             projection
-//!                 .element("run")
+//!                 .element("run-query")
 //!                 .data("state", "ready")
-//!                 .class_if("is-ready", true);
+//!                 .class_if("is-ready", true)
+//!                 .enabled(true);
 //!         },
 //!         |action| actions.push(*action),
 //!     )
 //!     .expect("widget projection targets rendered elements");
 //!
-//! assert_eq!(projection.changed, 2);
+//! assert_eq!(projection.changed, 3);
 //! assert_eq!(dispatch.handled_count(), 1);
 //! assert_eq!(actions, vec![AppAction::Run]);
-//! assert!(frame.output().snapshot().find("run").unwrap().has_class("is-ready"));
+//! assert!(frame.output().snapshot().find("run-query").unwrap().has_class("is-ready"));
 //! ```
 //!
 //! HTML/CSS entry points live in the sibling `des-html` crate and produce the

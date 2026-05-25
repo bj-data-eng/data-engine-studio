@@ -492,6 +492,10 @@ impl<'a> ElementSnapshot<'a> {
         self.element.selected
     }
 
+    pub fn checked(&self) -> bool {
+        self.selected()
+    }
+
     pub fn disabled(&self) -> bool {
         self.element.disabled
     }
