@@ -394,10 +394,8 @@ impl DocumentProjection {
     }
 
     pub fn push_text(&mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) {
-        self.operations.push(DocumentProjectionOperation::SetText {
-            id: id.into(),
-            text: text.into(),
-        });
+        self.operations
+            .push(DocumentProjectionOperation::set_text(id, text));
     }
 
     pub fn set_value(mut self, id: impl Into<ElementId>, value: impl Into<String>) -> Self {
@@ -406,10 +404,8 @@ impl DocumentProjection {
     }
 
     pub fn push_value(&mut self, id: impl Into<ElementId>, value: impl Into<String>) {
-        self.operations.push(DocumentProjectionOperation::SetValue {
-            id: id.into(),
-            value: value.into(),
-        });
+        self.operations
+            .push(DocumentProjectionOperation::set_value(id, value));
     }
 
     pub fn set_attribute(
@@ -429,11 +425,7 @@ impl DocumentProjection {
         value: impl Into<String>,
     ) {
         self.operations
-            .push(DocumentProjectionOperation::SetAttribute {
-                id: id.into(),
-                name: name.into(),
-                value: value.into(),
-            });
+            .push(DocumentProjectionOperation::set_attribute(id, name, value));
     }
 
     pub fn set_attributes<I, K, V>(mut self, id: impl Into<ElementId>, attributes: I) -> Self
@@ -585,10 +577,7 @@ impl DocumentProjection {
 
     pub fn push_remove_attribute(&mut self, id: impl Into<ElementId>, name: impl Into<String>) {
         self.operations
-            .push(DocumentProjectionOperation::RemoveAttribute {
-                id: id.into(),
-                name: name.into(),
-            });
+            .push(DocumentProjectionOperation::remove_attribute(id, name));
     }
 
     pub fn remove_attributes<I, K>(mut self, id: impl Into<ElementId>, names: I) -> Self
@@ -656,10 +645,7 @@ impl DocumentProjection {
 
     pub fn push_selected(&mut self, id: impl Into<ElementId>, selected: bool) {
         self.operations
-            .push(DocumentProjectionOperation::SetSelected {
-                id: id.into(),
-                selected,
-            });
+            .push(DocumentProjectionOperation::set_selected(id, selected));
     }
 
     pub fn push_select_if(&mut self, id: impl Into<ElementId>, present: bool) {
@@ -703,10 +689,7 @@ impl DocumentProjection {
 
     pub fn push_disabled(&mut self, id: impl Into<ElementId>, disabled: bool) {
         self.operations
-            .push(DocumentProjectionOperation::SetDisabled {
-                id: id.into(),
-                disabled,
-            });
+            .push(DocumentProjectionOperation::set_disabled(id, disabled));
     }
 
     pub fn push_disable_if(&mut self, id: impl Into<ElementId>, present: bool) {
@@ -750,10 +733,7 @@ impl DocumentProjection {
 
     pub fn push_focused(&mut self, id: impl Into<ElementId>, focused: bool) {
         self.operations
-            .push(DocumentProjectionOperation::SetFocused {
-                id: id.into(),
-                focused,
-            });
+            .push(DocumentProjectionOperation::set_focused(id, focused));
     }
 
     pub fn push_focus_if(&mut self, id: impl Into<ElementId>, present: bool) {
@@ -784,11 +764,8 @@ impl DocumentProjection {
         class: impl Into<ClassName>,
         present: bool,
     ) {
-        self.operations.push(DocumentProjectionOperation::SetClass {
-            id: id.into(),
-            class: class.into(),
-            present,
-        });
+        self.operations
+            .push(DocumentProjectionOperation::set_class(id, class, present));
     }
 
     pub fn add_class(self, id: impl Into<ElementId>, class: impl Into<ClassName>) -> Self {
@@ -1557,6 +1534,76 @@ fn prefixed_attribute_name(prefix: &str, name: impl AsRef<str>) -> String {
 }
 
 impl DocumentProjectionOperation {
+    pub fn set_text(id: impl Into<ElementId>, text: impl Into<TextContent>) -> Self {
+        Self::SetText {
+            id: id.into(),
+            text: text.into(),
+        }
+    }
+
+    pub fn set_value(id: impl Into<ElementId>, value: impl Into<String>) -> Self {
+        Self::SetValue {
+            id: id.into(),
+            value: value.into(),
+        }
+    }
+
+    pub fn set_attribute(
+        id: impl Into<ElementId>,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        Self::SetAttribute {
+            id: id.into(),
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
+    pub fn remove_attribute(id: impl Into<ElementId>, name: impl Into<String>) -> Self {
+        Self::RemoveAttribute {
+            id: id.into(),
+            name: name.into(),
+        }
+    }
+
+    pub fn set_selected(id: impl Into<ElementId>, selected: bool) -> Self {
+        Self::SetSelected {
+            id: id.into(),
+            selected,
+        }
+    }
+
+    pub fn set_disabled(id: impl Into<ElementId>, disabled: bool) -> Self {
+        Self::SetDisabled {
+            id: id.into(),
+            disabled,
+        }
+    }
+
+    pub fn set_focused(id: impl Into<ElementId>, focused: bool) -> Self {
+        Self::SetFocused {
+            id: id.into(),
+            focused,
+        }
+    }
+
+    pub fn set_class(id: impl Into<ElementId>, class: impl Into<ClassName>, present: bool) -> Self {
+        Self::SetClass {
+            id: id.into(),
+            class: class.into(),
+            present,
+        }
+    }
+
+    pub fn add_class(id: impl Into<ElementId>, class: impl Into<ClassName>) -> Self {
+        Self::set_class(id, class, true)
+    }
+
+    pub fn remove_class(id: impl Into<ElementId>, class: impl Into<ClassName>) -> Self {
+        Self::set_class(id, class, false)
+    }
+
     pub const fn kind(&self) -> DocumentProjectionOperationKind {
         match self {
             Self::SetText { .. } => DocumentProjectionOperationKind::Text,
@@ -1604,11 +1651,21 @@ impl DocumentProjectionOperation {
         }
     }
 
+    pub fn attribute_named(&self, name: &str) -> Option<&str> {
+        self.attribute()
+            .and_then(|(candidate, value)| (candidate == name).then_some(value))
+    }
+
     pub fn removed_attribute(&self) -> Option<&str> {
         match self {
             Self::RemoveAttribute { name, .. } => Some(name),
             _ => None,
         }
+    }
+
+    pub fn removes_attribute(&self, name: &str) -> bool {
+        self.removed_attribute()
+            .is_some_and(|candidate| candidate == name)
     }
 
     pub fn selected(&self) -> Option<bool> {
@@ -1618,11 +1675,19 @@ impl DocumentProjectionOperation {
         }
     }
 
+    pub fn sets_selected(&self, selected: bool) -> bool {
+        self.selected() == Some(selected)
+    }
+
     pub fn disabled(&self) -> Option<bool> {
         match self {
             Self::SetDisabled { disabled, .. } => Some(*disabled),
             _ => None,
         }
+    }
+
+    pub fn sets_disabled(&self, disabled: bool) -> bool {
+        self.disabled() == Some(disabled)
     }
 
     pub fn focused(&self) -> Option<bool> {
@@ -1632,11 +1697,28 @@ impl DocumentProjectionOperation {
         }
     }
 
+    pub fn sets_focused(&self, focused: bool) -> bool {
+        self.focused() == Some(focused)
+    }
+
     pub fn class(&self) -> Option<(&ClassName, bool)> {
         match self {
             Self::SetClass { class, present, .. } => Some((class, *present)),
             _ => None,
         }
+    }
+
+    pub fn class_named(&self, class: &str) -> Option<bool> {
+        self.class()
+            .and_then(|(candidate, present)| (candidate.as_str() == class).then_some(present))
+    }
+
+    pub fn adds_class(&self, class: &str) -> bool {
+        self.class_named(class) == Some(true)
+    }
+
+    pub fn removes_class(&self, class: &str) -> bool {
+        self.class_named(class) == Some(false)
     }
 
     pub fn targets(&self, target: impl AsRef<str>) -> bool {

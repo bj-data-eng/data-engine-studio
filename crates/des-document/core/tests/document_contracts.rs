@@ -2740,15 +2740,8 @@ fn document_projection_composes_subprojections_for_app_state() {
         .set_text("summary-count", "42 rows")
         .set_data("summary", "state", "ready");
     let controls_projection = [
-        DocumentProjectionOperation::SetDisabled {
-            id: ElementId::new("refresh"),
-            disabled: true,
-        },
-        DocumentProjectionOperation::SetClass {
-            id: ElementId::new("refresh"),
-            class: "is-loading".into(),
-            present: true,
-        },
+        DocumentProjectionOperation::set_disabled("refresh", true),
+        DocumentProjectionOperation::add_class("refresh", "is-loading"),
     ]
     .into_iter()
     .collect::<DocumentProjection>();
@@ -2843,9 +2836,16 @@ fn document_projection_composes_subprojections_for_app_state() {
     );
     assert!(projection.operations()[0].is_attribute());
     assert!(projection.operations()[0].targets("summary"));
+    assert_eq!(
+        projection.operations()[0].attribute_named("data-source"),
+        Some("app-state")
+    );
     assert!(projection.operations()[3].is_text());
     assert!(projection.operations()[5].is_disabled());
+    assert!(projection.operations()[5].sets_disabled(true));
     assert!(projection.operations()[6].is_class());
+    assert!(projection.operations()[6].adds_class("is-loading"));
+    assert!(!projection.operations()[6].removes_class("is-loading"));
 
     let report = view.project(&projection).unwrap();
     let output = view.update();
