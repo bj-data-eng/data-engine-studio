@@ -34,6 +34,7 @@ pub struct ResolvedElement {
     pub id: ElementId,
     pub element: Element,
     pub classes: Vec<ClassName>,
+    pub role: Option<String>,
     pub attributes: std::collections::BTreeMap<String, String>,
     pub behavior_hooks: Vec<ElementBehaviorHook>,
     pub rect: Rect,

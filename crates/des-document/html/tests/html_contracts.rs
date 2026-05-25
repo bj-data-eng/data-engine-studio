@@ -1,7 +1,7 @@
 use des_document::{DocumentEngine, Element, Size};
 use des_html::{
-    CompileOptions, CompiledHtml, HtmlCompileLimits, HtmlDocument, HtmlFile, HtmlNode,
-    HtmlRenderLimits, HtmlSet, HtmlSink, HtmlStylesheet, RenderOptions, Value,
+    CompileOptions, CompiledHtml, HtmlCompileLimits, HtmlDiagnosticCode, HtmlDocument, HtmlFile,
+    HtmlNode, HtmlRenderLimits, HtmlSet, HtmlSink, HtmlStylesheet, RenderOptions, Value,
 };
 use std::collections::BTreeMap;
 use std::fs;
@@ -57,7 +57,7 @@ fn html_document_parser_recovers_like_browser_html() {
 fn html_document_parser_handles_void_elements_entities_and_comments() {
     let html = HtmlDocument::parse_fragment(
         r#"
-        <main id="app" class="shell primary" data-mode="demo">
+        <main id="app" class="shell primary" role="application" data-mode="demo" aria-label="Workspace">
           Hello &amp; welcome
           <!-- ignored comment -->
           <input id="search" value="A &quot;quote&quot;">
@@ -70,9 +70,14 @@ fn html_document_parser_handles_void_elements_entities_and_comments() {
     assert_eq!(main.tag, "main");
     assert_eq!(main.id.as_deref(), Some("app"));
     assert_eq!(main.classes, ["shell", "primary"]);
+    assert_eq!(main.role.as_deref(), Some("application"));
     assert_eq!(
         main.attributes.get("data-mode").map(String::as_str),
         Some("demo")
+    );
+    assert_eq!(
+        main.attributes.get("aria-label").map(String::as_str),
+        Some("Workspace")
     );
     assert!(main.children.iter().any(|child| {
         child
@@ -110,9 +115,33 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
 }
 
 #[test]
+fn html_document_parser_reports_behavior_hook_diagnostics() {
+    let html =
+        HtmlDocument::parse_fragment(r#"<button on:click="" data-command:input="">Run</button>"#)
+            .expect("HTML should parse with non-fatal diagnostics");
+
+    assert!(html.children[0].behavior_hooks.is_empty());
+    assert_eq!(html.diagnostics.len(), 2);
+    assert_eq!(
+        html.diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code)
+            .collect::<Vec<_>>(),
+        vec![
+            HtmlDiagnosticCode::EmptyBehaviorCommand,
+            HtmlDiagnosticCode::EmptyBehaviorCommand,
+        ]
+    );
+    assert!(html.diagnostics.iter().all(|diagnostic| {
+        diagnostic.tag.as_deref() == Some("button")
+            && diagnostic.message.contains("missing a Rust command")
+    }));
+}
+
+#[test]
 fn html_document_emits_typed_document_nodes_with_stable_ids() {
     let html = HtmlDocument::parse_fragment(
-        r#"<main id="app" class="shell"><button id="run" class="primary" on:click="run">Run</button><p>Ready</p></main>"#,
+        r#"<main id="app" class="shell" role="application" data-workspace="demo" aria-label="Workspace"><button id="run" class="primary" on:click="run">Run</button><p>Ready</p></main>"#,
     )
     .expect("HTML should parse");
     let mut document = html
@@ -142,6 +171,9 @@ fn html_document_emits_typed_document_nodes_with_stable_ids() {
         .expect("missing ids should receive stable path ids");
 
     assert_eq!(app.element(), Element::Main);
+    assert_eq!(app.role(), Some("application"));
+    assert_eq!(app.attribute("data-workspace"), Some("demo"));
+    assert_eq!(app.attribute("aria-label"), Some("Workspace"));
     assert_eq!(run.element(), Element::Button);
     assert!(run.interactive());
     assert_eq!(run.behavior_hooks()[0].event, "click");
@@ -170,6 +202,31 @@ fn html_stylesheet_parses_html_and_css_together() {
     assert_eq!(panel.rect().size.width, 144.0);
     assert_eq!(panel.attribute("class"), None);
     assert_eq!(panel.text(), Some("Panel".to_owned()));
+}
+
+#[test]
+fn html_document_and_stylesheet_load_from_files() {
+    let html_fixture = TempHtmlPath::new("des-html-document-load");
+    let css_fixture = TempHtmlPath::new("des-html-stylesheet-load");
+    fs::write(
+        html_fixture.path(),
+        r#"<section id="loaded" class="card">Loaded</section>"#,
+    )
+    .expect("HTML fixture should be writable");
+    fs::write(css_fixture.path(), ".card { width: 88px; height: 24px; }")
+        .expect("CSS fixture should be writable");
+
+    let html = HtmlDocument::load(html_fixture.path()).expect("HTML document should load");
+    assert!(
+        html.children
+            .iter()
+            .any(|node| node.tag == "html" || node.id.as_deref() == Some("loaded")),
+        "document parsing should return browser document structure"
+    );
+
+    let bundle = HtmlStylesheet::load_files(html_fixture.path(), css_fixture.path())
+        .expect("HTML+CSS files should load");
+    assert!(bundle.stylesheet.rule_count() > 0);
 }
 
 #[test]

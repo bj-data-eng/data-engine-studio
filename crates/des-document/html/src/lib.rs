@@ -152,15 +152,24 @@ pub type HtmlContext = BTreeMap<String, Value>;
 pub struct HtmlDocument {
     /// Top-level HTML nodes in source order.
     pub children: Vec<HtmlNode>,
+    /// Non-fatal authoring diagnostics collected while mapping HTML semantics.
+    pub diagnostics: Vec<HtmlDiagnostic>,
 }
 
 impl HtmlDocument {
     /// Parses an HTML document using HTML5 tree-construction rules.
     pub fn parse(source: &str) -> HtmlResult<Self> {
         let dom = parse_document(RcDom::default(), Default::default()).one(source);
+        let mut diagnostics = Vec::new();
         Ok(Self {
-            children: rcdom_children_to_html(&dom.document.children.borrow()),
+            children: rcdom_children_to_html(&dom.document.children.borrow(), &mut diagnostics),
+            diagnostics,
         })
+    }
+
+    /// Reads and parses an HTML document file using HTML5 tree-construction rules.
+    pub fn load(path: impl AsRef<Path>) -> HtmlResult<Self> {
+        Self::parse(&fs::read_to_string(path)?)
     }
 
     /// Parses an HTML fragment using a `body` context element.
@@ -174,8 +183,13 @@ impl HtmlDocument {
             false,
         )
         .one(source);
+        let mut diagnostics = Vec::new();
         Ok(Self {
-            children: rcdom_fragment_children_to_html(&dom.document.children.borrow()),
+            children: rcdom_fragment_children_to_html(
+                &dom.document.children.borrow(),
+                &mut diagnostics,
+            ),
+            diagnostics,
         })
     }
 
@@ -217,6 +231,16 @@ impl HtmlStylesheet {
             stylesheet,
         })
     }
+
+    /// Reads HTML and CSS files and parses them into the document pipeline.
+    pub fn load_files(html_path: impl AsRef<Path>, css_path: impl AsRef<Path>) -> HtmlResult<Self> {
+        let html = HtmlDocument::load(html_path)?;
+        let stylesheet =
+            StyleSheet::parse_css(&fs::read_to_string(css_path)?).map_err(|error| {
+                HtmlError::Render(format!("CSS stylesheet failed to parse: {error}"))
+            })?;
+        Ok(Self { html, stylesheet })
+    }
 }
 
 /// Rust behavior declared from HTML attributes.
@@ -226,6 +250,42 @@ pub struct HtmlBehaviorHook {
     pub event: String,
     /// Rust command/event intent declared by the author.
     pub command: String,
+}
+
+/// Non-fatal HTML authoring diagnostic.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HtmlDiagnostic {
+    /// Stable diagnostic category.
+    pub code: HtmlDiagnosticCode,
+    /// Human-readable diagnostic message.
+    pub message: String,
+    /// Best-effort element tag connected to the diagnostic.
+    pub tag: Option<String>,
+    /// Best-effort attribute name connected to the diagnostic.
+    pub attribute: Option<String>,
+}
+
+impl HtmlDiagnostic {
+    fn new(
+        code: HtmlDiagnosticCode,
+        message: impl Into<String>,
+        tag: Option<String>,
+        attribute: Option<String>,
+    ) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            tag,
+            attribute,
+        }
+    }
+}
+
+/// Stable HTML diagnostic codes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HtmlDiagnosticCode {
+    EmptyBehaviorEvent,
+    EmptyBehaviorCommand,
 }
 
 /// Parsed html document.
@@ -451,6 +511,8 @@ pub struct HtmlNode {
     pub id: Option<String>,
     /// Resolved class names from the `class` attribute.
     pub classes: Vec<String>,
+    /// Element role from the `role` attribute, when present.
+    pub role: Option<String>,
     /// Non-id/class attributes with parsed or interpolated values.
     pub attributes: BTreeMap<String, String>,
     /// Rust behavior hooks declared through `on:*` attributes.
@@ -468,6 +530,7 @@ impl HtmlNode {
             tag: "#text".to_owned(),
             id: None,
             classes: Vec::new(),
+            role: None,
             attributes: BTreeMap::new(),
             behavior_hooks: Vec::new(),
             text: Some(text.into()),
@@ -495,6 +558,9 @@ impl HtmlNode {
         let mut spec = ElementSpec::new(element_for_tag(&self.tag));
         for class in &self.classes {
             spec = spec.class(class.clone());
+        }
+        if let Some(role) = &self.role {
+            spec = spec.role(role.clone());
         }
         for (name, value) in &self.attributes {
             spec = spec.attribute(name.clone(), value.clone());
@@ -985,16 +1051,22 @@ impl LimitedString {
     }
 }
 
-fn rcdom_children_to_html(children: &[Handle]) -> Vec<HtmlNode> {
+fn rcdom_children_to_html(
+    children: &[Handle],
+    diagnostics: &mut Vec<HtmlDiagnostic>,
+) -> Vec<HtmlNode> {
     let mut nodes = Vec::new();
     for child in children {
-        append_rcdom_node(child, &mut nodes);
+        append_rcdom_node(child, &mut nodes, diagnostics);
     }
     nodes
 }
 
-fn rcdom_fragment_children_to_html(children: &[Handle]) -> Vec<HtmlNode> {
-    let mut nodes = rcdom_children_to_html(children);
+fn rcdom_fragment_children_to_html(
+    children: &[Handle],
+    diagnostics: &mut Vec<HtmlDiagnostic>,
+) -> Vec<HtmlNode> {
+    let mut nodes = rcdom_children_to_html(children, diagnostics);
     loop {
         if nodes.len() != 1 {
             return nodes;
@@ -1006,9 +1078,16 @@ fn rcdom_fragment_children_to_html(children: &[Handle]) -> Vec<HtmlNode> {
     }
 }
 
-fn append_rcdom_node(handle: &Handle, nodes: &mut Vec<HtmlNode>) {
+fn append_rcdom_node(
+    handle: &Handle,
+    nodes: &mut Vec<HtmlNode>,
+    diagnostics: &mut Vec<HtmlDiagnostic>,
+) {
     match &handle.data {
-        NodeData::Document => nodes.extend(rcdom_children_to_html(&handle.children.borrow())),
+        NodeData::Document => nodes.extend(rcdom_children_to_html(
+            &handle.children.borrow(),
+            diagnostics,
+        )),
         NodeData::Doctype { .. } | NodeData::Comment { .. } => {}
         NodeData::Text { contents } => {
             let text = contents.borrow().to_string();
@@ -1020,6 +1099,7 @@ fn append_rcdom_node(handle: &Handle, nodes: &mut Vec<HtmlNode>) {
             let tag = name.local.to_string();
             let mut id = None;
             let mut classes = Vec::new();
+            let mut role = None;
             let mut attributes = BTreeMap::new();
             let mut behavior_hooks = Vec::new();
 
@@ -1030,27 +1110,30 @@ fn append_rcdom_node(handle: &Handle, nodes: &mut Vec<HtmlNode>) {
                     id = Some(value);
                 } else if name == "class" {
                     classes.extend(value.split_whitespace().map(str::to_owned));
+                } else if name == "role" {
+                    role = Some(value);
                 } else if let Some(event) = name.strip_prefix("on:") {
-                    behavior_hooks.push(HtmlBehaviorHook {
-                        event: event.to_owned(),
-                        command: value,
-                    });
+                    push_behavior_hook(&tag, &name, event, value, &mut behavior_hooks, diagnostics);
                 } else if let Some(command_event) = name.strip_prefix("data-command") {
                     let event = command_event
                         .strip_prefix(':')
                         .filter(|event| !event.is_empty())
                         .unwrap_or("click");
-                    behavior_hooks.push(HtmlBehaviorHook {
-                        event: event.to_owned(),
-                        command: value.clone(),
-                    });
+                    push_behavior_hook(
+                        &tag,
+                        &name,
+                        event,
+                        value.clone(),
+                        &mut behavior_hooks,
+                        diagnostics,
+                    );
                     attributes.insert(name, value);
                 } else {
                     attributes.insert(name, value);
                 }
             }
 
-            let children = rcdom_children_to_html(&handle.children.borrow());
+            let children = rcdom_children_to_html(&handle.children.borrow(), diagnostics);
             let text = if children.len() == 1 && children[0].is_text() {
                 children[0].text.clone()
             } else {
@@ -1061,6 +1144,7 @@ fn append_rcdom_node(handle: &Handle, nodes: &mut Vec<HtmlNode>) {
                 tag,
                 id,
                 classes,
+                role,
                 attributes,
                 behavior_hooks,
                 text,
@@ -1077,6 +1161,38 @@ fn html_attribute_name(name: &QualName) -> String {
     } else {
         name.local.to_string()
     }
+}
+
+fn push_behavior_hook(
+    tag: &str,
+    attribute: &str,
+    event: &str,
+    command: String,
+    behavior_hooks: &mut Vec<HtmlBehaviorHook>,
+    diagnostics: &mut Vec<HtmlDiagnostic>,
+) {
+    if event.trim().is_empty() {
+        diagnostics.push(HtmlDiagnostic::new(
+            HtmlDiagnosticCode::EmptyBehaviorEvent,
+            "behavior hook is missing an event name",
+            Some(tag.to_owned()),
+            Some(attribute.to_owned()),
+        ));
+        return;
+    }
+    if command.trim().is_empty() {
+        diagnostics.push(HtmlDiagnostic::new(
+            HtmlDiagnosticCode::EmptyBehaviorCommand,
+            "behavior hook is missing a Rust command",
+            Some(tag.to_owned()),
+            Some(attribute.to_owned()),
+        ));
+        return;
+    }
+    behavior_hooks.push(HtmlBehaviorHook {
+        event: event.to_owned(),
+        command,
+    });
 }
 
 fn element_for_tag(tag: &str) -> Element {
@@ -1256,6 +1372,7 @@ fn render_element(
     let mut attributes = BTreeMap::new();
     let mut classes = Vec::new();
     let mut id = None;
+    let mut role = None;
     let mut behavior_hooks = Vec::new();
 
     for attribute in &element.attributes {
@@ -1269,6 +1386,8 @@ fn render_element(
             classes.extend(value.split_whitespace().map(str::to_owned));
         } else if attribute.name == "id" {
             id = Some(value);
+        } else if attribute.name == "role" {
+            role = Some(value);
         } else if let Some(event) = attribute.name.strip_prefix("on:") {
             behavior_hooks.push(HtmlBehaviorHook {
                 event: event.to_owned(),
@@ -1312,6 +1431,7 @@ fn render_element(
         tag: element.tag.clone(),
         id,
         classes,
+        role,
         attributes,
         behavior_hooks,
         text,

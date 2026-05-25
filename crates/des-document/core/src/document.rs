@@ -924,6 +924,7 @@ impl Document {
             id: element.id.clone(),
             element: element.spec.element,
             classes: element.spec.classes.clone(),
+            role: element.spec.role.clone(),
             attributes: element.spec.attributes.clone(),
             behavior_hooks: element.spec.behavior_hooks.clone(),
             rect,
@@ -1216,6 +1217,11 @@ impl DocumentBuilder {
 impl ElementBuilder<'_> {
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
         self.spec.classes.push(class.into());
+        self
+    }
+
+    pub fn role(mut self, role: impl Into<String>) -> Self {
+        self.spec.role = Some(role.into());
         self
     }
 

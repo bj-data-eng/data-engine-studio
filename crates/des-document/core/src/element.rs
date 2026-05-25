@@ -149,6 +149,7 @@ impl From<String> for ClassName {
 pub struct ElementSpec {
     pub element: Element,
     pub classes: Vec<ClassName>,
+    pub role: Option<String>,
     pub attributes: BTreeMap<String, String>,
     pub behavior_hooks: Vec<ElementBehaviorHook>,
     pub interactive: bool,
@@ -169,6 +170,7 @@ impl ElementSpec {
         Self {
             element,
             classes: Vec::new(),
+            role: None,
             attributes: BTreeMap::new(),
             behavior_hooks: Vec::new(),
             interactive: false,
@@ -187,6 +189,11 @@ impl ElementSpec {
 
     pub fn class(mut self, class: impl Into<ClassName>) -> Self {
         self.classes.push(class.into());
+        self
+    }
+
+    pub fn role(mut self, role: impl Into<String>) -> Self {
+        self.role = Some(role.into());
         self
     }
 
@@ -299,6 +306,7 @@ pub struct VisualElementClone {
     pub source_id: ElementId,
     pub element: Element,
     pub classes: Vec<ClassName>,
+    pub role: Option<String>,
     pub attributes: BTreeMap<String, String>,
     pub behavior_hooks: Vec<ElementBehaviorHook>,
     pub text: Option<TextContent>,
@@ -313,6 +321,7 @@ impl VisualElementClone {
             source_id: element.id.clone(),
             element: element.element,
             classes: element.classes.clone(),
+            role: element.role.clone(),
             attributes: element.attributes.clone(),
             behavior_hooks: element.behavior_hooks.clone(),
             text: element.text.clone(),
@@ -356,6 +365,7 @@ impl VisualElementClone {
     pub(crate) fn to_element(&self, options: &VisualCloneOptions, is_root: bool) -> DocumentNode {
         let mut spec = ElementSpec::new(self.element);
         spec.classes = self.classes.clone();
+        spec.role = self.role.clone();
         spec.attributes = self.attributes.clone();
         spec.behavior_hooks = self.behavior_hooks.clone();
         if is_root {

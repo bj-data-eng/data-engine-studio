@@ -77,6 +77,10 @@ impl<'a> ElementSnapshot<'a> {
         &self.element.classes
     }
 
+    pub fn role(&self) -> Option<&str> {
+        self.element.role.as_deref()
+    }
+
     pub fn attributes(&self) -> &std::collections::BTreeMap<String, String> {
         &self.element.attributes
     }
