@@ -10,7 +10,6 @@ description = "Runtime and compiled html language for Data Engine Studio documen
 des-document.workspace = true
 html5ever.workspace = true
 markup5ever_rcdom.workspace = true
-serde.workspace = true
 
 [dev-dependencies]
 filetime.workspace = true

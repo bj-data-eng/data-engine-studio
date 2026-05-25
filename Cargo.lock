@@ -788,7 +788,6 @@ dependencies = [
  "filetime",
  "html5ever",
  "markup5ever_rcdom",
- "serde",
 ]
 
 [[package]]
