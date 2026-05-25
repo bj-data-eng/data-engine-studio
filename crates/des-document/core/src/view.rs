@@ -1,6 +1,7 @@
 use crate::{
-    Document, DocumentBuilder, DocumentEngine, DocumentInput, DocumentOutput, DocumentProjection,
-    DocumentProjectionReport, DocumentResult, DocumentWidget, Size, StyleSheet, TextMeasurer,
+    Document, DocumentBuilder, DocumentCommandAction, DocumentCommandRegistry, DocumentEngine,
+    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentResult,
+    DocumentWidget, Size, StyleSheet, TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -12,6 +13,13 @@ pub struct DocumentView {
     document: Document,
     stylesheet: StyleSheet,
     engine: DocumentEngine,
+}
+
+/// Resolved document output plus typed app actions collected from authored commands.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentActionFrame<Action> {
+    pub output: DocumentOutput,
+    pub actions: Vec<DocumentCommandAction<Action>>,
 }
 
 impl DocumentView {
@@ -247,10 +255,35 @@ impl DocumentView {
         self.engine.update(&mut self.document, &self.stylesheet)
     }
 
+    /// Resolves the document and collects typed app actions from authored commands.
+    pub fn update_actions<Action>(
+        &mut self,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        let output = self.update();
+        Self::collect_action_frame(registry, output)
+    }
+
     /// Routes input, resolves style/layout, and returns the current document output.
     pub fn update_with_input(&mut self, input: DocumentInput) -> DocumentOutput {
         self.engine
             .update_with_input(&mut self.document, &self.stylesheet, input)
+    }
+
+    /// Routes input, resolves the document, and collects typed app actions.
+    pub fn update_with_input_actions<Action>(
+        &mut self,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        let output = self.update_with_input(input);
+        Self::collect_action_frame(registry, output)
     }
 
     /// Routes input and resolves the document with a host-provided text measurer.
@@ -267,9 +300,34 @@ impl DocumentView {
         )
     }
 
+    /// Routes input with a host text measurer and collects typed app actions.
+    pub fn update_with_input_and_text_measurer_actions<Action>(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        let output = self.update_with_input_and_text_measurer(input, text_measurer);
+        Self::collect_action_frame(registry, output)
+    }
+
     /// Splits the view into its owned document, stylesheet, and engine.
     pub fn into_parts(self) -> (Document, StyleSheet, DocumentEngine) {
         (self.document, self.stylesheet, self.engine)
+    }
+
+    fn collect_action_frame<Action>(
+        registry: &DocumentCommandRegistry<Action>,
+        output: DocumentOutput,
+    ) -> DocumentActionFrame<Action>
+    where
+        Action: Clone,
+    {
+        let actions = registry.collect_actions(&output);
+        DocumentActionFrame { output, actions }
     }
 }
 

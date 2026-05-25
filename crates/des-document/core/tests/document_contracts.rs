@@ -324,6 +324,42 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
 }
 
 #[test]
+fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+    }
+
+    let stylesheet = StyleSheet::new().id(
+        "run",
+        Style::default()
+            .width(Length::Px(96.0))
+            .height(Length::Px(32.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").on_click("run").text("Run");
+    });
+    let registry = DocumentCommandRegistry::new().bind_click("run", AppAction::Run);
+
+    let frame = view.update_with_input_actions(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &registry,
+    );
+    let run = frame.output.snapshot().find("run").unwrap();
+
+    assert_eq!(run.text(), Some("Run".to_owned()));
+    assert_eq!(
+        frame.actions,
+        vec![DocumentCommandAction {
+            target: ElementId::new("run"),
+            event: DocumentEventKind::Clicked,
+            command: "run".to_owned(),
+            action: AppAction::Run,
+        }]
+    );
+}
+
+#[test]
 fn document_command_registry_dispatches_typed_actions_with_context() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum AppAction {
