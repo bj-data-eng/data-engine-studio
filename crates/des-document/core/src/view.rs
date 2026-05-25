@@ -155,6 +155,47 @@ impl<Action> DocumentActionFrame<Action> {
             .map(DocumentCommandAction::action)
     }
 
+    /// Iterates typed app actions emitted by one element and authored behavior intent.
+    pub fn actions_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a DocumentCommandAction<Action>> + 'a {
+        self.actions_for(target)
+            .filter(move |action| action.matches_intent(intent))
+    }
+
+    /// Returns the first typed app action emitted by one element and behavior intent.
+    pub fn first_action_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentCommandAction<Action>> {
+        self.actions
+            .iter()
+            .find(|action| action.target.as_str() == target && action.matches_intent(intent))
+    }
+
+    /// Iterates only typed app action values emitted by one element and behavior intent.
+    pub fn action_values_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.actions_for_target_intent(target, intent)
+            .map(DocumentCommandAction::action)
+    }
+
+    /// Returns only the first typed app action value emitted by one element and intent.
+    pub fn first_action_value_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&Action> {
+        self.first_action_for_target_intent(target, intent)
+            .map(DocumentCommandAction::action)
+    }
+
     /// Iterates typed app actions emitted by click intent.
     pub fn clicked_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::Click)
@@ -409,6 +450,20 @@ impl<Action> DocumentActionFrame<Action> {
         Action: PartialEq,
     {
         self.actions_for_intent(intent)
+            .any(|candidate| &candidate.action == action)
+    }
+
+    /// Returns true when the supplied element and behavior intent emitted the action.
+    pub fn contains_action_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        action: &Action,
+    ) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.actions_for_target_intent(target, intent)
             .any(|candidate| &candidate.action == action)
     }
 

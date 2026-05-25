@@ -428,6 +428,23 @@ impl DocumentOutput {
         self.commands_for(target).next()
     }
 
+    pub fn commands_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = DocumentCommandRef<'a>> + 'a {
+        self.commands_for(target)
+            .filter(move |command| command.matches_intent(intent))
+    }
+
+    pub fn first_command_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<DocumentCommandRef<'a>> {
+        self.commands_for_target_intent(target, intent).next()
+    }
+
     pub fn has_command(&self, target: &str, command: &str) -> bool {
         self.commands_for(target)
             .any(|event| event.command == command)

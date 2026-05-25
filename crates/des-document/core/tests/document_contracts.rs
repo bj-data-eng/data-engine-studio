@@ -556,6 +556,19 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
             .collect::<Vec<_>>(),
         vec!["commit"]
     );
+    assert_eq!(
+        key_output
+            .commands_for_target_intent("commit", ElementBehaviorEvent::KeyDown)
+            .map(|command| command.command)
+            .collect::<Vec<_>>(),
+        vec!["commit"]
+    );
+    assert_eq!(
+        key_output
+            .first_command_for_target_intent("commit", ElementBehaviorEvent::KeyDown)
+            .map(|command| command.command().to_owned()),
+        Some("commit".to_owned())
+    );
     assert_eq!(click_actions.len(), 1);
     assert_eq!(*click_actions[0].action, AppAction::CommitByClick);
     assert_eq!(click_actions[0].event, DocumentEventKind::Clicked);
@@ -1101,9 +1114,42 @@ fn document_action_frame_supports_app_update_loop_queries() {
         key_frame.first_action_value_for_intent(ElementBehaviorEvent::KeyDown),
         Some(&AppAction::Cancel)
     );
+    assert_eq!(
+        key_frame
+            .actions_for_target_intent("cancel", ElementBehaviorEvent::KeyDown)
+            .map(|action| action.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["cancel"]
+    );
+    assert_eq!(
+        key_frame
+            .first_action_for_target_intent("cancel", ElementBehaviorEvent::KeyDown)
+            .map(|action| &action.action),
+        Some(&AppAction::Cancel)
+    );
+    assert_eq!(
+        key_frame
+            .action_values_for_target_intent("cancel", ElementBehaviorEvent::KeyDown)
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Cancel]
+    );
+    assert_eq!(
+        key_frame.first_action_value_for_target_intent("cancel", ElementBehaviorEvent::KeyDown),
+        Some(&AppAction::Cancel)
+    );
     assert!(
         key_frame.contains_action_for_intent(ElementBehaviorEvent::KeyDown, &AppAction::Cancel)
     );
+    assert!(key_frame.contains_action_for_target_intent(
+        "cancel",
+        ElementBehaviorEvent::KeyDown,
+        &AppAction::Cancel
+    ));
+    assert!(!key_frame.contains_action_for_target_intent(
+        "run",
+        ElementBehaviorEvent::KeyDown,
+        &AppAction::Cancel
+    ));
     assert_eq!(
         key_frame
             .key_down_actions()
