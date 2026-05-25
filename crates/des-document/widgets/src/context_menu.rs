@@ -1,6 +1,6 @@
 use des_document::{
-    DocumentBuilder, Element, ElementId, ElementSpec, FloatingPlacement, FloatingShift, Insets,
-    Length, Point, Style, StyleSelector, StyleSheet,
+    DocumentBuilder, DocumentWidget, Element, ElementId, ElementSpec, FloatingPlacement,
+    FloatingShift, Insets, Length, Point, Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -195,6 +195,16 @@ impl ContextMenu {
     }
 }
 
+impl DocumentWidget for ContextMenu {
+    fn render(&self, ui: &mut DocumentBuilder) {
+        ContextMenu::render(self, ui);
+    }
+
+    fn push_styles(&self, stylesheet: &mut StyleSheet) {
+        ContextMenu::push_styles(self, stylesheet);
+    }
+}
+
 impl ContextMenuItem {
     pub fn new(id: impl Into<ElementId>, label: impl Into<String>) -> Self {
         Self {
@@ -248,7 +258,9 @@ pub fn context_menu_surface_style() -> Style {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_document::{Document, DocumentEngine, FloatingPlacement, Size, StyleSheet};
+    use des_document::{
+        Document, DocumentEngine, DocumentView, FloatingPlacement, Size, StyleSheet,
+    };
 
     #[test]
     fn context_menu_renders_menu_items_and_separators() {
@@ -278,6 +290,30 @@ mod tests {
                 .find("primary-separator")
                 .unwrap()
                 .has_class("context-menu-separator")
+        );
+    }
+
+    #[test]
+    fn context_menu_implements_document_widget_contract() {
+        let menu = ContextMenu::new("text-context-menu")
+            .at(Point::new(40.0, 24.0))
+            .item("copy", "Copy");
+        let mut view = DocumentView::build(Size::new(240.0, 140.0), StyleSheet::new(), |ui| {
+            ui.widget(&menu);
+        });
+        view.push_widget_styles(&menu);
+
+        let output = view.update();
+
+        assert!(output.snapshot().find("copy").unwrap().interactive());
+        assert_eq!(
+            output
+                .snapshot()
+                .find("text-context-menu-anchor")
+                .unwrap()
+                .rect()
+                .origin,
+            Point::new(40.0, 24.0)
         );
     }
 

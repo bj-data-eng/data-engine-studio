@@ -1,6 +1,6 @@
 use crate::{
-    Document, DocumentBuilder, DocumentEngine, DocumentInput, DocumentOutput, Size, StyleSheet,
-    TextMeasurer,
+    Document, DocumentBuilder, DocumentEngine, DocumentInput, DocumentOutput, DocumentWidget, Size,
+    StyleSheet, TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -61,6 +61,11 @@ impl DocumentView {
     /// Replaces the stylesheet used to resolve this document.
     pub fn replace_stylesheet(&mut self, stylesheet: StyleSheet) {
         self.stylesheet = stylesheet;
+    }
+
+    /// Adds styles declared by a reusable document widget.
+    pub fn push_widget_styles(&mut self, widget: &impl DocumentWidget) {
+        widget.push_styles(&mut self.stylesheet);
     }
 
     /// Returns the retained document engine.

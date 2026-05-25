@@ -1159,6 +1159,12 @@ pub struct DocumentBuilder {
     children: Vec<DocumentNode>,
 }
 
+pub trait DocumentWidget {
+    fn render(&self, ui: &mut DocumentBuilder);
+
+    fn push_styles(&self, _stylesheet: &mut StyleSheet) {}
+}
+
 pub struct ElementBuilder<'a> {
     parent: &'a mut DocumentBuilder,
     id: ElementId,
@@ -1182,6 +1188,10 @@ impl DocumentBuilder {
             id: id.into(),
             spec: ElementSpec::new(element),
         }
+    }
+
+    pub fn widget(&mut self, widget: &impl DocumentWidget) {
+        widget.render(self);
     }
 
     element_builder_methods! {

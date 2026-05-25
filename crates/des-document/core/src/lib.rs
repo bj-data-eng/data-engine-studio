@@ -23,7 +23,9 @@ mod text;
 mod view;
 
 pub use css::CssParseError;
-pub use document::{Document, DocumentBuilder, DocumentError, DocumentResult, ElementBuilder};
+pub use document::{
+    Document, DocumentBuilder, DocumentError, DocumentResult, DocumentWidget, ElementBuilder,
+};
 pub use element::{
     ClassName, Color, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId, ElementSpec,
     ElementStateSelector, Glyph, VisualCloneOptions, VisualElementClone,
