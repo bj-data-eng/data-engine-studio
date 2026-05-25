@@ -1043,6 +1043,59 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
     assert!(mapped_click_frame.contains_clicked_action(&HtmlAction::Run));
     assert!(mapped_key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
 
+    let intent_registry = bundle.command_intent_action_registry([
+        (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+        (
+            ElementBehaviorEvent::Click,
+            "project.commit",
+            HtmlAction::CommitByClick,
+        ),
+        (
+            ElementBehaviorEvent::KeyDown,
+            "project.commit",
+            HtmlAction::CommitByKeyboard,
+        ),
+    ]);
+    let mut pushed_intent_registry = DocumentCommandRegistry::new();
+    bundle.push_command_intent_actions(
+        &mut pushed_intent_registry,
+        [
+            (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+            (
+                ElementBehaviorEvent::Click,
+                "project.commit",
+                HtmlAction::CommitByClick,
+            ),
+            (
+                ElementBehaviorEvent::KeyDown,
+                "project.commit",
+                HtmlAction::CommitByKeyboard,
+            ),
+        ],
+    );
+    let intent_click_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 32.0)),
+            &intent_registry,
+        )
+        .expect("intent mapped HTML commands should route click actions");
+    let intent_key_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            &intent_registry,
+        )
+        .expect("intent mapped HTML commands should route keyboard actions");
+
+    assert_eq!(
+        pushed_intent_registry.bindings(),
+        intent_registry.bindings()
+    );
+    assert!(intent_click_frame.contains_clicked_action(&HtmlAction::CommitByClick));
+    assert!(intent_key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
+    assert!(!intent_click_frame.contains_clicked_action(&HtmlAction::CommitByKeyboard));
+
     let registry = bundle.command_registry(|hook| match (hook.command(), hook.intent()) {
         ("project.run", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::Run),
         ("project.commit", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::CommitByClick),

@@ -293,6 +293,47 @@ impl HtmlDocument {
         registry
     }
 
+    /// Pushes typed Rust actions for `(event intent, command)` pairs.
+    ///
+    /// This is the concise path when one HTML command name is reused by several
+    /// event hooks but each event should map to a distinct Rust action.
+    pub fn push_command_intent_actions<Action, Command>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let actions = actions
+            .into_iter()
+            .map(|(intent, command, action)| (intent, command.as_ref().to_owned(), action))
+            .collect::<Vec<_>>();
+        self.push_commands(registry, |hook| {
+            let intent = hook.intent()?;
+            actions
+                .iter()
+                .find(|(action_intent, command, _)| {
+                    *action_intent == intent && command == hook.command()
+                })
+                .map(|(_, _, action)| action.clone())
+        });
+    }
+
+    /// Creates typed Rust action bindings from `(event intent, command, action)` tuples.
+    pub fn command_intent_action_registry<Action, Command>(
+        &self,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> DocumentCommandRegistry<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_command_intent_actions(&mut registry, actions);
+        registry
+    }
+
     /// Creates a retained document from this HTML tree.
     pub fn to_document(&self, viewport: Size) -> HtmlResult<Document> {
         Ok(Document::build(viewport, |document| {
@@ -970,6 +1011,30 @@ impl HtmlStylesheet {
         Command: AsRef<str>,
     {
         self.html.command_action_registry(actions)
+    }
+
+    /// Pushes typed Rust actions for `(event intent, command)` pairs.
+    pub fn push_command_intent_actions<Action, Command>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.html.push_command_intent_actions(registry, actions);
+    }
+
+    /// Creates typed Rust action bindings from `(event intent, command, action)` tuples.
+    pub fn command_intent_action_registry<Action, Command>(
+        &self,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> DocumentCommandRegistry<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.html.command_intent_action_registry(actions)
     }
 
     /// Parses an HTML document and CSS stylesheet into typed document inputs.
@@ -1975,6 +2040,35 @@ impl HtmlSet {
         Command: AsRef<str>,
     {
         Ok(self.get(name)?.command_action_registry(actions))
+    }
+
+    /// Pushes typed Rust actions for `(event intent, command)` pairs in a named document.
+    pub fn push_command_intent_actions<Action, Command>(
+        &self,
+        name: &str,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<()>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.get(name)?
+            .push_command_intent_actions(registry, actions);
+        Ok(())
+    }
+
+    /// Creates typed Rust action bindings from `(event intent, command, action)` tuples.
+    pub fn command_intent_action_registry<Action, Command>(
+        &self,
+        name: &str,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentCommandRegistry<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self.get(name)?.command_intent_action_registry(actions))
     }
 
     /// Creates a retained document from a named HTML document.
