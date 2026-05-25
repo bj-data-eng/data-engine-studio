@@ -78,6 +78,64 @@ impl DocumentProjection {
         self
     }
 
+    pub fn elements<I, Id>(
+        &mut self,
+        ids: I,
+        mut project: impl FnMut(ElementProjection<'_>),
+    ) -> &mut Self
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        for id in ids {
+            project(self.element(id));
+        }
+        self
+    }
+
+    pub fn with_elements<I, Id>(
+        mut self,
+        ids: I,
+        project: impl FnMut(ElementProjection<'_>),
+    ) -> Self
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        self.elements(ids, project);
+        self
+    }
+
+    pub fn elements_if<I, Id>(
+        &mut self,
+        ids: I,
+        present: bool,
+        project: impl FnMut(ElementProjection<'_>),
+    ) -> &mut Self
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        if present {
+            self.elements(ids, project);
+        }
+        self
+    }
+
+    pub fn with_elements_if<I, Id>(
+        mut self,
+        ids: I,
+        present: bool,
+        project: impl FnMut(ElementProjection<'_>),
+    ) -> Self
+    where
+        I: IntoIterator<Item = Id>,
+        Id: Into<ElementId>,
+    {
+        self.elements_if(ids, present, project);
+        self
+    }
+
     pub fn when(mut self, present: bool, project: impl FnOnce(&mut Self)) -> Self {
         self.project_if(present, project);
         self
@@ -551,6 +609,10 @@ pub struct ElementProjection<'a> {
 }
 
 impl ElementProjection<'_> {
+    pub fn id(&self) -> &ElementId {
+        &self.id
+    }
+
     pub fn when(&mut self, present: bool, project: impl FnOnce(&mut Self)) -> &mut Self {
         if present {
             project(self);

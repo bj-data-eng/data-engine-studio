@@ -1222,6 +1222,67 @@ fn document_projection_composes_subprojections_for_app_state() {
 }
 
 #[test]
+fn document_projection_projects_collections_of_elements_fluently() {
+    let row_ids = ["row-1", "row-2", "row-3"];
+    let selected_ids = ["row-2"];
+    let stale_ids = ["row-1", "row-3"];
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.div("table").children(|ui| {
+            for row_id in row_ids {
+                ui.div(row_id)
+                    .class("row")
+                    .data("state", "idle")
+                    .text(row_id);
+            }
+        });
+    });
+
+    let mut projection = DocumentProjection::new().with_elements(row_ids, |mut row| {
+        let state = format!("ready:{}", row.id().as_str());
+        row.data("state", state)
+            .aria("selected", "false")
+            .add_class("is-ready")
+            .remove_class("is-stale");
+    });
+    projection
+        .elements(selected_ids, |mut row| {
+            row.select()
+                .aria("selected", "true")
+                .add_class("is-selected");
+        })
+        .elements_if(stale_ids, false, |mut row| {
+            row.data("state", "stale").add_class("is-stale");
+        });
+    let projection = projection.with_elements_if(stale_ids, true, |mut row| {
+        row.data("quality", "stale").add_class("is-stale");
+    });
+
+    let report = view.project(&projection).unwrap();
+    let output = view.update();
+    let row_1 = output.snapshot().find("row-1").unwrap();
+    let row_2 = output.snapshot().find("row-2").unwrap();
+    let row_3 = output.snapshot().find("row-3").unwrap();
+
+    assert_eq!(report.operations, 19);
+    assert_eq!(report.changed, 16);
+    assert_eq!(row_1.data("state"), Some("ready:row-1"));
+    assert_eq!(row_2.data("state"), Some("ready:row-2"));
+    assert_eq!(row_3.data("state"), Some("ready:row-3"));
+    assert!(row_1.has_class("is-ready"));
+    assert!(row_2.has_class("is-ready"));
+    assert!(row_3.has_class("is-ready"));
+    assert!(!row_1.selected());
+    assert!(row_2.selected());
+    assert!(!row_3.selected());
+    assert_eq!(row_2.aria("selected"), Some("true"));
+    assert_eq!(row_1.data("quality"), Some("stale"));
+    assert_eq!(row_3.data("quality"), Some("stale"));
+    assert!(row_1.has_class("is-stale"));
+    assert!(!row_2.has_class("is-stale"));
+    assert!(row_3.has_class("is-stale"));
+}
+
+#[test]
 fn document_view_projects_state_and_updates_in_one_fluent_call() {
     let stylesheet = StyleSheet::new()
         .rule(
