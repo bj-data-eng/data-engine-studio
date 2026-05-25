@@ -2909,6 +2909,14 @@ fn document_view_builder_can_build_action_surfaces_directly() {
 
     let registry = DocumentCommandRegistry::new().bind_click("run", AppAction::Run);
     let mut direct_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .with(|builder| {
+            builder.extend_stylesheet(StyleSheet::new().id(
+                "run",
+                Style::default().background(Color::rgb(220, 238, 255)),
+            ))
+        })
+        .try_with(|builder| builder.with_css_forgiving(".ignored { unknown-property: yes; }"))
+        .expect("builder configuration should compose")
         .with_css("#run { width: 96px; height: 32px; }")
         .expect("CSS should compose")
         .build_action_surface(registry, |ui| {
@@ -2936,6 +2944,7 @@ fn document_view_builder_can_build_action_surfaces_directly() {
     assert!(direct_frame.contains_clicked_action(&AppAction::Run));
     assert_eq!(direct_surface.commands().bindings().len(), 1);
     assert_eq!(run.rect().size, Size::new(96.0, 32.0));
+    assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
     assert!(configured_frame.contains_action_for_target_intent(
         "menu",
         ElementBehaviorEvent::ContextMenu,

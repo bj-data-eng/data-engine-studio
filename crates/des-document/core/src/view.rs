@@ -2195,6 +2195,14 @@ impl DocumentViewBuilder {
         }
     }
 
+    pub fn with(self, configure: impl FnOnce(Self) -> Self) -> Self {
+        configure(self)
+    }
+
+    pub fn try_with<E>(self, configure: impl FnOnce(Self) -> Result<Self, E>) -> Result<Self, E> {
+        configure(self)
+    }
+
     pub fn stylesheet(mut self, stylesheet: StyleSheet) -> Self {
         self.stylesheet = stylesheet;
         self
