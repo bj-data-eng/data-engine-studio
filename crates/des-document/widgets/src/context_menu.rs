@@ -367,6 +367,35 @@ impl ContextMenu {
             .update_actions())
     }
 
+    /// Builds this menu from `(command, action)` pairs and collects typed actions.
+    pub fn update_actions_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_actions_with_stylesheet_and_actions(viewport, StyleSheet::new(), actions)
+    }
+
+    /// Builds this menu with caller-provided styles and `(command, action)` pairs.
+    pub fn update_actions_with_stylesheet_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self
+            .try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?
+            .update_actions())
+    }
+
     /// Builds this menu, routes input, and collects typed actions in one call.
     pub fn update_with_input_actions<Action>(
         &self,
@@ -398,6 +427,42 @@ impl ContextMenu {
     {
         Ok(self
             .try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?
+            .update_with_input_actions(input))
+    }
+
+    /// Builds this menu from `(command, action)` pairs, routes input, and collects actions.
+    pub fn update_with_input_actions_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_stylesheet_and_actions(
+            viewport,
+            input,
+            StyleSheet::new(),
+            actions,
+        )
+    }
+
+    /// Builds this menu with caller styles and `(command, action)` pairs, then routes input.
+    pub fn update_with_input_actions_with_stylesheet_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        stylesheet: StyleSheet,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        Ok(self
+            .try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?
             .update_with_input_actions(input))
     }
 
@@ -834,6 +899,16 @@ mod tests {
                 },
             )
             .expect("context menu should update and collect actions directly");
+        let direct_mapped_frame = menu
+            .update_with_input_actions_with_actions(
+                Size::new(240.0, 140.0),
+                DocumentInput::primary_click(Point::new(2.0, 2.0)),
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("context menu should update with command action pairs directly");
         let empty_frame = menu
             .update_actions(Size::new(240.0, 140.0), |item| match item.command_name() {
                 Some("copy-selection") => Some(MenuAction::Copy),
@@ -841,6 +916,15 @@ mod tests {
                 _ => None,
             })
             .expect("context menu should resolve with typed actions directly");
+        let mapped_empty_frame = menu
+            .update_actions_with_actions(
+                Size::new(240.0, 140.0),
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("context menu should resolve with command action pairs directly");
         let copy = frame.output().snapshot().find("copy").unwrap();
         let paste = frame.output().snapshot().find("paste").unwrap();
 
@@ -851,7 +935,13 @@ mod tests {
         assert!(frame.contains_clicked_action(&MenuAction::Copy));
         assert!(mapped_frame.contains_clicked_action(&MenuAction::Copy));
         assert!(direct_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(direct_mapped_frame.contains_action_for_target_intent(
+            "copy",
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert!(empty_frame.is_empty());
+        assert!(mapped_empty_frame.is_empty());
         assert!(!frame.contains_action(&MenuAction::Rename));
     }
 
