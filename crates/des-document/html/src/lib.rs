@@ -418,6 +418,19 @@ impl HtmlDocument {
         self.to_action_surface(viewport, self.command_action_registry(actions))
     }
 
+    /// Creates an action surface from `(event intent, command, action)` tuples.
+    pub fn to_action_surface_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.to_action_surface(viewport, self.command_intent_action_registry(actions))
+    }
+
     /// Creates an action surface from this HTML tree, stylesheet, and typed commands.
     pub fn to_action_surface_with_stylesheet<Action>(
         &self,
@@ -481,6 +494,23 @@ impl HtmlDocument {
         Ok((report, surface))
     }
 
+    /// Creates an action surface, applies projection, and maps intent-scoped commands.
+    pub fn to_action_surface_with_projection_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut surface =
+            self.to_action_surface(viewport, self.command_intent_action_registry(actions))?;
+        let report = surface.project(projection)?;
+        Ok((report, surface))
+    }
+
     /// Creates an action surface, builds projection, and maps HTML commands to typed actions.
     pub fn to_action_surface_projected_with_actions<Action, Command>(
         &self,
@@ -495,6 +525,22 @@ impl HtmlDocument {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.to_action_surface_with_projection_and_actions(viewport, &projection, actions)
+    }
+
+    /// Creates an action surface, builds projection, and maps intent-scoped commands.
+    pub fn to_action_surface_projected_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.to_action_surface_with_projection_and_intent_actions(viewport, &projection, actions)
     }
 
     /// Creates a view, applies retained state projection, resolves it, and returns the frame.
@@ -1245,6 +1291,20 @@ impl HtmlStylesheet {
         self.into_action_surface(viewport, commands)
     }
 
+    /// Consumes parsed HTML/CSS into an action surface from intent-scoped actions.
+    pub fn into_action_surface_with_intent_actions<Action, Command>(
+        self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let commands = self.command_intent_action_registry(actions);
+        self.into_action_surface(viewport, commands)
+    }
+
     /// Creates an action surface, applies retained state projection, and returns both.
     pub fn to_action_surface_with_projection<Action>(
         &self,
@@ -1275,6 +1335,24 @@ impl HtmlStylesheet {
         )
     }
 
+    /// Creates an action surface, applies projection, and maps intent-scoped commands.
+    pub fn to_action_surface_with_projection_and_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.to_action_surface_with_projection(
+            viewport,
+            projection,
+            self.command_intent_action_registry(actions),
+        )
+    }
+
     /// Creates an action surface, builds retained state projection in place, and applies it.
     pub fn to_action_surface_projected_with<Action>(
         &self,
@@ -1301,6 +1379,22 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.to_action_surface_with_projection_and_actions(viewport, &projection, actions)
+    }
+
+    /// Creates an action surface, builds projection, and maps intent-scoped commands.
+    pub fn to_action_surface_projected_with_intent_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.to_action_surface_with_projection_and_intent_actions(viewport, &projection, actions)
     }
 
     /// Creates an action surface, applies projection, and configures typed commands in one hook.

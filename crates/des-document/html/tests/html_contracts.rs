@@ -934,6 +934,23 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
             commands.push_context_menu("project.menu", HtmlAction::Menu);
         })
         .expect("HTML should create an action surface with a typed stylesheet");
+    let intent_html = HtmlDocument::parse_fragment(
+        r#"<button id="shared" on:click="project.open" on:contextmenu="project.open">Open</button>"#,
+    )
+    .expect("HTML should parse shared command hooks");
+    let mut intent_surface = intent_html
+        .to_action_surface_with_intent_actions(
+            Size::new(320.0, 180.0),
+            [
+                (ElementBehaviorEvent::Click, "project.open", HtmlAction::Run),
+                (
+                    ElementBehaviorEvent::ContextMenu,
+                    "project.open",
+                    HtmlAction::Menu,
+                ),
+            ],
+        )
+        .expect("HTML should map one command differently by event intent");
 
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
@@ -943,12 +960,23 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let context_frame = styled_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let intent_click_frame = intent_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let intent_context_frame = intent_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let run = context_frame.output().snapshot().find("run").unwrap();
 
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(configured_frame.contains_action(&HtmlAction::Run));
     assert!(mapped_context_frame.contains_action(&HtmlAction::Menu));
     assert_eq!(mapped_surface.commands().bindings().len(), 2);
+    assert!(intent_click_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(intent_context_frame.contains_action_for_target_intent(
+        "shared",
+        ElementBehaviorEvent::ContextMenu,
+        &HtmlAction::Menu
+    ));
+    assert_eq!(intent_surface.commands().bindings().len(), 2);
     assert!(context_frame.contains_action(&HtmlAction::Menu));
     assert_eq!(run.rect().size.width, 96.0);
     assert_eq!(styled_surface.commands().bindings().len(), 2);
@@ -1376,12 +1404,35 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
             ],
         )
         .expect("HTML bundle should create mapped projected action surfaces");
+    let (intent_surface_report, mut intent_projected_surface) = bundle
+        .to_action_surface_projected_with_intent_actions(
+            Size::new(320.0, 180.0),
+            |projection| {
+                projection.element("select").add_class("is-selected");
+            },
+            [
+                (
+                    ElementBehaviorEvent::Click,
+                    "project.select",
+                    HtmlAction::Select,
+                ),
+                (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+            ],
+        )
+        .expect("HTML bundle should create intent-mapped projected action surfaces");
     let surface_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 0.0)));
     let mapped_projected_surface_frame = mapped_projected_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 32.0)));
+    let intent_projected_surface_frame = intent_projected_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 32.0)));
     let surface_run = surface_frame.output().snapshot().find("run").unwrap();
     let mapped_projected_select = mapped_projected_surface_frame
+        .output()
+        .snapshot()
+        .find("select")
+        .unwrap();
+    let intent_projected_select = intent_projected_surface_frame
         .output()
         .snapshot()
         .find("select")
@@ -1397,6 +1448,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(mapped_surface_report.changed, 1);
     assert!(mapped_projected_select.has_class("is-selected"));
     assert!(mapped_projected_surface_frame.contains_clicked_action(&HtmlAction::Select));
+    assert_eq!(intent_surface_report.operations, 1);
+    assert_eq!(intent_surface_report.changed, 1);
+    assert!(intent_projected_select.has_class("is-selected"));
+    assert!(intent_projected_surface_frame.contains_clicked_action(&HtmlAction::Select));
 
     let (configured_report, mut configured_surface) = bundle
         .to_action_surface_projected_with_and(
