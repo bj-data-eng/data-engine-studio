@@ -1384,8 +1384,16 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
         .classes_if("status", ["is-loading", "is-stale"], true)
         .set_data_if("status", "busy", "true", true)
         .set_aria_if("status", "busy", "false", false)
+        .select_if("status", true)
+        .disable_if("status", false)
+        .focus_if("details", true)
         .with_element_if("details", show_details, |mut details| {
-            details.text("Loading details").class_if("is-ready", false);
+            details
+                .text("Loading details")
+                .class_if("is-ready", false)
+                .select_if(true)
+                .disable_if(false)
+                .focus_if(true);
         })
         .with_element_if("details", show_error, |mut details| {
             details.data("error", "true").add_class("has-error");
@@ -1398,17 +1406,42 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
     let reset_status = reset_output.snapshot().find("status").unwrap();
     let reset_details = reset_output.snapshot().find("details").unwrap();
 
-    assert_eq!(reset_report.operations, 7);
-    assert_eq!(reset_report.changed, 7);
+    assert_eq!(reset_report.operations, 11);
+    assert_eq!(reset_report.changed, 10);
     assert!(!reset_status.has_class("is-ready"));
     assert!(reset_status.has_class("is-loading"));
     assert!(reset_status.has_class("is-stale"));
+    assert!(reset_status.selected());
+    assert!(!reset_status.disabled());
     assert_eq!(reset_status.data("busy"), Some("true"));
     assert_eq!(reset_status.aria("busy"), None);
     assert_eq!(reset_details.text(), Some("Loading details".to_owned()));
     assert!(!reset_details.has_class("is-ready"));
+    assert!(reset_details.selected());
+    assert!(reset_details.focused());
     assert_eq!(reset_details.data("error"), None);
     assert!(!reset_details.has_class("has-error"));
+
+    let clear_state = DocumentProjection::new()
+        .deselect_if("status", true)
+        .enable_if("status", true)
+        .blur_if("details", true)
+        .select_if("details", false)
+        .with_element("details", |mut details| {
+            details.deselect_if(true).enable_if(true).blur_if(true);
+        });
+    let clear_report = view.project(&clear_state).unwrap();
+    let clear_output = view.update();
+    let clear_status = clear_output.snapshot().find("status").unwrap();
+    let clear_details = clear_output.snapshot().find("details").unwrap();
+
+    assert_eq!(clear_report.operations, 6);
+    assert_eq!(clear_report.changed, 3);
+    assert!(!clear_status.selected());
+    assert!(!clear_status.disabled());
+    assert!(!clear_details.selected());
+    assert!(!clear_details.disabled());
+    assert!(!clear_details.focused());
 
     let conditional_report = view
         .project_with(|projection| {

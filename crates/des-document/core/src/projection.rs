@@ -489,8 +489,22 @@ impl DocumentProjection {
         self.set_selected(id, true)
     }
 
+    pub fn select_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_selected(id, true);
+        }
+        self
+    }
+
     pub fn deselect(self, id: impl Into<ElementId>) -> Self {
         self.set_selected(id, false)
+    }
+
+    pub fn deselect_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_selected(id, false);
+        }
+        self
     }
 
     pub fn push_selected(&mut self, id: impl Into<ElementId>, selected: bool) {
@@ -499,6 +513,18 @@ impl DocumentProjection {
                 id: id.into(),
                 selected,
             });
+    }
+
+    pub fn push_select_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        if present {
+            self.push_selected(id, true);
+        }
+    }
+
+    pub fn push_deselect_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        if present {
+            self.push_selected(id, false);
+        }
     }
 
     pub fn set_disabled(mut self, id: impl Into<ElementId>, disabled: bool) -> Self {
@@ -510,8 +536,22 @@ impl DocumentProjection {
         self.set_disabled(id, true)
     }
 
+    pub fn disable_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_disabled(id, true);
+        }
+        self
+    }
+
     pub fn enable(self, id: impl Into<ElementId>) -> Self {
         self.set_disabled(id, false)
+    }
+
+    pub fn enable_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_disabled(id, false);
+        }
+        self
     }
 
     pub fn push_disabled(&mut self, id: impl Into<ElementId>, disabled: bool) {
@@ -520,6 +560,18 @@ impl DocumentProjection {
                 id: id.into(),
                 disabled,
             });
+    }
+
+    pub fn push_disable_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        if present {
+            self.push_disabled(id, true);
+        }
+    }
+
+    pub fn push_enable_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        if present {
+            self.push_disabled(id, false);
+        }
     }
 
     pub fn set_focused(mut self, id: impl Into<ElementId>, focused: bool) -> Self {
@@ -531,8 +583,22 @@ impl DocumentProjection {
         self.set_focused(id, true)
     }
 
+    pub fn focus_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_focused(id, true);
+        }
+        self
+    }
+
     pub fn blur(self, id: impl Into<ElementId>) -> Self {
         self.set_focused(id, false)
+    }
+
+    pub fn blur_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.push_focused(id, false);
+        }
+        self
     }
 
     pub fn push_focused(&mut self, id: impl Into<ElementId>, focused: bool) {
@@ -541,6 +607,18 @@ impl DocumentProjection {
                 id: id.into(),
                 focused,
             });
+    }
+
+    pub fn push_focus_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        if present {
+            self.push_focused(id, true);
+        }
+    }
+
+    pub fn push_blur_if(&mut self, id: impl Into<ElementId>, present: bool) {
+        if present {
+            self.push_focused(id, false);
+        }
     }
 
     pub fn set_class(
@@ -845,8 +923,22 @@ impl ElementProjection<'_> {
         self.selected(true)
     }
 
+    pub fn select_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.select();
+        }
+        self
+    }
+
     pub fn deselect(&mut self) -> &mut Self {
         self.selected(false)
+    }
+
+    pub fn deselect_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.deselect();
+        }
+        self
     }
 
     pub fn disabled(&mut self, disabled: bool) -> &mut Self {
@@ -858,8 +950,22 @@ impl ElementProjection<'_> {
         self.disabled(true)
     }
 
+    pub fn disable_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.disable();
+        }
+        self
+    }
+
     pub fn enable(&mut self) -> &mut Self {
         self.disabled(false)
+    }
+
+    pub fn enable_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.enable();
+        }
+        self
     }
 
     pub fn focused(&mut self, focused: bool) -> &mut Self {
@@ -871,8 +977,22 @@ impl ElementProjection<'_> {
         self.focused(true)
     }
 
+    pub fn focus_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.focus();
+        }
+        self
+    }
+
     pub fn blur(&mut self) -> &mut Self {
         self.focused(false)
+    }
+
+    pub fn blur_if(&mut self, present: bool) -> &mut Self {
+        if present {
+            self.blur();
+        }
+        self
     }
 
     pub fn class(&mut self, class: impl Into<ClassName>, present: bool) -> &mut Self {
