@@ -944,6 +944,92 @@ impl HtmlStylesheet {
         &self.stylesheet
     }
 
+    /// Returns the parsed document stylesheet for controlled extension.
+    pub fn stylesheet_mut(&mut self) -> &mut StyleSheet {
+        &mut self.stylesheet
+    }
+
+    /// Replaces the parsed document stylesheet.
+    pub fn replace_stylesheet(&mut self, stylesheet: StyleSheet) {
+        self.stylesheet = stylesheet;
+    }
+
+    /// Extends the parsed stylesheet with typed rules.
+    pub fn extend_stylesheet(&mut self, stylesheet: StyleSheet) -> &mut Self {
+        self.stylesheet.extend(stylesheet);
+        self
+    }
+
+    /// Extends the parsed stylesheet with typed rules and returns the bundle.
+    pub fn with_stylesheet(mut self, stylesheet: StyleSheet) -> Self {
+        self.extend_stylesheet(stylesheet);
+        self
+    }
+
+    /// Conditionally extends the parsed stylesheet with typed rules.
+    pub fn extend_stylesheet_if(&mut self, stylesheet: StyleSheet, present: bool) -> &mut Self {
+        self.stylesheet.extend_if(stylesheet, present);
+        self
+    }
+
+    /// Conditionally extends the parsed stylesheet and returns the bundle.
+    pub fn with_stylesheet_if(mut self, stylesheet: StyleSheet, present: bool) -> Self {
+        self.extend_stylesheet_if(stylesheet, present);
+        self
+    }
+
+    /// Parses strict CSS into the parsed stylesheet.
+    pub fn extend_css(&mut self, css: &str) -> HtmlResult<&mut Self> {
+        self.stylesheet.extend(parse_stylesheet(css)?);
+        Ok(self)
+    }
+
+    /// Parses strict CSS into the parsed stylesheet and returns the bundle.
+    pub fn with_css(mut self, css: &str) -> HtmlResult<Self> {
+        self.extend_css(css)?;
+        Ok(self)
+    }
+
+    /// Conditionally parses strict CSS into the parsed stylesheet.
+    pub fn extend_css_if(&mut self, present: bool, css: &str) -> HtmlResult<&mut Self> {
+        if present {
+            self.extend_css(css)?;
+        }
+        Ok(self)
+    }
+
+    /// Conditionally parses strict CSS into the parsed stylesheet and returns the bundle.
+    pub fn with_css_if(mut self, present: bool, css: &str) -> HtmlResult<Self> {
+        self.extend_css_if(present, css)?;
+        Ok(self)
+    }
+
+    /// Parses forgiving CSS into the parsed stylesheet.
+    pub fn extend_css_forgiving(&mut self, css: &str) -> HtmlResult<&mut Self> {
+        self.stylesheet.extend(parse_stylesheet_forgiving(css)?);
+        Ok(self)
+    }
+
+    /// Parses forgiving CSS into the parsed stylesheet and returns the bundle.
+    pub fn with_css_forgiving(mut self, css: &str) -> HtmlResult<Self> {
+        self.extend_css_forgiving(css)?;
+        Ok(self)
+    }
+
+    /// Conditionally parses forgiving CSS into the parsed stylesheet.
+    pub fn extend_css_forgiving_if(&mut self, present: bool, css: &str) -> HtmlResult<&mut Self> {
+        if present {
+            self.extend_css_forgiving(css)?;
+        }
+        Ok(self)
+    }
+
+    /// Conditionally parses forgiving CSS into the parsed stylesheet and returns the bundle.
+    pub fn with_css_forgiving_if(mut self, present: bool, css: &str) -> HtmlResult<Self> {
+        self.extend_css_forgiving_if(present, css)?;
+        Ok(self)
+    }
+
     /// Returns Rust behavior hooks declared by the parsed HTML in document order.
     pub fn behavior_hooks(&self) -> Vec<&HtmlBehaviorHook> {
         self.html.behavior_hooks()

@@ -1452,10 +1452,19 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         r#"<button id="run" class="primary" on:click="project.run">Run</button>"#,
         r#".primary { width: 96px; height: 32px; }"#,
     )
+    .and_then(|bundle| bundle.with_css(".primary { padding: 2px; }"))
+    .and_then(|bundle| bundle.with_css_if(false, ".primary { width: ; }"))
+    .and_then(|bundle| {
+        bundle.with_css_forgiving(".primary { unknown-property: 1px; } .primary { margin: 1px; }")
+    })
+    .map(|bundle| {
+        bundle.with_stylesheet(StyleSheet::new().class("primary", Style::default().radius(4.0)))
+    })
     .expect("HTML and CSS should compile together from the prelude");
     assert!(bundle.html().is_clean());
     assert_eq!(bundle.html().children()[0].id.as_deref(), Some("run"));
-    assert_eq!(bundle.stylesheet().rule_count(), 1);
+    assert!(bundle.stylesheet().rule_count() >= 4);
+    assert!(bundle.stylesheet().has_rule_for_class("primary"));
 
     let mut surface = bundle
         .into_action_surface_with_actions(
@@ -1468,6 +1477,9 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     let run = frame.output.snapshot().find("run").unwrap();
 
     assert_eq!(run.rect().size.width, 96.0);
+    assert_eq!(run.style().padding, Insets::all(2.0));
+    assert_eq!(run.style().margin, Insets::all(1.0));
+    assert_eq!(run.style().radius, CornerRadii::all(4.0));
     assert_eq!(surface.commands().bindings().len(), 1);
     assert_eq!(frame.actions.len(), 1);
     assert_eq!(frame.actions[0].action, HtmlAction::Run);
