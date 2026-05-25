@@ -200,6 +200,102 @@ impl HtmlDocument {
         self.to_view_with_stylesheet(viewport, parse_stylesheet_forgiving(css)?)
     }
 
+    /// Parses CSS, resolves this HTML tree, and returns the first output frame.
+    pub fn update_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentOutput> {
+        self.to_view_with_css(viewport, css)
+            .map(|mut view| view.update())
+    }
+
+    /// Parses forgiving CSS, resolves this HTML tree, and returns the first output frame.
+    pub fn update_with_css_forgiving(
+        &self,
+        viewport: Size,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.to_view_with_css_forgiving(viewport, css)
+            .map(|mut view| view.update())
+    }
+
+    /// Parses CSS, resolves this HTML tree, and collects typed Rust actions.
+    pub fn update_actions_with_css<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.to_view_with_css(viewport, css)
+            .map(|mut view| view.update_actions(registry))
+    }
+
+    /// Parses forgiving CSS, resolves this HTML tree, and collects typed Rust actions.
+    pub fn update_actions_with_css_forgiving<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.to_view_with_css_forgiving(viewport, css)
+            .map(|mut view| view.update_actions(registry))
+    }
+
+    /// Parses CSS, routes input through this HTML tree, and returns output.
+    pub fn update_with_input_and_css(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.to_view_with_css(viewport, css)
+            .map(|mut view| view.update_with_input(input))
+    }
+
+    /// Parses CSS, routes input through this HTML tree, and collects typed actions.
+    pub fn update_with_input_actions_and_css<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.to_view_with_css(viewport, css)
+            .map(|mut view| view.update_with_input_actions(input, registry))
+    }
+
+    /// Parses forgiving CSS, routes input through this HTML tree, and returns output.
+    pub fn update_with_input_and_css_forgiving(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.to_view_with_css_forgiving(viewport, css)
+            .map(|mut view| view.update_with_input(input))
+    }
+
+    /// Parses forgiving CSS, routes input through this HTML tree, and collects typed actions.
+    pub fn update_with_input_actions_and_css_forgiving<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.to_view_with_css_forgiving(viewport, css)
+            .map(|mut view| view.update_with_input_actions(input, registry))
+    }
+
     /// Emits this parsed HTML tree into a caller-owned document builder.
     pub fn write_to_document_builder(&self, builder: &mut DocumentBuilder) {
         let mut path = Vec::new();

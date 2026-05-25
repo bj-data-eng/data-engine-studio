@@ -1,5 +1,6 @@
 use des_document::{
-    DocumentCommandRegistry, DocumentEngine, DocumentInput, Element, ElementId, Point, Size,
+    DocumentCommandRegistry, DocumentEngine, DocumentInput, DocumentKey, Element,
+    ElementBehaviorEvent, ElementId, Point, Size,
 };
 use des_html::{HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
@@ -343,6 +344,74 @@ fn html_css_entry_points_can_recover_like_browser_stylesheets() {
     assert!(bundle.stylesheet().rule_count() >= 1);
     assert_eq!(panel.rect().size.width, 144.0);
     assert_eq!(panel.rect().size.height, 48.0);
+}
+
+#[test]
+fn html_document_updates_with_css_and_collects_actions_directly() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+        Filter,
+    }
+
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section id="panel" class="card">
+          <button id="run" data-command="project.run">Run</button>
+          <input id="filter" autofocus on:keydown="project.filter">
+        </section>
+        "#,
+    )
+    .expect("HTML should parse");
+    let css = r#"
+        .card { width: 180px; height: 72px; }
+        button { width: 80px; height: 28px; }
+    "#;
+    let registry = DocumentCommandRegistry::new()
+        .bind("project.run", HtmlAction::Run)
+        .bind_on(
+            ElementBehaviorEvent::KeyDown,
+            "project.filter",
+            HtmlAction::Filter,
+        );
+
+    let output = html
+        .update_with_css(Size::new(240.0, 160.0), css)
+        .expect("HTML and CSS should resolve directly");
+    let click_frame = html
+        .update_with_input_actions_and_css(
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            css,
+            &registry,
+        )
+        .expect("HTML and CSS should collect click actions directly");
+    let forgiving_frame = html
+        .update_with_input_actions_and_css_forgiving(
+            Size::new(240.0, 160.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            &registry,
+        )
+        .expect("forgiving CSS should collect keyboard actions directly");
+
+    assert_eq!(
+        output.snapshot().find("panel").unwrap().rect().size.width,
+        180.0
+    );
+    assert_eq!(
+        click_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        80.0
+    );
+    assert!(click_frame.contains_action(&HtmlAction::Run));
+    assert!(forgiving_frame.contains_action(&HtmlAction::Filter));
 }
 
 #[test]
