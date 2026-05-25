@@ -338,6 +338,24 @@ impl Document {
         Ok(true)
     }
 
+    pub fn set_attributes<I, K, V>(
+        &mut self,
+        id: impl Into<ElementId>,
+        attributes: I,
+    ) -> DocumentResult<usize>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let id = id.into();
+        let mut changed = 0;
+        for (name, value) in attributes {
+            changed += usize::from(self.set_attribute(id.clone(), name, value)?);
+        }
+        Ok(changed)
+    }
+
     pub fn remove_attribute(
         &mut self,
         id: impl Into<ElementId>,
@@ -351,6 +369,23 @@ impl Document {
         }
         self.revision = self.revision.wrapping_add(1);
         Ok(true)
+    }
+
+    pub fn remove_attributes<I, K>(
+        &mut self,
+        id: impl Into<ElementId>,
+        names: I,
+    ) -> DocumentResult<usize>
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        let id = id.into();
+        let mut changed = 0;
+        for name in names {
+            changed += usize::from(self.remove_attribute(id.clone(), name)?);
+        }
+        Ok(changed)
     }
 
     pub fn add_class(
@@ -369,6 +404,23 @@ impl Document {
         Ok(true)
     }
 
+    pub fn add_classes<I, C>(
+        &mut self,
+        id: impl Into<ElementId>,
+        classes: I,
+    ) -> DocumentResult<usize>
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        let id = id.into();
+        let mut changed = 0;
+        for class in classes {
+            changed += usize::from(self.add_class(id.clone(), class)?);
+        }
+        Ok(changed)
+    }
+
     pub fn remove_class(
         &mut self,
         id: impl Into<ElementId>,
@@ -384,6 +436,23 @@ impl Document {
         }
         self.revision = self.revision.wrapping_add(1);
         Ok(true)
+    }
+
+    pub fn remove_classes<I, C>(
+        &mut self,
+        id: impl Into<ElementId>,
+        classes: I,
+    ) -> DocumentResult<usize>
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        let id = id.into();
+        let mut changed = 0;
+        for class in classes {
+            changed += usize::from(self.remove_class(id.clone(), class)?);
+        }
+        Ok(changed)
     }
 
     pub fn toggle_class(
@@ -415,6 +484,14 @@ impl Document {
         Ok(true)
     }
 
+    pub fn select(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_selected(id, true)
+    }
+
+    pub fn deselect(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_selected(id, false)
+    }
+
     pub fn set_disabled(
         &mut self,
         id: impl Into<ElementId>,
@@ -430,6 +507,14 @@ impl Document {
         Ok(true)
     }
 
+    pub fn disable(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_disabled(id, true)
+    }
+
+    pub fn enable(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_disabled(id, false)
+    }
+
     pub fn set_focused(&mut self, id: impl Into<ElementId>, focused: bool) -> DocumentResult<bool> {
         let id = id.into();
         let element = self.element_mut(&id)?;
@@ -439,6 +524,14 @@ impl Document {
         element.spec.focused = focused;
         self.revision = self.revision.wrapping_add(1);
         Ok(true)
+    }
+
+    pub fn focus(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_focused(id, true)
+    }
+
+    pub fn blur(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
+        self.set_focused(id, false)
     }
 
     pub fn reparent(

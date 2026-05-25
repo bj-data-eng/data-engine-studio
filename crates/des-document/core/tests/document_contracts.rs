@@ -1126,25 +1126,27 @@ fn style_rules_resolve_element_class_state_and_id_in_order() {
 fn document_mutation_can_add_remove_and_toggle_classes_before_layout() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
-        .rule(
-            StyleSelector::Element(Element::Div),
+        .element(
+            Element::Div,
             Style::default()
                 .size(100.0, 40.0)
                 .background(Color::rgb(20, 20, 20)),
         )
-        .rule(
-            StyleSelector::class("expanded"),
-            Style::default().size(140.0, 60.0),
-        )
-        .rule(
-            StyleSelector::class("accent"),
+        .class("expanded", Style::default().size(140.0, 60.0))
+        .class(
+            "accent",
             Style::default().background(Color::rgb(35, 56, 78)),
         );
     let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
-        ui.element("card", ElementSpec::new(Element::Div), |_| {});
+        ui.element("card", ElementSpec::div(), |_| {});
     });
 
-    assert!(document.add_class("card", "expanded").unwrap());
+    assert_eq!(
+        document
+            .add_classes("card", ["expanded", "expanded"])
+            .unwrap(),
+        1
+    );
     assert!(document.toggle_class("card", "accent").unwrap());
     assert!(document.add_class("missing", "accent").is_err());
 
@@ -1153,7 +1155,12 @@ fn document_mutation_can_add_remove_and_toggle_classes_before_layout() {
     assert_eq!(card.rect.size, Size::new(140.0, 60.0));
     assert_eq!(card.style.background, Some(Color::rgb(35, 56, 78)));
 
-    assert!(document.remove_class("card", "expanded").unwrap());
+    assert_eq!(
+        document
+            .remove_classes("card", ["expanded", "missing"])
+            .unwrap(),
+        1
+    );
     assert!(document.toggle_class("card", "accent").unwrap());
 
     let output = engine.update(&mut document, &stylesheet);
@@ -1201,9 +1208,15 @@ fn document_mutation_can_set_text_value_and_authored_states() {
 
     assert!(document.set_text("label", "Much longer text").unwrap());
     assert!(document.set_value("control", "updated").unwrap());
-    assert!(document.set_selected("control", true).unwrap());
-    assert!(document.set_disabled("control", true).unwrap());
-    assert!(document.set_focused("control", true).unwrap());
+    assert_eq!(
+        document
+            .set_attributes("control", [("data-state", "busy"), ("aria-label", "Busy")])
+            .unwrap(),
+        2
+    );
+    assert!(document.select("control").unwrap());
+    assert!(document.disable("control").unwrap());
+    assert!(document.focus("control").unwrap());
 
     let output = engine.update(&mut document, &stylesheet);
     let label = output.layout.find("label").unwrap();
@@ -1215,10 +1228,35 @@ fn document_mutation_can_set_text_value_and_authored_states() {
     );
     assert_eq!(label.rect.size.width, 120.0);
     assert_eq!(control.value.as_deref(), Some("updated"));
+    assert_eq!(
+        control.attributes.get("data-state").map(String::as_str),
+        Some("busy")
+    );
+    assert_eq!(
+        control.attributes.get("aria-label").map(String::as_str),
+        Some("Busy")
+    );
     assert_eq!(control.style.background, Some(Color::rgb(35, 56, 78)));
     assert_eq!(control.style.text_color, Color::rgb(90, 96, 102));
     assert_eq!(control.style.border, Some(Color::rgb(88, 157, 230)));
     assert!(!control.interactive);
+
+    assert_eq!(
+        document
+            .remove_attributes("control", ["data-state", "aria-label", "missing"])
+            .unwrap(),
+        2
+    );
+    assert!(document.deselect("control").unwrap());
+    assert!(document.enable("control").unwrap());
+    assert!(document.blur("control").unwrap());
+
+    let output = engine.update(&mut document, &stylesheet);
+    let control = output.layout.find("control").unwrap();
+    assert!(control.attributes.is_empty());
+    assert_eq!(control.style.background, None);
+    assert_eq!(control.style.border, None);
+    assert!(control.interactive);
 }
 
 #[test]
