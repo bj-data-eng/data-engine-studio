@@ -1452,6 +1452,85 @@ fn document_widgets_can_project_retained_state_through_the_view_front_door() {
 }
 
 #[test]
+fn document_view_projects_state_and_collects_actions_through_one_front_door() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Refresh,
+        Toggle,
+    }
+
+    struct StatusWidget {
+        ready: bool,
+    }
+
+    impl DocumentWidget for StatusWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("status")
+                .class("status")
+                .command("status.toggle")
+                .text("Pending");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_class("status", Style::default().size(120.0, 32.0));
+        }
+
+        fn push_projection(&self, projection: &mut DocumentProjection) {
+            projection
+                .element("status")
+                .text(if self.ready { "Ready" } else { "Waiting" })
+                .class("is-ready", self.ready);
+        }
+    }
+
+    let registry = DocumentCommandRegistry::new()
+        .bind("refresh", AppAction::Refresh)
+        .bind("status.toggle", AppAction::Toggle);
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.button("refresh").command("refresh").text("Refresh");
+        ui.button("status").command("status.toggle").text("Pending");
+    });
+
+    let (report, frame) = view
+        .project_with_and_update_with_input_actions(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection
+                    .element("refresh")
+                    .text("Refresh now")
+                    .class("is-ready", true);
+            },
+            &registry,
+        )
+        .unwrap();
+    let refresh = frame.output().snapshot().find("refresh").unwrap();
+
+    assert_eq!(report.operations, 2);
+    assert_eq!(report.changed, 2);
+    assert_eq!(refresh.text(), Some("Refresh now".to_owned()));
+    assert!(refresh.has_class("is-ready"));
+    assert_eq!(frame.len(), 1);
+    assert!(frame.contains_action(&AppAction::Refresh));
+
+    let mut widget_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&StatusWidget { ready: false });
+    let (widget_report, widget_frame) = widget_view
+        .project_widget_and_update_with_input_actions(
+            &StatusWidget { ready: true },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+        )
+        .unwrap();
+    let status = widget_frame.output().snapshot().find("status").unwrap();
+
+    assert_eq!(widget_report.operations, 2);
+    assert_eq!(widget_report.changed, 2);
+    assert_eq!(status.text(), Some("Ready".to_owned()));
+    assert!(status.has_class("is-ready"));
+    assert!(widget_frame.contains_action(&AppAction::Toggle));
+}
+
+#[test]
 fn document_builder_and_engine_update_are_front_door_api() {
     let mut document = Document::build(Size::new(320.0, 200.0), |document| {
         document.element("panel", ElementSpec::div().class("panel"), |document| {

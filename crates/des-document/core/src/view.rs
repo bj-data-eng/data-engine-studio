@@ -189,6 +189,20 @@ impl DocumentView {
         Ok((report, output))
     }
 
+    /// Applies a projection, resolves the document, and collects typed app actions.
+    pub fn project_and_update_actions<Action>(
+        &mut self,
+        projection: &DocumentProjection,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let report = self.project(projection)?;
+        let frame = self.update_actions(registry);
+        Ok((report, frame))
+    }
+
     /// Builds a projection, applies it, and resolves the updated document.
     pub fn project_with_and_update(
         &mut self,
@@ -197,6 +211,20 @@ impl DocumentView {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.project_and_update(&projection)
+    }
+
+    /// Builds a projection, applies it, resolves the document, and collects typed actions.
+    pub fn project_with_and_update_actions<Action>(
+        &mut self,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project_and_update_actions(&projection, registry)
     }
 
     /// Applies a projection, routes input, and resolves the updated document.
@@ -210,6 +238,21 @@ impl DocumentView {
         Ok((report, output))
     }
 
+    /// Applies a projection, routes input, resolves the document, and collects typed actions.
+    pub fn project_and_update_with_input_actions<Action>(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let report = self.project(projection)?;
+        let frame = self.update_with_input_actions(input, registry);
+        Ok((report, frame))
+    }
+
     /// Builds a projection, applies it, routes input, and resolves the document.
     pub fn project_with_and_update_with_input(
         &mut self,
@@ -219,6 +262,21 @@ impl DocumentView {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.project_and_update_with_input(&projection, input)
+    }
+
+    /// Builds a projection, applies it, routes input, and collects typed actions.
+    pub fn project_with_and_update_with_input_actions<Action>(
+        &mut self,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project_and_update_with_input_actions(&projection, input, registry)
     }
 
     /// Applies app-state projections declared by a reusable document widget.
@@ -254,6 +312,20 @@ impl DocumentView {
         Ok((report, output))
     }
 
+    /// Applies a widget projection, resolves the document, and collects typed actions.
+    pub fn project_widget_and_update_actions<Action>(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let report = self.project_widget(widget)?;
+        let frame = self.update_actions(registry);
+        Ok((report, frame))
+    }
+
     /// Applies widget projections and resolves the updated document.
     pub fn project_widgets_and_update<'a, W>(
         &mut self,
@@ -267,6 +339,21 @@ impl DocumentView {
         Ok((report, output))
     }
 
+    /// Applies widget projections, resolves the document, and collects typed actions.
+    pub fn project_widgets_and_update_actions<'a, W, Action>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+    {
+        let report = self.project_widgets(widgets)?;
+        let frame = self.update_actions(registry);
+        Ok((report, frame))
+    }
+
     /// Applies a widget projection, routes input, and resolves the document.
     pub fn project_widget_and_update_with_input(
         &mut self,
@@ -276,6 +363,21 @@ impl DocumentView {
         let report = self.project_widget(widget)?;
         let output = self.update_with_input(input);
         Ok((report, output))
+    }
+
+    /// Applies a widget projection, routes input, and collects typed actions.
+    pub fn project_widget_and_update_with_input_actions<Action>(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let report = self.project_widget(widget)?;
+        let frame = self.update_with_input_actions(input, registry);
+        Ok((report, frame))
     }
 
     /// Applies widget projections, routes input, and resolves the document.
@@ -290,6 +392,22 @@ impl DocumentView {
         let report = self.project_widgets(widgets)?;
         let output = self.update_with_input(input);
         Ok((report, output))
+    }
+
+    /// Applies widget projections, routes input, and collects typed actions.
+    pub fn project_widgets_and_update_with_input_actions<'a, W, Action>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+    {
+        let report = self.project_widgets(widgets)?;
+        let frame = self.update_with_input_actions(input, registry);
+        Ok((report, frame))
     }
 
     /// Returns the stylesheet used to resolve this document.
