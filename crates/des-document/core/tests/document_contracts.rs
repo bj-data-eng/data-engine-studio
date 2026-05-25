@@ -2167,6 +2167,7 @@ fn document_widgets_can_declare_typed_command_bindings() {
 
     let toggle = ToggleWidget;
     let close = CloseWidget;
+    let boxed_toggle: Box<dyn DocumentActionWidget<WidgetAction>> = Box::new(ToggleWidget);
     let registry = DocumentCommandRegistry::new()
         .bind_widget(&toggle)
         .bind_widget(&close);
@@ -2183,11 +2184,15 @@ fn document_widgets_can_declare_typed_command_bindings() {
         DocumentInput::secondary_click(Point::new(8.0, 8.0)),
         &pushed,
     );
+    let toggle_commands = toggle.commands();
+    let boxed_toggle_commands = boxed_toggle.commands();
     let toggle_registry = toggle.command_registry();
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
     assert_eq!(surface.commands().bindings(), registry.bindings());
+    assert_eq!(toggle_commands.bindings().len(), 2);
+    assert_eq!(boxed_toggle_commands.bindings(), toggle_commands.bindings());
     assert_eq!(toggle_registry.bindings().len(), 2);
     assert_eq!(toggle_surface.commands().bindings().len(), 2);
     assert!(click_frame.contains_action(&WidgetAction::Toggle));

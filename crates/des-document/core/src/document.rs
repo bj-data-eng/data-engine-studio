@@ -1371,13 +1371,17 @@ pub trait DocumentWidget {
 pub trait DocumentActionWidget<Action>: DocumentWidget {
     fn push_commands(&self, registry: &mut DocumentCommandRegistry<Action>);
 
+    fn commands(&self) -> DocumentCommandRegistry<Action> {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_commands(&mut registry);
+        registry
+    }
+
     fn command_registry(&self) -> DocumentCommandRegistry<Action>
     where
         Self: Sized,
     {
-        let mut registry = DocumentCommandRegistry::new();
-        self.push_commands(&mut registry);
-        registry
+        self.commands()
     }
 
     fn action_surface(&self, viewport: Size) -> crate::DocumentActionSurface<Action>
