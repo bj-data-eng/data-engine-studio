@@ -3,6 +3,7 @@ use des_document::{
     DocumentInput, DocumentResult, DocumentView, DocumentWidget, ElementId, FloatingPlacement,
     FloatingShift, Insets, Length, Point, Size, Style, StyleSelector, StyleSheet,
 };
+use std::collections::BTreeMap;
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
 pub const CONTEXT_MENU_ITEM_CLASS: &str = "context-menu-item";
@@ -209,6 +210,36 @@ impl ContextMenu {
         registry
     }
 
+    /// Pushes typed actions for menu command names into a registry.
+    pub fn push_command_actions<Action, Command>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let actions = actions
+            .into_iter()
+            .map(|(command, action)| (command.as_ref().to_owned(), action))
+            .collect::<BTreeMap<_, _>>();
+        self.push_commands(registry, |item| actions.get(item.command_name()?).cloned());
+    }
+
+    /// Builds a typed command registry from `(command, action)` pairs.
+    pub fn command_action_registry<Action, Command>(
+        &self,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentCommandRegistry<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_command_actions(&mut registry, actions);
+        registry
+    }
+
     /// Builds a ready-to-drive menu action surface from this widget.
     pub fn action_surface<Action>(
         &self,
@@ -226,6 +257,34 @@ impl ContextMenu {
         action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
     ) -> DocumentActionSurface<Action> {
         self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)
+            .expect("context menu projection targets rendered elements")
+    }
+
+    /// Builds a menu action surface from `(command, action)` pairs.
+    pub fn action_surface_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentActionSurface<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.action_surface_with_stylesheet_and_actions(viewport, StyleSheet::new(), actions)
+    }
+
+    /// Builds a styled menu action surface from `(command, action)` pairs.
+    pub fn action_surface_with_stylesheet_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentActionSurface<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)
             .expect("context menu projection targets rendered elements")
     }
 
@@ -249,6 +308,36 @@ impl ContextMenu {
             .stylesheet(stylesheet)
             .try_widget(self)?;
         Ok(view.action_surface(self.command_registry(action_for)))
+    }
+
+    /// Tries to build a menu action surface from `(command, action)` pairs.
+    pub fn try_action_surface_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.try_action_surface_with_stylesheet_and_actions(viewport, StyleSheet::new(), actions)
+    }
+
+    /// Tries to build a styled menu action surface from `(command, action)` pairs.
+    pub fn try_action_surface_with_stylesheet_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let view = DocumentView::compose(viewport)
+            .stylesheet(stylesheet)
+            .try_widget(self)?;
+        Ok(view.action_surface(self.command_action_registry(actions)))
     }
 
     /// Builds, resolves, and collects typed actions from this menu in one call.
@@ -668,16 +757,35 @@ mod tests {
             Some("rename-selection") => Some(MenuAction::Rename),
             _ => None,
         });
+        let mapped_registry = menu.command_action_registry([
+            ("copy-selection", MenuAction::Copy),
+            ("rename-selection", MenuAction::Rename),
+        ]);
+        let mut pushed_mapped = DocumentCommandRegistry::new();
+        menu.push_command_actions(
+            &mut pushed_mapped,
+            [
+                ("copy-selection", MenuAction::Copy),
+                ("rename-selection", MenuAction::Rename),
+            ],
+        );
         let mut view = DocumentView::compose(Size::new(240.0, 140.0)).widget(&menu);
 
         let frame = view.update_with_input_actions(
             DocumentInput::primary_click(Point::new(2.0, 2.0)),
             &registry,
         );
+        let mapped_frame = view.update_with_input_actions(
+            DocumentInput::primary_click(Point::new(2.0, 2.0)),
+            &mapped_registry,
+        );
 
         assert_eq!(menu.entries().len(), 3);
         assert_eq!(pushed.bindings().len(), 2);
+        assert_eq!(mapped_registry.bindings().len(), 2);
+        assert_eq!(pushed_mapped.bindings().len(), 2);
         assert!(frame.contains_action(&MenuAction::Copy));
+        assert!(mapped_frame.contains_clicked_action(&MenuAction::Copy));
         assert!(!frame.contains_action(&MenuAction::Rename));
         assert_eq!(
             frame.first_clicked_action().unwrap().target().as_str(),
@@ -703,9 +811,18 @@ mod tests {
                 Some("rename-selection") => Some(MenuAction::Rename),
                 _ => None,
             });
+        let mut mapped_surface = menu.action_surface_with_actions(
+            Size::new(240.0, 140.0),
+            [
+                ("copy-selection", MenuAction::Copy),
+                ("rename-selection", MenuAction::Rename),
+            ],
+        );
 
         let frame =
             surface.update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let mapped_frame = mapped_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let direct_frame = menu
             .update_with_input_actions(
                 Size::new(240.0, 140.0),
@@ -728,9 +845,11 @@ mod tests {
         let paste = frame.output().snapshot().find("paste").unwrap();
 
         assert_eq!(surface.commands().bindings().len(), 2);
+        assert_eq!(mapped_surface.commands().bindings().len(), 2);
         assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
         assert!(!paste.interactive());
         assert!(frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(mapped_frame.contains_clicked_action(&MenuAction::Copy));
         assert!(direct_frame.contains_clicked_action(&MenuAction::Copy));
         assert!(empty_frame.is_empty());
         assert!(!frame.contains_action(&MenuAction::Rename));
