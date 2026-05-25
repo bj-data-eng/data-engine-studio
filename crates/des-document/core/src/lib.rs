@@ -52,10 +52,12 @@
 //! }
 //!
 //! let widget = RunButton;
-//! let mut surface = DocumentView::compose(Size::new(320.0, 180.0))
-//!     .with_css(".primary { background: rgb(222, 238, 255); }")
-//!     .expect("valid app stylesheet")
-//!     .action_widget(&widget);
+//! let mut surface = widget
+//!     .action_surface_with_css(
+//!         Size::new(320.0, 180.0),
+//!         ".primary { background: rgb(222, 238, 255); }",
+//!     )
+//!     .expect("valid app stylesheet");
 //!
 //! let frame =
 //!     surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
