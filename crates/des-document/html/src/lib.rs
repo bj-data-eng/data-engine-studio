@@ -226,6 +226,40 @@ impl HtmlDocument {
         registry
     }
 
+    /// Pushes typed Rust actions for HTML command names while preserving hook intent.
+    ///
+    /// Each `(command, action)` pair maps an authored `on:*` or `data-command`
+    /// command string to a Rust action. If the command is declared by multiple
+    /// event hooks, the action is cloned into each hook's parsed document intent.
+    pub fn push_command_actions<Action, Command>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let actions = actions
+            .into_iter()
+            .map(|(command, action)| (command.as_ref().to_owned(), action))
+            .collect::<BTreeMap<_, _>>();
+        self.push_commands(registry, |hook| actions.get(hook.command()).cloned());
+    }
+
+    /// Creates typed Rust action bindings from `(command, action)` pairs.
+    pub fn command_action_registry<Action, Command>(
+        &self,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentCommandRegistry<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_command_actions(&mut registry, actions);
+        registry
+    }
+
     /// Creates a retained document from this HTML tree.
     pub fn to_document(&self, viewport: Size) -> HtmlResult<Document> {
         Ok(Document::build(viewport, |document| {
@@ -630,6 +664,30 @@ impl HtmlStylesheet {
         action_for: impl FnMut(&HtmlBehaviorHook) -> Option<Action>,
     ) -> DocumentCommandRegistry<Action> {
         self.html.command_registry(action_for)
+    }
+
+    /// Pushes typed Rust actions for HTML command names while preserving hook intent.
+    pub fn push_command_actions<Action, Command>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.html.push_command_actions(registry, actions);
+    }
+
+    /// Creates typed Rust action bindings from `(command, action)` pairs.
+    pub fn command_action_registry<Action, Command>(
+        &self,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentCommandRegistry<Action>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.html.command_action_registry(actions)
     }
 
     /// Parses an HTML document and CSS stylesheet into typed document inputs.

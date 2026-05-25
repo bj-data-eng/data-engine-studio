@@ -785,6 +785,41 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
         hook.command() == "project.commit" && hook.matches_intent(ElementBehaviorEvent::KeyDown)
     }));
 
+    let mapped_registry = bundle.command_action_registry([
+        ("project.run", HtmlAction::Run),
+        ("project.commit", HtmlAction::CommitByKeyboard),
+    ]);
+    let mut pushed_mapped_registry = DocumentCommandRegistry::new();
+    bundle.push_command_actions(
+        &mut pushed_mapped_registry,
+        [
+            ("project.run", HtmlAction::Run),
+            ("project.commit", HtmlAction::CommitByKeyboard),
+        ],
+    );
+    let mapped_click_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mapped_registry,
+        )
+        .expect("mapped HTML commands should route click actions");
+    let mapped_key_frame = bundle
+        .update_with_input_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            &mapped_registry,
+        )
+        .expect("mapped HTML commands should route keyboard actions");
+
+    assert_eq!(mapped_registry.bindings().len(), 3);
+    assert_eq!(
+        pushed_mapped_registry.bindings(),
+        mapped_registry.bindings()
+    );
+    assert!(mapped_click_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(mapped_key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
+
     let registry = bundle.command_registry(|hook| match (hook.command(), hook.intent()) {
         ("project.run", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::Run),
         ("project.commit", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::CommitByClick),
