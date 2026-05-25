@@ -331,6 +331,19 @@ impl HtmlDocument {
         Ok(self.to_view(viewport)?.action_surface_with(configure))
     }
 
+    /// Creates an action surface from this HTML tree and `(command, action)` pairs.
+    pub fn to_action_surface_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.to_action_surface(viewport, self.command_action_registry(actions))
+    }
+
     /// Creates an action surface from this HTML tree, stylesheet, and typed commands.
     pub fn to_action_surface_with_stylesheet<Action>(
         &self,
@@ -767,6 +780,19 @@ impl HtmlStylesheet {
         Ok(self.to_view(viewport)?.action_surface_with(configure))
     }
 
+    /// Creates an action surface from parsed HTML/CSS and `(command, action)` pairs.
+    pub fn to_action_surface_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.to_action_surface(viewport, self.command_action_registry(actions))
+    }
+
     /// Consumes the parsed HTML/CSS into an action surface paired with typed Rust commands.
     pub fn into_action_surface<Action>(
         self,
@@ -783,6 +809,20 @@ impl HtmlStylesheet {
         configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         Ok(self.into_view(viewport)?.action_surface_with(configure))
+    }
+
+    /// Consumes parsed HTML/CSS into an action surface from `(command, action)` pairs.
+    pub fn into_action_surface_with_actions<Action, Command>(
+        self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<DocumentActionSurface<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let commands = self.command_action_registry(actions);
+        self.into_action_surface(viewport, commands)
     }
 
     /// Creates an action surface, applies retained state projection, and returns both.

@@ -721,6 +721,15 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
             commands.push_click("project.run", HtmlAction::Run);
         })
         .expect("HTML should configure an action surface without CSS");
+    let mut mapped_surface = html
+        .to_action_surface_with_actions(
+            Size::new(320.0, 180.0),
+            [
+                ("project.run", HtmlAction::Run),
+                ("project.menu", HtmlAction::Menu),
+            ],
+        )
+        .expect("HTML should map command names into an action surface");
     let stylesheet = des_document::StyleSheet::parse_css("#run { width: 96px; height: 32px; }")
         .expect("CSS should parse");
     let mut styled_surface = html
@@ -734,12 +743,16 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let configured_frame = configured_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mapped_context_frame = mapped_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let context_frame = styled_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let run = context_frame.output().snapshot().find("run").unwrap();
 
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(configured_frame.contains_action(&HtmlAction::Run));
+    assert!(mapped_context_frame.contains_action(&HtmlAction::Menu));
+    assert_eq!(mapped_surface.commands().bindings().len(), 2);
     assert!(context_frame.contains_action(&HtmlAction::Menu));
     assert_eq!(run.rect().size.width, 96.0);
     assert_eq!(styled_surface.commands().bindings().len(), 2);
@@ -1014,11 +1027,21 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert!(frame.contains_action(&HtmlAction::Run));
     assert!(!frame.contains_action(&HtmlAction::Select));
 
-    let projected_registry = bundle.command_registry(|hook| match hook.command() {
-        "project.run" => Some(HtmlAction::Run),
-        "project.select" => Some(HtmlAction::Select),
-        _ => None,
-    });
+    let projected_registry = bundle.command_action_registry([
+        ("project.run", HtmlAction::Run),
+        ("project.select", HtmlAction::Select),
+    ]);
+    let mut mapped_surface = bundle
+        .to_action_surface_with_actions(
+            Size::new(320.0, 180.0),
+            [
+                ("project.run", HtmlAction::Run),
+                ("project.select", HtmlAction::Select),
+            ],
+        )
+        .expect("HTML bundle should create mapped action surfaces");
+    let mapped_frame = mapped_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 32.0)));
     let (surface_report, mut surface) = bundle
         .to_action_surface_with_projection(Size::new(320.0, 180.0), &projection, projected_registry)
         .expect("HTML bundle should create a projected action surface");
@@ -1030,6 +1053,7 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(surface_report.changed, 7);
     assert_eq!(surface_run.text(), Some("Ready".to_owned()));
     assert!(surface_run.has_class("is-ready"));
+    assert!(mapped_frame.contains_clicked_action(&HtmlAction::Select));
     assert!(surface_frame.contains_clicked_action(&HtmlAction::Run));
 
     let (configured_report, mut configured_surface) = bundle
@@ -1092,9 +1116,10 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     assert_eq!(bundle.stylesheet().rule_count(), 1);
 
     let mut surface = bundle
-        .into_action_surface_with(Size::new(320.0, 180.0), |commands| {
-            commands.push("project.run", HtmlAction::Run);
-        })
+        .into_action_surface_with_actions(
+            Size::new(320.0, 180.0),
+            [("project.run", HtmlAction::Run)],
+        )
         .expect("prelude-authored HTML should create an action surface");
     let frame: DocumentActionFrame<HtmlAction> =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
