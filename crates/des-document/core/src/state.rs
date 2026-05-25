@@ -1244,6 +1244,20 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.command_actions(output).map(|command| command.action)
+    }
+
+    pub fn collect_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.action_values(output).cloned().collect()
+    }
+
     pub fn collect_actions(&self, output: &DocumentOutput) -> Vec<DocumentCommandAction<Action>>
     where
         Action: Clone,
@@ -1267,6 +1281,26 @@ impl<Action> DocumentCommandRegistry<Action> {
                 action,
             })
         })
+    }
+
+    pub fn action_values_of_kind<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.command_actions_of_kind(output, kind)
+            .map(|command| command.action)
+    }
+
+    pub fn collect_action_values_of_kind(
+        &self,
+        output: &DocumentOutput,
+        kind: DocumentEventKind,
+    ) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.action_values_of_kind(output, kind).cloned().collect()
     }
 
     pub fn collect_actions_of_kind(
@@ -1298,6 +1332,28 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn action_values_for_intent<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.command_actions_for_intent(output, intent)
+            .map(|command| command.action)
+    }
+
+    pub fn collect_action_values_for_intent(
+        &self,
+        output: &DocumentOutput,
+        intent: ElementBehaviorEvent,
+    ) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.action_values_for_intent(output, intent)
+            .cloned()
+            .collect()
+    }
+
     pub fn collect_actions_for_intent(
         &self,
         output: &DocumentOutput,
@@ -1320,6 +1376,22 @@ impl<Action> DocumentCommandRegistry<Action> {
             .filter(move |command| command.target.as_str() == target)
     }
 
+    pub fn action_values_for<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+        target: &'a str,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.command_actions_for(output, target)
+            .map(|command| command.action)
+    }
+
+    pub fn collect_action_values_for(&self, output: &DocumentOutput, target: &str) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.action_values_for(output, target).cloned().collect()
+    }
+
     pub fn collect_actions_for(
         &self,
         output: &DocumentOutput,
@@ -1338,6 +1410,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::Click)
+    }
+
+    pub fn clicked_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::Click)
     }
 
     pub fn pointer_enter_actions<'a>(
@@ -1401,6 +1480,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::KeyDown)
+    }
+
+    pub fn key_down_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::KeyDown)
     }
 
     pub fn key_up_actions<'a>(

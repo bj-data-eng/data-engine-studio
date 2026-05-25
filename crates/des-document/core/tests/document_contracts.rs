@@ -683,6 +683,22 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     let key_actions = registry.collect_key_down_actions(&key_output);
     let hover_actions = registry.collect_pointer_enter_actions(&hover_output);
     let commit_actions = registry.collect_actions_for(&click_output, "commit");
+    let click_values = registry.collect_action_values(&click_output);
+    let clicked_values = registry
+        .clicked_action_values(&click_output)
+        .collect::<Vec<_>>();
+    let commit_values = registry
+        .action_values_for(&click_output, "commit")
+        .collect::<Vec<_>>();
+    let key_values =
+        registry.collect_action_values_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
+    let key_kind_values = registry.collect_action_values_of_kind(
+        &key_output,
+        DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
+    );
+    let borrowed_key_values = registry
+        .key_down_action_values(&key_output)
+        .collect::<Vec<_>>();
 
     assert_eq!(
         click_actions,
@@ -695,6 +711,9 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     );
     assert_eq!(clicked_actions, click_actions);
     assert_eq!(commit_actions, click_actions);
+    assert_eq!(click_values, vec![AppAction::CommitByClick]);
+    assert_eq!(clicked_values, vec![&AppAction::CommitByClick]);
+    assert_eq!(commit_values, vec![&AppAction::CommitByClick]);
     assert_eq!(
         key_actions,
         vec![DocumentCommandAction {
@@ -704,6 +723,9 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
             action: AppAction::CommitByKeyboard,
         }]
     );
+    assert_eq!(key_values, vec![AppAction::CommitByKeyboard]);
+    assert_eq!(key_kind_values, vec![AppAction::CommitByKeyboard]);
+    assert_eq!(borrowed_key_values, vec![&AppAction::CommitByKeyboard]);
     assert_eq!(
         hover_actions,
         vec![DocumentCommandAction {
