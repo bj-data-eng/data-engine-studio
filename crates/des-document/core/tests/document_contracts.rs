@@ -1,14 +1,14 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget, DocumentBuilder,
-    DocumentCommandAction, DocumentCommandBinding, DocumentCommandRegistry, DocumentEngine,
-    DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection,
-    DocumentProjectionOperation, DocumentProjectionReport, DocumentView, DocumentWidget, Element,
-    ElementBehaviorEvent, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets,
-    JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis,
-    Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
-    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
-    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentCommandAction, DocumentCommandBinding, DocumentCommandDispatchReport,
+    DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
+    DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
+    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId, ElementSpec,
+    ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length,
+    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
+    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
+    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1024,23 +1024,29 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
     assert_eq!(click_report.commands, 1);
     assert_eq!(click_report.handled, 1);
     assert_eq!(click_report.unhandled, 0);
+    assert_eq!(click_report.command_count(), 1);
+    assert_eq!(click_report.handled_count(), 1);
+    assert_eq!(click_report.unhandled_count(), 0);
     assert!(!click_report.is_empty());
     assert!(click_report.has_commands());
     assert!(click_report.has_handled());
     assert!(!click_report.has_unhandled());
     assert!(click_report.all_handled());
+    assert_eq!(key_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(key_report.commands, 1);
     assert_eq!(key_report.handled, 1);
     assert_eq!(key_report.unhandled, 0);
     assert_eq!(unknown_report.commands, 1);
     assert_eq!(unknown_report.handled, 0);
     assert_eq!(unknown_report.unhandled, 1);
+    assert_eq!(unknown_report.unhandled_count(), 1);
     assert!(unknown_report.has_unhandled());
     assert!(!unknown_report.all_handled());
     assert_eq!(clicked_only_report.commands, 1);
     assert_eq!(clicked_only_report.handled, 1);
     assert_eq!(clicked_only_report.unhandled, 0);
     assert_eq!(key_only_report.commands, 0);
+    assert_eq!(key_only_report, DocumentCommandDispatchReport::new(0, 0, 0));
     assert!(key_only_report.is_empty());
     assert!(!key_only_report.has_commands());
     assert!(!key_only_report.has_handled());

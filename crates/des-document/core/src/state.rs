@@ -1586,28 +1586,51 @@ pub struct DocumentCommandDispatchReport {
 }
 
 impl DocumentCommandDispatchReport {
+    pub const fn new(commands: usize, handled: usize, unhandled: usize) -> Self {
+        Self {
+            commands,
+            handled,
+            unhandled,
+        }
+    }
+
+    /// Returns the number of command events inspected by this dispatch pass.
+    pub const fn command_count(&self) -> usize {
+        self.commands
+    }
+
+    /// Returns the number of command events mapped to typed app actions.
+    pub const fn handled_count(&self) -> usize {
+        self.handled
+    }
+
+    /// Returns the number of command events without a typed app action binding.
+    pub const fn unhandled_count(&self) -> usize {
+        self.unhandled
+    }
+
     /// Returns true when no commands were inspected by this dispatch pass.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.commands == 0
     }
 
     /// Returns true when at least one command was inspected by this dispatch pass.
-    pub fn has_commands(&self) -> bool {
+    pub const fn has_commands(&self) -> bool {
         self.commands > 0
     }
 
     /// Returns true when at least one command was mapped to a typed action.
-    pub fn has_handled(&self) -> bool {
+    pub const fn has_handled(&self) -> bool {
         self.handled > 0
     }
 
     /// Returns true when at least one command did not have a typed action binding.
-    pub fn has_unhandled(&self) -> bool {
+    pub const fn has_unhandled(&self) -> bool {
         self.unhandled > 0
     }
 
     /// Returns true when every inspected command was mapped to a typed action.
-    pub fn all_handled(&self) -> bool {
+    pub const fn all_handled(&self) -> bool {
         self.unhandled == 0
     }
 }
