@@ -1,5 +1,5 @@
 use des_document::{
-    DocumentEngine, DocumentOutput, ElementId, Point, Rect, ScrollAxis, ScrollChrome,
+    DocumentEngine, DocumentOutput, DocumentView, ElementId, Point, Rect, ScrollAxis, ScrollChrome,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -46,6 +46,15 @@ impl AutoScroller {
         self.scroll_drag_with_filter(engine, output, pointer, |_| true)
     }
 
+    pub fn scroll_view_drag(
+        self,
+        view: &mut DocumentView,
+        output: &DocumentOutput,
+        pointer: Point,
+    ) -> Option<AutoScrollAction> {
+        self.scroll_view_drag_with_filter(view, output, pointer, |_| true)
+    }
+
     pub fn scroll_drag_with_filter(
         self,
         engine: &mut DocumentEngine,
@@ -84,6 +93,16 @@ impl AutoScroller {
         }
 
         None
+    }
+
+    pub fn scroll_view_drag_with_filter(
+        self,
+        view: &mut DocumentView,
+        output: &DocumentOutput,
+        pointer: Point,
+        accepts_element: impl FnMut(&ElementId) -> bool,
+    ) -> Option<AutoScrollAction> {
+        self.scroll_drag_with_filter(view.engine_mut(), output, pointer, accepts_element)
     }
 
     fn scroll_element(
@@ -248,7 +267,7 @@ fn scroll_position(chrome: &ScrollChrome) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use des_document::{Document, ElementSpec, Overflow, Size, Style, StyleSheet};
+    use des_document::{Document, DocumentView, ElementSpec, Overflow, Size, Style, StyleSheet};
 
     fn vertical_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
         let mut engine = DocumentEngine::default();
@@ -273,6 +292,30 @@ mod tests {
         });
         let output = engine.update(&mut document, &stylesheet);
         (engine, document, stylesheet, output)
+    }
+
+    fn vertical_scroll_view_fixture() -> (DocumentView, DocumentOutput) {
+        let stylesheet = StyleSheet::new()
+            .id(
+                "scroll-parent",
+                Style::default()
+                    .size(120.0, 80.0)
+                    .overflow_y(Overflow::Scroll),
+            )
+            .class("row", Style::default().size(100.0, 32.0));
+        let mut view = DocumentView::build(Size::new(160.0, 120.0), stylesheet, |ui| {
+            ui.element("scroll-parent", ElementSpec::div(), |ui| {
+                for index in 0..8 {
+                    ui.element(
+                        format!("row-{index}"),
+                        ElementSpec::div().class("row"),
+                        |_| {},
+                    );
+                }
+            });
+        });
+        let output = view.update();
+        (view, output)
     }
 
     fn horizontal_scroll_fixture() -> (DocumentEngine, Document, StyleSheet, DocumentOutput) {
@@ -306,6 +349,47 @@ mod tests {
         assert_eq!(action.element_id, ElementId::new("scroll-parent"));
         assert!(action.delta.y > 0.0);
         assert!(engine.element_state("scroll-parent").unwrap().scroll_y > 0.0);
+    }
+
+    #[test]
+    fn auto_scroller_scrolls_document_view_without_exposing_engine() {
+        let (mut view, output) = vertical_scroll_view_fixture();
+        let pointer = Point::new(40.0, 76.0);
+
+        let action = AutoScroller::new(AutoScrollOptions::default())
+            .scroll_view_drag(&mut view, &output, pointer)
+            .expect("pointer near the bottom should scroll a view");
+
+        assert_eq!(action.element_id, ElementId::new("scroll-parent"));
+        assert!(action.delta.y > 0.0);
+        assert!(
+            view.engine()
+                .element_state("scroll-parent")
+                .unwrap()
+                .scroll_y
+                > 0.0
+        );
+    }
+
+    #[test]
+    fn auto_scroller_document_view_filter_can_reject_scroll_container() {
+        let (mut view, output) = vertical_scroll_view_fixture();
+
+        let action = AutoScroller::new(AutoScrollOptions::default()).scroll_view_drag_with_filter(
+            &mut view,
+            &output,
+            Point::new(40.0, 76.0),
+            |_| false,
+        );
+
+        assert!(action.is_none());
+        assert_eq!(
+            view.engine()
+                .element_state("scroll-parent")
+                .unwrap()
+                .scroll_y,
+            0.0
+        );
     }
 
     #[test]
