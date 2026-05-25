@@ -3,12 +3,13 @@ use des_document::{
     DocumentCommandAction, DocumentCommandBinding, DocumentCommandDispatchReport,
     DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
     DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
-    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId, ElementSpec,
-    ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length,
-    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
-    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
-    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId, ElementProjectionPatch,
+    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
+    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
+    TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow,
+    TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -1542,6 +1543,89 @@ fn document_projection_updates_semantic_attributes() {
 
     assert_eq!(unchanged_report.operations, 6);
     assert_eq!(unchanged_report.changed, 0);
+}
+
+#[test]
+fn element_projection_patch_groups_reusable_state_updates() {
+    let stylesheet = StyleSheet::new()
+        .class(
+            "is-ready",
+            Style::default().background(Color::rgb(205, 239, 221)),
+        )
+        .class(
+            "is-stale",
+            Style::default().border(Color::rgb(180, 120, 80)),
+        );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.div("status")
+            .class("is-stale")
+            .data("state", "idle")
+            .data("ephemeral", "true")
+            .children(|ui| {
+                ui.text("status-label", "Idle");
+            });
+    });
+    let ready_patch = ElementProjectionPatch::new()
+        .value("ready")
+        .data("state", "ready")
+        .remove_data("ephemeral")
+        .aria("live", "polite")
+        .select()
+        .enable()
+        .focus()
+        .add_class("is-ready")
+        .remove_class("is-stale");
+    let label_patch = ElementProjectionPatch::new().text("Ready");
+    let projection = DocumentProjection::new()
+        .set_patch("status", &ready_patch)
+        .set_patch("status-label", label_patch);
+
+    assert_eq!(ready_patch.operation_count(), 9);
+    assert!(!ready_patch.is_empty());
+
+    let report = view.project(&projection).unwrap();
+    let output = view.update();
+    let status = output.snapshot().find("status").unwrap();
+    let label = output.snapshot().find("status-label").unwrap();
+
+    assert_eq!(report.operations, 10);
+    assert_eq!(report.changed, 9);
+    assert_eq!(label.text(), Some("Ready".to_owned()));
+    assert_eq!(status.value(), Some("ready"));
+    assert_eq!(status.data("state"), Some("ready"));
+    assert_eq!(status.data("ephemeral"), None);
+    assert_eq!(status.aria("live"), Some("polite"));
+    assert!(status.selected());
+    assert!(!status.disabled());
+    assert!(status.focused());
+    assert!(status.has_class("is-ready"));
+    assert!(!status.has_class("is-stale"));
+    assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
+
+    let reset_patch = ElementProjectionPatch::new()
+        .deselect()
+        .disable()
+        .blur()
+        .data_if("state", "ready", false)
+        .aria_if("live", "polite", false)
+        .classes_if(["is-ready", "is-stale"], false);
+    let reset_report = view
+        .project_with(|projection| {
+            projection.element("status").patch(reset_patch);
+        })
+        .unwrap();
+    let reset_output = view.update();
+    let reset_status = reset_output.snapshot().find("status").unwrap();
+
+    assert_eq!(reset_report.operations, 7);
+    assert_eq!(reset_report.changed, 6);
+    assert!(!reset_status.selected());
+    assert!(reset_status.disabled());
+    assert!(!reset_status.focused());
+    assert_eq!(reset_status.data("state"), None);
+    assert_eq!(reset_status.aria("live"), None);
+    assert!(!reset_status.has_class("is-ready"));
+    assert!(!reset_status.has_class("is-stale"));
 }
 
 #[test]

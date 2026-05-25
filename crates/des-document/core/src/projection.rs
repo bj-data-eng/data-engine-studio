@@ -1,4 +1,5 @@
 use crate::{ClassName, Document, DocumentError, DocumentResult, ElementId, TextContent};
+use std::borrow::Borrow;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DocumentProjection {
@@ -272,6 +273,23 @@ impl DocumentProjection {
             project(self);
         }
         self
+    }
+
+    pub fn set_patch(
+        mut self,
+        id: impl Into<ElementId>,
+        patch: impl Borrow<ElementProjectionPatch>,
+    ) -> Self {
+        self.push_patch(id, patch);
+        self
+    }
+
+    pub fn push_patch(
+        &mut self,
+        id: impl Into<ElementId>,
+        patch: impl Borrow<ElementProjectionPatch>,
+    ) {
+        patch.borrow().apply_to(self.element(id));
     }
 
     pub fn set_text(mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) -> Self {
@@ -837,6 +855,234 @@ pub struct ElementProjection<'a> {
     id: ElementId,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ElementProjectionPatch {
+    text: Option<TextContent>,
+    value: Option<String>,
+    attributes: Vec<(String, String)>,
+    removed_attributes: Vec<String>,
+    selected: Option<bool>,
+    disabled: Option<bool>,
+    focused: Option<bool>,
+    classes: Vec<(ClassName, bool)>,
+}
+
+impl ElementProjectionPatch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn text(mut self, text: impl Into<TextContent>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    pub fn value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+
+    pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.attributes.push((name.into(), value.into()));
+        self
+    }
+
+    pub fn attribute_if(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.attributes.push((name.into(), value.into()));
+        } else {
+            self.removed_attributes.push(name.into());
+        }
+        self
+    }
+
+    pub fn attributes<I, K, V>(mut self, attributes: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.attributes.extend(
+            attributes
+                .into_iter()
+                .map(|(name, value)| (name.into(), value.into())),
+        );
+        self
+    }
+
+    pub fn data(self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
+        self.attribute(prefixed_attribute_name("data-", name), value)
+    }
+
+    pub fn data_if(self, name: impl AsRef<str>, value: impl Into<String>, present: bool) -> Self {
+        self.attribute_if(prefixed_attribute_name("data-", name), value, present)
+    }
+
+    pub fn aria(self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
+        self.attribute(prefixed_attribute_name("aria-", name), value)
+    }
+
+    pub fn aria_if(self, name: impl AsRef<str>, value: impl Into<String>, present: bool) -> Self {
+        self.attribute_if(prefixed_attribute_name("aria-", name), value, present)
+    }
+
+    pub fn remove_attribute(mut self, name: impl Into<String>) -> Self {
+        self.removed_attributes.push(name.into());
+        self
+    }
+
+    pub fn remove_attributes<I, K>(mut self, names: I) -> Self
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        self.removed_attributes
+            .extend(names.into_iter().map(Into::into));
+        self
+    }
+
+    pub fn remove_data(self, name: impl AsRef<str>) -> Self {
+        self.remove_attribute(prefixed_attribute_name("data-", name))
+    }
+
+    pub fn remove_aria(self, name: impl AsRef<str>) -> Self {
+        self.remove_attribute(prefixed_attribute_name("aria-", name))
+    }
+
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = Some(selected);
+        self
+    }
+
+    pub fn select(self) -> Self {
+        self.selected(true)
+    }
+
+    pub fn deselect(self) -> Self {
+        self.selected(false)
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
+    }
+
+    pub fn disable(self) -> Self {
+        self.disabled(true)
+    }
+
+    pub fn enable(self) -> Self {
+        self.disabled(false)
+    }
+
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.focused = Some(focused);
+        self
+    }
+
+    pub fn focus(self) -> Self {
+        self.focused(true)
+    }
+
+    pub fn blur(self) -> Self {
+        self.focused(false)
+    }
+
+    pub fn class(mut self, class: impl Into<ClassName>, present: bool) -> Self {
+        self.classes.push((class.into(), present));
+        self
+    }
+
+    pub fn add_class(self, class: impl Into<ClassName>) -> Self {
+        self.class(class, true)
+    }
+
+    pub fn remove_class(self, class: impl Into<ClassName>) -> Self {
+        self.class(class, false)
+    }
+
+    pub fn add_classes<I, C>(mut self, classes: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.classes
+            .extend(classes.into_iter().map(|class| (class.into(), true)));
+        self
+    }
+
+    pub fn remove_classes<I, C>(mut self, classes: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.classes
+            .extend(classes.into_iter().map(|class| (class.into(), false)));
+        self
+    }
+
+    pub fn class_if(self, class: impl Into<ClassName>, present: bool) -> Self {
+        self.class(class, present)
+    }
+
+    pub fn classes_if<I, C>(mut self, classes: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.classes
+            .extend(classes.into_iter().map(|class| (class.into(), present)));
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.operation_count() == 0
+    }
+
+    pub fn operation_count(&self) -> usize {
+        usize::from(self.text.is_some())
+            + usize::from(self.value.is_some())
+            + self.attributes.len()
+            + self.removed_attributes.len()
+            + usize::from(self.selected.is_some())
+            + usize::from(self.disabled.is_some())
+            + usize::from(self.focused.is_some())
+            + self.classes.len()
+    }
+
+    pub fn apply_to(&self, mut element: ElementProjection<'_>) {
+        if let Some(text) = &self.text {
+            element.text(text.clone());
+        }
+        if let Some(value) = &self.value {
+            element.value(value.clone());
+        }
+        for (name, value) in &self.attributes {
+            element.attribute(name.clone(), value.clone());
+        }
+        for name in &self.removed_attributes {
+            element.remove_attribute(name.clone());
+        }
+        if let Some(selected) = self.selected {
+            element.selected(selected);
+        }
+        if let Some(disabled) = self.disabled {
+            element.disabled(disabled);
+        }
+        if let Some(focused) = self.focused {
+            element.focused(focused);
+        }
+        for (class, present) in &self.classes {
+            element.class(class.clone(), *present);
+        }
+    }
+}
+
 impl ElementProjection<'_> {
     pub fn id(&self) -> &ElementId {
         &self.id
@@ -851,6 +1097,14 @@ impl ElementProjection<'_> {
 
     pub fn text(&mut self, text: impl Into<TextContent>) -> &mut Self {
         self.projection.push_text(self.id.clone(), text);
+        self
+    }
+
+    pub fn patch(&mut self, patch: impl Borrow<ElementProjectionPatch>) -> &mut Self {
+        patch.borrow().apply_to(ElementProjection {
+            projection: self.projection,
+            id: self.id.clone(),
+        });
         self
     }
 
