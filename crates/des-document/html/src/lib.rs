@@ -196,6 +196,38 @@ impl HtmlDocument {
         hooks
     }
 
+    /// Returns Rust behavior hooks matching a typed document intent.
+    pub fn behavior_hooks_for(&self, event: ElementBehaviorEvent) -> Vec<&HtmlBehaviorHook> {
+        self.behavior_hooks()
+            .into_iter()
+            .filter(|hook| hook.matches_intent(event))
+            .collect()
+    }
+
+    /// Returns the first Rust behavior hook matching a typed document intent.
+    pub fn first_behavior_hook_for(
+        &self,
+        event: ElementBehaviorEvent,
+    ) -> Option<&HtmlBehaviorHook> {
+        self.behavior_hooks()
+            .into_iter()
+            .find(|hook| hook.matches_intent(event))
+    }
+
+    /// Returns true when a matching behavior hook is declared by the parsed HTML.
+    pub fn has_behavior_hook(&self, event: ElementBehaviorEvent, command: &str) -> bool {
+        self.behavior_hooks()
+            .into_iter()
+            .any(|hook| hook.matches_intent(event) && hook.has_command(command))
+    }
+
+    /// Returns true when any parsed behavior hook declares the supplied command.
+    pub fn has_command_hook(&self, command: &str) -> bool {
+        self.behavior_hooks()
+            .into_iter()
+            .any(|hook| hook.has_command(command))
+    }
+
     /// Pushes typed Rust command bindings for HTML-authored behavior hooks.
     ///
     /// The mapper receives each parsed `on:*` or `data-command` hook in document
@@ -876,6 +908,29 @@ impl HtmlStylesheet {
         self.html.behavior_hooks()
     }
 
+    /// Returns Rust behavior hooks matching a typed document intent.
+    pub fn behavior_hooks_for(&self, event: ElementBehaviorEvent) -> Vec<&HtmlBehaviorHook> {
+        self.html.behavior_hooks_for(event)
+    }
+
+    /// Returns the first Rust behavior hook matching a typed document intent.
+    pub fn first_behavior_hook_for(
+        &self,
+        event: ElementBehaviorEvent,
+    ) -> Option<&HtmlBehaviorHook> {
+        self.html.first_behavior_hook_for(event)
+    }
+
+    /// Returns true when a matching behavior hook is declared by the parsed HTML.
+    pub fn has_behavior_hook(&self, event: ElementBehaviorEvent, command: &str) -> bool {
+        self.html.has_behavior_hook(event, command)
+    }
+
+    /// Returns true when any parsed behavior hook declares the supplied command.
+    pub fn has_command_hook(&self, command: &str) -> bool {
+        self.html.has_command_hook(command)
+    }
+
     /// Pushes typed Rust command bindings for HTML-authored behavior hooks.
     pub fn push_commands<Action>(
         &self,
@@ -1506,6 +1561,38 @@ impl HtmlNode {
         hooks
     }
 
+    /// Returns Rust behavior hooks in this subtree matching a typed document intent.
+    pub fn behavior_hooks_for(&self, event: ElementBehaviorEvent) -> Vec<&HtmlBehaviorHook> {
+        self.behavior_hooks()
+            .into_iter()
+            .filter(|hook| hook.matches_intent(event))
+            .collect()
+    }
+
+    /// Returns the first Rust behavior hook matching a typed document intent.
+    pub fn first_behavior_hook_for(
+        &self,
+        event: ElementBehaviorEvent,
+    ) -> Option<&HtmlBehaviorHook> {
+        self.behavior_hooks()
+            .into_iter()
+            .find(|hook| hook.matches_intent(event))
+    }
+
+    /// Returns true when this subtree declares a matching behavior hook.
+    pub fn has_behavior_hook(&self, event: ElementBehaviorEvent, command: &str) -> bool {
+        self.behavior_hooks()
+            .into_iter()
+            .any(|hook| hook.matches_intent(event) && hook.has_command(command))
+    }
+
+    /// Returns true when this subtree declares the supplied command hook.
+    pub fn has_command_hook(&self, command: &str) -> bool {
+        self.behavior_hooks()
+            .into_iter()
+            .any(|hook| hook.has_command(command))
+    }
+
     fn collect_by_tag<'a>(&'a self, tag: &str, nodes: &mut Vec<&'a HtmlNode>) {
         if self.tag == tag {
             nodes.push(self);
@@ -1624,6 +1711,11 @@ impl HtmlBehaviorHook {
         &self.command
     }
 
+    /// Returns true when this hook declares the supplied command.
+    pub fn has_command(&self, command: &str) -> bool {
+        self.command == command
+    }
+
     /// Returns the parsed typed event intent when this hook maps to a document intent.
     pub fn intent(&self) -> Option<ElementBehaviorEvent> {
         ElementBehaviorEvent::from_name(&self.event)
@@ -1632,6 +1724,71 @@ impl HtmlBehaviorHook {
     /// Returns true when this hook maps to the supplied document behavior intent.
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
         self.intent() == Some(intent)
+    }
+
+    /// Returns true when this hook maps to click intent.
+    pub fn is_click(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Click)
+    }
+
+    /// Returns true when this hook maps to context-menu intent.
+    pub fn is_context_menu(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns true when this hook maps to pointer-enter intent.
+    pub fn is_pointer_enter(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns true when this hook maps to pointer-leave intent.
+    pub fn is_pointer_leave(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    /// Returns true when this hook maps to pointer-down intent.
+    pub fn is_pointer_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerDown)
+    }
+
+    /// Returns true when this hook maps to pointer-up intent.
+    pub fn is_pointer_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::PointerUp)
+    }
+
+    /// Returns true when this hook maps to drag-start intent.
+    pub fn is_drag_start(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+    }
+
+    /// Returns true when this hook maps to drag intent.
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Drag)
+    }
+
+    /// Returns true when this hook maps to drag-end intent.
+    pub fn is_drag_end(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragEnd)
+    }
+
+    /// Returns true when this hook maps to any pointer drag intent.
+    pub fn is_any_drag(&self) -> bool {
+        self.is_drag_start() || self.is_drag() || self.is_drag_end()
+    }
+
+    /// Returns true when this hook maps to scroll intent.
+    pub fn is_scroll(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    /// Returns true when this hook maps to key-down intent.
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns true when this hook maps to key-up intent.
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
     }
 
     /// Converts the parsed HTML hook into the egui-free document hook contract.

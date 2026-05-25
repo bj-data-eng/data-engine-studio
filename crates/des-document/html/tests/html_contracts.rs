@@ -2,7 +2,9 @@ use des_document::{
     DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentInput,
     DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Point, Size,
 };
-use des_html::{HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
+use des_html::{
+    HtmlBehaviorHook, HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -185,11 +187,37 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
     assert_eq!(button.behavior_hooks[0].command, "project.open");
     assert_eq!(button.behavior_hooks[0].event(), "click");
     assert_eq!(button.behavior_hooks[0].command(), "project.open");
+    assert!(button.behavior_hooks[0].has_command("project.open"));
     assert_eq!(
         button.behavior_hooks[0].intent(),
         Some(ElementBehaviorEvent::Click)
     );
     assert!(button.behavior_hooks[0].matches_intent(ElementBehaviorEvent::Click));
+    assert!(button.behavior_hooks[0].is_click());
+    assert!(!button.behavior_hooks[0].is_key_down());
+    assert!(button.has_behavior_hook(ElementBehaviorEvent::Click, "project.open"));
+    assert!(button.has_command_hook("project.filter"));
+    assert_eq!(
+        button.behavior_hooks_for(ElementBehaviorEvent::Click).len(),
+        1
+    );
+    assert_eq!(
+        button
+            .first_behavior_hook_for(ElementBehaviorEvent::Click)
+            .map(HtmlBehaviorHook::command),
+        Some("project.open")
+    );
+    assert!(html.has_behavior_hook(ElementBehaviorEvent::Click, "project.open"));
+    assert!(html.has_command_hook("project.filter"));
+    assert_eq!(
+        html.behavior_hooks_for(ElementBehaviorEvent::Click).len(),
+        1
+    );
+    assert_eq!(
+        html.first_behavior_hook_for(ElementBehaviorEvent::Click)
+            .map(HtmlBehaviorHook::command),
+        Some("project.open")
+    );
     assert_eq!(button.behavior_hooks[1].event, "input");
     assert_eq!(button.behavior_hooks[1].command, "project.filter");
     assert_eq!(button.behavior_hooks[1].intent(), None);
@@ -965,6 +993,20 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
     assert!(hooks.iter().any(|hook| {
         hook.command() == "project.commit" && hook.matches_intent(ElementBehaviorEvent::KeyDown)
     }));
+    assert!(bundle.has_behavior_hook(ElementBehaviorEvent::Click, "project.run"));
+    assert!(bundle.has_command_hook("project.commit"));
+    assert_eq!(
+        bundle
+            .behavior_hooks_for(ElementBehaviorEvent::KeyDown)
+            .len(),
+        1
+    );
+    assert_eq!(
+        bundle
+            .first_behavior_hook_for(ElementBehaviorEvent::KeyDown)
+            .map(HtmlBehaviorHook::command),
+        Some("project.commit")
+    );
 
     let mapped_registry = bundle.command_action_registry([
         ("project.run", HtmlAction::Run),
