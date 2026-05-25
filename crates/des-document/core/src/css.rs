@@ -30,20 +30,40 @@ impl fmt::Display for CssParseError {
 
 impl Error for CssParseError {}
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CssParseMode {
+    Strict,
+    Forgiving,
+}
+
 pub(crate) fn parse_stylesheet(input: &str) -> Result<StyleSheet, CssParseError> {
-    let input = strip_comments(input)?;
+    parse_stylesheet_with_mode(input, CssParseMode::Strict)
+}
+
+pub(crate) fn parse_stylesheet_forgiving(input: &str) -> Result<StyleSheet, CssParseError> {
+    parse_stylesheet_with_mode(input, CssParseMode::Forgiving)
+}
+
+fn parse_stylesheet_with_mode(
+    input: &str,
+    mode: CssParseMode,
+) -> Result<StyleSheet, CssParseError> {
+    let input = strip_comments(input, mode)?;
     let mut sheet = StyleSheet::new();
-    parse_rules_into(&mut sheet, input.as_str(), None)?;
+    parse_rules_into(&mut sheet, input.as_str(), None, mode)?;
     Ok(sheet)
 }
 
-fn strip_comments(input: &str) -> Result<String, CssParseError> {
+fn strip_comments(input: &str, mode: CssParseMode) -> Result<String, CssParseError> {
     let mut output = String::with_capacity(input.len());
     let mut rest = input;
     while let Some(start) = rest.find("/*") {
         output.push_str(&rest[..start]);
         let after_start = &rest[start + 2..];
         let Some(end) = after_start.find("*/") else {
+            if mode == CssParseMode::Forgiving {
+                return Ok(output);
+            }
             return Err(CssParseError::new("CSS comment is missing closing `*/`"));
         };
         rest = &after_start[end + 2..];
@@ -56,45 +76,79 @@ fn parse_rules_into(
     sheet: &mut StyleSheet,
     input: &str,
     condition: Option<StyleCondition>,
+    mode: CssParseMode,
 ) -> Result<(), CssParseError> {
     let mut rest = input.trim_start();
     while !rest.is_empty() {
         let Some(start) = rest.find('{') else {
+            if mode == CssParseMode::Forgiving {
+                break;
+            }
             return Err(CssParseError::new(
                 "CSS contains trailing text outside a rule",
             ));
         };
         let prelude = rest[..start].trim();
         if prelude.is_empty() {
+            if mode == CssParseMode::Forgiving {
+                let end = matching_block_end(rest, start)?;
+                rest = rest[end + 1..].trim_start();
+                continue;
+            }
             return Err(CssParseError::new("CSS rule is missing a selector"));
         }
-        let end = matching_block_end(rest, start)?;
+        let end = match matching_block_end(rest, start) {
+            Ok(end) => end,
+            Err(error) => {
+                if mode == CssParseMode::Forgiving {
+                    break;
+                }
+                return Err(error);
+            }
+        };
         let block = &rest[start + 1..end];
         rest = rest[end + 1..].trim_start();
 
         if let Some(query) = prelude.strip_prefix("@media") {
-            let media_condition = parse_media_query(query.trim())?;
-            let condition = merge_conditions(condition, media_condition)?;
-            parse_rules_into(sheet, block, Some(condition))?;
+            let Some(condition) =
+                parse_conditional_rule(condition, parse_media_query(query.trim()), mode)?
+            else {
+                continue;
+            };
+            parse_rules_into(sheet, block, Some(condition), mode)?;
             continue;
         }
 
         if let Some(query) = prelude.strip_prefix("@container") {
-            let container_condition = parse_container_query(query.trim())?;
-            let condition = merge_conditions(condition, container_condition)?;
-            parse_rules_into(sheet, block, Some(condition))?;
+            let Some(condition) =
+                parse_conditional_rule(condition, parse_container_query(query.trim()), mode)?
+            else {
+                continue;
+            };
+            parse_rules_into(sheet, block, Some(condition), mode)?;
             continue;
         }
 
         if prelude.starts_with('@') {
+            if mode == CssParseMode::Forgiving {
+                continue;
+            }
             return Err(CssParseError::new(format!(
                 "unsupported CSS at-rule `{prelude}`"
             )));
         }
 
-        let style = parse_declarations(block)?;
+        let style = parse_declarations(block, mode)?;
         for selector in prelude.split(',') {
-            let selector = parse_selector(selector.trim())?;
+            let selector = match parse_selector(selector.trim()) {
+                Ok(selector) => selector,
+                Err(error) => {
+                    if mode == CssParseMode::Forgiving {
+                        continue;
+                    }
+                    return Err(error);
+                }
+            };
             if let Some(condition) = condition {
                 sheet.push_conditional_rule(condition, selector, style.clone());
             } else {
@@ -103,6 +157,23 @@ fn parse_rules_into(
         }
     }
     Ok(())
+}
+
+fn parse_conditional_rule(
+    existing: Option<StyleCondition>,
+    next: Result<StyleCondition, CssParseError>,
+    mode: CssParseMode,
+) -> Result<Option<StyleCondition>, CssParseError> {
+    match next.and_then(|next| merge_conditions(existing, next)) {
+        Ok(condition) => Ok(Some(condition)),
+        Err(error) => {
+            if mode == CssParseMode::Forgiving {
+                Ok(None)
+            } else {
+                Err(error)
+            }
+        }
+    }
 }
 
 fn matching_block_end(input: &str, open: usize) -> Result<usize, CssParseError> {
@@ -525,7 +596,7 @@ fn parse_nth_child(
     }
 }
 
-fn parse_declarations(input: &str) -> Result<Style, CssParseError> {
+fn parse_declarations(input: &str, mode: CssParseMode) -> Result<Style, CssParseError> {
     let mut style = Style::default();
     for declaration in input.split(';') {
         let declaration = declaration.trim();
@@ -533,11 +604,19 @@ fn parse_declarations(input: &str) -> Result<Style, CssParseError> {
             continue;
         }
         let Some((name, value)) = declaration.split_once(':') else {
+            if mode == CssParseMode::Forgiving {
+                continue;
+            }
             return Err(CssParseError::new(format!(
                 "CSS declaration `{declaration}` is missing `:`"
             )));
         };
-        apply_declaration(&mut style, name.trim(), value.trim())?;
+        if let Err(error) = apply_declaration(&mut style, name.trim(), value.trim()) {
+            if mode == CssParseMode::Forgiving {
+                continue;
+            }
+            return Err(error);
+        }
     }
     Ok(style)
 }

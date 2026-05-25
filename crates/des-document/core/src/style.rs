@@ -2147,8 +2147,17 @@ impl StyleSheet {
         crate::css::parse_stylesheet(input)
     }
 
+    pub fn parse_css_forgiving(input: &str) -> Result<Self, crate::CssParseError> {
+        crate::css::parse_stylesheet_forgiving(input)
+    }
+
     pub fn extend_css(&mut self, input: &str) -> Result<(), crate::CssParseError> {
         self.extend(Self::parse_css(input)?);
+        Ok(())
+    }
+
+    pub fn extend_css_forgiving(&mut self, input: &str) -> Result<(), crate::CssParseError> {
+        self.extend(Self::parse_css_forgiving(input)?);
         Ok(())
     }
 
