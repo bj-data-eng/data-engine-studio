@@ -124,6 +124,97 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
 }
 
 #[test]
+fn document_command_registry_dispatches_typed_actions_with_context() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        RunQuery,
+        CancelQuery,
+    }
+
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("run"),
+            Style::default()
+                .width(Length::Px(96.0))
+                .height(Length::Px(32.0)),
+        )
+        .rule(
+            StyleSelector::id("cancel"),
+            Style::default()
+                .width(Length::Px(96.0))
+                .height(Length::Px(32.0)),
+        );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").on_click("run-query").text("Run");
+        ui.button("cancel")
+            .focused(true)
+            .on_key_down("cancel-query")
+            .text("Cancel");
+    });
+    let mut unhandled_view =
+        DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+            ui.button("later")
+                .focused(true)
+                .on_key_down("unknown-command")
+                .text("Later");
+        });
+    let registry = DocumentCommandRegistry::new()
+        .bind("run-query", AppAction::RunQuery)
+        .bind("cancel-query", AppAction::CancelQuery);
+
+    let click_output =
+        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Escape));
+    let unknown_output =
+        unhandled_view.update_with_input(DocumentInput::key_down(DocumentKey::Escape));
+    let mut handled = Vec::new();
+    let click_report = registry.dispatch(&click_output, |command| {
+        handled.push((
+            command.target.clone(),
+            command.event,
+            command.command.to_owned(),
+            *command.action,
+        ));
+    });
+    let key_report = registry.dispatch(&key_output, |command| {
+        handled.push((
+            command.target.clone(),
+            command.event,
+            command.command.to_owned(),
+            *command.action,
+        ));
+    });
+    let unknown_report = registry.dispatch(&unknown_output, |_| {});
+
+    assert_eq!(click_report.commands, 1);
+    assert_eq!(click_report.handled, 1);
+    assert_eq!(click_report.unhandled, 0);
+    assert_eq!(key_report.commands, 1);
+    assert_eq!(key_report.handled, 1);
+    assert_eq!(key_report.unhandled, 0);
+    assert_eq!(unknown_report.commands, 1);
+    assert_eq!(unknown_report.handled, 0);
+    assert_eq!(unknown_report.unhandled, 1);
+    assert_eq!(
+        handled,
+        vec![
+            (
+                ElementId::new("run"),
+                DocumentEventKind::Clicked,
+                "run-query".to_owned(),
+                AppAction::RunQuery,
+            ),
+            (
+                ElementId::new("cancel"),
+                DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Escape)),
+                "cancel-query".to_owned(),
+                AppAction::CancelQuery,
+            )
+        ]
+    );
+}
+
+#[test]
 fn keyboard_input_targets_focused_element_and_emits_hook_command() {
     let stylesheet = StyleSheet::new().rule(
         StyleSelector::id("search"),

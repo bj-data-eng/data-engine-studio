@@ -206,6 +206,32 @@ impl<Action> DocumentCommandRegistry<Action> {
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
         &self.bindings
     }
+
+    pub fn dispatch<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        mut handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        let mut report = DocumentCommandDispatchReport::default();
+        for command in output.command_events() {
+            report.commands += 1;
+            let Some(action) = self.action_for(command.command) else {
+                report.unhandled += 1;
+                continue;
+            };
+            report.handled += 1;
+            handler(DocumentCommandActionRef {
+                target: command.target,
+                event: command.event,
+                command: command.command,
+                action,
+            });
+        }
+        report
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -214,6 +240,13 @@ pub struct DocumentCommandActionRef<'a, Action> {
     pub event: DocumentEventKind,
     pub command: &'a str,
     pub action: &'a Action,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct DocumentCommandDispatchReport {
+    pub commands: usize,
+    pub handled: usize,
+    pub unhandled: usize,
 }
 
 pub struct DocumentCommandIter<'a> {
