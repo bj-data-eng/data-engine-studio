@@ -496,6 +496,28 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             &registry,
         )
         .expect("forgiving CSS should collect keyboard actions directly");
+    let configured_click_frame = html
+        .update_with_input_actions_and_css_with(
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            css,
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+        )
+        .expect("HTML and CSS should configure typed actions for one update");
+    let configured_forgiving_frame = html
+        .update_with_input_actions_and_css_forgiving_with(
+            Size::new(240.0, 160.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+        )
+        .expect("forgiving CSS should configure typed actions for one update");
     let mut surface = html
         .to_action_surface_with_css(Size::new(240.0, 160.0), css, |commands| {
             commands.push("project.run", HtmlAction::Run);
@@ -534,6 +556,8 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     );
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(forgiving_frame.contains_action(&HtmlAction::Filter));
+    assert!(configured_click_frame.contains_action(&HtmlAction::Run));
+    assert!(configured_forgiving_frame.contains_action(&HtmlAction::Filter));
     assert!(surface_click.contains_action(&HtmlAction::Run));
     assert!(surface_key.contains_action(&HtmlAction::Filter));
 }
@@ -634,6 +658,21 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     let key_frame = html
         .update_actions(Size::new(320.0, 180.0), &registry)
         .expect("HTML should collect actions directly after update");
+    let configured_key_frame = html
+        .update_with_input_actions_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+                commands.push_key_down("project.search", HtmlAction::Search);
+            },
+        )
+        .expect("HTML should configure typed actions for one update");
+    let configured_empty_frame = html
+        .update_actions_with(Size::new(320.0, 180.0), |commands| {
+            commands.push_click("project.run", HtmlAction::Run);
+        })
+        .expect("HTML should configure typed actions for a no-input update");
     let key_input_frame = html
         .update_with_input_actions(
             Size::new(320.0, 180.0),
@@ -652,6 +691,8 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     assert!(input_output.was_clicked("run"));
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(key_input_frame.contains_action(&HtmlAction::Search));
+    assert!(configured_key_frame.contains_action(&HtmlAction::Search));
+    assert!(configured_empty_frame.is_empty());
     assert!(key_frame.is_empty());
 }
 
@@ -778,6 +819,21 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             &registry,
         )
         .expect("HTML bundle should collect keyboard actions directly");
+    let configured_click_frame = bundle
+        .update_with_input_actions_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+        )
+        .expect("HTML bundle should configure typed actions for one update");
+    let configured_empty_frame = bundle
+        .update_actions_with(Size::new(320.0, 180.0), |commands| {
+            commands.push("project.run", HtmlAction::Run);
+        })
+        .expect("HTML bundle should configure typed actions for a no-input update");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -785,6 +841,8 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     );
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(key_frame.contains_action(&HtmlAction::Filter));
+    assert!(configured_click_frame.contains_action(&HtmlAction::Run));
+    assert!(configured_empty_frame.is_empty());
     assert_eq!(
         click_frame
             .output()

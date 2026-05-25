@@ -299,6 +299,20 @@ impl HtmlDocument {
             .map(|mut view| view.update_actions(registry))
     }
 
+    /// Resolves this HTML tree and configures typed Rust actions in one hook.
+    pub fn update_actions_with<Action>(
+        &self,
+        viewport: Size,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_actions(viewport, &registry)
+    }
+
     /// Routes input through this HTML tree with an empty stylesheet.
     pub fn update_with_input(
         &self,
@@ -321,6 +335,21 @@ impl HtmlDocument {
     {
         self.to_view(viewport)
             .map(|mut view| view.update_with_input_actions(input, registry))
+    }
+
+    /// Routes input through this HTML tree and configures typed Rust actions in one hook.
+    pub fn update_with_input_actions_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_actions(viewport, input, &registry)
     }
 
     /// Parses CSS and creates an action surface configured with typed Rust commands.
@@ -377,6 +406,21 @@ impl HtmlDocument {
             .map(|mut view| view.update_actions(registry))
     }
 
+    /// Parses CSS, resolves this HTML tree, and configures typed Rust actions in one hook.
+    pub fn update_actions_with_css_and<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_actions_with_css(viewport, css, &registry)
+    }
+
     /// Parses forgiving CSS, resolves this HTML tree, and collects typed Rust actions.
     pub fn update_actions_with_css_forgiving<Action>(
         &self,
@@ -389,6 +433,21 @@ impl HtmlDocument {
     {
         self.to_view_with_css_forgiving(viewport, css)
             .map(|mut view| view.update_actions(registry))
+    }
+
+    /// Parses forgiving CSS, resolves this HTML tree, and configures typed actions in one hook.
+    pub fn update_actions_with_css_forgiving_and<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_actions_with_css_forgiving(viewport, css, &registry)
     }
 
     /// Parses CSS, routes input through this HTML tree, and returns output.
@@ -417,6 +476,22 @@ impl HtmlDocument {
             .map(|mut view| view.update_with_input_actions(input, registry))
     }
 
+    /// Parses CSS, routes input, and configures typed Rust actions in one hook.
+    pub fn update_with_input_actions_and_css_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_actions_and_css(viewport, input, css, &registry)
+    }
+
     /// Parses forgiving CSS, routes input through this HTML tree, and returns output.
     pub fn update_with_input_and_css_forgiving(
         &self,
@@ -441,6 +516,22 @@ impl HtmlDocument {
     {
         self.to_view_with_css_forgiving(viewport, css)
             .map(|mut view| view.update_with_input_actions(input, registry))
+    }
+
+    /// Parses forgiving CSS, routes input, and configures typed actions in one hook.
+    pub fn update_with_input_actions_and_css_forgiving_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
     }
 
     /// Emits this parsed HTML tree into a caller-owned document builder.
@@ -717,6 +808,20 @@ impl HtmlStylesheet {
         Ok(self.to_view(viewport)?.update_actions(registry))
     }
 
+    /// Creates a view, resolves it, and configures typed Rust actions in one hook.
+    pub fn update_actions_with<Action>(
+        &self,
+        viewport: Size,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_actions(viewport, &registry)
+    }
+
     /// Creates a view, routes input, and returns the resolved output frame.
     pub fn update_with_input(
         &self,
@@ -739,6 +844,21 @@ impl HtmlStylesheet {
         Ok(self
             .to_view(viewport)?
             .update_with_input_actions(input, registry))
+    }
+
+    /// Creates a view, routes input, and configures typed Rust actions in one hook.
+    pub fn update_with_input_actions_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_actions(viewport, input, &registry)
     }
 }
 
