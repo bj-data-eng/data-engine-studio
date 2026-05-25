@@ -375,6 +375,9 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert!(!clicked_commands[0].is_context_menu());
     assert!(!clicked_commands[0].is_pointer_enter());
     assert!(!clicked_commands[0].is_pointer_leave());
+    assert!(!clicked_commands[0].is_key_down());
+    assert!(!clicked_commands[0].is_key_up());
+    assert!(!clicked_commands[0].is_drag());
     assert_eq!(
         output
             .commands_for("run")
@@ -526,6 +529,9 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     assert_eq!(click_actions[0].event, DocumentEventKind::Clicked);
     assert_eq!(key_actions.len(), 1);
     assert_eq!(*key_actions[0].action, AppAction::CommitByKeyboard);
+    assert!(key_actions[0].is_key_down());
+    assert!(!key_actions[0].is_key_up());
+    assert!(!key_actions[0].is_drag());
     assert_eq!(key_intent_actions.len(), 1);
     assert_eq!(*key_intent_actions[0].action, AppAction::CommitByKeyboard);
     assert_eq!(
@@ -869,6 +875,9 @@ fn document_action_frame_supports_app_update_loop_queries() {
     assert!(!click_action.is_context_menu());
     assert!(!click_action.is_pointer_enter());
     assert!(!click_action.is_pointer_leave());
+    assert!(!click_action.is_key_down());
+    assert!(!click_action.is_key_up());
+    assert!(!click_action.is_drag());
     assert!(click_action.is_action(&AppAction::Run));
     assert_eq!(click_frame.actions_for("run").count(), 1);
     assert_eq!(
@@ -928,6 +937,9 @@ fn document_action_frame_supports_app_update_loop_queries() {
         Some("cancel")
     );
     assert_eq!(actions[0].action, AppAction::Cancel);
+    assert!(actions[0].is_key_down());
+    assert!(!actions[0].is_key_up());
+    assert!(!actions[0].is_drag());
 
     let hover_frame =
         view.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 72.0)), &registry);

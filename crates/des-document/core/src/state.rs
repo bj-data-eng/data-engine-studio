@@ -522,6 +522,23 @@ impl DocumentCommand {
     pub fn is_pointer_leave(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
+
+    /// Returns true when this command was emitted by key-down intent.
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns true when this command was emitted by key-up intent.
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns true when this command was emitted by any pointer drag intent.
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+            || self.matches_intent(ElementBehaviorEvent::Drag)
+            || self.matches_intent(ElementBehaviorEvent::DragEnd)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -575,6 +592,23 @@ impl DocumentCommandRef<'_> {
     /// Returns true when this command was emitted by pointer-leave intent.
     pub fn is_pointer_leave(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    /// Returns true when this command was emitted by key-down intent.
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns true when this command was emitted by key-up intent.
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns true when this command was emitted by any pointer drag intent.
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+            || self.matches_intent(ElementBehaviorEvent::Drag)
+            || self.matches_intent(ElementBehaviorEvent::DragEnd)
     }
 }
 
@@ -1550,6 +1584,23 @@ impl<Action> DocumentCommandActionRef<'_, Action> {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
     }
 
+    /// Returns true when this action was emitted by key-down intent.
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns true when this action was emitted by key-up intent.
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns true when this action was emitted by any pointer drag intent.
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+            || self.matches_intent(ElementBehaviorEvent::Drag)
+            || self.matches_intent(ElementBehaviorEvent::DragEnd)
+    }
+
     /// Returns true when this command mapped to the supplied typed app action.
     pub fn is_action(&self, action: &Action) -> bool
     where
@@ -1616,6 +1667,23 @@ impl<Action> DocumentCommandAction<Action> {
     /// Returns true when this action was emitted by pointer-leave intent.
     pub fn is_pointer_leave(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    /// Returns true when this action was emitted by key-down intent.
+    pub fn is_key_down(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyDown)
+    }
+
+    /// Returns true when this action was emitted by key-up intent.
+    pub fn is_key_up(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns true when this action was emitted by any pointer drag intent.
+    pub fn is_drag(&self) -> bool {
+        self.matches_intent(ElementBehaviorEvent::DragStart)
+            || self.matches_intent(ElementBehaviorEvent::Drag)
+            || self.matches_intent(ElementBehaviorEvent::DragEnd)
     }
 
     /// Returns true when this command mapped to the supplied typed app action.
