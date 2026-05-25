@@ -1693,6 +1693,49 @@ fn document_builder_supports_conditional_authoring_helpers() {
 }
 
 #[test]
+fn document_builder_supports_conditional_behavior_helpers() {
+    let can_run = true;
+    let can_cancel = false;
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.button("run")
+            .interactive_if(can_run)
+            .focused(true)
+            .command_if("run", can_run)
+            .command_on_if(ElementBehaviorEvent::KeyDown, "run-key", can_run)
+            .command_if("cancel", can_cancel)
+            .text("Run");
+    });
+    let stylesheet = StyleSheet::new().id("run", Style::default().size(96.0, 32.0));
+    let mut engine = DocumentEngine::default();
+
+    let click_output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+    );
+    let key_output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::key_down(DocumentKey::Enter),
+    );
+    let run = click_output.snapshot().find("run").unwrap();
+
+    assert!(run.interactive());
+    assert!(click_output.has_command("run", "run"));
+    assert!(!click_output.has_command("run", "cancel"));
+    assert!(key_output.has_command_intent("run", ElementBehaviorEvent::KeyDown, "run-key"));
+
+    let spec = ElementSpec::button()
+        .interactive_if(true)
+        .command_if("save", true)
+        .command_on_if(ElementBehaviorEvent::KeyDown, "save-key", false);
+
+    assert!(spec.interactive);
+    assert_eq!(spec.behavior_hooks.len(), 1);
+    assert_eq!(spec.behavior_hooks[0].command, "save");
+}
+
+#[test]
 fn update_reports_created_retained_and_removed_elements() {
     let mut engine = DocumentEngine::default();
     let stylesheet = probe_stylesheet();

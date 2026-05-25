@@ -347,12 +347,38 @@ impl ElementSpec {
         self
     }
 
+    pub fn on_if(
+        self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.on(event, command)
+        } else {
+            self
+        }
+    }
+
     pub fn command(self, command: impl Into<String>) -> Self {
         self.on_click(command)
     }
 
+    pub fn command_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_click_if(command, present)
+    }
+
     pub fn command_on(self, event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
         self.on(event, command)
+    }
+
+    pub fn command_on_if(
+        self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.on_if(event, command, present)
     }
 
     pub fn on_events<I, C>(mut self, events: I) -> Self
@@ -372,6 +398,10 @@ impl ElementSpec {
 
     pub fn on_click(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::Click, command)
+    }
+
+    pub fn on_click_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Click, command, present)
     }
 
     pub fn on_context_menu(self, command: impl Into<String>) -> Self {
@@ -420,6 +450,11 @@ impl ElementSpec {
 
     pub fn interactive(mut self) -> Self {
         self.interactive = true;
+        self
+    }
+
+    pub fn interactive_if(mut self, interactive: bool) -> Self {
+        self.interactive |= interactive;
         self
     }
 

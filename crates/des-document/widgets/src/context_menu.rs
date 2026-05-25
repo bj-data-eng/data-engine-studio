@@ -1,6 +1,6 @@
 use des_document::{
-    DocumentBuilder, DocumentWidget, ElementId, ElementSpec, FloatingPlacement, FloatingShift,
-    Insets, Length, Point, Style, StyleSelector, StyleSheet,
+    DocumentBuilder, DocumentWidget, ElementId, FloatingPlacement, FloatingShift, Insets, Length,
+    Point, Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -174,26 +174,23 @@ impl ContextMenu {
     pub fn render(&self, ui: &mut DocumentBuilder) {
         if matches!(self.anchor, ContextMenuAnchor::Point(_)) {
             let anchor_id = self.anchor_id();
-            ui.element(anchor_id.as_str(), ElementSpec::div(), |_| {});
+            ui.div(anchor_id.as_str()).empty();
         }
-        ui.element(
-            self.id.as_str(),
-            ElementSpec::div().class(CONTEXT_MENU_CLASS).interactive(),
-            |ui| {
+        ui.div(self.id.as_str())
+            .class(CONTEXT_MENU_CLASS)
+            .interactive()
+            .children(|ui| {
                 for entry in &self.entries {
                     match entry {
                         ContextMenuEntry::Item(item) => item.render(ui),
                         ContextMenuEntry::Separator { id } => {
-                            ui.element(
-                                id.as_str(),
-                                ElementSpec::div().class(CONTEXT_MENU_SEPARATOR_CLASS),
-                                |_| {},
-                            );
+                            ui.div(id.as_str())
+                                .class(CONTEXT_MENU_SEPARATOR_CLASS)
+                                .empty();
                         }
                     }
                 }
-            },
-        );
+            });
     }
 
     fn anchor_id(&self) -> ElementId {
@@ -241,26 +238,22 @@ impl ContextMenuItem {
     }
 
     fn render(&self, ui: &mut DocumentBuilder) {
-        let mut spec = ElementSpec::button()
+        ui.button(self.id.as_str())
             .class(CONTEXT_MENU_ITEM_CLASS)
             .selected(self.selected)
-            .disabled(self.disabled);
-        if !self.disabled {
-            spec = spec.interactive();
-            if let Some(command) = &self.command {
-                spec = spec.on_click(command.clone());
-            }
-        }
-        ui.element(self.id.as_str(), spec, |ui| {
-            ui.text_element(
-                format!("{}-label", self.id.as_str()),
-                ElementSpec::text()
+            .disabled(self.disabled)
+            .interactive_if(!self.disabled)
+            .on_click_if(
+                self.command.as_deref().unwrap_or_default(),
+                !self.disabled && self.command.is_some(),
+            )
+            .children(|ui| {
+                ui.text_node(format!("{}-label", self.id.as_str()))
                     .class(CONTEXT_MENU_LABEL_CLASS)
                     .selected(self.selected)
-                    .disabled(self.disabled),
-                self.label.as_str(),
-            );
-        });
+                    .disabled(self.disabled)
+                    .text(self.label.as_str());
+            });
     }
 }
 
