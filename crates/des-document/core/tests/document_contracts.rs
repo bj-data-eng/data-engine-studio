@@ -3911,6 +3911,7 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
             "drop-target",
             ElementSpec::new(Element::Div)
                 .classes(["drop-zone", "accepts-files"])
+                .role("button")
                 .data("state", "ready")
                 .aria("label", "Drop target")
                 .value("target-a")
@@ -3948,6 +3949,8 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(drop_target.element(), Element::Div);
     assert!(drop_target.id_is("drop-target"));
     assert!(drop_target.is_element(Element::Div));
+    assert_eq!(drop_target.role(), Some("button"));
+    assert!(drop_target.has_role("button"));
     assert!(drop_target.has_class("drop-zone"));
     assert!(drop_target.has_all_classes(["drop-zone", "accepts-files"]));
     assert!(drop_target.has_any_class(["missing", "accepts-files"]));
@@ -4009,6 +4012,15 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(drop_target.count_with_attribute("data-state", "ready"), 1);
     assert_eq!(drop_target.count_with_data("state", "ready"), 1);
     assert_eq!(drop_target.count_with_aria("label", "Drop target"), 1);
+    assert_eq!(drop_target.elements_with_role("button").len(), 1);
+    assert!(drop_target.contains_role("button"));
+    assert!(!drop_target.contains_role("menu"));
+    assert!(
+        drop_target
+            .first_with_role("button")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert_eq!(drop_target.count_with_role("button"), 1);
     assert!(drop_target.contains_selected());
     assert!(drop_target.contains_focused());
     assert!(drop_target.contains_interactive());
@@ -4075,6 +4087,15 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(snapshot.count_with_attribute("data-state", "ready"), 1);
     assert_eq!(snapshot.count_with_data("state", "ready"), 1);
     assert_eq!(snapshot.count_with_aria("label", "Drop target"), 1);
+    assert_eq!(snapshot.elements_with_role("button").len(), 1);
+    assert!(snapshot.contains_role("button"));
+    assert!(!snapshot.contains_role("menu"));
+    assert!(
+        snapshot
+            .first_with_role("button")
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert_eq!(snapshot.count_with_role("button"), 1);
     assert!(snapshot.contains_selected());
     assert!(snapshot.contains_disabled());
     assert!(snapshot.contains_focused());

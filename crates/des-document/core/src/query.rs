@@ -204,6 +204,35 @@ impl<'a> DocumentSnapshot<'a> {
         self.count_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
     }
 
+    pub fn elements_with_role(&self, role: impl AsRef<str>) -> Vec<ElementSnapshot<'a>> {
+        let role = role.as_ref();
+        let mut elements = Vec::new();
+        collect_elements(self.root, &mut elements, &mut |element| {
+            element.role.as_deref() == Some(role)
+        });
+        elements
+    }
+
+    pub fn contains_role(&self, role: impl AsRef<str>) -> bool {
+        let role = role.as_ref();
+        find_matching_element(self.root, &mut |element| {
+            element.role.as_deref() == Some(role)
+        })
+        .is_some()
+    }
+
+    pub fn first_with_role(&self, role: impl AsRef<str>) -> Option<ElementSnapshot<'a>> {
+        let role = role.as_ref();
+        find_matching_element(self.root, &mut |element| {
+            element.role.as_deref() == Some(role)
+        })
+        .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_with_role(&self, role: impl AsRef<str>) -> usize {
+        self.elements_with_role(role).len()
+    }
+
     pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
         let mut elements = Vec::new();
         collect_elements(self.root, &mut elements, &mut |element| {
@@ -330,6 +359,10 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn role(&self) -> Option<&str> {
         self.element.role.as_deref()
+    }
+
+    pub fn has_role(&self, role: &str) -> bool {
+        self.role() == Some(role)
     }
 
     pub fn attributes(&self) -> &std::collections::BTreeMap<String, String> {
@@ -636,6 +669,35 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn count_with_aria(&self, name: impl AsRef<str>, value: impl AsRef<str>) -> usize {
         self.count_with_attribute(prefixed_attribute_name("aria-", name.as_ref()), value)
+    }
+
+    pub fn elements_with_role(&self, role: impl AsRef<str>) -> Vec<ElementSnapshot<'a>> {
+        let role = role.as_ref();
+        let mut elements = Vec::new();
+        collect_elements(self.element, &mut elements, &mut |element| {
+            element.role.as_deref() == Some(role)
+        });
+        elements
+    }
+
+    pub fn contains_role(&self, role: impl AsRef<str>) -> bool {
+        let role = role.as_ref();
+        find_matching_element(self.element, &mut |element| {
+            element.role.as_deref() == Some(role)
+        })
+        .is_some()
+    }
+
+    pub fn first_with_role(&self, role: impl AsRef<str>) -> Option<ElementSnapshot<'a>> {
+        let role = role.as_ref();
+        find_matching_element(self.element, &mut |element| {
+            element.role.as_deref() == Some(role)
+        })
+        .map(|element| ElementSnapshot { element })
+    }
+
+    pub fn count_with_role(&self, role: impl AsRef<str>) -> usize {
+        self.elements_with_role(role).len()
     }
 
     pub fn elements_by_element(&self, target: Element) -> Vec<ElementSnapshot<'a>> {
