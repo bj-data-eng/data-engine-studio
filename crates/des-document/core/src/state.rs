@@ -410,10 +410,22 @@ impl DocumentOutput {
             .map(|selection| &selection.target)
     }
 
+    pub fn text_selection_target_is(&self, target: &str) -> bool {
+        self.text_selection
+            .as_ref()
+            .is_some_and(|selection| selection.target.as_str() == target)
+    }
+
     pub fn text_selection_range(&self) -> Option<std::ops::Range<usize>> {
         self.text_selection
             .as_ref()
             .map(DocumentTextSelection::char_range)
+    }
+
+    pub fn text_selection_granularity(&self) -> Option<TextSelectionGranularity> {
+        self.text_selection
+            .as_ref()
+            .map(|selection| selection.granularity)
     }
 
     pub fn selected_text(&self) -> Option<String> {
@@ -424,6 +436,13 @@ impl DocumentOutput {
         }
         let text = frame.text.as_ref()?.semantic_text();
         selection.selected_text_from(text)
+    }
+
+    pub fn selected_text_for(&self, target: &str) -> Option<String> {
+        if !self.text_selection_target_is(target) {
+            return None;
+        }
+        self.selected_text()
     }
 }
 

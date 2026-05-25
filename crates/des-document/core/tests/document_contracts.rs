@@ -4453,9 +4453,20 @@ fn selectable_text_exposes_selected_text_for_copy() {
         output.text_selection_target().map(ElementId::as_str),
         Some("label")
     );
+    assert!(output.text_selection_target_is("label"));
+    assert!(!output.text_selection_target_is("other"));
     assert!(output.has_text_selection());
     assert!(output.text_selection_is_active());
+    assert_eq!(
+        output.text_selection_granularity(),
+        Some(TextSelectionGranularity::Character)
+    );
     assert_eq!(output.selected_text().as_deref(), Some("Customer"));
+    assert_eq!(
+        output.selected_text_for("label").as_deref(),
+        Some("Customer")
+    );
+    assert_eq!(output.selected_text_for("other"), None);
     assert!(output.snapshot().find("label").unwrap().selectable_text());
     assert!(output.snapshot().find("label").unwrap().copyable_text());
 }
