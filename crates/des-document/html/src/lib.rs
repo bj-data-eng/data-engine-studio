@@ -4,6 +4,40 @@
 //! semantics, maps the resulting tree into `des-document` primitives, and keeps
 //! behavior declarative through Rust command/event hooks. It does not execute
 //! JavaScript and does not embed template logic in HTML.
+//!
+//! ```
+//! use des_html::prelude::*;
+//!
+//! #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+//! enum AppAction {
+//!     RunQuery,
+//! }
+//!
+//! let ui = HtmlDocument::parse_fragment(
+//!     r#"<button id="run" class="primary" on:click="query.run">Run</button>"#,
+//! )
+//! .expect("HTML should parse")
+//! .with_css_forgiving(
+//!     r#"
+//!     .primary {
+//!         width: 96px;
+//!         height: 32px;
+//!         background: rgb(222, 238, 255);
+//!     }
+//!     "#,
+//! )
+//! .expect("CSS should parse");
+//!
+//! let actions = ui
+//!     .update_with_input_action_values_with_actions(
+//!         Size::new(320.0, 180.0),
+//!         DocumentInput::primary_click(Point::new(8.0, 8.0)),
+//!         [("query.run", AppAction::RunQuery)],
+//!     )
+//!     .expect("HTML-authored commands should map to typed Rust actions");
+//!
+//! assert_eq!(actions, vec![AppAction::RunQuery]);
+//! ```
 
 use des_document::{
     Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandAction,
