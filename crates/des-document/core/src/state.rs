@@ -400,6 +400,15 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn collect_actions(&self, output: &DocumentOutput) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.command_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
     pub fn command_actions_of_kind<'a>(
         &'a self,
         output: &'a DocumentOutput,
@@ -414,6 +423,19 @@ impl<Action> DocumentCommandRegistry<Action> {
                 action,
             })
         })
+    }
+
+    pub fn collect_actions_of_kind(
+        &self,
+        output: &DocumentOutput,
+        kind: DocumentEventKind,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.command_actions_of_kind(output, kind)
+            .map(DocumentCommandAction::from)
+            .collect()
     }
 
     pub fn command_actions_for_intent<'a>(
@@ -432,6 +454,19 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn collect_actions_for_intent(
+        &self,
+        output: &DocumentOutput,
+        intent: ElementBehaviorEvent,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.command_actions_for_intent(output, intent)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
     pub fn command_actions_for<'a>(
         &'a self,
         output: &'a DocumentOutput,
@@ -441,11 +476,36 @@ impl<Action> DocumentCommandRegistry<Action> {
             .filter(move |command| command.target.as_str() == target)
     }
 
+    pub fn collect_actions_for(
+        &self,
+        output: &DocumentOutput,
+        target: &str,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.command_actions_for(output, target)
+            .map(DocumentCommandAction::from)
+            .collect()
+    }
+
     pub fn clicked_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::Click)
+    }
+
+    pub fn collect_clicked_actions(
+        &self,
+        output: &DocumentOutput,
+    ) -> Vec<DocumentCommandAction<Action>>
+    where
+        Action: Clone,
+    {
+        self.clicked_actions(output)
+            .map(DocumentCommandAction::from)
+            .collect()
     }
 
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
@@ -559,6 +619,25 @@ pub struct DocumentCommandActionRef<'a, Action> {
     pub event: DocumentEventKind,
     pub command: &'a str,
     pub action: &'a Action,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentCommandAction<Action> {
+    pub target: ElementId,
+    pub event: DocumentEventKind,
+    pub command: String,
+    pub action: Action,
+}
+
+impl<Action: Clone> From<DocumentCommandActionRef<'_, Action>> for DocumentCommandAction<Action> {
+    fn from(command: DocumentCommandActionRef<'_, Action>) -> Self {
+        Self {
+            target: command.target.clone(),
+            event: command.event,
+            command: command.command.to_owned(),
+            action: command.action.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

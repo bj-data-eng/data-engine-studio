@@ -1,12 +1,12 @@
 use des_document::{
-    AlignItems, Color, CornerRadii, Direction, Document, DocumentBuilder, DocumentCommandRegistry,
-    DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey,
-    DocumentProjection, DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId,
-    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
-    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
-    TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow,
-    TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    AlignItems, Color, CornerRadii, Direction, Document, DocumentBuilder, DocumentCommandAction,
+    DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
+    DocumentKey, DocumentProjection, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
+    ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput,
+    KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
     VisualCloneOptions, WhiteSpace,
 };
 
@@ -257,6 +257,69 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     assert_eq!(
         key_actions[0].event,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter))
+    );
+}
+
+#[test]
+fn document_command_registry_collects_owned_app_actions_for_update_loops() {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum AppAction {
+        CommitByClick,
+        CommitByKeyboard,
+        Fallback,
+    }
+
+    let stylesheet = StyleSheet::new().id(
+        "commit",
+        Style::default()
+            .width(Length::Px(120.0))
+            .height(Length::Px(36.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("commit")
+            .focused(true)
+            .on_click("commit")
+            .on_key_down("commit")
+            .text("Commit");
+    });
+    let registry = DocumentCommandRegistry::new()
+        .bind("commit", AppAction::Fallback)
+        .bind_click("commit", AppAction::CommitByClick)
+        .bind_on(
+            ElementBehaviorEvent::KeyDown,
+            "commit",
+            AppAction::CommitByKeyboard,
+        );
+
+    let click_output =
+        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
+
+    let click_actions = registry.collect_actions(&click_output);
+    let clicked_actions = registry.collect_clicked_actions(&click_output);
+    let key_actions =
+        registry.collect_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
+    let commit_actions = registry.collect_actions_for(&click_output, "commit");
+
+    assert_eq!(
+        click_actions,
+        vec![DocumentCommandAction {
+            target: ElementId::new("commit"),
+            event: DocumentEventKind::Clicked,
+            command: "commit".to_owned(),
+            action: AppAction::CommitByClick,
+        }]
+    );
+    assert_eq!(clicked_actions, click_actions);
+    assert_eq!(commit_actions, click_actions);
+    assert_eq!(
+        key_actions,
+        vec![DocumentCommandAction {
+            target: ElementId::new("commit"),
+            event: DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
+            command: "commit".to_owned(),
+            action: AppAction::CommitByKeyboard,
+        }]
     );
 }
 
