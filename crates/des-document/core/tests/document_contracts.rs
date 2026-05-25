@@ -3153,6 +3153,8 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
                 .data("state", "ready")
                 .aria("label", "Drop target")
                 .value("target-a")
+                .selected(true)
+                .focused(true)
                 .interactive(),
             |ui| {
                 ui.text("drop-label", "Drop here");
@@ -3163,7 +3165,11 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
                 );
             },
         );
-        ui.element("plain-card", ElementSpec::new(Element::Div), |_| {});
+        ui.element(
+            "plain-card",
+            ElementSpec::new(Element::Div).disabled(true),
+            |_| {},
+        );
     });
 
     let output = engine.update(&mut document, &stylesheet);
@@ -3190,6 +3196,9 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert!(drop_target.has_data("state", "ready"));
     assert!(drop_target.has_aria("label", "Drop target"));
     assert_eq!(drop_target.value(), Some("target-a"));
+    assert!(drop_target.selected());
+    assert!(!drop_target.disabled());
+    assert!(drop_target.focused());
     assert!(drop_target.interactive());
     assert_eq!(drop_target.rect().size, Size::new(80.0, 30.0));
     assert_eq!(drop_target.child_count(), 2);
@@ -3239,6 +3248,25 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(drop_target.count_with_attribute("data-state", "ready"), 1);
     assert_eq!(drop_target.count_with_data("state", "ready"), 1);
     assert_eq!(drop_target.count_with_aria("label", "Drop target"), 1);
+    assert!(drop_target.contains_selected());
+    assert!(drop_target.contains_focused());
+    assert!(drop_target.contains_interactive());
+    assert!(!drop_target.contains_disabled());
+    assert_eq!(drop_target.count_selected(), 1);
+    assert_eq!(drop_target.count_focused(), 1);
+    assert_eq!(drop_target.count_interactive(), 1);
+    assert_eq!(drop_target.count_disabled(), 0);
+    assert!(
+        drop_target
+            .first_selected()
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        drop_target
+            .focused_elements()
+            .into_iter()
+            .any(|element| element.id_is("drop-target"))
+    );
     assert_eq!(drop_target.count_by_element(Element::Text), 1);
     assert!(
         drop_target
@@ -3286,6 +3314,36 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert_eq!(snapshot.count_with_attribute("data-state", "ready"), 1);
     assert_eq!(snapshot.count_with_data("state", "ready"), 1);
     assert_eq!(snapshot.count_with_aria("label", "Drop target"), 1);
+    assert!(snapshot.contains_selected());
+    assert!(snapshot.contains_disabled());
+    assert!(snapshot.contains_focused());
+    assert!(snapshot.contains_interactive());
+    assert_eq!(snapshot.count_selected(), 1);
+    assert_eq!(snapshot.count_disabled(), 1);
+    assert_eq!(snapshot.count_focused(), 1);
+    assert_eq!(snapshot.count_interactive(), 1);
+    assert!(
+        snapshot
+            .first_selected()
+            .is_some_and(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        snapshot
+            .first_disabled()
+            .is_some_and(|element| element.id_is("plain-card"))
+    );
+    assert!(
+        snapshot
+            .focused_elements()
+            .into_iter()
+            .any(|element| element.id_is("drop-target"))
+    );
+    assert!(
+        snapshot
+            .interactive_elements()
+            .into_iter()
+            .any(|element| element.id_is("drop-target"))
+    );
     assert_eq!(snapshot.elements_by_element(Element::Div).len(), 3);
     assert!(snapshot.contains_element(Element::Div));
     assert!(

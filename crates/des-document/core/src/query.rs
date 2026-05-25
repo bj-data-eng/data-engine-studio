@@ -224,6 +224,86 @@ impl<'a> DocumentSnapshot<'a> {
     pub fn count_by_element(&self, target: Element) -> usize {
         self.elements_by_element(target).len()
     }
+
+    pub fn selected_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.selected)
+    }
+
+    pub fn first_selected(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.selected)
+    }
+
+    pub fn contains_selected(&self) -> bool {
+        self.first_selected().is_some()
+    }
+
+    pub fn count_selected(&self) -> usize {
+        self.selected_elements().len()
+    }
+
+    pub fn disabled_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.disabled)
+    }
+
+    pub fn first_disabled(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.disabled)
+    }
+
+    pub fn contains_disabled(&self) -> bool {
+        self.first_disabled().is_some()
+    }
+
+    pub fn count_disabled(&self) -> usize {
+        self.disabled_elements().len()
+    }
+
+    pub fn focused_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.focused)
+    }
+
+    pub fn first_focused(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.focused)
+    }
+
+    pub fn contains_focused(&self) -> bool {
+        self.first_focused().is_some()
+    }
+
+    pub fn count_focused(&self) -> usize {
+        self.focused_elements().len()
+    }
+
+    pub fn interactive_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.interactive)
+    }
+
+    pub fn first_interactive(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.interactive)
+    }
+
+    pub fn contains_interactive(&self) -> bool {
+        self.first_interactive().is_some()
+    }
+
+    pub fn count_interactive(&self) -> usize {
+        self.interactive_elements().len()
+    }
+
+    fn elements_matching(
+        &self,
+        mut predicate: impl FnMut(&ResolvedElement) -> bool,
+    ) -> Vec<ElementSnapshot<'a>> {
+        let mut elements = Vec::new();
+        collect_elements(self.root, &mut elements, &mut predicate);
+        elements
+    }
+
+    fn first_matching(
+        &self,
+        mut predicate: impl FnMut(&ResolvedElement) -> bool,
+    ) -> Option<ElementSnapshot<'a>> {
+        find_matching_element(self.root, &mut predicate).map(|element| ElementSnapshot { element })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -577,6 +657,87 @@ impl<'a> ElementSnapshot<'a> {
 
     pub fn count_by_element(&self, target: Element) -> usize {
         self.elements_by_element(target).len()
+    }
+
+    pub fn selected_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.selected)
+    }
+
+    pub fn first_selected(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.selected)
+    }
+
+    pub fn contains_selected(&self) -> bool {
+        self.first_selected().is_some()
+    }
+
+    pub fn count_selected(&self) -> usize {
+        self.selected_elements().len()
+    }
+
+    pub fn disabled_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.disabled)
+    }
+
+    pub fn first_disabled(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.disabled)
+    }
+
+    pub fn contains_disabled(&self) -> bool {
+        self.first_disabled().is_some()
+    }
+
+    pub fn count_disabled(&self) -> usize {
+        self.disabled_elements().len()
+    }
+
+    pub fn focused_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.focused)
+    }
+
+    pub fn first_focused(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.focused)
+    }
+
+    pub fn contains_focused(&self) -> bool {
+        self.first_focused().is_some()
+    }
+
+    pub fn count_focused(&self) -> usize {
+        self.focused_elements().len()
+    }
+
+    pub fn interactive_elements(&self) -> Vec<ElementSnapshot<'a>> {
+        self.elements_matching(|element| element.interactive)
+    }
+
+    pub fn first_interactive(&self) -> Option<ElementSnapshot<'a>> {
+        self.first_matching(|element| element.interactive)
+    }
+
+    pub fn contains_interactive(&self) -> bool {
+        self.first_interactive().is_some()
+    }
+
+    pub fn count_interactive(&self) -> usize {
+        self.interactive_elements().len()
+    }
+
+    fn elements_matching(
+        &self,
+        mut predicate: impl FnMut(&ResolvedElement) -> bool,
+    ) -> Vec<ElementSnapshot<'a>> {
+        let mut elements = Vec::new();
+        collect_elements(self.element, &mut elements, &mut predicate);
+        elements
+    }
+
+    fn first_matching(
+        &self,
+        mut predicate: impl FnMut(&ResolvedElement) -> bool,
+    ) -> Option<ElementSnapshot<'a>> {
+        find_matching_element(self.element, &mut predicate)
+            .map(|element| ElementSnapshot { element })
     }
 }
 
