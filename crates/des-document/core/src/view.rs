@@ -216,6 +216,34 @@ impl<Action> DocumentActionSurface<Action> {
         self
     }
 
+    /// Adds command bindings declared by a reusable action widget.
+    pub fn bind_widget(mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) -> Self {
+        self.push_widget_commands(widget);
+        self
+    }
+
+    /// Adds command bindings declared by a collection of reusable action widgets.
+    pub fn bind_widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> Self
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.push_widget_commands_many(widgets);
+        self
+    }
+
+    /// Adds command bindings declared by a reusable action widget.
+    pub fn push_widget_commands(&mut self, widget: &(impl DocumentActionWidget<Action> + ?Sized)) {
+        self.commands.push_widget_commands(widget);
+    }
+
+    /// Adds command bindings declared by a collection of reusable action widgets.
+    pub fn push_widget_commands_many<'a, W>(&mut self, widgets: impl IntoIterator<Item = &'a W>)
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.commands.push_widget_commands_many(widgets);
+    }
+
     /// Applies a batch of app-state projections to the paired view.
     pub fn project(
         &mut self,

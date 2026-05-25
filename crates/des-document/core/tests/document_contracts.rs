@@ -2174,6 +2174,21 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let mut pushed = DocumentCommandRegistry::new();
     pushed.push_widget_commands(&toggle);
     pushed.push_widget_commands(&close);
+    let mut manual_surface =
+        DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+            ui.widget(&toggle);
+            ui.widget(&close);
+        })
+        .action_surface(DocumentCommandRegistry::new())
+        .bind_widget(&toggle);
+    manual_surface.push_widget_commands(&close);
+    let mut many_surface = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.widget(&toggle);
+        ui.widget(&close);
+    })
+    .action_surface(DocumentCommandRegistry::new())
+    .bind_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>]);
+    many_surface.push_widget_commands_many([&close as &dyn DocumentActionWidget<WidgetAction>]);
     let mut surface = DocumentView::compose(Size::new(320.0, 180.0))
         .action_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>, &close]);
     let toggle_surface = toggle.action_surface(Size::new(320.0, 180.0));
@@ -2190,6 +2205,8 @@ fn document_widgets_can_declare_typed_command_bindings() {
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
+    assert_eq!(manual_surface.commands().bindings(), registry.bindings());
+    assert_eq!(many_surface.commands().bindings(), registry.bindings());
     assert_eq!(surface.commands().bindings(), registry.bindings());
     assert_eq!(toggle_commands.bindings().len(), 2);
     assert_eq!(boxed_toggle_commands.bindings(), toggle_commands.bindings());
