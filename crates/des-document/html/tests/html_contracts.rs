@@ -831,6 +831,7 @@ fn html_document_projects_state_without_css_plumbing() {
         .set_text("run", "Ready")
         .add_class("run", "is-ready")
         .set_data("app", "state", "ready");
+    let registry = DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
 
     let (report, output) = html
         .update_with_projection(Size::new(320.0, 180.0), &projection)
@@ -865,6 +866,53 @@ fn html_document_projects_state_without_css_plumbing() {
     assert_eq!(mapped_report.changed, 2);
     assert_eq!(mapped_run.text(), Some("Running".to_owned()));
     assert!(mapped_frame.contains_clicked_action(&HtmlAction::Run));
+
+    let mut dispatched = Vec::new();
+    let (dispatch_report, dispatch_frame, action_report) = html
+        .update_with_input_projection_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &projection,
+            &registry,
+            |action| {
+                dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML document should project state and dispatch actions without CSS");
+    let dispatch_run = dispatch_frame.output().snapshot().find("run").unwrap();
+    let mut configured_dispatched = Vec::new();
+    let (configured_report, configured_frame, configured_action_report) = html
+        .update_with_input_projected_with_and_dispatch_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("run").text("Configured");
+            },
+            |commands| {
+                commands.push_click("project.run", HtmlAction::Run);
+            },
+            |action| {
+                configured_dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML document should build projection, configure actions, and dispatch");
+    let configured_run = configured_frame.output().snapshot().find("run").unwrap();
+
+    assert_eq!(dispatch_report.operations, 3);
+    assert_eq!(dispatch_report.changed, 3);
+    assert_eq!(dispatch_run.text(), Some("Ready".to_owned()));
+    assert_eq!(action_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![HtmlAction::Run]);
+    assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(configured_report.operations, 1);
+    assert_eq!(configured_report.changed, 1);
+    assert_eq!(configured_run.text(), Some("Configured".to_owned()));
+    assert_eq!(
+        configured_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched, vec![HtmlAction::Run]);
+    assert!(configured_frame.contains_clicked_action(&HtmlAction::Run));
 
     let (surface_report, mut surface) = html
         .to_action_surface_projected_with_actions(
@@ -2086,6 +2134,42 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             [("inline.run", SetAction::Run)],
         )
         .expect("named document should project state and map actions through the set front door");
+    let mut projected_dispatched = Vec::new();
+    let (dispatch_project_report, dispatch_project_frame, dispatch_project_action_report) = set
+        .update_with_input_projected_with_and_dispatch(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("inline").text("Dispatched");
+            },
+            &registry,
+            |action| {
+                projected_dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should project state and dispatch actions");
+    let mut configured_projected_dispatched = Vec::new();
+    let (
+        configured_dispatch_project_report,
+        configured_dispatch_project_frame,
+        configured_dispatch_project_action_report,
+    ) = set
+        .update_with_input_projected_with_and_dispatch_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("inline").text("Configured dispatch");
+            },
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+            |action| {
+                configured_projected_dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should configure projected dispatch actions");
     let (intent_project_report, intent_project_frame) = set
         .update_with_input_projected_with_and_intent_actions(
             "shared",
@@ -2326,6 +2410,40 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .unwrap()
             .text(),
         Some("Mapped".to_owned())
+    );
+    assert_eq!(dispatch_project_report.operations, 1);
+    assert_eq!(dispatch_project_report.changed, 1);
+    assert!(dispatch_project_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        dispatch_project_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        dispatch_project_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .text(),
+        Some("Dispatched".to_owned())
+    );
+    assert_eq!(configured_dispatch_project_report.operations, 1);
+    assert_eq!(configured_dispatch_project_report.changed, 1);
+    assert!(configured_dispatch_project_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        configured_dispatch_project_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_projected_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        configured_dispatch_project_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .text(),
+        Some("Configured dispatch".to_owned())
     );
     assert_eq!(intent_project_report.operations, 1);
     assert_eq!(intent_project_report.changed, 1);
