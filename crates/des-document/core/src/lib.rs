@@ -45,13 +45,19 @@
 //!     }
 //! }
 //!
+//! impl DocumentActionWidget<AppAction> for RunButton {
+//!     fn push_commands(&self, registry: &mut DocumentCommandRegistry<AppAction>) {
+//!         registry.push_click("run", AppAction::Run);
+//!     }
+//! }
+//!
 //! let widget = RunButton;
 //! let mut view = DocumentView::compose(Size::new(320.0, 180.0))
 //!     .with_css(".primary { background: rgb(222, 238, 255); }")
 //!     .expect("valid app stylesheet")
 //!     .widget(&widget);
 //!
-//! let registry = DocumentCommandRegistry::new().bind("run", AppAction::Run);
+//! let registry = DocumentCommandRegistry::new().bind_widget(&widget);
 //! let frame = view.update_with_input_actions(
 //!     DocumentInput::primary_click(Point::new(8.0, 8.0)),
 //!     &registry,
