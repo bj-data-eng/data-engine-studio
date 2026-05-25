@@ -20,6 +20,7 @@ mod state;
 mod style;
 mod table;
 mod text;
+mod view;
 
 pub use css::CssParseError;
 pub use document::{Document, DocumentBuilder, DocumentError, DocumentResult, ElementBuilder};
@@ -59,3 +60,4 @@ pub use text::{
     TextRun, TextTransform, TextVerticalAlign, TextWrapMode, WhiteSpace, WhiteSpaceCollapse,
     WordBreak,
 };
+pub use view::DocumentView;

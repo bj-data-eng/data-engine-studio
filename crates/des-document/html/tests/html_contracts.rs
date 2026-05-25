@@ -250,6 +250,25 @@ fn html_stylesheet_parses_html_and_css_together() {
 }
 
 #[test]
+fn html_stylesheet_can_create_ready_to_update_document_view() {
+    let bundle = HtmlStylesheet::parse_fragment(
+        r#"<button id="run" class="primary" on:click="run">Run</button>"#,
+        r#".primary { width: 96px; height: 32px; }"#,
+    )
+    .expect("HTML and CSS should compile together");
+    let mut view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML bundle should create a document view");
+
+    let output = view.update();
+    let run = output.snapshot().find("run").unwrap();
+
+    assert_eq!(run.rect().size.width, 96.0);
+    assert!(run.interactive());
+    assert_eq!(run.behavior_hooks()[0].command, "run");
+}
+
+#[test]
 fn html_document_and_stylesheet_load_from_files() {
     let html_fixture = TempHtmlPath::new("des-html-document-load", "html");
     let css_fixture = TempHtmlPath::new("des-html-stylesheet-load", "css");

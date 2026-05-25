@@ -1,9 +1,9 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentEngine, DocumentEvent,
-    DocumentEventKind, DocumentInput, Element, ElementId, ElementSpec, ElementStateSelector,
-    FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow,
-    Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
-    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+    DocumentEventKind, DocumentInput, DocumentView, Element, ElementId, ElementSpec,
+    ElementStateSelector, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput,
+    ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
+    TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
     TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
     Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
@@ -35,6 +35,36 @@ fn pointer_input(
         }),
         scroll_delta: Point::ZERO,
     }
+}
+
+#[test]
+fn document_view_groups_document_stylesheet_and_engine_update() {
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::class("panel"),
+        Style::default()
+            .width(Length::Px(240.0))
+            .height(Length::Px(80.0)),
+    );
+    let mut view = DocumentView::build(Size::new(640.0, 480.0), stylesheet, |ui| {
+        ui.div("panel").class("panel").children(|ui| {
+            ui.text("label", "Ready");
+        });
+    });
+
+    let output = view.update();
+
+    assert_eq!(output.layout.id.as_str(), "root");
+    assert_eq!(
+        output
+            .snapshot()
+            .find("panel")
+            .expect("panel should exist")
+            .rect()
+            .size
+            .width,
+        240.0
+    );
+    assert_eq!(view.document().viewport(), Size::new(640.0, 480.0));
 }
 
 #[test]

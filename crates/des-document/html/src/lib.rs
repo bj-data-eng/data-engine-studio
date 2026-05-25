@@ -6,7 +6,7 @@
 //! JavaScript and does not embed template logic in HTML.
 
 use des_document::{
-    Document, DocumentBuilder, Element, ElementSpec, Size, StyleSheet, TextContent,
+    Document, DocumentBuilder, DocumentView, Element, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -153,6 +153,22 @@ impl HtmlStylesheet {
             html: HtmlDocument::load(html_path)?,
             stylesheet: parse_stylesheet(&fs::read_to_string(css_path)?)?,
         })
+    }
+
+    /// Creates a ready-to-update retained document view from the parsed assets.
+    pub fn to_view(&self, viewport: Size) -> HtmlResult<DocumentView> {
+        Ok(DocumentView::new(
+            self.html.to_document(viewport)?,
+            self.stylesheet.clone(),
+        ))
+    }
+
+    /// Consumes the parsed assets into a ready-to-update retained document view.
+    pub fn into_view(self, viewport: Size) -> HtmlResult<DocumentView> {
+        Ok(DocumentView::new(
+            self.html.to_document(viewport)?,
+            self.stylesheet,
+        ))
     }
 }
 
