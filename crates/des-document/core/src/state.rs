@@ -543,6 +543,22 @@ impl DocumentInput {
         Self::pointer(PointerInput::at(position).primary_clicked())
     }
 
+    pub fn primary_press(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position).primary_press())
+    }
+
+    pub fn primary_down(position: Point) -> Self {
+        Self::pointer(PointerInput::at(position).primary_down())
+    }
+
+    pub fn primary_drag(position: Point, delta: Point) -> Self {
+        Self::pointer(
+            PointerInput::at(position)
+                .primary_down()
+                .with_primary_delta(delta),
+        )
+    }
+
     pub fn primary_double_click(position: Point) -> Self {
         Self::pointer(PointerInput::at(position).primary_double_clicked())
     }
@@ -670,6 +686,10 @@ impl PointerInput {
 
     pub fn primary_pressed(self) -> Self {
         self.with_primary_pressed(true)
+    }
+
+    pub fn primary_press(self) -> Self {
+        self.primary_down().primary_pressed()
     }
 
     pub fn primary_clicked(self) -> Self {

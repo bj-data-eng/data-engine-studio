@@ -352,11 +352,14 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
     assert_eq!(input.keys[1], KeyInput::up(DocumentKey::Escape));
 
     let click = PointerInput::at(Point::new(4.0, 5.0)).primary_clicked();
+    let press = PointerInput::at(Point::new(4.0, 5.0)).primary_press();
     let double_click = PointerInput::at(Point::new(4.0, 5.0)).primary_double_clicked();
     let triple_click = PointerInput::at(Point::new(4.0, 5.0)).primary_triple_clicked();
     let context_click = PointerInput::at(Point::new(4.0, 5.0)).secondary_clicked();
 
     assert_eq!(click.primary_click_count, 1);
+    assert!(press.primary_down);
+    assert!(press.primary_pressed);
     assert_eq!(double_click.primary_click_count, 2);
     assert_eq!(triple_click.primary_click_count, 3);
     assert!(click.primary_clicked);
@@ -382,6 +385,25 @@ fn document_input_builders_express_host_intent_without_struct_literals() {
             .unwrap()
             .primary_click_count,
         1
+    );
+    assert!(
+        DocumentInput::primary_press(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .primary_pressed
+    );
+    assert!(
+        DocumentInput::primary_down(Point::new(1.0, 2.0))
+            .pointer
+            .unwrap()
+            .primary_down
+    );
+    assert_eq!(
+        DocumentInput::primary_drag(Point::new(1.0, 2.0), Point::new(3.0, 4.0))
+            .pointer
+            .unwrap()
+            .primary_delta,
+        Point::new(3.0, 4.0)
     );
     assert_eq!(
         DocumentInput::primary_double_click(Point::new(1.0, 2.0))
