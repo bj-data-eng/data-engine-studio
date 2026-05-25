@@ -3791,6 +3791,12 @@ impl DocumentInput {
         Self::pointer(PointerInput::at(position).secondary_clicked())
     }
 
+    /// Creates untargeted scroll intent.
+    ///
+    /// The document engine does not infer a scroll target without pointer
+    /// context. Host adapters should pair scroll deltas with
+    /// [`DocumentInput::with_pointer`] when wheel or gesture input should route
+    /// to the hovered scroll container.
     pub fn scroll(delta: Point) -> Self {
         Self {
             scroll_delta: delta,

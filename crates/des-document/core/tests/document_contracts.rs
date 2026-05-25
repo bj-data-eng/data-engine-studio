@@ -9719,6 +9719,44 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
 }
 
 #[test]
+fn scroll_only_input_is_untargeted_without_pointer_context() {
+    let mut engine = DocumentEngine::default();
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::id("scroll-panel"),
+            Style::default()
+                .size(180.0, 80.0)
+                .padding(Insets::all(8.0))
+                .gap(4.0)
+                .border_width(5.0)
+                .overflow_y(Overflow::Scroll),
+        )
+        .rule(
+            StyleSelector::class("scroll-row"),
+            Style::default().size(120.0, 36.0),
+        );
+    let mut document = overflowing_scroll_document();
+
+    engine.update(&mut document, &stylesheet);
+    let output = engine.update_with_input(
+        &mut document,
+        &stylesheet,
+        DocumentInput::scroll(Point::new(0.0, -24.0)),
+    );
+
+    assert!(output.hit_id().is_none());
+    assert!(!output.has_event(
+        "scroll-panel",
+        DocumentEventKind::Scrolled(ScrollAxis::Vertical)
+    ));
+    assert_eq!(engine.element_state("scroll-panel").unwrap().scroll_y, 0.0);
+    assert_eq!(
+        output.layout.find("row-0").unwrap().rect.origin,
+        Point::new(13.0, 13.0)
+    );
+}
+
+#[test]
 fn horizontal_overflow_scrolls_child_content_on_x_axis() {
     let mut engine = DocumentEngine::default();
     let stylesheet = StyleSheet::new()
