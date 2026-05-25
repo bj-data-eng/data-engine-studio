@@ -993,7 +993,38 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![AppAction::Run]);
 
+    let output_only_projection = DocumentProjection::new().set_text("inspect", "Inspect projected");
+    let (output_report, output_only) = surface
+        .project_and_update(&output_only_projection)
+        .expect("action surfaces should support projection plus output without collecting actions");
+    let (input_report, input_output_only) = surface
+        .project_with_and_update_with_input(
+            DocumentInput::pointer_at(Point::new(8.0, 40.0)),
+            |projection| {
+                projection.element("inspect").text("Inspect hover");
+            },
+        )
+        .expect("action surfaces should route input without collecting actions");
+    let inspect_output = output_only.snapshot().find("inspect").unwrap();
+    let hovered_inspect = input_output_only.snapshot().find("inspect").unwrap();
+
+    assert_eq!(output_report.operations, 1);
+    assert_eq!(inspect_output.text(), Some("Inspect projected".to_owned()));
+    assert_eq!(input_report.operations, 1);
+    assert_eq!(hovered_inspect.text(), Some("Inspect hover".to_owned()));
+    assert!(input_output_only.pointer_entered_for("inspect"));
+
     let mut text_measurer = FixedTextMeasurer;
+    let (measured_output_report, measured_output) = surface
+        .project_with_and_update_with_input_and_text_measurer(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut text_measurer,
+            |projection| {
+                projection.element("run").text("Measured output");
+            },
+        )
+        .expect("action surfaces should project and measure output without collecting actions");
+    let measured_output_run = measured_output.snapshot().find("run").unwrap();
     let mut measured_dispatched = Vec::new();
     let (report, measured_frame) = surface
         .project_with_and_update_with_input_and_text_measurer_actions(
@@ -1014,6 +1045,12 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
             },
         );
 
+    assert_eq!(measured_output_report.operations, 1);
+    assert_eq!(
+        measured_output_run.text(),
+        Some("Measured output".to_owned())
+    );
+    assert_eq!(measured_output_run.rect().size.width, 64.0);
     assert_eq!(report.operations, 1);
     assert_eq!(report.changed, 1);
     assert_eq!(measured_run.text(), Some("Run projected".to_owned()));

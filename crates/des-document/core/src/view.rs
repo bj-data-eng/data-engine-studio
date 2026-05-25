@@ -959,6 +959,22 @@ impl<Action> DocumentActionSurface<Action> {
         self.view.project_widgets(widgets)
     }
 
+    /// Applies a projection, resolves the paired view, and returns output.
+    pub fn project_and_update(
+        &mut self,
+        projection: &DocumentProjection,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        self.view.project_and_update(projection)
+    }
+
+    /// Builds a projection, applies it, resolves the paired view, and returns output.
+    pub fn project_with_and_update(
+        &mut self,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        self.view.project_with_and_update(project)
+    }
+
     /// Applies a projection, resolves the view, and collects typed app actions.
     pub fn project_and_update_actions(
         &mut self,
@@ -1008,6 +1024,43 @@ impl<Action> DocumentActionSurface<Action> {
             .project_widgets_and_update_actions(widgets, &self.commands)
     }
 
+    /// Applies a widget projection, resolves the paired view, and returns output.
+    pub fn project_widget_and_update(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        self.view.project_widget_and_update(widget)
+    }
+
+    /// Applies widget projections, resolves the paired view, and returns output.
+    pub fn project_widgets_and_update<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.view.project_widgets_and_update(widgets)
+    }
+
+    /// Applies a projection, routes input through the paired view, and returns output.
+    pub fn project_and_update_with_input(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        self.view.project_and_update_with_input(projection, input)
+    }
+
+    /// Builds a projection, routes input through the paired view, and returns output.
+    pub fn project_with_and_update_with_input(
+        &mut self,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        self.view.project_with_and_update_with_input(input, project)
+    }
+
     /// Applies a projection, routes input, and collects typed app actions.
     pub fn project_and_update_with_input_actions(
         &mut self,
@@ -1052,6 +1105,32 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .project_with_and_update_with_input_actions(input, project, &self.commands)
+    }
+
+    /// Applies a projection, routes input through a host text measurer, and returns output.
+    pub fn project_and_update_with_input_and_text_measurer(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let report = self.project(projection)?;
+        let output = self
+            .view
+            .update_with_input_and_text_measurer(input, text_measurer);
+        Ok((report, output))
+    }
+
+    /// Builds a projection, routes input through a host text measurer, and returns output.
+    pub fn project_with_and_update_with_input_and_text_measurer(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project_and_update_with_input_and_text_measurer(&projection, input, text_measurer)
     }
 
     /// Builds a projection, routes input, collects typed actions, and dispatches them.
@@ -1162,6 +1241,16 @@ impl<Action> DocumentActionSurface<Action> {
         Ok((projection_report, frame, dispatch_report))
     }
 
+    /// Applies a widget projection, routes input through the paired view, and returns output.
+    pub fn project_widget_and_update_with_input(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        self.view
+            .project_widget_and_update_with_input(widget, input)
+    }
+
     /// Applies a widget projection, routes input, and collects typed app actions.
     pub fn project_widget_and_update_with_input_actions(
         &mut self,
@@ -1193,6 +1282,19 @@ impl<Action> DocumentActionSurface<Action> {
             self.project_widget_and_update_with_input_actions(widget, input)?;
         let dispatch_report = frame.dispatch(handler);
         Ok((projection_report, frame, dispatch_report))
+    }
+
+    /// Applies widget projections, routes input through the paired view, and returns output.
+    pub fn project_widgets_and_update_with_input<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.view
+            .project_widgets_and_update_with_input(widgets, input)
     }
 
     /// Applies widget projections, routes input, and collects typed app actions.
