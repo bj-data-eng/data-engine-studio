@@ -953,6 +953,25 @@ impl DocumentViewBuilder {
         Ok(view)
     }
 
+    pub fn build_with_action_widget<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentActionSurface<Action> {
+        self.try_build_with_action_widget(widget, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_build_with_action_widget<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentActionSurface<Action>> {
+        let view = self.try_build_with_widget(widget, build)?;
+        let commands = DocumentCommandRegistry::new().bind_widget(widget);
+        Ok(DocumentActionSurface::new(view, commands))
+    }
+
     pub fn build_with_widgets<'a, W>(
         self,
         widgets: impl IntoIterator<Item = &'a W>,
@@ -980,6 +999,32 @@ impl DocumentViewBuilder {
         let mut view = self.build(build);
         view.project_widgets(widgets)?;
         Ok(view)
+    }
+
+    pub fn build_with_action_widgets<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentActionSurface<Action>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.try_build_with_action_widgets(widgets, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn try_build_with_action_widgets<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentActionSurface<Action>>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        let widgets = widgets.into_iter().collect::<Vec<_>>();
+        let commands = DocumentCommandRegistry::new().bind_widgets(widgets.iter().copied());
+        let view = self.try_build_with_widgets(widgets, build)?;
+        Ok(DocumentActionSurface::new(view, commands))
     }
 
     pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {

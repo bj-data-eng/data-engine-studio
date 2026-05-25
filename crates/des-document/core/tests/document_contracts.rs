@@ -1975,6 +1975,23 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(report.operations, 1);
     assert_eq!(projected_toggle.data("state"), Some("armed"));
     assert!(projected_frame.contains_action(&WidgetAction::Toggle));
+
+    let mut mixed_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_with_action_widgets(
+            [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
+            |ui| {
+                ui.div("toolbar").children(|ui| {
+                    ui.widget(&toggle);
+                    ui.widget(&close);
+                });
+            },
+        );
+    let mixed_frame =
+        mixed_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+
+    assert!(mixed_frame.output().snapshot().find("toolbar").is_some());
+    assert_eq!(mixed_surface.commands().bindings(), registry.bindings());
+    assert!(mixed_frame.contains_action(&WidgetAction::Toggle));
 }
 
 #[test]
