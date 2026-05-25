@@ -2203,6 +2203,12 @@ fn document_view_can_mount_a_widget_with_its_styles() {
     let meter: Box<dyn DocumentWidget> = Box::new(MeterWidget);
     let widget_refs = [&*badge, &*meter];
     let mut boxed = DocumentView::compose(Size::new(320.0, 180.0)).widgets(widget_refs);
+    let mut conditional = DocumentView::compose(Size::new(320.0, 180.0)).widget_if(&widget, true);
+    let mut skipped = DocumentView::compose(Size::new(320.0, 180.0)).widget_if(&widget, false);
+    let mut conditional_many =
+        DocumentView::compose(Size::new(320.0, 180.0)).widgets_if(widget_refs, true);
+    let mut skipped_many =
+        DocumentView::compose(Size::new(320.0, 180.0)).widgets_if(widget_refs, false);
     let mut pushed = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
         ui.widget(&*badge);
         ui.widget(&*meter);
@@ -2215,6 +2221,15 @@ fn document_view_can_mount_a_widget_with_its_styles() {
         assert_eq!(badge.rect().size, Size::new(88.0, 24.0));
         assert_eq!(badge.style().background, Some(Color::rgb(220, 238, 255)));
     }
+
+    assert!(conditional.update().snapshot().find("badge").is_some());
+    assert!(skipped.update().snapshot().find("badge").is_none());
+    let conditional_many_output = conditional_many.update();
+    assert!(conditional_many_output.snapshot().find("badge").is_some());
+    assert!(conditional_many_output.snapshot().find("meter").is_some());
+    let skipped_many_output = skipped_many.update();
+    assert!(skipped_many_output.snapshot().find("badge").is_none());
+    assert!(skipped_many_output.snapshot().find("meter").is_none());
 
     for output in [boxed.update(), pushed.update()] {
         let badge = output.snapshot().find("badge").unwrap();
@@ -2664,6 +2679,20 @@ fn document_widgets_can_declare_typed_command_bindings() {
         .push_widget_commands_many_if([&close as &dyn DocumentActionWidget<WidgetAction>], false);
     let mut surface = DocumentView::compose(Size::new(320.0, 180.0))
         .action_widgets([&toggle as &dyn DocumentActionWidget<WidgetAction>, &close]);
+    let mut conditional_surface =
+        DocumentView::compose(Size::new(320.0, 180.0)).action_widget_if(&toggle, true);
+    let mut skipped_surface =
+        DocumentView::compose(Size::new(320.0, 180.0)).action_widget_if(&toggle, false);
+    let mut conditional_many_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .action_widgets_if(
+            [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
+            true,
+        );
+    let mut skipped_many_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .action_widgets_if(
+            [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
+            false,
+        );
     let toggle_surface = toggle.action_surface(Size::new(320.0, 180.0));
 
     let click_frame =
@@ -2681,6 +2710,13 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(manual_surface.commands().bindings(), registry.bindings());
     assert_eq!(many_surface.commands().bindings(), registry.bindings());
     assert_eq!(surface.commands().bindings(), registry.bindings());
+    assert_eq!(conditional_surface.commands().bindings().len(), 2);
+    assert_eq!(skipped_surface.commands().bindings().len(), 0);
+    assert_eq!(
+        conditional_many_surface.commands().bindings(),
+        registry.bindings()
+    );
+    assert_eq!(skipped_many_surface.commands().bindings().len(), 0);
     assert_eq!(toggle_commands.bindings().len(), 2);
     assert_eq!(boxed_toggle_commands.bindings(), toggle_commands.bindings());
     assert_eq!(toggle_registry.bindings().len(), 2);
@@ -2697,6 +2733,26 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .rect()
             .size,
         Size::new(96.0, 32.0)
+    );
+    assert!(
+        conditional_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .contains_action(&WidgetAction::Toggle)
+    );
+    assert!(
+        skipped_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .is_empty()
+    );
+    assert!(
+        conditional_many_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .contains_action(&WidgetAction::Toggle)
+    );
+    assert!(
+        skipped_many_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .is_empty()
     );
 
     let (report, projected_frame) = surface

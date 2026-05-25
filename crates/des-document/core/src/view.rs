@@ -1300,11 +1300,25 @@ impl DocumentViewBuilder {
             .expect("document widget projection targets rendered elements")
     }
 
+    pub fn widget_if(self, widget: &(impl DocumentWidget + ?Sized), present: bool) -> DocumentView {
+        self.try_widget_if(widget, present)
+            .expect("document widget projection targets rendered elements")
+    }
+
     pub fn action_widget<Action>(
         self,
         widget: &(impl DocumentActionWidget<Action> + ?Sized),
     ) -> DocumentActionSurface<Action> {
         self.try_action_widget(widget)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn action_widget_if<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+    ) -> DocumentActionSurface<Action> {
+        self.try_action_widget_if(widget, present)
             .expect("document widget projection targets rendered elements")
     }
 
@@ -1315,6 +1329,21 @@ impl DocumentViewBuilder {
         let view = self.try_widget(widget)?;
         let commands = DocumentCommandRegistry::new().bind_widget(widget);
         Ok(DocumentActionSurface::new(view, commands))
+    }
+
+    pub fn try_action_widget_if<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+    ) -> DocumentResult<DocumentActionSurface<Action>> {
+        if present {
+            self.try_action_widget(widget)
+        } else {
+            Ok(DocumentActionSurface::new(
+                self.build(|_| {}),
+                DocumentCommandRegistry::new(),
+            ))
+        }
     }
 
     pub fn try_widget(
@@ -1332,11 +1361,35 @@ impl DocumentViewBuilder {
         Ok(view)
     }
 
+    pub fn try_widget_if(
+        self,
+        widget: &(impl DocumentWidget + ?Sized),
+        present: bool,
+    ) -> DocumentResult<DocumentView> {
+        if present {
+            self.try_widget(widget)
+        } else {
+            Ok(self.build(|_| {}))
+        }
+    }
+
     pub fn widgets<'a, W>(self, widgets: impl IntoIterator<Item = &'a W>) -> DocumentView
     where
         W: DocumentWidget + ?Sized + 'a,
     {
         self.try_widgets(widgets)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn widgets_if<'a, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> DocumentView
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.try_widgets_if(widgets, present)
             .expect("document widget projection targets rendered elements")
     }
 
@@ -1351,6 +1404,18 @@ impl DocumentViewBuilder {
             .expect("document widget projection targets rendered elements")
     }
 
+    pub fn action_widgets_if<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> DocumentActionSurface<Action>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.try_action_widgets_if(widgets, present)
+            .expect("document widget projection targets rendered elements")
+    }
+
     pub fn try_action_widgets<'a, Action, W>(
         self,
         widgets: impl IntoIterator<Item = &'a W>,
@@ -1362,6 +1427,24 @@ impl DocumentViewBuilder {
         let commands = DocumentCommandRegistry::new().bind_widgets(widgets.iter().copied());
         let view = self.try_widgets(widgets)?;
         Ok(DocumentActionSurface::new(view, commands))
+    }
+
+    pub fn try_action_widgets_if<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> DocumentResult<DocumentActionSurface<Action>>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        if present {
+            self.try_action_widgets(widgets)
+        } else {
+            Ok(DocumentActionSurface::new(
+                self.build(|_| {}),
+                DocumentCommandRegistry::new(),
+            ))
+        }
     }
 
     pub fn try_widgets<'a, W>(
@@ -1385,6 +1468,21 @@ impl DocumentViewBuilder {
         );
         view.project_widgets(widgets)?;
         Ok(view)
+    }
+
+    pub fn try_widgets_if<'a, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> DocumentResult<DocumentView>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        if present {
+            self.try_widgets(widgets)
+        } else {
+            Ok(self.build(|_| {}))
+        }
     }
 
     pub fn build_with_widget(
