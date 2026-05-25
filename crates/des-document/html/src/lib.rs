@@ -239,6 +239,48 @@ impl HtmlDocument {
         self.to_view_with_stylesheet(viewport, parse_stylesheet_forgiving(css)?)
     }
 
+    /// Creates an action surface from this HTML tree and typed Rust commands.
+    pub fn to_action_surface<Action>(
+        &self,
+        viewport: Size,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self.to_view(viewport)?.action_surface(commands))
+    }
+
+    /// Creates an action surface and configures typed Rust commands in one hook.
+    pub fn to_action_surface_with<Action>(
+        &self,
+        viewport: Size,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self.to_view(viewport)?.action_surface_with(configure))
+    }
+
+    /// Creates an action surface from this HTML tree, stylesheet, and typed commands.
+    pub fn to_action_surface_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        commands: DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_stylesheet(viewport, stylesheet)?
+            .action_surface(commands))
+    }
+
+    /// Creates an action surface from this HTML tree and stylesheet, configuring commands in place.
+    pub fn to_action_surface_with_stylesheet_and<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_stylesheet(viewport, stylesheet)?
+            .action_surface_with(configure))
+    }
+
     /// Parses CSS and creates an action surface configured with typed Rust commands.
     pub fn to_action_surface_with_css<Action>(
         &self,

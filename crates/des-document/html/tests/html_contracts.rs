@@ -601,6 +601,55 @@ fn html_document_can_create_ready_to_update_document_view_without_css() {
 }
 
 #[test]
+fn html_document_can_create_action_surfaces_without_css_plumbing() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+        Menu,
+    }
+
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <main id="app">
+          <button id="run" on:click="project.run" on:contextmenu="project.menu">Run</button>
+        </main>
+        "#,
+    )
+    .expect("HTML should parse");
+    let registry = DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
+    let mut surface = html
+        .to_action_surface(Size::new(320.0, 180.0), registry)
+        .expect("HTML should create an action surface without CSS");
+    let mut configured_surface = html
+        .to_action_surface_with(Size::new(320.0, 180.0), |commands| {
+            commands.push_click("project.run", HtmlAction::Run);
+        })
+        .expect("HTML should configure an action surface without CSS");
+    let stylesheet = des_document::StyleSheet::parse_css("#run { width: 96px; height: 32px; }")
+        .expect("CSS should parse");
+    let mut styled_surface = html
+        .to_action_surface_with_stylesheet_and(Size::new(320.0, 180.0), stylesheet, |commands| {
+            commands.push_click("project.run", HtmlAction::Run);
+            commands.push_context_menu("project.menu", HtmlAction::Menu);
+        })
+        .expect("HTML should create an action surface with a typed stylesheet");
+
+    let click_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let configured_frame = configured_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let context_frame = styled_surface
+        .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let run = context_frame.output().snapshot().find("run").unwrap();
+
+    assert!(click_frame.contains_action(&HtmlAction::Run));
+    assert!(configured_frame.contains_action(&HtmlAction::Run));
+    assert!(context_frame.contains_action(&HtmlAction::Menu));
+    assert_eq!(run.rect().size.width, 96.0);
+    assert_eq!(styled_surface.commands().bindings().len(), 2);
+}
+
+#[test]
 fn html_authored_commands_dispatch_to_typed_rust_actions() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {
