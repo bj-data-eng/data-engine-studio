@@ -2349,6 +2349,54 @@ fn document_builder_supports_conditional_authoring_helpers() {
 }
 
 #[test]
+fn document_builder_renders_app_items_fluently() {
+    #[derive(Clone, Copy)]
+    struct Row {
+        id: &'static str,
+        label: &'static str,
+        selected: bool,
+    }
+
+    let rows = [
+        Row {
+            id: "row-alpha",
+            label: "Alpha",
+            selected: false,
+        },
+        Row {
+            id: "row-beta",
+            label: "Beta",
+            selected: true,
+        },
+    ];
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), StyleSheet::new(), |ui| {
+        ui.section("table").children(|ui| {
+            ui.items(rows, |ui, row| {
+                ui.div(row.id)
+                    .class("row")
+                    .class_if("is-selected", row.selected)
+                    .text(row.label);
+            })
+            .items_if(rows, false, |ui, row| {
+                ui.div(format!("hidden-{}", row.id)).text("Hidden");
+            });
+        });
+    });
+
+    let output = view.update();
+    let alpha = output.snapshot().find("row-alpha").unwrap();
+    let beta = output.snapshot().find("row-beta").unwrap();
+
+    assert_eq!(alpha.text(), Some("Alpha".to_owned()));
+    assert_eq!(beta.text(), Some("Beta".to_owned()));
+    assert!(alpha.has_class("row"));
+    assert!(!alpha.has_class("is-selected"));
+    assert!(beta.has_class("is-selected"));
+    assert!(output.snapshot().find("hidden-row-alpha").is_none());
+    assert!(output.snapshot().find("hidden-row-beta").is_none());
+}
+
+#[test]
 fn document_builder_supports_conditional_behavior_helpers() {
     let can_run = true;
     let can_cancel = false;

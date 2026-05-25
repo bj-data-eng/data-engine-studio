@@ -1512,6 +1512,35 @@ impl DocumentBuilder {
         self
     }
 
+    pub fn items<I>(
+        &mut self,
+        items: I,
+        mut build: impl FnMut(&mut DocumentBuilder, I::Item),
+    ) -> &mut Self
+    where
+        I: IntoIterator,
+    {
+        for item in items {
+            build(self, item);
+        }
+        self
+    }
+
+    pub fn items_if<I>(
+        &mut self,
+        items: I,
+        present: bool,
+        build: impl FnMut(&mut DocumentBuilder, I::Item),
+    ) -> &mut Self
+    where
+        I: IntoIterator,
+    {
+        if present {
+            self.items(items, build);
+        }
+        self
+    }
+
     element_builder_methods! {
         div => Element::Div,
         span => Element::Span,
