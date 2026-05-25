@@ -78,6 +78,28 @@ impl DocumentProjection {
         self
     }
 
+    pub fn element_if(
+        &mut self,
+        id: impl Into<ElementId>,
+        present: bool,
+        project: impl FnOnce(ElementProjection<'_>),
+    ) -> &mut Self {
+        if present {
+            project(self.element(id));
+        }
+        self
+    }
+
+    pub fn with_element_if(
+        mut self,
+        id: impl Into<ElementId>,
+        present: bool,
+        project: impl FnOnce(ElementProjection<'_>),
+    ) -> Self {
+        self.element_if(id, present, project);
+        self
+    }
+
     pub fn elements<I, Id>(
         &mut self,
         ids: I,

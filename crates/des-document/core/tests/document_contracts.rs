@@ -1210,20 +1210,52 @@ fn document_projection_expresses_conditional_app_state_without_branching() {
         .classes_if("status", ["is-loading", "is-stale"], true)
         .set_data_if("status", "busy", "true", true)
         .set_aria_if("status", "busy", "false", false)
+        .with_element_if("details", show_details, |mut details| {
+            details.text("Loading details").class_if("is-ready", false);
+        })
+        .with_element_if("details", show_error, |mut details| {
+            details.data("error", "true").add_class("has-error");
+        })
         .when(show_error, |projection| {
             projection.push_data("status", "error", "true");
         });
     let reset_report = view.project(&reset).unwrap();
     let reset_output = view.update();
     let reset_status = reset_output.snapshot().find("status").unwrap();
+    let reset_details = reset_output.snapshot().find("details").unwrap();
 
-    assert_eq!(reset_report.operations, 5);
-    assert_eq!(reset_report.changed, 5);
+    assert_eq!(reset_report.operations, 7);
+    assert_eq!(reset_report.changed, 7);
     assert!(!reset_status.has_class("is-ready"));
     assert!(reset_status.has_class("is-loading"));
     assert!(reset_status.has_class("is-stale"));
     assert_eq!(reset_status.data("busy"), Some("true"));
     assert_eq!(reset_status.aria("busy"), None);
+    assert_eq!(reset_details.text(), Some("Loading details".to_owned()));
+    assert!(!reset_details.has_class("is-ready"));
+    assert_eq!(reset_details.data("error"), None);
+    assert!(!reset_details.has_class("has-error"));
+
+    let conditional_report = view
+        .project_with(|projection| {
+            projection
+                .element_if("status", true, |mut status| {
+                    status.data("phase", "complete").add_class("is-ready");
+                })
+                .element_if("details", false, |mut details| {
+                    details.data("should-not-appear", "true");
+                });
+        })
+        .unwrap();
+    let conditional_output = view.update();
+    let conditional_status = conditional_output.snapshot().find("status").unwrap();
+    let conditional_details = conditional_output.snapshot().find("details").unwrap();
+
+    assert_eq!(conditional_report.operations, 2);
+    assert_eq!(conditional_report.changed, 2);
+    assert_eq!(conditional_status.data("phase"), Some("complete"));
+    assert!(conditional_status.has_class("is-ready"));
+    assert_eq!(conditional_details.data("should-not-appear"), None);
 }
 
 #[test]
