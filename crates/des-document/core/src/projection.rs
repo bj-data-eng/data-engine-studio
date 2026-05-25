@@ -1543,6 +1543,62 @@ impl DocumentProjectionOperation {
         }
     }
 
+    pub fn text(&self) -> Option<&TextContent> {
+        match self {
+            Self::SetText { text, .. } => Some(text),
+            _ => None,
+        }
+    }
+
+    pub fn value(&self) -> Option<&str> {
+        match self {
+            Self::SetValue { value, .. } => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn attribute(&self) -> Option<(&str, &str)> {
+        match self {
+            Self::SetAttribute { name, value, .. } => Some((name, value)),
+            _ => None,
+        }
+    }
+
+    pub fn removed_attribute(&self) -> Option<&str> {
+        match self {
+            Self::RemoveAttribute { name, .. } => Some(name),
+            _ => None,
+        }
+    }
+
+    pub fn selected(&self) -> Option<bool> {
+        match self {
+            Self::SetSelected { selected, .. } => Some(*selected),
+            _ => None,
+        }
+    }
+
+    pub fn disabled(&self) -> Option<bool> {
+        match self {
+            Self::SetDisabled { disabled, .. } => Some(*disabled),
+            _ => None,
+        }
+    }
+
+    pub fn focused(&self) -> Option<bool> {
+        match self {
+            Self::SetFocused { focused, .. } => Some(*focused),
+            _ => None,
+        }
+    }
+
+    pub fn class(&self) -> Option<(&ClassName, bool)> {
+        match self {
+            Self::SetClass { class, present, .. } => Some((class, *present)),
+            _ => None,
+        }
+    }
+
     pub fn targets(&self, target: impl AsRef<str>) -> bool {
         self.target().as_str() == target.as_ref()
     }

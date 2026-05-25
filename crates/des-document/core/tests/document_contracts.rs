@@ -7,7 +7,7 @@ use des_document::{
     ElementBehaviorHook, ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector,
     FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point,
     PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
-    TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
+    TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextLayoutRequest, TextLayoutResult,
     TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
     TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
@@ -1929,9 +1929,45 @@ fn element_projection_patch_groups_reusable_state_updates() {
     let projection = DocumentProjection::new()
         .set_patch("status", &ready_patch)
         .set_patch("status-label", label_patch);
+    let status_operations = projection.operations_for("status").collect::<Vec<_>>();
+    let label_text = projection
+        .operations_for_kind("status-label", DocumentProjectionOperationKind::Text)
+        .next()
+        .and_then(DocumentProjectionOperation::text);
+    let ready_attribute = status_operations.iter().find_map(|operation| {
+        operation
+            .attribute()
+            .filter(|(name, _)| *name == "data-state")
+    });
+    let removed_attribute = status_operations
+        .iter()
+        .find_map(|operation| operation.removed_attribute());
+    let selected = status_operations
+        .iter()
+        .find_map(|operation| operation.selected());
+    let disabled = status_operations
+        .iter()
+        .find_map(|operation| operation.disabled());
+    let focused = status_operations
+        .iter()
+        .find_map(|operation| operation.focused());
+    let ready_class = status_operations.iter().find_map(|operation| {
+        operation
+            .class()
+            .filter(|(class, _)| class.as_str() == "is-ready")
+    });
 
     assert_eq!(ready_patch.operation_count(), 9);
     assert!(!ready_patch.is_empty());
+    assert_eq!(status_operations.len(), 9);
+    assert_eq!(label_text.map(TextContent::semantic_text), Some("Ready"));
+    assert_eq!(status_operations[0].value(), Some("ready"));
+    assert_eq!(ready_attribute, Some(("data-state", "ready")));
+    assert_eq!(removed_attribute, Some("data-ephemeral"));
+    assert_eq!(selected, Some(true));
+    assert_eq!(disabled, Some(false));
+    assert_eq!(focused, Some(true));
+    assert_eq!(ready_class.map(|(_, present)| present), Some(true));
 
     let report = view.project(&projection).unwrap();
     let output = view.update();
