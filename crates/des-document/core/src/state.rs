@@ -147,6 +147,25 @@ impl DocumentOutput {
         self.events_for_intent(intent).next()
     }
 
+    pub fn events_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a DocumentEvent> + 'a {
+        self.events_for(target)
+            .filter(move |event| event.matches_intent(intent))
+    }
+
+    pub fn first_event_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentEvent> {
+        self.events
+            .iter()
+            .find(|event| event.target.as_str() == target && event.matches_intent(intent))
+    }
+
     pub fn event_targets_of_kind(
         &self,
         kind: DocumentEventKind,
@@ -170,6 +189,15 @@ impl DocumentOutput {
         intent: ElementBehaviorEvent,
     ) -> Option<&ElementId> {
         self.event_targets_for_intent(intent).next()
+    }
+
+    pub fn event_targets_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a ElementId> + 'a {
+        self.events_for_target_intent(target, intent)
+            .map(|event| &event.target)
     }
 
     pub fn has_event_intent(&self, intent: ElementBehaviorEvent) -> bool {

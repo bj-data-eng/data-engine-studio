@@ -7898,6 +7898,28 @@ fn pointer_input_emits_document_interaction_events() {
     );
     assert!(output.events.contains(&DocumentEvent::pressed("card")));
     assert!(output.events.contains(&DocumentEvent::clicked("card")));
+    assert_eq!(
+        output
+            .events_for_target_intent("card", ElementBehaviorEvent::Click)
+            .count(),
+        1
+    );
+    assert_eq!(
+        output.first_event_for_target_intent("card", ElementBehaviorEvent::PointerDown),
+        Some(&DocumentEvent::pressed("card"))
+    );
+    assert_eq!(
+        output
+            .event_targets_for_target_intent("card", ElementBehaviorEvent::Click)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["card"]
+    );
+    assert!(
+        output
+            .first_event_for_target_intent("missing", ElementBehaviorEvent::Click)
+            .is_none()
+    );
 
     let output = engine.update_with_input(
         &mut document,
@@ -7919,6 +7941,10 @@ fn pointer_input_emits_document_interaction_events() {
     );
 
     assert!(output.events.contains(&DocumentEvent::released("card")));
+    assert_eq!(
+        output.first_event_for_target_intent("card", ElementBehaviorEvent::PointerUp),
+        Some(&DocumentEvent::released("card"))
+    );
 
     let output = engine.update_with_input(
         &mut document,
