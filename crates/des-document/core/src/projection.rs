@@ -44,6 +44,18 @@ pub enum DocumentProjectionOperation {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum DocumentProjectionOperationKind {
+    Text,
+    Value,
+    Attribute,
+    RemoveAttribute,
+    Selected,
+    Disabled,
+    Focused,
+    Class,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DocumentProjectionReport {
     pub operations: usize,
@@ -821,6 +833,58 @@ impl DocumentProjection {
         &self.operations
     }
 
+    pub fn operations_for(
+        &self,
+        target: impl AsRef<str>,
+    ) -> impl Iterator<Item = &DocumentProjectionOperation> {
+        let target = target.as_ref().to_owned();
+        self.operations
+            .iter()
+            .filter(move |operation| operation.targets(&target))
+    }
+
+    pub fn operations_of_kind(
+        &self,
+        kind: DocumentProjectionOperationKind,
+    ) -> impl Iterator<Item = &DocumentProjectionOperation> {
+        self.operations
+            .iter()
+            .filter(move |operation| operation.kind() == kind)
+    }
+
+    pub fn operations_for_kind(
+        &self,
+        target: impl AsRef<str>,
+        kind: DocumentProjectionOperationKind,
+    ) -> impl Iterator<Item = &DocumentProjectionOperation> {
+        let target = target.as_ref().to_owned();
+        self.operations
+            .iter()
+            .filter(move |operation| operation.targets(&target) && operation.kind() == kind)
+    }
+
+    pub fn has_operation_for(&self, target: impl AsRef<str>) -> bool {
+        self.operations_for(target).next().is_some()
+    }
+
+    pub fn has_operation_kind(&self, kind: DocumentProjectionOperationKind) -> bool {
+        self.operations_of_kind(kind).next().is_some()
+    }
+
+    pub fn has_operation_for_kind(
+        &self,
+        target: impl AsRef<str>,
+        kind: DocumentProjectionOperationKind,
+    ) -> bool {
+        self.operations_for_kind(target, kind).next().is_some()
+    }
+
+    pub fn targets(&self) -> impl Iterator<Item = &ElementId> {
+        self.operations
+            .iter()
+            .map(DocumentProjectionOperation::target)
+    }
+
     pub fn len(&self) -> usize {
         self.operations.len()
     }
@@ -1393,6 +1457,19 @@ fn prefixed_attribute_name(prefix: &str, name: impl AsRef<str>) -> String {
 }
 
 impl DocumentProjectionOperation {
+    pub const fn kind(&self) -> DocumentProjectionOperationKind {
+        match self {
+            Self::SetText { .. } => DocumentProjectionOperationKind::Text,
+            Self::SetValue { .. } => DocumentProjectionOperationKind::Value,
+            Self::SetAttribute { .. } => DocumentProjectionOperationKind::Attribute,
+            Self::RemoveAttribute { .. } => DocumentProjectionOperationKind::RemoveAttribute,
+            Self::SetSelected { .. } => DocumentProjectionOperationKind::Selected,
+            Self::SetDisabled { .. } => DocumentProjectionOperationKind::Disabled,
+            Self::SetFocused { .. } => DocumentProjectionOperationKind::Focused,
+            Self::SetClass { .. } => DocumentProjectionOperationKind::Class,
+        }
+    }
+
     pub fn target(&self) -> &ElementId {
         match self {
             Self::SetText { id, .. }
@@ -1404,6 +1481,42 @@ impl DocumentProjectionOperation {
             | Self::SetFocused { id, .. }
             | Self::SetClass { id, .. } => id,
         }
+    }
+
+    pub fn targets(&self, target: impl AsRef<str>) -> bool {
+        self.target().as_str() == target.as_ref()
+    }
+
+    pub const fn is_text(&self) -> bool {
+        matches!(self, Self::SetText { .. })
+    }
+
+    pub const fn is_value(&self) -> bool {
+        matches!(self, Self::SetValue { .. })
+    }
+
+    pub const fn is_attribute(&self) -> bool {
+        matches!(self, Self::SetAttribute { .. })
+    }
+
+    pub const fn is_remove_attribute(&self) -> bool {
+        matches!(self, Self::RemoveAttribute { .. })
+    }
+
+    pub const fn is_selected(&self) -> bool {
+        matches!(self, Self::SetSelected { .. })
+    }
+
+    pub const fn is_disabled(&self) -> bool {
+        matches!(self, Self::SetDisabled { .. })
+    }
+
+    pub const fn is_focused(&self) -> bool {
+        matches!(self, Self::SetFocused { .. })
+    }
+
+    pub const fn is_class(&self) -> bool {
+        matches!(self, Self::SetClass { .. })
     }
 
     fn apply_to(&self, document: &mut Document) -> Result<bool, DocumentError> {

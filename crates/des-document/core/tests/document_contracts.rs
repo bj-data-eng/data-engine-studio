@@ -2,14 +2,14 @@ use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentActionWidget, DocumentBuilder,
     DocumentCommandAction, DocumentCommandBinding, DocumentCommandDispatchReport,
     DocumentCommandRegistry, DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput,
-    DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport,
-    DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId, ElementProjectionPatch,
-    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
-    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
-    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
-    TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow,
-    TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
-    VisualCloneOptions, WhiteSpace,
+    DocumentKey, DocumentProjection, DocumentProjectionOperation, DocumentProjectionOperationKind,
+    DocumentProjectionReport, DocumentView, DocumentWidget, Element, ElementBehaviorEvent,
+    ElementId, ElementProjectionPatch, ElementSpec, ElementStateSelector, FlexWrap, Insets,
+    JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis,
+    Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec,
+    TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
+    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
+    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -2022,13 +2022,53 @@ fn document_projection_composes_subprojections_for_app_state() {
     assert!(!projection.is_empty());
     assert_eq!(
         projection
-            .operations()
-            .iter()
-            .map(DocumentProjectionOperation::target)
+            .targets()
             .map(ElementId::as_str)
             .collect::<Vec<_>>(),
         vec!["summary-count", "summary", "refresh", "refresh", "summary"]
     );
+    assert_eq!(
+        projection
+            .operations_for("summary")
+            .map(DocumentProjectionOperation::kind)
+            .collect::<Vec<_>>(),
+        vec![
+            DocumentProjectionOperationKind::Attribute,
+            DocumentProjectionOperationKind::Attribute,
+        ]
+    );
+    assert_eq!(
+        projection
+            .operations_of_kind(DocumentProjectionOperationKind::Attribute)
+            .map(DocumentProjectionOperation::target)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["summary", "summary"]
+    );
+    assert_eq!(
+        projection
+            .operations_for_kind("refresh", DocumentProjectionOperationKind::Class)
+            .count(),
+        1
+    );
+    assert!(projection.has_operation_for("summary-count"));
+    assert!(!projection.has_operation_for("missing"));
+    assert!(projection.has_operation_kind(DocumentProjectionOperationKind::Disabled));
+    assert!(
+        projection.has_operation_for_kind("refresh", DocumentProjectionOperationKind::Disabled)
+    );
+    assert!(
+        !projection.has_operation_for_kind("summary", DocumentProjectionOperationKind::Focused)
+    );
+    assert_eq!(
+        projection.operations()[0].kind(),
+        DocumentProjectionOperationKind::Text
+    );
+    assert!(projection.operations()[0].is_text());
+    assert!(projection.operations()[0].targets("summary-count"));
+    assert!(projection.operations()[1].is_attribute());
+    assert!(projection.operations()[2].is_disabled());
+    assert!(projection.operations()[3].is_class());
 
     let report = view.project(&projection).unwrap();
     let output = view.update();

@@ -101,8 +101,8 @@ pub use geometry::{
     JustifyContent, Length, Overflow, Point, Position, PositionInsets, Rect, ScrollAxis, Size,
 };
 pub use projection::{
-    DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport, ElementProjection,
-    ElementProjectionPatch,
+    DocumentProjection, DocumentProjectionOperation, DocumentProjectionOperationKind,
+    DocumentProjectionReport, ElementProjection, ElementProjectionPatch,
 };
 pub use query::{DocumentQueryError, DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
