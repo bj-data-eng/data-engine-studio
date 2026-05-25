@@ -92,6 +92,15 @@ impl ContextMenu {
         self.item_with(ContextMenuItem::new(id, label))
     }
 
+    pub fn item_if(
+        self,
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.item_with_if(ContextMenuItem::new(id, label), present)
+    }
+
     pub fn command_item(
         self,
         id: impl Into<ElementId>,
@@ -101,8 +110,40 @@ impl ContextMenu {
         self.item_with(ContextMenuItem::new(id, label).command(command))
     }
 
+    pub fn command_item_if(
+        self,
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        command: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.item_with_if(ContextMenuItem::new(id, label).command(command), present)
+    }
+
+    pub fn selected_item(self, id: impl Into<ElementId>, label: impl Into<String>) -> Self {
+        self.item_with(ContextMenuItem::new(id, label).selected(true))
+    }
+
+    pub fn selected_item_if(
+        self,
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.item_with_if(ContextMenuItem::new(id, label).selected(true), present)
+    }
+
     pub fn disabled_item(self, id: impl Into<ElementId>, label: impl Into<String>) -> Self {
         self.item_with(ContextMenuItem::new(id, label).disabled(true))
+    }
+
+    pub fn disabled_item_if(
+        self,
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.item_with_if(ContextMenuItem::new(id, label).disabled(true), present)
     }
 
     pub fn item_with(mut self, item: ContextMenuItem) -> Self {
@@ -110,9 +151,40 @@ impl ContextMenu {
         self
     }
 
+    pub fn item_with_if(mut self, item: ContextMenuItem, present: bool) -> Self {
+        if present {
+            self.entries.push(ContextMenuEntry::Item(item));
+        }
+        self
+    }
+
+    pub fn items<I>(mut self, items: I) -> Self
+    where
+        I: IntoIterator<Item = ContextMenuItem>,
+    {
+        self.entries
+            .extend(items.into_iter().map(ContextMenuEntry::Item));
+        self
+    }
+
+    pub fn items_if<I>(self, items: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = ContextMenuItem>,
+    {
+        if present { self.items(items) } else { self }
+    }
+
     pub fn separator(mut self, id: impl Into<ElementId>) -> Self {
         self.entries
             .push(ContextMenuEntry::Separator { id: id.into() });
+        self
+    }
+
+    pub fn separator_if(mut self, id: impl Into<ElementId>, present: bool) -> Self {
+        if present {
+            self.entries
+                .push(ContextMenuEntry::Separator { id: id.into() });
+        }
         self
     }
 
@@ -406,6 +478,54 @@ mod tests {
                 .unwrap()
                 .has_class("context-menu-separator")
         );
+    }
+
+    #[test]
+    fn context_menu_supports_fluent_conditional_entries() {
+        let include_debug = true;
+        let include_hidden = false;
+        let menu = ContextMenu::new("row-menu")
+            .item("copy", "Copy")
+            .item_if("hidden-item", "Hidden", include_hidden)
+            .command_item_if("rename", "Rename", "rename-row", include_debug)
+            .selected_item("sort-ascending", "Sort ascending")
+            .selected_item_if("hidden-selected", "Hidden selected", include_hidden)
+            .disabled_item_if("paste", "Paste", include_debug)
+            .separator_if("debug-separator", include_debug)
+            .separator_if("hidden-separator", include_hidden)
+            .item_with_if(
+                ContextMenuItem::new("inspect", "Inspect").command("inspect-row"),
+                include_debug,
+            )
+            .items_if(
+                [
+                    ContextMenuItem::new("duplicate", "Duplicate").command("duplicate-row"),
+                    ContextMenuItem::new("delete", "Delete").disabled(true),
+                ],
+                include_debug,
+            )
+            .items_if(
+                [ContextMenuItem::new("hidden-batch", "Hidden batch")],
+                include_hidden,
+            );
+        let mut view = DocumentView::compose(Size::new(260.0, 180.0)).widget(&menu);
+
+        let output = view.update();
+        let snapshot = output.snapshot();
+
+        assert_eq!(menu.entries().len(), 8);
+        assert!(snapshot.find("copy").is_some());
+        assert!(snapshot.find("rename").unwrap().interactive());
+        assert!(snapshot.find("sort-ascending").unwrap().selected());
+        assert!(!snapshot.find("paste").unwrap().interactive());
+        assert!(snapshot.find("debug-separator").is_some());
+        assert!(snapshot.find("inspect").unwrap().interactive());
+        assert!(snapshot.find("duplicate").unwrap().interactive());
+        assert!(!snapshot.find("delete").unwrap().interactive());
+        assert!(snapshot.find("hidden-item").is_none());
+        assert!(snapshot.find("hidden-selected").is_none());
+        assert!(snapshot.find("hidden-separator").is_none());
+        assert!(snapshot.find("hidden-batch").is_none());
     }
 
     #[test]
