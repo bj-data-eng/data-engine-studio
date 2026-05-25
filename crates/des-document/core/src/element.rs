@@ -507,14 +507,46 @@ impl ElementSpec {
         self
     }
 
+    pub fn deselect(self) -> Self {
+        self.selected(false)
+    }
+
+    pub fn selected_if(self, present: bool) -> Self {
+        if present { self.selected(true) } else { self }
+    }
+
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    pub fn disable(self) -> Self {
+        self.disabled(true)
+    }
+
+    pub fn enable(self) -> Self {
+        self.disabled(false)
+    }
+
+    pub fn disable_if(self, present: bool) -> Self {
+        if present { self.disable() } else { self }
+    }
+
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
         self
+    }
+
+    pub fn focus(self) -> Self {
+        self.focused(true)
+    }
+
+    pub fn blur(self) -> Self {
+        self.focused(false)
+    }
+
+    pub fn focus_if(self, present: bool) -> Self {
+        if present { self.focus() } else { self }
     }
 
     pub fn selectable_text(mut self) -> Self {
@@ -523,14 +555,34 @@ impl ElementSpec {
         self
     }
 
+    pub fn selectable_text_if(self, present: bool) -> Self {
+        if present {
+            self.selectable_text()
+        } else {
+            self
+        }
+    }
+
     pub fn copyable_text(mut self, copyable_text: bool) -> Self {
         self.copyable_text = copyable_text;
         self
     }
 
+    pub fn copyable_text_if(self, copyable_text: bool, present: bool) -> Self {
+        if present {
+            self.copyable_text(copyable_text)
+        } else {
+            self
+        }
+    }
+
     pub fn value(mut self, value: impl Into<String>) -> Self {
         self.value = Some(value.into());
         self
+    }
+
+    pub fn value_if(self, value: impl Into<String>, present: bool) -> Self {
+        if present { self.value(value) } else { self }
     }
 
     pub fn glyph(mut self, glyph: Glyph) -> Self {

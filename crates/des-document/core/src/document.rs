@@ -1884,13 +1884,58 @@ impl ElementBuilder<'_> {
         self
     }
 
+    pub fn select(mut self) -> Self {
+        self.spec.selected = true;
+        self
+    }
+
+    pub fn deselect(mut self) -> Self {
+        self.spec = self.spec.deselect();
+        self
+    }
+
+    pub fn select_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.selected_if(present);
+        self
+    }
+
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.spec.disabled = disabled;
         self
     }
 
+    pub fn disable(mut self) -> Self {
+        self.spec = self.spec.disable();
+        self
+    }
+
+    pub fn enable(mut self) -> Self {
+        self.spec = self.spec.enable();
+        self
+    }
+
+    pub fn disable_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.disable_if(present);
+        self
+    }
+
     pub fn focused(mut self, focused: bool) -> Self {
         self.spec.focused = focused;
+        self
+    }
+
+    pub fn focus(mut self) -> Self {
+        self.spec = self.spec.focus();
+        self
+    }
+
+    pub fn blur(mut self) -> Self {
+        self.spec = self.spec.blur();
+        self
+    }
+
+    pub fn focus_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.focus_if(present);
         self
     }
 
@@ -1900,13 +1945,28 @@ impl ElementBuilder<'_> {
         self
     }
 
+    pub fn selectable_text_if(mut self, present: bool) -> Self {
+        self.spec = self.spec.selectable_text_if(present);
+        self
+    }
+
     pub fn copyable_text(mut self, copyable_text: bool) -> Self {
         self.spec.copyable_text = copyable_text;
         self
     }
 
+    pub fn copyable_text_if(mut self, copyable_text: bool, present: bool) -> Self {
+        self.spec = self.spec.copyable_text_if(copyable_text, present);
+        self
+    }
+
     pub fn value(mut self, value: impl Into<String>) -> Self {
         self.spec.value = Some(value.into());
+        self
+    }
+
+    pub fn value_if(mut self, value: impl Into<String>, present: bool) -> Self {
+        self.spec = self.spec.value_if(value, present);
         self
     }
 

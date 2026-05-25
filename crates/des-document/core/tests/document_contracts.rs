@@ -2467,6 +2467,9 @@ fn document_builder_supports_conditional_authoring_helpers() {
 
     let show_badge = true;
     let disabled = false;
+    let focused = true;
+    let selected = true;
+    let selectable = true;
     let primary = LabelWidget("primary");
     let secondary = LabelWidget("secondary");
     let skipped = LabelWidget("skipped");
@@ -2484,7 +2487,15 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .data_if("stale", "true", false)
             .aria_if("label", "Run", true)
             .aria_if("disabled", "true", false)
+            .select_if(selected)
+            .disable_if(disabled)
+            .focus_if(focused)
+            .value_if("ready", show_badge)
             .text("Run");
+        ui.p("description")
+            .selectable_text_if(selectable)
+            .copyable_text_if(false, disabled)
+            .text("Ready to run.");
         ui.when(show_badge, |ui| {
             ui.div("conditional").class("conditional").empty();
         })
@@ -2502,6 +2513,7 @@ fn document_builder_supports_conditional_authoring_helpers() {
         );
     let output = DocumentEngine::default().update(&mut document, &stylesheet);
     let run = output.snapshot().find("run").unwrap();
+    let description = output.snapshot().find("description").unwrap();
 
     assert!(run.has_all_classes(["control", "is-visible", "has-icon", "is-primary"]));
     assert!(!run.has_class("is-disabled"));
@@ -2513,6 +2525,12 @@ fn document_builder_supports_conditional_authoring_helpers() {
     assert_eq!(run.data("stale"), None);
     assert_eq!(run.aria("label"), Some("Run"));
     assert_eq!(run.aria("disabled"), None);
+    assert!(run.selected());
+    assert!(!run.disabled());
+    assert!(run.focused());
+    assert_eq!(run.value(), Some("ready"));
+    assert!(description.selectable_text());
+    assert!(description.copyable_text());
     assert_eq!(run.rect().size, Size::new(96.0, 32.0));
     assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
     assert!(output.snapshot().find("conditional").is_some());
@@ -2531,7 +2549,13 @@ fn document_builder_supports_conditional_authoring_helpers() {
         .class_if("included", true)
         .class_if("excluded", false)
         .data_if("mode", "demo", true)
-        .aria_if("hidden", "true", false);
+        .aria_if("hidden", "true", false)
+        .selected_if(true)
+        .disable_if(false)
+        .focus_if(true)
+        .selectable_text_if(true)
+        .copyable_text_if(false, false)
+        .value_if("demo", true);
     assert!(
         spec.classes
             .iter()
@@ -2548,6 +2572,12 @@ fn document_builder_supports_conditional_authoring_helpers() {
         Some("demo")
     );
     assert_eq!(spec.attributes.get("aria-hidden"), None);
+    assert!(spec.selected);
+    assert!(!spec.disabled);
+    assert!(spec.focused);
+    assert!(spec.selectable_text);
+    assert!(spec.copyable_text);
+    assert_eq!(spec.value.as_deref(), Some("demo"));
 }
 
 #[test]
