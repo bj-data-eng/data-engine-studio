@@ -311,6 +311,8 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     enum AppAction {
         CommitByClick,
         CommitByKeyboard,
+        CommitByContextMenu,
+        CommitByPointerEnter,
         Fallback,
     }
 
@@ -325,22 +327,37 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
             .focused(true)
             .on_click("commit")
             .on_key_down("commit")
+            .on_context_menu("commit-menu")
+            .on_pointer_enter("commit-hover")
             .text("Commit");
     });
     let registry = DocumentCommandRegistry::new()
         .bind("commit", AppAction::Fallback)
         .bind_click("commit", AppAction::CommitByClick)
-        .bind_on(
-            ElementBehaviorEvent::KeyDown,
-            "commit",
-            AppAction::CommitByKeyboard,
-        );
+        .bind_key_down("commit", AppAction::CommitByKeyboard)
+        .bind_context_menu("commit-menu", AppAction::CommitByContextMenu)
+        .bind_pointer_enter("commit-hover", AppAction::CommitByPointerEnter);
 
+    let hover_output = view.update_with_input(pointer_input(
+        Point::new(8.0, 8.0),
+        false,
+        false,
+        false,
+        0.0,
+    ));
     let click_output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
     let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
-    let click_actions = registry.command_actions(&click_output).collect::<Vec<_>>();
+    let context_output =
+        view.update_with_input(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let click_actions = registry.clicked_actions(&click_output).collect::<Vec<_>>();
     let key_actions = registry.command_actions(&key_output).collect::<Vec<_>>();
+    let context_actions = registry
+        .command_actions_for_intent(&context_output, ElementBehaviorEvent::ContextMenu)
+        .collect::<Vec<_>>();
+    let hover_actions = registry
+        .command_actions_for_intent(&hover_output, ElementBehaviorEvent::PointerEnter)
+        .collect::<Vec<_>>();
     let key_intent_actions = registry
         .command_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown)
         .collect::<Vec<_>>();
@@ -366,6 +383,10 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         key_actions[0].event,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter))
     );
+    assert_eq!(context_actions.len(), 1);
+    assert_eq!(*context_actions[0].action, AppAction::CommitByContextMenu);
+    assert_eq!(hover_actions.len(), 1);
+    assert_eq!(*hover_actions[0].action, AppAction::CommitByPointerEnter);
 }
 
 #[test]
@@ -388,24 +409,15 @@ fn document_command_registry_supports_conditional_action_bindings() {
         ui.button("run")
             .focused(true)
             .command("run")
-            .command_on(ElementBehaviorEvent::KeyDown, "run-key")
+            .on_key_down_if("run-key", true)
+            .on_key_up_if("skip-key-up", false)
             .text("Run");
     });
     let registry = DocumentCommandRegistry::new()
         .bind_if("run", AppAction::Run, true)
         .bind_if("cancel", AppAction::Cancel, false)
-        .bind_on_if(
-            ElementBehaviorEvent::KeyDown,
-            "run-key",
-            AppAction::RunKey,
-            true,
-        )
-        .bind_on_if(
-            ElementBehaviorEvent::KeyDown,
-            "cancel-key",
-            AppAction::CancelKey,
-            false,
-        );
+        .bind_key_down_if("run-key", AppAction::RunKey, true)
+        .bind_key_down_if("cancel-key", AppAction::CancelKey, false);
 
     let click_frame = view.update_with_input_actions(
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -423,6 +435,7 @@ fn document_command_registry_supports_conditional_action_bindings() {
     let mut pushed = DocumentCommandRegistry::new();
     pushed.push_click_if("run", AppAction::Run, true);
     pushed.push_click_if("cancel", AppAction::Cancel, false);
+    pushed.push_key_up_if("cancel-key", AppAction::CancelKey, false);
 
     assert_eq!(pushed.bindings().len(), 1);
     assert_eq!(
@@ -2073,7 +2086,17 @@ fn document_builder_supports_conditional_behavior_helpers() {
             .focused(true)
             .command_if("run", can_run)
             .command_on_if(ElementBehaviorEvent::KeyDown, "run-key", can_run)
+            .on_context_menu_if("run-menu", can_run)
+            .on_pointer_down_if("run-press", can_run)
+            .on_pointer_up_if("run-release", can_run)
+            .on_drag_start_if("run-drag-start", can_run)
+            .on_drag_if("run-drag", can_run)
+            .on_drag_end_if("run-drag-end", can_run)
+            .on_scroll_if("run-scroll", can_run)
+            .on_key_up_if("run-key-up", can_run)
             .command_if("cancel", can_cancel)
+            .on_pointer_enter_if("cancel-hover", can_cancel)
+            .on_pointer_leave_if("cancel-leave", can_cancel)
             .text("Run");
     });
     let stylesheet = StyleSheet::new().id("run", Style::default().size(96.0, 32.0));
@@ -2095,15 +2118,38 @@ fn document_builder_supports_conditional_behavior_helpers() {
     assert!(click_output.has_command("run", "run"));
     assert!(!click_output.has_command("run", "cancel"));
     assert!(key_output.has_command_intent("run", ElementBehaviorEvent::KeyDown, "run-key"));
+    assert_eq!(run.behavior_hooks().len(), 10);
 
     let spec = ElementSpec::button()
         .interactive_if(true)
         .command_if("save", true)
-        .command_on_if(ElementBehaviorEvent::KeyDown, "save-key", false);
+        .command_on_if(ElementBehaviorEvent::KeyDown, "save-key", false)
+        .on_context_menu_if("save-menu", true)
+        .on_pointer_enter_if("save-hover", true)
+        .on_pointer_leave_if("skip-leave", false)
+        .on_pointer_down_if("save-press", true)
+        .on_pointer_up_if("save-release", true)
+        .on_drag_start_if("save-drag-start", true)
+        .on_drag_if("save-drag", true)
+        .on_drag_end_if("save-drag-end", true)
+        .on_scroll_if("save-scroll", true)
+        .on_key_down_if("save-key-down", true)
+        .on_key_up_if("skip-key-up", false);
 
     assert!(spec.interactive);
-    assert_eq!(spec.behavior_hooks.len(), 1);
+    assert_eq!(spec.behavior_hooks.len(), 10);
     assert_eq!(spec.behavior_hooks[0].command, "save");
+    assert!(
+        spec.behavior_hooks
+            .iter()
+            .any(|hook| hook.command == "save-hover")
+    );
+    assert!(
+        !spec
+            .behavior_hooks
+            .iter()
+            .any(|hook| hook.command == "skip-key-up")
+    );
 }
 
 #[test]

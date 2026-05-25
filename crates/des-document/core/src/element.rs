@@ -408,44 +408,88 @@ impl ElementSpec {
         self.on(ElementBehaviorEvent::ContextMenu, command)
     }
 
+    pub fn on_context_menu_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::ContextMenu, command, present)
+    }
+
     pub fn on_pointer_enter(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::PointerEnter, command)
+    }
+
+    pub fn on_pointer_enter_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::PointerEnter, command, present)
     }
 
     pub fn on_pointer_leave(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::PointerLeave, command)
     }
 
+    pub fn on_pointer_leave_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::PointerLeave, command, present)
+    }
+
     pub fn on_pointer_down(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::PointerDown, command)
+    }
+
+    pub fn on_pointer_down_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::PointerDown, command, present)
     }
 
     pub fn on_pointer_up(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::PointerUp, command)
     }
 
+    pub fn on_pointer_up_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::PointerUp, command, present)
+    }
+
     pub fn on_drag_start(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::DragStart, command)
+    }
+
+    pub fn on_drag_start_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::DragStart, command, present)
     }
 
     pub fn on_drag(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::Drag, command)
     }
 
+    pub fn on_drag_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Drag, command, present)
+    }
+
     pub fn on_drag_end(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::DragEnd, command)
+    }
+
+    pub fn on_drag_end_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::DragEnd, command, present)
     }
 
     pub fn on_scroll(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::Scroll, command)
     }
 
+    pub fn on_scroll_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::Scroll, command, present)
+    }
+
     pub fn on_key_down(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::KeyDown, command)
     }
 
+    pub fn on_key_down_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::KeyDown, command, present)
+    }
+
     pub fn on_key_up(self, command: impl Into<String>) -> Self {
         self.on(ElementBehaviorEvent::KeyUp, command)
+    }
+
+    pub fn on_key_up_if(self, command: impl Into<String>, present: bool) -> Self {
+        self.on_if(ElementBehaviorEvent::KeyUp, command, present)
     }
 
     pub fn interactive(mut self) -> Self {

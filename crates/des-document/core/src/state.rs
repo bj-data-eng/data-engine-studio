@@ -348,6 +348,50 @@ impl<Action> DocumentCommandBinding<Action> {
         Self::on(ElementBehaviorEvent::Click, command, action)
     }
 
+    pub fn context_menu(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::ContextMenu, command, action)
+    }
+
+    pub fn pointer_enter(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::PointerEnter, command, action)
+    }
+
+    pub fn pointer_leave(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::PointerLeave, command, action)
+    }
+
+    pub fn pointer_down(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::PointerDown, command, action)
+    }
+
+    pub fn pointer_up(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::PointerUp, command, action)
+    }
+
+    pub fn drag_start(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::DragStart, command, action)
+    }
+
+    pub fn drag(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::Drag, command, action)
+    }
+
+    pub fn drag_end(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::DragEnd, command, action)
+    }
+
+    pub fn scroll(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::Scroll, command, action)
+    }
+
+    pub fn key_down(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::KeyDown, command, action)
+    }
+
+    pub fn key_up(command: impl Into<String>, action: Action) -> Self {
+        Self::on(ElementBehaviorEvent::KeyUp, command, action)
+    }
+
     fn matches(&self, command: DocumentCommandRef<'_>) -> bool {
         self.command == command.command.trim()
             && self
@@ -420,6 +464,171 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_context_menu(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_context_menu(command, action);
+        self
+    }
+
+    pub fn bind_context_menu_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_context_menu_if(command, action, present);
+        self
+    }
+
+    pub fn bind_pointer_enter(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_pointer_enter(command, action);
+        self
+    }
+
+    pub fn bind_pointer_enter_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_pointer_enter_if(command, action, present);
+        self
+    }
+
+    pub fn bind_pointer_leave(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_pointer_leave(command, action);
+        self
+    }
+
+    pub fn bind_pointer_leave_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_pointer_leave_if(command, action, present);
+        self
+    }
+
+    pub fn bind_pointer_down(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_pointer_down(command, action);
+        self
+    }
+
+    pub fn bind_pointer_down_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_pointer_down_if(command, action, present);
+        self
+    }
+
+    pub fn bind_pointer_up(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_pointer_up(command, action);
+        self
+    }
+
+    pub fn bind_pointer_up_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_pointer_up_if(command, action, present);
+        self
+    }
+
+    pub fn bind_drag_start(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_drag_start(command, action);
+        self
+    }
+
+    pub fn bind_drag_start_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_drag_start_if(command, action, present);
+        self
+    }
+
+    pub fn bind_drag(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_drag(command, action);
+        self
+    }
+
+    pub fn bind_drag_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_drag_if(command, action, present);
+        self
+    }
+
+    pub fn bind_drag_end(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_drag_end(command, action);
+        self
+    }
+
+    pub fn bind_drag_end_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_drag_end_if(command, action, present);
+        self
+    }
+
+    pub fn bind_scroll(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_scroll(command, action);
+        self
+    }
+
+    pub fn bind_scroll_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_scroll_if(command, action, present);
+        self
+    }
+
+    pub fn bind_key_down(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_key_down(command, action);
+        self
+    }
+
+    pub fn bind_key_down_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_key_down_if(command, action, present);
+        self
+    }
+
+    pub fn bind_key_up(mut self, command: impl Into<String>, action: Action) -> Self {
+        self.push_key_up(command, action);
+        self
+    }
+
+    pub fn bind_key_up_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_key_up_if(command, action, present);
+        self
+    }
+
     pub fn bind_many<I, Command>(mut self, bindings: I) -> Self
     where
         I: IntoIterator<Item = (Command, Action)>,
@@ -470,6 +679,146 @@ impl<Action> DocumentCommandRegistry<Action> {
     pub fn push_click_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
         if present {
             self.push_click(command, action);
+        }
+    }
+
+    pub fn push_context_menu(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::ContextMenu, command, action);
+    }
+
+    pub fn push_context_menu_if(
+        &mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_context_menu(command, action);
+        }
+    }
+
+    pub fn push_pointer_enter(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::PointerEnter, command, action);
+    }
+
+    pub fn push_pointer_enter_if(
+        &mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_pointer_enter(command, action);
+        }
+    }
+
+    pub fn push_pointer_leave(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::PointerLeave, command, action);
+    }
+
+    pub fn push_pointer_leave_if(
+        &mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_pointer_leave(command, action);
+        }
+    }
+
+    pub fn push_pointer_down(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::PointerDown, command, action);
+    }
+
+    pub fn push_pointer_down_if(
+        &mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_pointer_down(command, action);
+        }
+    }
+
+    pub fn push_pointer_up(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::PointerUp, command, action);
+    }
+
+    pub fn push_pointer_up_if(
+        &mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_pointer_up(command, action);
+        }
+    }
+
+    pub fn push_drag_start(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::DragStart, command, action);
+    }
+
+    pub fn push_drag_start_if(
+        &mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_drag_start(command, action);
+        }
+    }
+
+    pub fn push_drag(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::Drag, command, action);
+    }
+
+    pub fn push_drag_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_drag(command, action);
+        }
+    }
+
+    pub fn push_drag_end(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::DragEnd, command, action);
+    }
+
+    pub fn push_drag_end_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_drag_end(command, action);
+        }
+    }
+
+    pub fn push_scroll(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::Scroll, command, action);
+    }
+
+    pub fn push_scroll_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_scroll(command, action);
+        }
+    }
+
+    pub fn push_key_down(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::KeyDown, command, action);
+    }
+
+    pub fn push_key_down_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_key_down(command, action);
+        }
+    }
+
+    pub fn push_key_up(&mut self, command: impl Into<String>, action: Action) {
+        self.push_on(ElementBehaviorEvent::KeyUp, command, action);
+    }
+
+    pub fn push_key_up_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_key_up(command, action);
         }
     }
 
