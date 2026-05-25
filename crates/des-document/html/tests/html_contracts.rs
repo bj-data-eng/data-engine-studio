@@ -402,6 +402,26 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             &registry,
         )
         .expect("forgiving CSS should collect keyboard actions directly");
+    let mut surface = html
+        .to_action_surface_with_css(Size::new(240.0, 160.0), css, |commands| {
+            commands.push("project.run", HtmlAction::Run);
+            commands.push_key_down("project.filter", HtmlAction::Filter);
+        })
+        .expect("HTML and CSS should create a typed action surface directly");
+    let surface_click =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut forgiving_surface = html
+        .to_action_surface_with_css_forgiving(
+            Size::new(240.0, 160.0),
+            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+        )
+        .expect("forgiving CSS should create a typed action surface directly");
+    let surface_key =
+        forgiving_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -420,6 +440,8 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     );
     assert!(click_frame.contains_action(&HtmlAction::Run));
     assert!(forgiving_frame.contains_action(&HtmlAction::Filter));
+    assert!(surface_click.contains_action(&HtmlAction::Run));
+    assert!(surface_key.contains_action(&HtmlAction::Filter));
 }
 
 #[test]

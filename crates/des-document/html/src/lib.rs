@@ -209,6 +209,30 @@ impl HtmlDocument {
         self.to_view_with_stylesheet(viewport, parse_stylesheet_forgiving(css)?)
     }
 
+    /// Parses CSS and creates an action surface configured with typed Rust commands.
+    pub fn to_action_surface_with_css<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_css(viewport, css)?
+            .action_surface_with(configure))
+    }
+
+    /// Parses forgiving CSS and creates an action surface with typed Rust commands.
+    pub fn to_action_surface_with_css_forgiving<Action>(
+        &self,
+        viewport: Size,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self
+            .to_view_with_css_forgiving(viewport, css)?
+            .action_surface_with(configure))
+    }
+
     /// Parses CSS, resolves this HTML tree, and returns the first output frame.
     pub fn update_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentOutput> {
         self.to_view_with_css(viewport, css)
