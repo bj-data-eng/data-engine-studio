@@ -1111,6 +1111,61 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(measured_dispatched, vec![AppAction::Run]);
+
+    let mut direct_view = DocumentView::build(
+        Size::new(320.0, 180.0),
+        StyleSheet::new().id("run", Style::default().height(Length::Px(32.0))),
+        |ui| {
+            ui.button("run").on_click("run").text("Run");
+        },
+    );
+    let direct_registry = DocumentCommandRegistry::new().bind_click("run", AppAction::Run);
+    let mut direct_update_dispatched = Vec::new();
+    let (direct_update_frame, direct_update_report) =
+        direct_view.update_and_dispatch(&direct_registry, |action| {
+            direct_update_dispatched.push(action.action().clone());
+        });
+    let mut direct_measurer = FixedTextMeasurer;
+    let mut direct_measured_dispatched = Vec::new();
+    let (direct_measured_report, direct_measured_frame, direct_measured_action_report) =
+        direct_view
+            .project_with_and_update_with_input_and_text_measurer_and_dispatch(
+                DocumentInput::primary_click(Point::new(8.0, 8.0)),
+                &mut direct_measurer,
+                |projection| {
+                    projection.element("run").text("Measured direct");
+                },
+                &direct_registry,
+                |action| {
+                    direct_measured_dispatched.push(action.action().clone());
+                },
+            )
+            .unwrap();
+    let direct_measured_run = direct_measured_frame
+        .output()
+        .snapshot()
+        .find("run")
+        .unwrap();
+
+    assert!(direct_update_frame.is_empty());
+    assert_eq!(
+        direct_update_report,
+        DocumentCommandDispatchReport::new(0, 0, 0)
+    );
+    assert!(direct_update_dispatched.is_empty());
+    assert_eq!(direct_measured_report.operations, 1);
+    assert_eq!(direct_measured_report.changed, 1);
+    assert_eq!(
+        direct_measured_run.text(),
+        Some("Measured direct".to_owned())
+    );
+    assert_eq!(direct_measured_run.rect().size.width, 64.0);
+    assert!(direct_measured_frame.contains_action(&AppAction::Run));
+    assert_eq!(
+        direct_measured_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(direct_measured_dispatched, vec![AppAction::Run]);
 }
 
 #[test]
@@ -3286,6 +3341,80 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(frame.len(), 1);
     assert!(frame.contains_action(&AppAction::Refresh));
 
+    let mut direct_dispatched = Vec::new();
+    let (direct_frame, direct_report) = view.update_with_input_and_dispatch(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &registry,
+        |action| {
+            direct_dispatched.push(*action.action());
+        },
+    );
+
+    assert!(direct_frame.contains_action(&AppAction::Refresh));
+    assert_eq!(direct_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(direct_dispatched, vec![AppAction::Refresh]);
+
+    let direct_projection = DocumentProjection::new().set_text("refresh", "Dispatch refresh");
+    let mut projected_dispatched = Vec::new();
+    let (direct_projection_report, direct_projection_frame, direct_projection_action_report) = view
+        .project_and_update_with_input_and_dispatch(
+            &direct_projection,
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| {
+                projected_dispatched.push(*action.action());
+            },
+        )
+        .unwrap();
+    let direct_projected_refresh = direct_projection_frame
+        .output()
+        .snapshot()
+        .find("refresh")
+        .unwrap();
+
+    assert_eq!(direct_projection_report.operations, 1);
+    assert_eq!(
+        direct_projected_refresh.text(),
+        Some("Dispatch refresh".to_owned())
+    );
+    assert!(direct_projection_frame.contains_action(&AppAction::Refresh));
+    assert_eq!(
+        direct_projection_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_dispatched, vec![AppAction::Refresh]);
+
+    let mut projected_with_dispatched = Vec::new();
+    let (direct_with_report, direct_with_frame, direct_with_action_report) = view
+        .project_with_and_update_with_input_and_dispatch(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("refresh").text("Dispatch with");
+            },
+            &registry,
+            |action| {
+                projected_with_dispatched.push(*action.action());
+            },
+        )
+        .unwrap();
+
+    assert_eq!(direct_with_report.operations, 1);
+    assert_eq!(
+        direct_with_frame
+            .output()
+            .snapshot()
+            .find("refresh")
+            .unwrap()
+            .text(),
+        Some("Dispatch with".to_owned())
+    );
+    assert!(direct_with_frame.contains_action(&AppAction::Refresh));
+    assert_eq!(
+        direct_with_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(projected_with_dispatched, vec![AppAction::Refresh]);
+
     let mut widget_view =
         DocumentView::compose(Size::new(320.0, 180.0)).widget(&StatusWidget { ready: false });
     let (widget_report, widget_frame) = widget_view
@@ -3302,6 +3431,26 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(status.text(), Some("Ready".to_owned()));
     assert!(status.has_class("is-ready"));
     assert!(widget_frame.contains_action(&AppAction::Toggle));
+
+    let mut direct_widget_dispatched = Vec::new();
+    let (direct_widget_report, direct_widget_frame, direct_widget_action_report) = widget_view
+        .project_widget_and_update_with_input_and_dispatch(
+            &StatusWidget { ready: false },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| {
+                direct_widget_dispatched.push(*action.action());
+            },
+        )
+        .unwrap();
+
+    assert_eq!(direct_widget_report.operations, 2);
+    assert!(direct_widget_frame.contains_action(&AppAction::Toggle));
+    assert_eq!(
+        direct_widget_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(direct_widget_dispatched, vec![AppAction::Toggle]);
 
     let mut widget_surface = DocumentView::compose(Size::new(320.0, 180.0))
         .action_widget(&StatusWidget { ready: false });
