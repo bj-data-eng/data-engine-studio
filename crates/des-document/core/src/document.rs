@@ -1335,6 +1335,18 @@ pub trait DocumentWidget {
 
     fn push_projection(&self, _projection: &mut DocumentProjection) {}
 
+    fn stylesheet(&self) -> StyleSheet {
+        let mut stylesheet = StyleSheet::new();
+        self.push_styles(&mut stylesheet);
+        stylesheet
+    }
+
+    fn projection(&self) -> DocumentProjection {
+        let mut projection = DocumentProjection::new();
+        self.push_projection(&mut projection);
+        projection
+    }
+
     fn view(&self, viewport: Size) -> crate::DocumentView {
         self.view_with_stylesheet(viewport, StyleSheet::new())
     }

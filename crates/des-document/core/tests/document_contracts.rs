@@ -1862,7 +1862,25 @@ fn document_widget_trait_builds_views_through_its_front_door() {
         StyleSheet::new().class("accent", Style::default().border(Color::rgb(90, 120, 180))),
     );
     let boxed: Box<dyn DocumentWidget> = Box::new(BadgeWidget { ready: true });
+    let widget_stylesheet = widget.stylesheet();
+    let widget_projection = widget.projection();
+    let boxed_stylesheet = boxed.stylesheet();
+    let boxed_projection = boxed.projection();
     let mut boxed_view = boxed.try_view(Size::new(240.0, 120.0)).unwrap();
+
+    assert_eq!(widget_stylesheet.rule_count(), 2);
+    assert_eq!(boxed_stylesheet.rule_count(), 2);
+    assert_eq!(widget_projection.len(), 2);
+    assert_eq!(boxed_projection.len(), 2);
+    assert_eq!(
+        widget_projection
+            .operations()
+            .iter()
+            .map(DocumentProjectionOperation::target)
+            .map(ElementId::as_str)
+            .collect::<Vec<_>>(),
+        vec!["badge", "badge"]
+    );
 
     let direct_output = direct.update();
     let direct_badge = direct_output.snapshot().find("badge").unwrap();
