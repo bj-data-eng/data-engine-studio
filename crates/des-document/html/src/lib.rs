@@ -1290,6 +1290,23 @@ impl HtmlDocument {
         Ok((frame, report))
     }
 
+    /// Parses CSS, routes input, and dispatches only typed action values.
+    pub fn update_with_input_and_css_and_dispatch_action_values<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions_and_css(viewport, input, css, registry)?;
+        let report = frame.dispatch_action_values(handler);
+        Ok((frame, report))
+    }
+
     /// Parses CSS, configures typed actions in one hook, routes input, and dispatches them.
     pub fn update_with_input_and_css_and_dispatch_with<Action>(
         &self,
@@ -1305,6 +1322,25 @@ impl HtmlDocument {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_and_css_and_dispatch(viewport, input, css, &registry, handler)
+    }
+
+    /// Parses CSS, configures typed actions, and dispatches only action values.
+    pub fn update_with_input_and_css_and_dispatch_action_values_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_css_and_dispatch_action_values(
+            viewport, input, css, &registry, handler,
+        )
     }
 
     /// Parses forgiving CSS, routes input through this HTML tree, and returns output.
@@ -1367,6 +1403,24 @@ impl HtmlDocument {
         Ok((frame, report))
     }
 
+    /// Parses forgiving CSS, routes input, and dispatches only typed action values.
+    pub fn update_with_input_and_css_forgiving_and_dispatch_action_values<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame =
+            self.update_with_input_actions_and_css_forgiving(viewport, input, css, registry)?;
+        let report = frame.dispatch_action_values(handler);
+        Ok((frame, report))
+    }
+
     /// Parses forgiving CSS, configures typed actions, routes input, and dispatches them.
     pub fn update_with_input_and_css_forgiving_and_dispatch_with<Action>(
         &self,
@@ -1382,6 +1436,25 @@ impl HtmlDocument {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_and_css_forgiving_and_dispatch(
+            viewport, input, css, &registry, handler,
+        )
+    }
+
+    /// Parses forgiving CSS, configures typed actions, and dispatches action values.
+    pub fn update_with_input_and_css_forgiving_and_dispatch_action_values_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_css_forgiving_and_dispatch_action_values(
             viewport, input, css, &registry, handler,
         )
     }
@@ -3789,6 +3862,25 @@ impl HtmlSet {
             .update_with_input_and_css_and_dispatch(viewport, input, css, registry, handler)
     }
 
+    /// Parses CSS, routes input, and dispatches only typed action values.
+    pub fn update_with_input_and_css_and_dispatch_action_values<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_css_and_dispatch_action_values(
+                viewport, input, css, registry, handler,
+            )
+    }
+
     /// Parses CSS, configures typed actions in one hook, routes input, and dispatches them.
     pub fn update_with_input_and_css_and_dispatch_with<Action>(
         &self,
@@ -3804,6 +3896,25 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_and_css_and_dispatch_with(viewport, input, css, configure, handler)
+    }
+
+    /// Parses CSS, configures typed actions, and dispatches action values.
+    pub fn update_with_input_and_css_and_dispatch_action_values_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_css_and_dispatch_action_values_with(
+                viewport, input, css, configure, handler,
+            )
     }
 
     /// Parses forgiving CSS, routes input, and collects typed Rust actions.
@@ -3857,6 +3968,25 @@ impl HtmlSet {
             )
     }
 
+    /// Parses forgiving CSS, routes input, and dispatches only typed action values.
+    pub fn update_with_input_and_css_forgiving_and_dispatch_action_values<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_css_forgiving_and_dispatch_action_values(
+                viewport, input, css, registry, handler,
+            )
+    }
+
     /// Parses forgiving CSS, configures typed actions, routes input, and dispatches them.
     pub fn update_with_input_and_css_forgiving_and_dispatch_with<Action>(
         &self,
@@ -3872,6 +4002,25 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_and_css_forgiving_and_dispatch_with(
+                viewport, input, css, configure, handler,
+            )
+    }
+
+    /// Parses forgiving CSS, configures typed actions, and dispatches action values.
+    pub fn update_with_input_and_css_forgiving_and_dispatch_action_values_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_css_forgiving_and_dispatch_action_values_with(
                 viewport, input, css, configure, handler,
             )
     }
