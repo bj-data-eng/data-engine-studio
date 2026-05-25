@@ -2314,6 +2314,16 @@ impl DocumentViewBuilder {
             .expect("document widget projection targets rendered elements")
     }
 
+    pub fn build_with_widget_if(
+        self,
+        widget: &(impl DocumentWidget + ?Sized),
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentView {
+        self.try_build_with_widget_if(widget, present, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
     pub fn try_build_with_widget(
         mut self,
         widget: &(impl DocumentWidget + ?Sized),
@@ -2325,12 +2335,35 @@ impl DocumentViewBuilder {
         Ok(view)
     }
 
+    pub fn try_build_with_widget_if(
+        self,
+        widget: &(impl DocumentWidget + ?Sized),
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentView> {
+        if present {
+            self.try_build_with_widget(widget, build)
+        } else {
+            Ok(self.build(build))
+        }
+    }
+
     pub fn build_with_action_widget<Action>(
         self,
         widget: &(impl DocumentActionWidget<Action> + ?Sized),
         build: impl FnOnce(&mut DocumentBuilder),
     ) -> DocumentActionSurface<Action> {
         self.try_build_with_action_widget(widget, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn build_with_action_widget_if<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentActionSurface<Action> {
+        self.try_build_with_action_widget_if(widget, present, build)
             .expect("document widget projection targets rendered elements")
     }
 
@@ -2344,6 +2377,22 @@ impl DocumentViewBuilder {
         Ok(DocumentActionSurface::new(view, commands))
     }
 
+    pub fn try_build_with_action_widget_if<Action>(
+        self,
+        widget: &(impl DocumentActionWidget<Action> + ?Sized),
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentActionSurface<Action>> {
+        if present {
+            self.try_build_with_action_widget(widget, build)
+        } else {
+            Ok(DocumentActionSurface::new(
+                self.build(build),
+                DocumentCommandRegistry::new(),
+            ))
+        }
+    }
+
     pub fn build_with_widgets<'a, W>(
         self,
         widgets: impl IntoIterator<Item = &'a W>,
@@ -2353,6 +2402,19 @@ impl DocumentViewBuilder {
         W: DocumentWidget + ?Sized + 'a,
     {
         self.try_build_with_widgets(widgets, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn build_with_widgets_if<'a, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentView
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.try_build_with_widgets_if(widgets, present, build)
             .expect("document widget projection targets rendered elements")
     }
 
@@ -2373,6 +2435,22 @@ impl DocumentViewBuilder {
         Ok(view)
     }
 
+    pub fn try_build_with_widgets_if<'a, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentView>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        if present {
+            self.try_build_with_widgets(widgets, build)
+        } else {
+            Ok(self.build(build))
+        }
+    }
+
     pub fn build_with_action_widgets<'a, Action, W>(
         self,
         widgets: impl IntoIterator<Item = &'a W>,
@@ -2382,6 +2460,19 @@ impl DocumentViewBuilder {
         W: DocumentActionWidget<Action> + ?Sized + 'a,
     {
         self.try_build_with_action_widgets(widgets, build)
+            .expect("document widget projection targets rendered elements")
+    }
+
+    pub fn build_with_action_widgets_if<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentActionSurface<Action>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        self.try_build_with_action_widgets_if(widgets, present, build)
             .expect("document widget projection targets rendered elements")
     }
 
@@ -2397,6 +2488,25 @@ impl DocumentViewBuilder {
         let commands = DocumentCommandRegistry::new().bind_widgets(widgets.iter().copied());
         let view = self.try_build_with_widgets(widgets, build)?;
         Ok(DocumentActionSurface::new(view, commands))
+    }
+
+    pub fn try_build_with_action_widgets_if<'a, Action, W>(
+        self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+        build: impl FnOnce(&mut DocumentBuilder),
+    ) -> DocumentResult<DocumentActionSurface<Action>>
+    where
+        W: DocumentActionWidget<Action> + ?Sized + 'a,
+    {
+        if present {
+            self.try_build_with_action_widgets(widgets, build)
+        } else {
+            Ok(DocumentActionSurface::new(
+                self.build(build),
+                DocumentCommandRegistry::new(),
+            ))
+        }
     }
 
     pub fn build_action_surface<Action>(

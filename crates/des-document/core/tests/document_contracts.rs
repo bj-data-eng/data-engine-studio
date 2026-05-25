@@ -3715,10 +3715,72 @@ fn document_widgets_can_declare_typed_command_bindings() {
         );
     let mixed_frame =
         mixed_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut conditional_widget_view = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_with_widget_if(&toggle, true, |ui| {
+            ui.widget(&toggle);
+        });
+    let mut skipped_widget_view = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_with_widget_if(&toggle, false, |ui| {
+            ui.div("toolbar").text("Toolbar");
+        });
+    let mut conditional_mixed_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_with_action_widgets_if(
+            [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
+            true,
+            |ui| {
+                ui.div("toolbar").children(|ui| {
+                    ui.widget(&toggle);
+                    ui.widget(&close);
+                });
+            },
+        );
+    let mut skipped_mixed_surface = DocumentView::compose(Size::new(320.0, 180.0))
+        .build_with_action_widgets_if(
+            [&toggle as &dyn DocumentActionWidget<WidgetAction>, &close],
+            false,
+            |ui| {
+                ui.div("toolbar").text("Toolbar");
+            },
+        );
+    let conditional_widget_output = conditional_widget_view.update();
+    let skipped_widget_output = skipped_widget_view.update();
+    let conditional_mixed_frame = conditional_mixed_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let skipped_mixed_frame = skipped_mixed_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
 
     assert!(mixed_frame.output().snapshot().find("toolbar").is_some());
     assert_eq!(mixed_surface.commands().bindings(), registry.bindings());
     assert!(mixed_frame.contains_action(&WidgetAction::Toggle));
+    assert!(
+        conditional_widget_output
+            .snapshot()
+            .find("toggle")
+            .is_some()
+    );
+    assert!(skipped_widget_output.snapshot().find("toolbar").is_some());
+    assert!(skipped_widget_output.snapshot().find("toggle").is_none());
+    assert_eq!(
+        conditional_mixed_surface.commands().bindings(),
+        registry.bindings()
+    );
+    assert!(conditional_mixed_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(skipped_mixed_surface.commands().bindings().len(), 0);
+    assert!(
+        skipped_mixed_frame
+            .output()
+            .snapshot()
+            .find("toolbar")
+            .is_some()
+    );
+    assert!(
+        skipped_mixed_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .is_none()
+    );
+    assert!(skipped_mixed_frame.is_empty());
 }
 
 #[test]
