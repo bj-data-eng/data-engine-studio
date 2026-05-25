@@ -837,6 +837,24 @@ impl HtmlStylesheet {
         Ok((report, surface))
     }
 
+    /// Creates an action surface, applies projection, and maps HTML commands to typed actions.
+    pub fn to_action_surface_with_projection_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.to_action_surface_with_projection(
+            viewport,
+            projection,
+            self.command_action_registry(actions),
+        )
+    }
+
     /// Creates an action surface, builds retained state projection in place, and applies it.
     pub fn to_action_surface_projected_with<Action>(
         &self,
@@ -847,6 +865,22 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.to_action_surface_with_projection(viewport, &projection, commands)
+    }
+
+    /// Creates an action surface, builds projection, and maps HTML commands to typed actions.
+    pub fn to_action_surface_projected_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionSurface<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.to_action_surface_with_projection_and_actions(viewport, &projection, actions)
     }
 
     /// Creates an action surface, applies projection, and configures typed commands in one hook.
@@ -930,6 +964,24 @@ impl HtmlStylesheet {
         Ok(view.project_and_update_actions(projection, registry)?)
     }
 
+    /// Creates a projected view, resolves it, and maps HTML commands to typed actions.
+    pub fn update_with_projection_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_projection_actions(
+            viewport,
+            projection,
+            &self.command_action_registry(actions),
+        )
+    }
+
     /// Builds retained state projection in place, resolves it, and collects typed actions.
     pub fn update_projected_with_actions<Action>(
         &self,
@@ -943,6 +995,22 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_projection_actions(viewport, &projection, registry)
+    }
+
+    /// Builds projection in place, resolves it, and maps HTML commands to typed actions.
+    pub fn update_projected_with_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_projection_and_actions(viewport, &projection, actions)
     }
 
     /// Creates a projected view, routes input, and returns the resolved output.
@@ -983,6 +1051,26 @@ impl HtmlStylesheet {
         Ok(view.project_and_update_with_input_actions(projection, input, registry)?)
     }
 
+    /// Creates a projected view, routes input, and maps HTML commands to typed actions.
+    pub fn update_with_input_projection_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        projection: &DocumentProjection,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_projection_actions(
+            viewport,
+            input,
+            projection,
+            &self.command_action_registry(actions),
+        )
+    }
+
     /// Builds retained state projection in place, routes input, and collects typed actions.
     pub fn update_with_input_projected_with_actions<Action>(
         &self,
@@ -997,6 +1085,23 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_input_projection_actions(viewport, input, &projection, registry)
+    }
+
+    /// Builds projection in place, routes input, and maps HTML commands to typed actions.
+    pub fn update_with_input_projected_with_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.update_with_input_projection_and_actions(viewport, input, &projection, actions)
     }
 
     /// Creates a view, resolves the document, and returns the first output frame.

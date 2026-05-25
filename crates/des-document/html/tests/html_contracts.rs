@@ -1019,6 +1019,24 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         )
         .expect("HTML bundle should project app state and collect actions");
     let run = frame.output().snapshot().find("run").unwrap();
+    let (mapped_report, mapped_update_frame) = bundle
+        .update_with_input_projected_with_and_actions(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 32.0)),
+            |projection| {
+                projection.element("select").add_class("is-selected");
+            },
+            [
+                ("project.run", HtmlAction::Run),
+                ("project.select", HtmlAction::Select),
+            ],
+        )
+        .expect("HTML bundle should project state and map command actions in one call");
+    let mapped_select = mapped_update_frame
+        .output()
+        .snapshot()
+        .find("select")
+        .unwrap();
 
     assert_eq!(report.operations, 4);
     assert_eq!(report.changed, 4);
@@ -1026,6 +1044,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(run.aria("pressed"), Some("true"));
     assert!(frame.contains_action(&HtmlAction::Run));
     assert!(!frame.contains_action(&HtmlAction::Select));
+    assert_eq!(mapped_report.operations, 1);
+    assert_eq!(mapped_report.changed, 1);
+    assert!(mapped_select.has_class("is-selected"));
+    assert!(mapped_update_frame.contains_clicked_action(&HtmlAction::Select));
 
     let projected_registry = bundle.command_action_registry([
         ("project.run", HtmlAction::Run),
@@ -1045,9 +1067,28 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     let (surface_report, mut surface) = bundle
         .to_action_surface_with_projection(Size::new(320.0, 180.0), &projection, projected_registry)
         .expect("HTML bundle should create a projected action surface");
+    let (mapped_surface_report, mut mapped_projected_surface) = bundle
+        .to_action_surface_projected_with_actions(
+            Size::new(320.0, 180.0),
+            |projection| {
+                projection.element("select").add_class("is-selected");
+            },
+            [
+                ("project.run", HtmlAction::Run),
+                ("project.select", HtmlAction::Select),
+            ],
+        )
+        .expect("HTML bundle should create mapped projected action surfaces");
     let surface_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 0.0)));
+    let mapped_projected_surface_frame = mapped_projected_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 32.0)));
     let surface_run = surface_frame.output().snapshot().find("run").unwrap();
+    let mapped_projected_select = mapped_projected_surface_frame
+        .output()
+        .snapshot()
+        .find("select")
+        .unwrap();
 
     assert_eq!(surface_report.operations, 7);
     assert_eq!(surface_report.changed, 7);
@@ -1055,6 +1096,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert!(surface_run.has_class("is-ready"));
     assert!(mapped_frame.contains_clicked_action(&HtmlAction::Select));
     assert!(surface_frame.contains_clicked_action(&HtmlAction::Run));
+    assert_eq!(mapped_surface_report.operations, 1);
+    assert_eq!(mapped_surface_report.changed, 1);
+    assert!(mapped_projected_select.has_class("is-selected"));
+    assert!(mapped_projected_surface_frame.contains_clicked_action(&HtmlAction::Select));
 
     let (configured_report, mut configured_surface) = bundle
         .to_action_surface_projected_with_and(
