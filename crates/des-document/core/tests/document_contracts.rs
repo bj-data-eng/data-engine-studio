@@ -1970,8 +1970,20 @@ fn document_builder_supports_fluent_text_nodes() {
 
 #[test]
 fn document_builder_supports_conditional_authoring_helpers() {
+    struct LabelWidget(&'static str);
+
+    impl DocumentWidget for LabelWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.div(self.0).class("label-widget").text(self.0);
+        }
+    }
+
     let show_badge = true;
     let disabled = false;
+    let primary = LabelWidget("primary");
+    let secondary = LabelWidget("secondary");
+    let skipped = LabelWidget("skipped");
+    let widget_refs = [&primary, &secondary];
     let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
         ui.button("run")
             .class("control")
@@ -1986,6 +1998,14 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .aria_if("label", "Run", true)
             .aria_if("disabled", "true", false)
             .text("Run");
+        ui.when(show_badge, |ui| {
+            ui.div("conditional").class("conditional").empty();
+        })
+        .when(disabled, |ui| {
+            ui.div("disabled-only").empty();
+        })
+        .widget_if(&skipped, disabled)
+        .widgets_if(widget_refs, show_badge);
     });
     let stylesheet = StyleSheet::new()
         .class("control", Style::default().size(96.0, 32.0))
@@ -2008,6 +2028,17 @@ fn document_builder_supports_conditional_authoring_helpers() {
     assert_eq!(run.aria("disabled"), None);
     assert_eq!(run.rect().size, Size::new(96.0, 32.0));
     assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
+    assert!(output.snapshot().find("conditional").is_some());
+    assert!(output.snapshot().find("disabled-only").is_none());
+    assert!(output.snapshot().find("skipped").is_none());
+    assert_eq!(
+        output.snapshot().find("primary").unwrap().text(),
+        Some("primary".to_owned())
+    );
+    assert_eq!(
+        output.snapshot().find("secondary").unwrap().text(),
+        Some("secondary".to_owned())
+    );
 
     let spec = ElementSpec::div()
         .class_if("included", true)

@@ -179,7 +179,9 @@ impl DocumentView {
     ) -> DocumentResult<Self> {
         widget.push_styles(&mut stylesheet);
         let mut view = Self::new(
-            Document::build(viewport, |ui| ui.widget(widget)),
+            Document::build(viewport, |ui| {
+                ui.widget(widget);
+            }),
             stylesheet,
         );
         view.project_widget(widget)?;
@@ -711,7 +713,9 @@ impl DocumentViewBuilder {
     ) -> DocumentResult<DocumentView> {
         widget.push_styles(&mut self.stylesheet);
         let mut view = DocumentView::new(
-            Document::build(self.viewport, |ui| ui.widget(widget)),
+            Document::build(self.viewport, |ui| {
+                ui.widget(widget);
+            }),
             self.stylesheet,
         );
         view.project_widget(widget)?;

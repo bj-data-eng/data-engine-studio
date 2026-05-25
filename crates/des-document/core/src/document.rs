@@ -1381,8 +1381,51 @@ impl DocumentBuilder {
         }
     }
 
-    pub fn widget(&mut self, widget: &(impl DocumentWidget + ?Sized)) {
+    pub fn when(&mut self, present: bool, build: impl FnOnce(&mut DocumentBuilder)) -> &mut Self {
+        if present {
+            build(self);
+        }
+        self
+    }
+
+    pub fn widget(&mut self, widget: &(impl DocumentWidget + ?Sized)) -> &mut Self {
         widget.render(self);
+        self
+    }
+
+    pub fn widget_if(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        present: bool,
+    ) -> &mut Self {
+        if present {
+            widget.render(self);
+        }
+        self
+    }
+
+    pub fn widgets<'a, W>(&mut self, widgets: impl IntoIterator<Item = &'a W>) -> &mut Self
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        for widget in widgets {
+            widget.render(self);
+        }
+        self
+    }
+
+    pub fn widgets_if<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        present: bool,
+    ) -> &mut Self
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        if present {
+            self.widgets(widgets);
+        }
+        self
     }
 
     element_builder_methods! {
