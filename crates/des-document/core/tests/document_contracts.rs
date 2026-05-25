@@ -4252,6 +4252,17 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
         )
         .with_css(".panel { width: 120px; }")
         .expect("strict CSS should compose")
+        .with_css_if(compact, ".css-extra { height: 12px; }")
+        .expect("conditional strict CSS should compose")
+        .with_css_if(destructive, ".skipped-css { width: ; }")
+        .expect("skipped strict CSS should not parse")
+        .with_css_forgiving_if(
+            compact,
+            ".css-extra { unknown-property: 1px; } .css-forgiving { width: 64px; }",
+        )
+        .expect("conditional forgiving CSS should compose")
+        .with_css_forgiving_if(destructive, "/* unclosed")
+        .expect("skipped forgiving CSS should not parse")
         .when(compact, |stylesheet| {
             stylesheet.push_class("compact", Style::default().padding(Insets::all(2.0)));
         })
@@ -4289,6 +4300,9 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert!(stylesheet.has_rule_for_selector(&StyleSelector::class("panel")));
     assert!(stylesheet.has_rule_for_element(Element::Div));
     assert!(stylesheet.has_rule_for_class("panel"));
+    assert!(stylesheet.has_rule_for_class("css-extra"));
+    assert!(stylesheet.has_rule_for_class("css-forgiving"));
+    assert!(!stylesheet.has_rule_for_class("skipped-css"));
     assert!(stylesheet.has_rule_for_id("title"));
     assert!(stylesheet.rules_for_class("panel").count() >= 2);
     assert_eq!(stylesheet.rules_for_id("title").count(), 2);
@@ -4327,10 +4341,24 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
             );
             stylesheet.push_ids(["mutable-title"], Style::default().height(Length::Px(14.0)));
         })
+        .extend_css_if(true, ".mutable-css { width: 24px; }")
+        .expect("conditional mutable CSS should compose")
+        .extend_css_if(false, ".mutable-skipped { width: ; }")
+        .expect("skipped mutable CSS should not parse")
+        .extend_css_forgiving_if(
+            true,
+            ".mutable-forgiving { unknown-property: 1px; } .mutable-forgiving { height: 24px; }",
+        )
+        .expect("conditional mutable forgiving CSS should compose")
+        .extend_css_forgiving_if(false, "/* unclosed")
+        .expect("skipped mutable forgiving CSS should not parse")
         .extend_if(
             StyleSheet::new().class("ignored", Style::default().width(Length::Px(999.0))),
             false,
         );
+    assert!(mutable_stylesheet.has_rule_for_class("mutable-css"));
+    assert!(mutable_stylesheet.has_rule_for_class("mutable-forgiving"));
+    assert!(!mutable_stylesheet.has_rule_for_class("mutable-skipped"));
     let mut view = DocumentView::build(Size::new(320.0, 200.0), stylesheet, |ui| {
         ui.div("panel")
             .classes(["panel", "accent", "compact", "danger", "frame", "skipped"])
@@ -4354,7 +4382,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert_eq!(panel.style().radius, CornerRadii::all(4.0));
     assert_eq!(title.rect().size, Size::new(80.0, 20.0));
     assert_eq!(title.style().padding.left, 4.0);
-    assert_eq!(mutable_stylesheet.rule_count(), 4);
+    assert_eq!(mutable_stylesheet.rule_count(), 7);
     assert!(view.stylesheet().rule_count() >= 6);
 }
 
