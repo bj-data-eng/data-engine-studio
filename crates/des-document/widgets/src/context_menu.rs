@@ -501,6 +501,62 @@ impl ContextMenu {
             .update_actions())
     }
 
+    /// Builds, resolves, and returns only typed action values from this menu.
+    pub fn update_action_values<Action>(
+        &self,
+        viewport: Size,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+    {
+        self.update_actions(viewport, action_for)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
+    /// Builds this menu with caller styles and returns only typed action values.
+    pub fn update_action_values_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+    {
+        self.update_actions_with_stylesheet(viewport, stylesheet, action_for)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
+    /// Builds this menu from `(command, action)` pairs and returns only typed values.
+    pub fn update_action_values_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_actions_with_actions(viewport, actions)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
+    /// Builds this menu with caller styles and `(command, action)` pairs, returning values.
+    pub fn update_action_values_with_stylesheet_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_actions_with_stylesheet_and_actions(viewport, stylesheet, actions)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
     /// Builds this menu, routes input, and collects typed actions in one call.
     pub fn update_with_input_actions<Action>(
         &self,
@@ -569,6 +625,68 @@ impl ContextMenu {
         Ok(self
             .try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?
             .update_with_input_actions(input))
+    }
+
+    /// Builds this menu, routes input, and returns only typed action values.
+    pub fn update_with_input_action_values<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+    {
+        self.update_with_input_actions(viewport, input, action_for)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
+    /// Builds this menu with caller styles, routes input, and returns only values.
+    pub fn update_with_input_action_values_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        stylesheet: StyleSheet,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+    {
+        self.update_with_input_actions_with_stylesheet(viewport, input, stylesheet, action_for)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
+    /// Builds this menu from `(command, action)` pairs, routes input, and returns values.
+    pub fn update_with_input_action_values_with_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_actions(viewport, input, actions)
+            .map(DocumentActionFrame::into_action_values)
+    }
+
+    /// Builds this menu with caller styles and action pairs, routes input, and returns values.
+    pub fn update_with_input_action_values_with_stylesheet_and_actions<Action, Command>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        stylesheet: StyleSheet,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<Vec<Action>>
+    where
+        Action: Clone,
+        Command: AsRef<str>,
+    {
+        self.update_with_input_actions_with_stylesheet_and_actions(
+            viewport, input, stylesheet, actions,
+        )
+        .map(DocumentActionFrame::into_action_values)
     }
 
     /// Builds this menu, routes input, collects typed actions, and dispatches them.
@@ -1217,6 +1335,38 @@ mod tests {
                 ],
             )
             .expect("context menu should update with command action pairs directly");
+        let direct_values = menu
+            .update_with_input_action_values(
+                Size::new(240.0, 140.0),
+                DocumentInput::primary_click(Point::new(2.0, 2.0)),
+                |item| match item.command_name() {
+                    Some("copy-selection") => Some(MenuAction::Copy),
+                    Some("rename-selection") => Some(MenuAction::Rename),
+                    _ => None,
+                },
+            )
+            .expect("context menu should collect typed item action values directly");
+        let direct_mapped_values = menu
+            .update_with_input_action_values_with_actions(
+                Size::new(240.0, 140.0),
+                DocumentInput::primary_click(Point::new(2.0, 2.0)),
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("context menu should collect mapped action values directly");
+        let styled_direct_mapped_values = menu
+            .update_with_input_action_values_with_stylesheet_and_actions(
+                Size::new(240.0, 140.0),
+                DocumentInput::primary_click(Point::new(2.0, 2.0)),
+                StyleSheet::new().id("copy", Style::default().height(Length::Px(39.0))),
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("context menu should collect styled mapped action values directly");
         let mut dispatched = Vec::new();
         let (dispatch_frame, dispatch_report) = menu
             .update_with_input_and_dispatch(
@@ -1315,6 +1465,22 @@ mod tests {
                 ],
             )
             .expect("context menu should resolve with command action pairs directly");
+        let empty_values = menu
+            .update_action_values(Size::new(240.0, 140.0), |item| match item.command_name() {
+                Some("copy-selection") => Some(MenuAction::Copy),
+                Some("rename-selection") => Some(MenuAction::Rename),
+                _ => None,
+            })
+            .expect("context menu should resolve action values directly");
+        let mapped_empty_values = menu
+            .update_action_values_with_actions(
+                Size::new(240.0, 140.0),
+                [
+                    ("copy-selection", MenuAction::Copy),
+                    ("rename-selection", MenuAction::Rename),
+                ],
+            )
+            .expect("context menu should resolve mapped action values directly");
         let copy = frame.output().snapshot().find("copy").unwrap();
         let paste = frame.output().snapshot().find("paste").unwrap();
 
@@ -1382,6 +1548,9 @@ mod tests {
             des_document::ElementBehaviorEvent::Click,
             &MenuAction::Copy
         ));
+        assert_eq!(direct_values, vec![MenuAction::Copy]);
+        assert_eq!(direct_mapped_values, vec![MenuAction::Copy]);
+        assert_eq!(styled_direct_mapped_values, vec![MenuAction::Copy]);
         assert!(dispatch_frame.contains_clicked_action(&MenuAction::Copy));
         assert_eq!(
             dispatch_report,
@@ -1442,6 +1611,8 @@ mod tests {
         assert_eq!(styled_dispatched_values, vec![MenuAction::Copy]);
         assert!(empty_frame.is_empty());
         assert!(mapped_empty_frame.is_empty());
+        assert!(empty_values.is_empty());
+        assert!(mapped_empty_values.is_empty());
         assert!(!frame.contains_action(&MenuAction::Rename));
     }
 

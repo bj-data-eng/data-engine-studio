@@ -231,6 +231,16 @@ impl HtmlDocument {
         self.children.iter().find_map(|child| child.find_by_id(id))
     }
 
+    /// Returns the first parsed node with the supplied HTML id, or an explicit HTML error.
+    pub fn require_by_id(&self, id: &str) -> HtmlResult<&HtmlNode> {
+        self.find_by_id(id).ok_or_else(|| HtmlError::Parse {
+            offset: 0,
+            line: 1,
+            column: 1,
+            message: format!("missing html node with id `{id}`"),
+        })
+    }
+
     /// Finds the first parsed node with the supplied tag name.
     pub fn first_by_tag(&self, tag: &str) -> Option<&HtmlNode> {
         self.children
@@ -3080,6 +3090,16 @@ impl HtmlNode {
             return Some(self);
         }
         self.children.iter().find_map(|child| child.find_by_id(id))
+    }
+
+    /// Returns the first node in this subtree with the supplied HTML id, or an explicit HTML error.
+    pub fn require_by_id(&self, id: &str) -> HtmlResult<&HtmlNode> {
+        self.find_by_id(id).ok_or_else(|| HtmlError::Parse {
+            offset: 0,
+            line: 1,
+            column: 1,
+            message: format!("missing html node with id `{id}`"),
+        })
     }
 
     /// Finds the first node in this subtree with the supplied tag name.

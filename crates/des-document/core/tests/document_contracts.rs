@@ -1236,6 +1236,9 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         surface.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 40.0)));
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let idle_values = surface.update_action_values();
+    let click_values =
+        surface.update_with_input_action_values(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let context_frame =
         surface.update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 72.0)));
     let mut dispatched = Vec::new();
@@ -1256,6 +1259,8 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert!(surface.stylesheet().has_rule_for_class("run-action"));
     assert!(hover_frame.contains_action(&AppAction::Inspect));
     assert!(click_frame.contains_action(&AppAction::Run));
+    assert!(idle_values.is_empty());
+    assert_eq!(click_values, vec![AppAction::Run]);
     let context_actions = context_frame.context_menu_actions().collect::<Vec<_>>();
     let context_values = context_frame
         .context_menu_action_values()

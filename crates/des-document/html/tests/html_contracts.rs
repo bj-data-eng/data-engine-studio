@@ -113,15 +113,33 @@ fn html_document_exposes_parsed_tree_queries() {
     )
     .expect("HTML should parse");
 
-    let app = html.find_by_id("app").expect("app id should be queryable");
+    let app = html
+        .require_by_id("app")
+        .expect("app id should be queryable");
     let primary = app
-        .find_by_id("primary")
+        .require_by_id("primary")
         .expect("subtree ids should be queryable");
     let controls = html.nodes_with_class("control");
     let sections = html.nodes_by_tag("section");
+    let missing = html
+        .require_by_id("missing")
+        .expect_err("missing ids should return explicit HTML errors");
+    let missing_subtree = app
+        .require_by_id("missing")
+        .expect_err("missing subtree ids should return explicit HTML errors");
 
     assert!(app.has_class("shell"));
     assert!(primary.has_class("selected"));
+    assert!(
+        missing
+            .to_string()
+            .contains("missing html node with id `missing`")
+    );
+    assert!(
+        missing_subtree
+            .to_string()
+            .contains("missing html node with id `missing`")
+    );
     assert_eq!(
         html.first_by_tag("button").unwrap().id.as_deref(),
         Some("run")
