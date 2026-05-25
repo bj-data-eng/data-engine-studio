@@ -1091,6 +1091,31 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             commands.push("project.run", HtmlAction::Run);
         })
         .expect("HTML bundle should configure typed actions for a no-input update");
+    let mut dispatched = Vec::new();
+    let (dispatch_frame, dispatch_report) = bundle
+        .update_with_input_and_dispatch(
+            Size::new(320.0, 180.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| {
+                dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML bundle should dispatch typed actions directly");
+    let mut configured_dispatched = Vec::new();
+    let (configured_dispatch_frame, configured_dispatch_report) = bundle
+        .update_with_input_and_dispatch_with(
+            Size::new(320.0, 180.0),
+            DocumentInput::key_down(DocumentKey::Enter),
+            |commands| {
+                commands.push("project.run", HtmlAction::Run);
+                commands.push_key_down("project.filter", HtmlAction::Filter);
+            },
+            |action| {
+                configured_dispatched.push(*action.action());
+            },
+        )
+        .expect("HTML bundle should configure and dispatch typed actions directly");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -1100,6 +1125,15 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
     assert!(key_frame.contains_action(&HtmlAction::Filter));
     assert!(configured_click_frame.contains_action(&HtmlAction::Run));
     assert!(configured_empty_frame.is_empty());
+    assert!(dispatch_frame.contains_action(&HtmlAction::Run));
+    assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![HtmlAction::Run]);
+    assert!(configured_dispatch_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(
+        configured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched, vec![HtmlAction::Filter]);
     assert_eq!(
         click_frame
             .output()
@@ -1545,6 +1579,34 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &registry,
         )
         .expect("named document should collect typed actions through the set front door");
+    let mut dispatched = Vec::new();
+    let (dispatch_frame, dispatch_report) = set
+        .update_with_input_and_dispatch(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+            |action| {
+                dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should dispatch typed actions through the set front door");
+    let mut configured_dispatched = Vec::new();
+    let (configured_dispatch_frame, configured_dispatch_report) = set
+        .update_with_input_and_dispatch_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+            |action| {
+                configured_dispatched.push(*action.action());
+            },
+        )
+        .expect(
+            "named document should configure and dispatch typed actions through the set front door",
+        );
     let empty_frame = set
         .update_actions("inline", Size::new(240.0, 160.0), &registry)
         .expect("named document should update and collect actions through the set front door");
@@ -1608,6 +1670,15 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
 
     assert!(input_output.was_clicked("inline"));
     assert!(action_frame.contains_action(&SetAction::Run));
+    assert!(dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![SetAction::Run]);
+    assert!(configured_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        configured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(configured_dispatched, vec![SetAction::Run]);
     assert!(empty_frame.is_empty());
     assert_eq!(
         mapped_registry.bindings(),

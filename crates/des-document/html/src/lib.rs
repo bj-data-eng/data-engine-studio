@@ -1387,6 +1387,38 @@ impl HtmlStylesheet {
         configure(&mut registry);
         self.update_with_input_actions(viewport, input, &registry)
     }
+
+    /// Creates a view, routes input, collects typed actions, and dispatches them.
+    pub fn update_with_input_and_dispatch<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_with_input_actions(viewport, input, registry)?;
+        let report = frame.dispatch(handler);
+        Ok((frame, report))
+    }
+
+    /// Creates a view, configures typed actions in one hook, routes input, and dispatches them.
+    pub fn update_with_input_and_dispatch_with<Action>(
+        &self,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        let mut registry = DocumentCommandRegistry::new();
+        configure(&mut registry);
+        self.update_with_input_and_dispatch(viewport, input, &registry, handler)
+    }
 }
 
 /// A parsed HTML element or text node.
@@ -1962,6 +1994,38 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_actions(viewport, input, registry)
+    }
+
+    /// Routes input through a named HTML document, collects typed actions, and dispatches them.
+    pub fn update_with_input_and_dispatch<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_dispatch(viewport, input, registry, handler)
+    }
+
+    /// Routes input through a named document, configures typed actions, and dispatches them.
+    pub fn update_with_input_and_dispatch_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_and_dispatch_with(viewport, input, configure, handler)
     }
 
     /// Applies projection and resolves a named HTML document.
