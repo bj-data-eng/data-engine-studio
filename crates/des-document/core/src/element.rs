@@ -248,6 +248,18 @@ impl ElementSpec {
         self
     }
 
+    pub fn class_if(self, class: impl Into<ClassName>, present: bool) -> Self {
+        if present { self.class(class) } else { self }
+    }
+
+    pub fn classes_if<I, C>(self, classes: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        if present { self.classes(classes) } else { self }
+    }
+
     pub fn role(mut self, role: impl Into<String>) -> Self {
         self.role = Some(role.into());
         self
@@ -256,6 +268,19 @@ impl ElementSpec {
     pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.attributes.insert(name.into(), value.into());
         self
+    }
+
+    pub fn attribute_if(
+        self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        if present {
+            self.attribute(name, value)
+        } else {
+            self
+        }
     }
 
     pub fn attributes<I, K, V>(mut self, attributes: I) -> Self
@@ -276,8 +301,24 @@ impl ElementSpec {
         self.attribute(prefixed_attribute_name("data-", name), value)
     }
 
+    pub fn data_if(self, name: impl AsRef<str>, value: impl Into<String>, present: bool) -> Self {
+        if present {
+            self.data(name, value)
+        } else {
+            self
+        }
+    }
+
     pub fn aria(self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
         self.attribute(prefixed_attribute_name("aria-", name), value)
+    }
+
+    pub fn aria_if(self, name: impl AsRef<str>, value: impl Into<String>, present: bool) -> Self {
+        if present {
+            self.aria(name, value)
+        } else {
+            self
+        }
     }
 
     pub fn behavior_hook(mut self, event: impl Into<String>, command: impl Into<String>) -> Self {

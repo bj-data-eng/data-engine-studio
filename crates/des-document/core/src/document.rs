@@ -1458,6 +1458,20 @@ impl ElementBuilder<'_> {
         self
     }
 
+    pub fn class_if(mut self, class: impl Into<ClassName>, present: bool) -> Self {
+        self.spec = self.spec.class_if(class, present);
+        self
+    }
+
+    pub fn classes_if<I, C>(mut self, classes: I, present: bool) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: Into<ClassName>,
+    {
+        self.spec = self.spec.classes_if(classes, present);
+        self
+    }
+
     pub fn role(mut self, role: impl Into<String>) -> Self {
         self.spec.role = Some(role.into());
         self
@@ -1465,6 +1479,16 @@ impl ElementBuilder<'_> {
 
     pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.spec = self.spec.attribute(name, value);
+        self
+    }
+
+    pub fn attribute_if(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.spec = self.spec.attribute_if(name, value, present);
         self
     }
 
@@ -1483,8 +1507,28 @@ impl ElementBuilder<'_> {
         self
     }
 
+    pub fn data_if(
+        mut self,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.spec = self.spec.data_if(name, value, present);
+        self
+    }
+
     pub fn aria(mut self, name: impl AsRef<str>, value: impl Into<String>) -> Self {
         self.spec = self.spec.aria(name, value);
+        self
+    }
+
+    pub fn aria_if(
+        mut self,
+        name: impl AsRef<str>,
+        value: impl Into<String>,
+        present: bool,
+    ) -> Self {
+        self.spec = self.spec.aria_if(name, value, present);
         self
     }
 

@@ -1629,6 +1629,70 @@ fn document_builder_supports_fluent_text_nodes() {
 }
 
 #[test]
+fn document_builder_supports_conditional_authoring_helpers() {
+    let show_badge = true;
+    let disabled = false;
+    let mut document = Document::build(Size::new(320.0, 200.0), |ui| {
+        ui.button("run")
+            .class("control")
+            .class_if("is-visible", show_badge)
+            .class_if("is-disabled", disabled)
+            .classes_if(["has-icon", "is-primary"], true)
+            .classes_if(["is-hidden", "is-muted"], false)
+            .attribute_if("title", "Run query", true)
+            .attribute_if("hidden", "hidden", false)
+            .data_if("state", "ready", true)
+            .data_if("stale", "true", false)
+            .aria_if("label", "Run", true)
+            .aria_if("disabled", "true", false)
+            .text("Run");
+    });
+    let stylesheet = StyleSheet::new()
+        .class("control", Style::default().size(96.0, 32.0))
+        .class(
+            "is-primary",
+            Style::default().background(Color::rgb(220, 238, 255)),
+        );
+    let output = DocumentEngine::default().update(&mut document, &stylesheet);
+    let run = output.snapshot().find("run").unwrap();
+
+    assert!(run.has_all_classes(["control", "is-visible", "has-icon", "is-primary"]));
+    assert!(!run.has_class("is-disabled"));
+    assert!(!run.has_class("is-hidden"));
+    assert!(!run.has_class("is-muted"));
+    assert_eq!(run.attribute("title"), Some("Run query"));
+    assert_eq!(run.attribute("hidden"), None);
+    assert_eq!(run.data("state"), Some("ready"));
+    assert_eq!(run.data("stale"), None);
+    assert_eq!(run.aria("label"), Some("Run"));
+    assert_eq!(run.aria("disabled"), None);
+    assert_eq!(run.rect().size, Size::new(96.0, 32.0));
+    assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
+
+    let spec = ElementSpec::div()
+        .class_if("included", true)
+        .class_if("excluded", false)
+        .data_if("mode", "demo", true)
+        .aria_if("hidden", "true", false);
+    assert!(
+        spec.classes
+            .iter()
+            .any(|class| class.as_str() == "included")
+    );
+    assert!(
+        !spec
+            .classes
+            .iter()
+            .any(|class| class.as_str() == "excluded")
+    );
+    assert_eq!(
+        spec.attributes.get("data-mode").map(String::as_str),
+        Some("demo")
+    );
+    assert_eq!(spec.attributes.get("aria-hidden"), None);
+}
+
+#[test]
 fn update_reports_created_retained_and_removed_elements() {
     let mut engine = DocumentEngine::default();
     let stylesheet = probe_stylesheet();
