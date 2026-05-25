@@ -2045,6 +2045,34 @@ impl DocumentView {
         Ok((report, frame))
     }
 
+    /// Applies a widget projection, resolves the document, and maps command names to actions.
+    pub fn project_widget_and_update_bound_actions<Action, Command>(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_many(actions);
+        self.project_widget_and_update_actions(widget, &registry)
+    }
+
+    /// Applies a widget projection, resolves the document, and maps intent-scoped commands.
+    pub fn project_widget_and_update_bound_intent_actions<Action, Command>(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_on_many(actions);
+        self.project_widget_and_update_actions(widget, &registry)
+    }
+
     /// Applies widget projections and resolves the updated document.
     pub fn project_widgets_and_update<'a, W>(
         &mut self,
@@ -2073,6 +2101,36 @@ impl DocumentView {
         Ok((report, frame))
     }
 
+    /// Applies widget projections, resolves the document, and maps command names to actions.
+    pub fn project_widgets_and_update_bound_actions<'a, W, Action, Command>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_many(actions);
+        self.project_widgets_and_update_actions(widgets, &registry)
+    }
+
+    /// Applies widget projections, resolves the document, and maps intent-scoped commands.
+    pub fn project_widgets_and_update_bound_intent_actions<'a, W, Action, Command>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_on_many(actions);
+        self.project_widgets_and_update_actions(widgets, &registry)
+    }
+
     /// Applies a widget projection, routes input, and resolves the document.
     pub fn project_widget_and_update_with_input(
         &mut self,
@@ -2097,6 +2155,36 @@ impl DocumentView {
         let report = self.project_widget(widget)?;
         let frame = self.update_with_input_actions(input, registry);
         Ok((report, frame))
+    }
+
+    /// Applies a widget projection, routes input, and maps command names to actions.
+    pub fn project_widget_and_update_with_input_bound_actions<Action, Command>(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_many(actions);
+        self.project_widget_and_update_with_input_actions(widget, input, &registry)
+    }
+
+    /// Applies a widget projection, routes input, and maps intent-scoped commands.
+    pub fn project_widget_and_update_with_input_bound_intent_actions<Action, Command>(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_on_many(actions);
+        self.project_widget_and_update_with_input_actions(widget, input, &registry)
     }
 
     /// Applies a widget projection, routes input, collects actions, and dispatches them.
@@ -2169,6 +2257,38 @@ impl DocumentView {
         let report = self.project_widgets(widgets)?;
         let frame = self.update_with_input_actions(input, registry);
         Ok((report, frame))
+    }
+
+    /// Applies widget projections, routes input, and maps command names to actions.
+    pub fn project_widgets_and_update_with_input_bound_actions<'a, W, Action, Command>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_many(actions);
+        self.project_widgets_and_update_with_input_actions(widgets, input, &registry)
+    }
+
+    /// Applies widget projections, routes input, and maps intent-scoped commands.
+    pub fn project_widgets_and_update_with_input_bound_intent_actions<'a, W, Action, Command>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+        Command: Into<String>,
+    {
+        let registry = DocumentCommandRegistry::new().bind_on_many(actions);
+        self.project_widgets_and_update_with_input_actions(widgets, input, &registry)
     }
 
     /// Applies widget projections, routes input, collects actions, and dispatches them.

@@ -3758,6 +3758,106 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(status.has_class("is-ready"));
     assert!(widget_frame.contains_action(&AppAction::Toggle));
 
+    let mut mapped_widget_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&StatusWidget { ready: false });
+    let (mapped_widget_report, mapped_widget_frame) = mapped_widget_view
+        .project_widget_and_update_with_input_bound_actions(
+            &StatusWidget { ready: true },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("status.toggle", AppAction::Toggle)],
+        )
+        .unwrap();
+    let mapped_status = mapped_widget_frame
+        .output()
+        .snapshot()
+        .find("status")
+        .unwrap();
+
+    assert_eq!(mapped_widget_report.operations, 2);
+    assert_eq!(mapped_widget_report.changed, 2);
+    assert_eq!(mapped_status.text(), Some("Ready".to_owned()));
+    assert!(mapped_widget_frame.contains_action(&AppAction::Toggle));
+
+    let mut intent_widget_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&StatusWidget { ready: false });
+    let (intent_widget_report, intent_widget_frame) = intent_widget_view
+        .project_widget_and_update_with_input_bound_intent_actions(
+            &StatusWidget { ready: true },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [(
+                ElementBehaviorEvent::Click,
+                "status.toggle",
+                AppAction::Toggle,
+            )],
+        )
+        .unwrap();
+
+    assert_eq!(intent_widget_report.operations, 2);
+    assert_eq!(intent_widget_report.changed, 2);
+    assert!(intent_widget_frame.contains_clicked_action(&AppAction::Toggle));
+
+    let waiting_status = StatusWidget { ready: false };
+    let ready_status = StatusWidget { ready: true };
+    let mut mapped_widgets_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
+    let (mapped_widgets_report, mapped_widgets_frame) = mapped_widgets_view
+        .project_widgets_and_update_with_input_bound_actions(
+            [&ready_status as &dyn DocumentWidget],
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [("status.toggle", AppAction::Toggle)],
+        )
+        .unwrap();
+
+    assert_eq!(mapped_widgets_report.operations, 2);
+    assert_eq!(mapped_widgets_report.changed, 2);
+    assert!(mapped_widgets_frame.contains_clicked_action(&AppAction::Toggle));
+
+    let mut intent_widgets_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
+    let (intent_widgets_report, intent_widgets_frame) = intent_widgets_view
+        .project_widgets_and_update_with_input_bound_intent_actions(
+            [&ready_status as &dyn DocumentWidget],
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            [(
+                ElementBehaviorEvent::Click,
+                "status.toggle",
+                AppAction::Toggle,
+            )],
+        )
+        .unwrap();
+
+    assert_eq!(intent_widgets_report.operations, 2);
+    assert_eq!(intent_widgets_report.changed, 2);
+    assert!(intent_widgets_frame.contains_clicked_action(&AppAction::Toggle));
+
+    let mut no_input_widget_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&StatusWidget { ready: false });
+    let (no_input_report, no_input_frame) = no_input_widget_view
+        .project_widget_and_update_bound_actions(
+            &StatusWidget { ready: true },
+            [("status.toggle", AppAction::Toggle)],
+        )
+        .unwrap();
+
+    assert_eq!(no_input_report.operations, 2);
+    assert!(no_input_frame.is_empty());
+
+    let mut no_input_widgets_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
+    let (no_input_widgets_report, no_input_widgets_frame) = no_input_widgets_view
+        .project_widgets_and_update_bound_intent_actions(
+            [&ready_status as &dyn DocumentWidget],
+            [(
+                ElementBehaviorEvent::Click,
+                "status.toggle",
+                AppAction::Toggle,
+            )],
+        )
+        .unwrap();
+
+    assert_eq!(no_input_widgets_report.operations, 2);
+    assert!(no_input_widgets_frame.is_empty());
+
     let mut direct_widget_dispatched = Vec::new();
     let (direct_widget_report, direct_widget_frame, direct_widget_action_report) = widget_view
         .project_widget_and_update_with_input_and_dispatch(
@@ -3929,8 +4029,6 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     );
     assert!(widget_value_frame.contains_action(&AppAction::Toggle));
 
-    let waiting_status = StatusWidget { ready: false };
-    let ready_status = StatusWidget { ready: true };
     let mut direct_widgets_view =
         DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
     let mut direct_widgets_dispatched = Vec::new();
