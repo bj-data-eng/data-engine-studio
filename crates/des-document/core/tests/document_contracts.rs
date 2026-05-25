@@ -635,14 +635,14 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     assert_eq!(
         key_output
             .commands_for_intent(ElementBehaviorEvent::KeyDown)
-            .map(|command| command.command)
+            .map(|command| command.command())
             .collect::<Vec<_>>(),
         vec!["commit"]
     );
     assert_eq!(
         key_output
             .commands_for_target_intent("commit", ElementBehaviorEvent::KeyDown)
-            .map(|command| command.command)
+            .map(|command| command.command())
             .collect::<Vec<_>>(),
         vec!["commit"]
     );
@@ -653,32 +653,33 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         Some("commit".to_owned())
     );
     assert_eq!(click_actions.len(), 1);
-    assert_eq!(*click_actions[0].action, AppAction::CommitByClick);
-    assert_eq!(click_actions[0].event, DocumentEventKind::Clicked);
+    assert_eq!(click_actions[0].action(), &AppAction::CommitByClick);
+    assert_eq!(click_actions[0].event(), DocumentEventKind::Clicked);
+    assert!(click_actions[0].command_is(" commit "));
     assert_eq!(key_actions.len(), 1);
-    assert_eq!(*key_actions[0].action, AppAction::CommitByKeyboard);
+    assert_eq!(key_actions[0].action(), &AppAction::CommitByKeyboard);
     assert!(key_actions[0].is_key_down());
     assert!(!key_actions[0].is_key_up());
     assert!(!key_actions[0].is_drag());
     assert_eq!(key_intent_actions.len(), 1);
-    assert_eq!(*key_intent_actions[0].action, AppAction::CommitByKeyboard);
+    assert_eq!(key_intent_actions[0].action(), &AppAction::CommitByKeyboard);
     assert_eq!(
-        key_actions[0].event,
+        key_actions[0].event(),
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter))
     );
     assert_eq!(context_actions.len(), 1);
-    assert_eq!(*context_actions[0].action, AppAction::CommitByContextMenu);
+    assert_eq!(context_actions[0].action(), &AppAction::CommitByContextMenu);
     assert!(context_actions[0].is_context_menu());
     assert!(!context_actions[0].is_pointer_enter());
     assert_eq!(context_values, vec![&AppAction::CommitByContextMenu]);
     assert_eq!(
         context_owned_actions,
-        vec![DocumentCommandAction {
-            target: ElementId::new("commit"),
-            event: DocumentEventKind::ContextRequested,
-            command: "commit-menu".to_owned(),
-            action: AppAction::CommitByContextMenu,
-        }]
+        vec![DocumentCommandAction::new(
+            "commit",
+            DocumentEventKind::ContextRequested,
+            "commit-menu",
+            AppAction::CommitByContextMenu
+        )]
     );
     assert_eq!(context_owned_values, vec![AppAction::CommitByContextMenu]);
     assert_eq!(
@@ -690,11 +691,11 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         vec![AppAction::CommitByContextMenu]
     );
     assert_eq!(hover_actions.len(), 1);
-    assert_eq!(*hover_actions[0].action, AppAction::CommitByPointerEnter);
+    assert_eq!(hover_actions[0].action(), &AppAction::CommitByPointerEnter);
     assert!(hover_actions[0].is_pointer_enter());
     assert!(!hover_actions[0].is_pointer_leave());
     assert_eq!(leave_actions.len(), 1);
-    assert_eq!(*leave_actions[0].action, AppAction::CommitByPointerLeave);
+    assert_eq!(leave_actions[0].action(), &AppAction::CommitByPointerLeave);
     assert!(leave_actions[0].is_pointer_leave());
     assert!(!leave_actions[0].is_pointer_enter());
 }
@@ -941,12 +942,12 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
 
     assert_eq!(
         click_actions,
-        vec![DocumentCommandAction {
-            target: ElementId::new("commit"),
-            event: DocumentEventKind::Clicked,
-            command: "commit".to_owned(),
-            action: AppAction::CommitByClick,
-        }]
+        vec![DocumentCommandAction::new(
+            "commit",
+            DocumentEventKind::Clicked,
+            "commit",
+            AppAction::CommitByClick
+        )]
     );
     assert_eq!(clicked_actions, click_actions);
     assert_eq!(commit_actions, click_actions);
@@ -956,12 +957,12 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     assert_eq!(collected_clicked_values, vec![AppAction::CommitByClick]);
     assert_eq!(
         key_actions,
-        vec![DocumentCommandAction {
-            target: ElementId::new("commit"),
-            event: DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
-            command: "commit".to_owned(),
-            action: AppAction::CommitByKeyboard,
-        }]
+        vec![DocumentCommandAction::new(
+            "commit",
+            DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
+            "commit",
+            AppAction::CommitByKeyboard
+        )]
     );
     assert_eq!(key_values, vec![AppAction::CommitByKeyboard]);
     assert_eq!(key_kind_values, vec![AppAction::CommitByKeyboard]);
@@ -969,12 +970,12 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     assert_eq!(borrowed_key_values, vec![&AppAction::CommitByKeyboard]);
     assert_eq!(
         hover_actions,
-        vec![DocumentCommandAction {
-            target: ElementId::new("commit"),
-            event: DocumentEventKind::PointerEntered,
-            command: "inspect".to_owned(),
-            action: AppAction::Inspect,
-        }]
+        vec![DocumentCommandAction::new(
+            "commit",
+            DocumentEventKind::PointerEntered,
+            "inspect",
+            AppAction::Inspect
+        )]
     );
     assert_eq!(hover_values, vec![&AppAction::Inspect]);
     assert_eq!(collected_hover_values, vec![AppAction::Inspect]);
@@ -1007,12 +1008,12 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
     assert_eq!(run.text(), Some("Run".to_owned()));
     assert_eq!(
         frame.actions(),
-        vec![DocumentCommandAction {
-            target: ElementId::new("run"),
-            event: DocumentEventKind::Clicked,
-            command: "run".to_owned(),
-            action: AppAction::Run,
-        }]
+        vec![DocumentCommandAction::new(
+            "run",
+            DocumentEventKind::Clicked,
+            "run",
+            AppAction::Run
+        )]
     );
 
     let mut handled = Vec::new();

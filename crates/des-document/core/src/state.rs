@@ -421,13 +421,7 @@ impl DocumentOutput {
     }
 
     pub fn commands(&self) -> Vec<DocumentCommand> {
-        self.command_events()
-            .map(|command| DocumentCommand {
-                target: command.target.clone(),
-                event: command.event,
-                command: command.command.to_owned(),
-            })
-            .collect()
+        self.command_events().map(DocumentCommand::from).collect()
     }
 
     pub fn command_events(&self) -> DocumentCommandIter<'_> {
@@ -591,6 +585,18 @@ pub struct DocumentCommand {
 }
 
 impl DocumentCommand {
+    pub fn new(
+        target: impl Into<ElementId>,
+        event: DocumentEventKind,
+        command: impl Into<String>,
+    ) -> Self {
+        Self {
+            target: target.into(),
+            event,
+            command: command.into(),
+        }
+    }
+
     /// Returns the element that emitted this command.
     pub fn target(&self) -> &ElementId {
         &self.target
@@ -609,6 +615,11 @@ impl DocumentCommand {
     /// Returns the authored command name.
     pub fn command(&self) -> &str {
         &self.command
+    }
+
+    /// Returns true when this command has the supplied authored command name.
+    pub fn command_is(&self, command: &str) -> bool {
+        self.command == command.trim()
     }
 
     /// Returns true when this command was emitted by the supplied behavior intent.
@@ -654,6 +665,12 @@ impl DocumentCommand {
     }
 }
 
+impl From<DocumentCommandRef<'_>> for DocumentCommand {
+    fn from(command: DocumentCommandRef<'_>) -> Self {
+        Self::new(command.target.clone(), command.event, command.command)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DocumentCommandRef<'a> {
     pub target: &'a ElementId,
@@ -661,7 +678,15 @@ pub struct DocumentCommandRef<'a> {
     pub command: &'a str,
 }
 
-impl DocumentCommandRef<'_> {
+impl<'a> DocumentCommandRef<'a> {
+    pub fn new(target: &'a ElementId, event: DocumentEventKind, command: &'a str) -> Self {
+        Self {
+            target,
+            event,
+            command,
+        }
+    }
+
     /// Returns the element that emitted this command.
     pub fn target(&self) -> &ElementId {
         self.target
@@ -678,8 +703,13 @@ impl DocumentCommandRef<'_> {
     }
 
     /// Returns the authored command name.
-    pub fn command(&self) -> &str {
+    pub fn command(&self) -> &'a str {
         self.command
+    }
+
+    /// Returns true when this command has the supplied authored command name.
+    pub fn command_is(&self, command: &str) -> bool {
+        self.command == command.trim()
     }
 
     /// Returns true when this command was emitted by the supplied behavior intent.
@@ -1451,12 +1481,12 @@ impl<Action> DocumentCommandRegistry<Action> {
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         output.command_events().filter_map(|command| {
             let action = self.action_for_event(command)?;
-            Some(DocumentCommandActionRef {
-                target: command.target,
-                event: command.event,
-                command: command.command,
+            Some(DocumentCommandActionRef::new(
+                command.target,
+                command.event,
+                command.command,
                 action,
-            })
+            ))
         })
     }
 
@@ -1490,12 +1520,12 @@ impl<Action> DocumentCommandRegistry<Action> {
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         output.commands_of_kind(kind).filter_map(|command| {
             let action = self.action_for_event(command)?;
-            Some(DocumentCommandActionRef {
-                target: command.target,
-                event: command.event,
-                command: command.command,
+            Some(DocumentCommandActionRef::new(
+                command.target,
+                command.event,
+                command.command,
                 action,
-            })
+            ))
         })
     }
 
@@ -1539,12 +1569,12 @@ impl<Action> DocumentCommandRegistry<Action> {
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         output.commands_for_intent(intent).filter_map(|command| {
             let action = self.action_for_event(command)?;
-            Some(DocumentCommandActionRef {
-                target: command.target,
-                event: command.event,
-                command: command.command,
+            Some(DocumentCommandActionRef::new(
+                command.target,
+                command.event,
+                command.command,
                 action,
-            })
+            ))
         })
     }
 
@@ -2354,6 +2384,20 @@ pub struct DocumentCommandActionRef<'a, Action> {
 }
 
 impl<Action> DocumentCommandActionRef<'_, Action> {
+    pub fn new<'a>(
+        target: &'a ElementId,
+        event: DocumentEventKind,
+        command: &'a str,
+        action: &'a Action,
+    ) -> DocumentCommandActionRef<'a, Action> {
+        DocumentCommandActionRef {
+            target,
+            event,
+            command,
+            action,
+        }
+    }
+
     /// Returns the element that emitted this action.
     pub fn target(&self) -> &ElementId {
         self.target
@@ -2372,6 +2416,11 @@ impl<Action> DocumentCommandActionRef<'_, Action> {
     /// Returns the authored command name that mapped to this action.
     pub fn command(&self) -> &str {
         self.command
+    }
+
+    /// Returns true when this action was mapped from the supplied authored command name.
+    pub fn command_is(&self, command: &str) -> bool {
+        self.command == command.trim()
     }
 
     /// Returns the typed app action mapped from this command.
@@ -2439,6 +2488,20 @@ pub struct DocumentCommandAction<Action> {
 }
 
 impl<Action> DocumentCommandAction<Action> {
+    pub fn new(
+        target: impl Into<ElementId>,
+        event: DocumentEventKind,
+        command: impl Into<String>,
+        action: Action,
+    ) -> Self {
+        Self {
+            target: target.into(),
+            event,
+            command: command.into(),
+            action,
+        }
+    }
+
     /// Returns the element that emitted this action.
     pub fn target(&self) -> &ElementId {
         &self.target
@@ -2457,6 +2520,11 @@ impl<Action> DocumentCommandAction<Action> {
     /// Returns the authored command name that mapped to this action.
     pub fn command(&self) -> &str {
         &self.command
+    }
+
+    /// Returns true when this action was mapped from the supplied authored command name.
+    pub fn command_is(&self, command: &str) -> bool {
+        self.command == command.trim()
     }
 
     /// Returns the typed app action mapped from this command.
@@ -2517,12 +2585,12 @@ impl<Action> DocumentCommandAction<Action> {
 
 impl<Action: Clone> From<DocumentCommandActionRef<'_, Action>> for DocumentCommandAction<Action> {
     fn from(command: DocumentCommandActionRef<'_, Action>) -> Self {
-        Self {
-            target: command.target.clone(),
-            event: command.event,
-            command: command.command.to_owned(),
-            action: command.action.clone(),
-        }
+        Self::new(
+            command.target.clone(),
+            command.event,
+            command.command,
+            command.action.clone(),
+        )
     }
 }
 
