@@ -1,6 +1,6 @@
 use des_document::{
-    DocumentBuilder, DocumentWidget, ElementId, FloatingPlacement, FloatingShift, Insets, Length,
-    Point, Style, StyleSelector, StyleSheet,
+    DocumentBuilder, DocumentCommandRegistry, DocumentWidget, ElementId, FloatingPlacement,
+    FloatingShift, Insets, Length, Point, Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -119,6 +119,46 @@ impl ContextMenu {
         &self.id
     }
 
+    pub fn entries(&self) -> &[ContextMenuEntry] {
+        &self.entries
+    }
+
+    /// Builds a typed command registry from enabled command items.
+    ///
+    /// The closure receives each enabled item with a command and can return the
+    /// app action that should be dispatched for that item.
+    pub fn command_registry<Action>(
+        &self,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentCommandRegistry<Action> {
+        let mut registry = DocumentCommandRegistry::new();
+        self.push_commands(&mut registry, action_for);
+        registry
+    }
+
+    /// Pushes typed command bindings for enabled command items into a registry.
+    pub fn push_commands<Action>(
+        &self,
+        registry: &mut DocumentCommandRegistry<Action>,
+        mut action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) {
+        for entry in &self.entries {
+            let ContextMenuEntry::Item(item) = entry else {
+                continue;
+            };
+            if item.is_disabled() {
+                continue;
+            }
+            let Some(command) = item.command_name() else {
+                continue;
+            };
+            let Some(action) = action_for(item) else {
+                continue;
+            };
+            registry.push_click(command, action);
+        }
+    }
+
     pub fn position(&self) -> Point {
         match &self.anchor {
             ContextMenuAnchor::Point(position) => *position,
@@ -225,6 +265,26 @@ impl ContextMenuItem {
     pub fn command(mut self, command: impl Into<String>) -> Self {
         self.command = Some(command.into());
         self
+    }
+
+    pub fn id(&self) -> &ElementId {
+        &self.id
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn command_name(&self) -> Option<&str> {
+        self.command.as_deref()
+    }
+
+    pub fn is_selected(&self) -> bool {
+        self.selected
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
     }
 
     pub fn selected(mut self, selected: bool) -> Self {
@@ -358,6 +418,46 @@ mod tests {
                 .unwrap()
                 .behavior_hooks()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn context_menu_builds_typed_command_registry_from_items() {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum MenuAction {
+            Copy,
+            Rename,
+        }
+
+        let menu = ContextMenu::new("row-menu")
+            .command_item("copy", "Copy", "copy-selection")
+            .command_item("rename", "Rename", "rename-selection")
+            .disabled_item("paste", "Paste");
+        let registry = menu.command_registry(|item| match item.id().as_str() {
+            "copy" => Some(MenuAction::Copy),
+            "rename" => Some(MenuAction::Rename),
+            _ => None,
+        });
+        let mut pushed = DocumentCommandRegistry::new();
+        menu.push_commands(&mut pushed, |item| match item.command_name() {
+            Some("copy-selection") => Some(MenuAction::Copy),
+            Some("rename-selection") => Some(MenuAction::Rename),
+            _ => None,
+        });
+        let mut view = DocumentView::compose(Size::new(240.0, 140.0)).widget(&menu);
+
+        let frame = view.update_with_input_actions(
+            DocumentInput::primary_click(Point::new(2.0, 2.0)),
+            &registry,
+        );
+
+        assert_eq!(menu.entries().len(), 3);
+        assert_eq!(pushed.bindings().len(), 2);
+        assert!(frame.contains_action(&MenuAction::Copy));
+        assert!(!frame.contains_action(&MenuAction::Rename));
+        assert_eq!(
+            frame.first_clicked_action().unwrap().target().as_str(),
+            "copy"
         );
     }
 

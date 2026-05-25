@@ -46,16 +46,12 @@ mod tests {
             Copy,
         }
 
-        impl DocumentActionWidget<MenuAction> for ContextMenu {
-            fn push_commands(&self, registry: &mut DocumentCommandRegistry<MenuAction>) {
-                registry.push_click("copy-selection", MenuAction::Copy);
-            }
-        }
-
         let menu = ContextMenu::new("text-context-menu")
             .command_item("copy", "Copy", "copy-selection")
             .disabled_item("paste", "Paste");
-        let registry = DocumentCommandRegistry::new().bind_widget(&menu);
+        let registry = menu.command_registry(|item| {
+            (item.command_name() == Some("copy-selection")).then_some(MenuAction::Copy)
+        });
         let mut view = DocumentView::compose(Size::new(240.0, 140.0)).widget(&menu);
 
         let frame = view.update_with_input_actions(
