@@ -7,6 +7,7 @@ use crate::geometry::{
     Overflow, Point, Position, Rect as DocumentRect, Size,
 };
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
+use crate::projection::DocumentProjection;
 use crate::state::{ElementState, ResolvedElement, ResolvedFloating};
 use crate::style::{
     ChildPosition, ComputedStyle, StyleMatchContext, StyleResolutionContext, StyleSheet,
@@ -1297,6 +1298,8 @@ pub trait DocumentWidget {
     fn render(&self, ui: &mut DocumentBuilder);
 
     fn push_styles(&self, _stylesheet: &mut StyleSheet) {}
+
+    fn push_projection(&self, _projection: &mut DocumentProjection) {}
 }
 
 pub struct ElementBuilder<'a> {

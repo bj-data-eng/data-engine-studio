@@ -817,6 +817,72 @@ fn document_view_can_mount_a_widget_with_its_styles() {
 }
 
 #[test]
+fn document_widgets_can_project_retained_state_through_the_view_front_door() {
+    struct StatusWidget {
+        ready: bool,
+        label: &'static str,
+    }
+
+    impl DocumentWidget for StatusWidget {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("status")
+                .class("status")
+                .on_click("status.toggle")
+                .text("Pending");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_class("status", Style::default().size(120.0, 32.0));
+            stylesheet.push_class(
+                "is-ready",
+                Style::default().background(Color::rgb(205, 239, 221)),
+            );
+        }
+
+        fn push_projection(&self, projection: &mut DocumentProjection) {
+            projection
+                .element("status")
+                .text(self.label)
+                .data("state", if self.ready { "ready" } else { "waiting" })
+                .class("is-ready", self.ready)
+                .disabled(!self.ready);
+        }
+    }
+
+    let waiting = StatusWidget {
+        ready: false,
+        label: "Waiting",
+    };
+    let ready = StatusWidget {
+        ready: true,
+        label: "Ready",
+    };
+    let mut view = DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting);
+
+    let output = view.update();
+    let status = output.snapshot().find("status").unwrap();
+    assert_eq!(status.text(), Some("Waiting".to_owned()));
+    assert_eq!(status.data("state"), Some("waiting"));
+    assert!(status.disabled());
+    assert!(!status.has_class("is-ready"));
+
+    let (report, output) = view.project_widget_and_update(&ready).unwrap();
+    let status = output.snapshot().find("status").unwrap();
+
+    assert_eq!(report.operations, 4);
+    assert_eq!(report.changed, 4);
+    assert_eq!(status.text(), Some("Ready".to_owned()));
+    assert_eq!(status.data("state"), Some("ready"));
+    assert!(!status.disabled());
+    assert!(status.has_class("is-ready"));
+    assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
+
+    let output =
+        view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
+    assert!(output.has_command("status", "status.toggle"));
+}
+
+#[test]
 fn document_builder_and_engine_update_are_front_door_api() {
     let mut document = Document::build(Size::new(320.0, 200.0), |document| {
         document.element("panel", ElementSpec::div().class("panel"), |document| {

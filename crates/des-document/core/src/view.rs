@@ -41,10 +41,13 @@ impl DocumentView {
         widget: &(impl DocumentWidget + ?Sized),
     ) -> Self {
         widget.push_styles(&mut stylesheet);
-        Self::new(
+        let mut view = Self::new(
             Document::build(viewport, |ui| ui.widget(widget)),
             stylesheet,
-        )
+        );
+        view.project_widget(widget)
+            .expect("document widget projection targets rendered elements");
+        view
     }
 
     /// Starts a composable document view builder for collecting structure,
@@ -104,6 +107,52 @@ impl DocumentView {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.project_and_update(&projection)
+    }
+
+    /// Applies app-state projections declared by a reusable document widget.
+    pub fn project_widget(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<DocumentProjectionReport> {
+        self.project_with(|projection| widget.push_projection(projection))
+    }
+
+    /// Applies app-state projections declared by a collection of widgets.
+    pub fn project_widgets<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<DocumentProjectionReport>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        self.project_with(|projection| {
+            for widget in widgets {
+                widget.push_projection(projection);
+            }
+        })
+    }
+
+    /// Applies a widget projection and resolves the updated document.
+    pub fn project_widget_and_update(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)> {
+        let report = self.project_widget(widget)?;
+        let output = self.update();
+        Ok((report, output))
+    }
+
+    /// Applies widget projections and resolves the updated document.
+    pub fn project_widgets_and_update<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentOutput)>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+    {
+        let report = self.project_widgets(widgets)?;
+        let output = self.update();
+        Ok((report, output))
     }
 
     /// Returns the stylesheet used to resolve this document.
@@ -240,10 +289,13 @@ impl DocumentViewBuilder {
 
     pub fn widget(mut self, widget: &(impl DocumentWidget + ?Sized)) -> DocumentView {
         widget.push_styles(&mut self.stylesheet);
-        DocumentView::new(
+        let mut view = DocumentView::new(
             Document::build(self.viewport, |ui| ui.widget(widget)),
             self.stylesheet,
-        )
+        );
+        view.project_widget(widget)
+            .expect("document widget projection targets rendered elements");
+        view
     }
 
     pub fn widgets<'a, W>(mut self, widgets: impl IntoIterator<Item = &'a W>) -> DocumentView
@@ -254,14 +306,17 @@ impl DocumentViewBuilder {
         for widget in &widgets {
             widget.push_styles(&mut self.stylesheet);
         }
-        DocumentView::new(
+        let mut view = DocumentView::new(
             Document::build(self.viewport, |ui| {
-                for widget in widgets {
-                    ui.widget(widget);
+                for widget in &widgets {
+                    ui.widget(*widget);
                 }
             }),
             self.stylesheet,
-        )
+        );
+        view.project_widgets(widgets)
+            .expect("document widget projection targets rendered elements");
+        view
     }
 
     pub fn build(self, build: impl FnOnce(&mut DocumentBuilder)) -> DocumentView {
