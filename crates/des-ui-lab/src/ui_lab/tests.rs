@@ -1573,6 +1573,7 @@ fn draggable_drag_drop_sets_handle_cursors() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     assert_eq!(
@@ -3310,6 +3311,7 @@ fn animation_margin_specimen_expands_layout_on_hover() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let hovered_target = frame(&hovered, "animation-hover-margin-target");
@@ -3354,6 +3356,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     for _ in 0..32 {
@@ -3374,6 +3377,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                     time_seconds: 0.0,
                 }),
                 scroll_delta: Point::ZERO,
+                keys: Vec::new(),
             },
         );
     }
@@ -3395,6 +3399,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     for _ in 0..32 {
@@ -3418,6 +3423,7 @@ fn animation_margin_specimen_returns_to_idle_after_hover_exit() {
                     time_seconds: 0.0,
                 }),
                 scroll_delta: Point::ZERO,
+                keys: Vec::new(),
             },
         );
     }

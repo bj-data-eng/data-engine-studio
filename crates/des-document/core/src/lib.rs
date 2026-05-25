@@ -43,9 +43,9 @@ pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentCommand, DocumentCommandActionRef, DocumentCommandBinding,
     DocumentCommandIter, DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEvent,
-    DocumentEventKind, DocumentInput, DocumentMetrics, DocumentOutput, DocumentTextSelection,
-    ElementState, PointerInput, ResolvedElement, ResolvedFloating, ScrollChrome,
-    TextSelectionGranularity,
+    DocumentEventKind, DocumentInput, DocumentKey, DocumentMetrics, DocumentOutput,
+    DocumentTextSelection, ElementState, KeyInput, KeyModifiers, PointerInput, ResolvedElement,
+    ResolvedFloating, ScrollChrome, TextSelectionGranularity,
 };
 pub use style::{
     Anchor, AnchorPlacement, BorderStyle, ComplexSelector, ComplexSelectorPart, CompoundSelector,

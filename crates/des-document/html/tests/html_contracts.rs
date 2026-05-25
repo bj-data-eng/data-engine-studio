@@ -272,6 +272,7 @@ fn html_stylesheet_can_create_ready_to_update_document_view() {
             time_seconds: 0.0,
         }),
         scroll_delta: des_document::Point::ZERO,
+        keys: Vec::new(),
     });
     let run = output.snapshot().find("run").unwrap();
 

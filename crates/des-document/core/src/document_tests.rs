@@ -100,6 +100,7 @@ fn hover_input(position: Point) -> DocumentInput {
             time_seconds: 0.0,
         }),
         scroll_delta: Point::ZERO,
+        keys: Vec::new(),
     }
 }
 
@@ -116,6 +117,7 @@ fn drag_text_input(position: Point, primary_pressed: bool) -> DocumentInput {
             time_seconds: 0.0,
         }),
         scroll_delta: Point::ZERO,
+        keys: Vec::new(),
     }
 }
 
@@ -1743,6 +1745,7 @@ fn scroll_limits_use_inner_content_viewport_after_border_and_padding() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -1000.0),
+            keys: Vec::new(),
         },
     );
     let scroll = output.layout.find("scroll").unwrap();
@@ -1788,6 +1791,7 @@ fn document_engine_update_with_input_clicks_interactive_element() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1893,6 +1897,7 @@ fn document_engine_update_treats_primary_click_count_as_control_click() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1943,6 +1948,7 @@ fn document_engine_update_eases_transitioned_paint_styles() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1968,6 +1974,7 @@ fn document_engine_update_eases_transitioned_paint_styles() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -2000,7 +2007,7 @@ fn document_engine_update_transitioned_paint_styles_settle_to_target() {
 
     engine.update(&mut document, &stylesheet);
     let output = (0..30)
-        .map(|_| engine.update_with_input(&mut document, &stylesheet, hover_input))
+        .map(|_| engine.update_with_input(&mut document, &stylesheet, hover_input.clone()))
         .last()
         .unwrap();
     let card = output.layout.find("card").unwrap();
@@ -2050,6 +2057,7 @@ fn document_engine_update_eases_transitioned_layout_styles() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -2183,7 +2191,7 @@ fn document_engine_repeated_hover_on_same_target_is_noop() {
     let input = hover_input(Point::new(2.0, 2.0));
 
     engine.update(&mut document, &stylesheet);
-    let first = engine.update_with_input(&mut document, &stylesheet, input);
+    let first = engine.update_with_input(&mut document, &stylesheet, input.clone());
     let second = engine.update_with_input(&mut document, &stylesheet, input);
 
     assert!(first.metrics.input_changed_state);
@@ -2576,6 +2584,7 @@ fn document_engine_update_hits_absolute_viewport_child_outside_parent() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -3002,6 +3011,7 @@ fn document_engine_update_with_input_scrolls_overflow_container() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -40.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3234,8 +3244,9 @@ fn document_engine_update_scroll_only_final_pass_skips_style_resolution() {
             time_seconds: 0.0,
         }),
         scroll_delta: Point::ZERO,
+        keys: Vec::new(),
     };
-    engine.update_with_input(&mut document, &stylesheet, hover_input);
+    engine.update_with_input(&mut document, &stylesheet, hover_input.clone());
 
     let output = engine.update_with_input(
         &mut document,
@@ -3291,6 +3302,7 @@ fn document_engine_update_with_input_offsets_scrolled_child_rects() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -40.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3354,6 +3366,7 @@ fn document_engine_update_with_input_hit_tests_scrolled_child_position() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -40.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3372,6 +3385,7 @@ fn document_engine_update_with_input_hit_tests_scrolled_child_position() {
                 time_seconds: 0.1,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -3415,6 +3429,7 @@ fn document_engine_update_with_input_rerenders_state_styles() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 

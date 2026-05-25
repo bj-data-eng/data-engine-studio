@@ -1,4 +1,4 @@
-use des_document::{DocumentInput, Point, PointerInput};
+use des_document::{DocumentInput, DocumentKey, KeyInput, KeyModifiers, Point, PointerInput};
 use eframe::egui;
 pub fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
     ui.input_mut(|input| {
@@ -36,8 +36,51 @@ pub fn document_input(ui: &egui::Ui, origin: egui::Pos2) -> DocumentInput {
                     time_seconds: input.time,
                 }),
             scroll_delta: Point::new(scroll_delta.x, scroll_delta.y),
+            keys: input.events.iter().filter_map(document_key_input).collect(),
         }
     })
+}
+
+fn document_key_input(event: &egui::Event) -> Option<KeyInput> {
+    let egui::Event::Key {
+        key,
+        pressed,
+        modifiers,
+        ..
+    } = event
+    else {
+        return None;
+    };
+    Some(KeyInput {
+        key: document_key(*key),
+        modifiers: KeyModifiers {
+            alt: modifiers.alt,
+            ctrl: modifiers.ctrl,
+            shift: modifiers.shift,
+            command: modifiers.command,
+        },
+        pressed: *pressed,
+    })
+}
+
+fn document_key(key: egui::Key) -> DocumentKey {
+    match key {
+        egui::Key::Enter => DocumentKey::Enter,
+        egui::Key::Escape => DocumentKey::Escape,
+        egui::Key::Tab => DocumentKey::Tab,
+        egui::Key::Space => DocumentKey::Space,
+        egui::Key::Backspace => DocumentKey::Backspace,
+        egui::Key::Delete => DocumentKey::Delete,
+        egui::Key::ArrowUp => DocumentKey::ArrowUp,
+        egui::Key::ArrowDown => DocumentKey::ArrowDown,
+        egui::Key::ArrowLeft => DocumentKey::ArrowLeft,
+        egui::Key::ArrowRight => DocumentKey::ArrowRight,
+        egui::Key::Home => DocumentKey::Home,
+        egui::Key::End => DocumentKey::End,
+        egui::Key::PageUp => DocumentKey::PageUp,
+        egui::Key::PageDown => DocumentKey::PageDown,
+        _ => DocumentKey::Unknown,
+    }
 }
 
 #[cfg(test)]
@@ -93,5 +136,37 @@ mod tests {
         let scroll_delta = input.unwrap().scroll_delta;
         assert!(scroll_delta.x > 0.0);
         assert!(scroll_delta.y < 0.0);
+    }
+
+    #[test]
+    fn document_input_maps_keyboard_intent() {
+        let ctx = egui::Context::default();
+        let raw = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(200.0, 120.0),
+            )),
+            events: vec![egui::Event::Key {
+                key: egui::Key::Enter,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers {
+                    command: true,
+                    ..Default::default()
+                },
+            }],
+            ..Default::default()
+        };
+        let mut input = None;
+
+        let _ = ctx.run_ui(raw, |ui| {
+            input = Some(document_input(ui, egui::Pos2::ZERO));
+        });
+
+        let key = input.unwrap().keys.into_iter().next().unwrap();
+        assert_eq!(key.key, DocumentKey::Enter);
+        assert!(key.modifiers.command);
+        assert!(key.pressed);
     }
 }

@@ -304,6 +304,14 @@ impl DocumentEvent {
     pub fn drag_ended(target: impl Into<ElementId>) -> Self {
         Self::new(target, DocumentEventKind::DragEnded)
     }
+
+    pub fn key_down(target: impl Into<ElementId>, key: KeyInput) -> Self {
+        Self::new(target, DocumentEventKind::KeyDown(key))
+    }
+
+    pub fn key_up(target: impl Into<ElementId>, key: KeyInput) -> Self {
+        Self::new(target, DocumentEventKind::KeyUp(key))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -318,6 +326,8 @@ pub enum DocumentEventKind {
     DragMoved,
     DragEnded,
     Scrolled(ScrollAxis),
+    KeyDown(KeyInput),
+    KeyUp(KeyInput),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -390,10 +400,11 @@ pub struct DocumentMetrics {
     pub animation_changed_paint: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct DocumentInput {
     pub pointer: Option<PointerInput>,
     pub scroll_delta: Point,
+    pub keys: Vec<KeyInput>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -406,6 +417,41 @@ pub struct PointerInput {
     pub primary_click_count: u8,
     pub secondary_clicked: bool,
     pub time_seconds: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct KeyInput {
+    pub key: DocumentKey,
+    pub modifiers: KeyModifiers,
+    pub pressed: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct KeyModifiers {
+    pub alt: bool,
+    pub ctrl: bool,
+    pub shift: bool,
+    pub command: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DocumentKey {
+    Enter,
+    Escape,
+    Tab,
+    Space,
+    Backspace,
+    Delete,
+    ArrowUp,
+    ArrowDown,
+    ArrowLeft,
+    ArrowRight,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Character(char),
+    Unknown,
 }
 
 #[derive(Clone, Debug, PartialEq)]

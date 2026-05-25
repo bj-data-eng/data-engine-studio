@@ -1,11 +1,12 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentCommandRegistry, DocumentEngine,
-    DocumentEvent, DocumentEventKind, DocumentInput, DocumentProjection, DocumentView, Element,
-    ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, Length,
-    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
-    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
-    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey, DocumentProjection, DocumentView,
+    Element, ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent,
+    KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style,
+    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
+    TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey,
+    TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -34,6 +35,7 @@ fn pointer_input(
             time_seconds,
         }),
         scroll_delta: Point::ZERO,
+        keys: Vec::new(),
     }
 }
 
@@ -119,6 +121,45 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert_eq!(actions[0].event, DocumentEventKind::Clicked);
     assert_eq!(actions[0].command, "run-query");
     assert_eq!(*actions[0].action, AppAction::RunQuery);
+}
+
+#[test]
+fn keyboard_input_targets_focused_element_and_emits_hook_command() {
+    let stylesheet = StyleSheet::new().rule(
+        StyleSelector::id("search"),
+        Style::default()
+            .width(Length::Px(180.0))
+            .height(Length::Px(32.0)),
+    );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.input("search")
+            .focused(true)
+            .on_key_down("submit-search")
+            .empty();
+    });
+
+    let output = view.update_with_input(DocumentInput {
+        pointer: None,
+        scroll_delta: Point::ZERO,
+        keys: vec![KeyInput {
+            key: DocumentKey::Enter,
+            modifiers: KeyModifiers::default(),
+            pressed: true,
+        }],
+    });
+    let commands = output.commands();
+
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].target, ElementId::new("search"));
+    assert_eq!(
+        commands[0].event,
+        DocumentEventKind::KeyDown(KeyInput {
+            key: DocumentKey::Enter,
+            modifiers: KeyModifiers::default(),
+            pressed: true,
+        })
+    );
+    assert_eq!(commands[0].command, "submit-search");
 }
 
 #[test]
@@ -393,6 +434,7 @@ fn style_rules_resolve_element_class_state_and_id_in_order() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1052,6 +1094,7 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1074,6 +1117,7 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1101,6 +1145,7 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                         time_seconds: 0.0,
                     }),
                     scroll_delta: Point::ZERO,
+                    keys: Vec::new(),
                 },
             )
         })
@@ -1127,6 +1172,7 @@ fn transitioned_state_rules_ease_visual_style_properties() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1168,6 +1214,7 @@ fn untransitioned_hover_color_reuses_layout_and_updates_paint() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1212,6 +1259,7 @@ fn untransitioned_hover_layout_change_rebuilds_layout() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1274,6 +1322,7 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let card = output.layout.find("card").unwrap();
@@ -1307,6 +1356,7 @@ fn transitioned_state_rules_ease_layout_and_box_model_properties() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1688,6 +1738,7 @@ fn selectable_text_tracks_pointer_selection_points() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let dragging = engine.update_with_input(
@@ -1705,6 +1756,7 @@ fn selectable_text_tracks_pointer_selection_points() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1735,6 +1787,7 @@ fn selectable_text_tracks_pointer_selection_points() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1775,6 +1828,7 @@ fn selectable_text_exposes_selected_text_for_copy() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let output = engine.update_with_input(
@@ -1792,6 +1846,7 @@ fn selectable_text_exposes_selected_text_for_copy() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -1885,6 +1940,7 @@ fn selectable_text_can_disable_copy_without_disabling_selection() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let output = engine.update_with_input(
@@ -1902,6 +1958,7 @@ fn selectable_text_can_disable_copy_without_disabling_selection() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2077,6 +2134,7 @@ fn selectable_text_secondary_click_requests_context() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2115,6 +2173,7 @@ fn interactive_element_secondary_click_requests_context() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2682,6 +2741,7 @@ fn pointer_input_can_target_absolute_child_outside_parent_box() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2730,6 +2790,7 @@ fn absolute_viewport_child_escapes_ancestor_overflow_clip() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2773,6 +2834,7 @@ fn pointer_input_targets_interactive_owner_instead_of_inner_text() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2814,6 +2876,7 @@ fn pointer_input_emits_document_interaction_events() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2841,6 +2904,7 @@ fn pointer_input_emits_document_interaction_events() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2861,6 +2925,7 @@ fn pointer_input_emits_document_interaction_events() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2897,6 +2962,7 @@ fn document_engine_captures_primary_pointer_drag() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2923,6 +2989,7 @@ fn document_engine_captures_primary_pointer_drag() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -2953,6 +3020,7 @@ fn document_engine_captures_primary_pointer_drag() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -3001,6 +3069,7 @@ fn scroll_delta_updates_hovered_scroll_container_state() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -24.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3067,6 +3136,7 @@ fn horizontal_overflow_scrolls_child_content_on_x_axis() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(-30.0, 0.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3261,6 +3331,7 @@ fn normalized_auto_axis_scrolls_overflowing_content() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -20.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3444,6 +3515,7 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(-16.0, -24.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3484,6 +3556,7 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let vertical = output
@@ -3522,6 +3595,7 @@ fn two_axis_overflow_keeps_independent_scroll_state_and_chrome() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let vertical = output
@@ -3668,6 +3742,7 @@ fn scrollbar_hover_transition_reuses_layout() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let vertical = output
@@ -3701,6 +3776,7 @@ fn scrollbar_hover_transition_reuses_layout() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -3861,6 +3937,7 @@ fn clipped_scroll_chrome_does_not_drive_animation_work() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     engine
@@ -3909,6 +3986,7 @@ fn scroll_delta_is_clamped_when_content_does_not_overflow() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::new(0.0, -240.0),
+            keys: Vec::new(),
         },
     );
 
@@ -3952,6 +4030,7 @@ fn overflow_scroll_container_emits_draggable_scroll_chrome() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     engine.update_with_input(
@@ -3969,6 +4048,7 @@ fn overflow_scroll_container_emits_draggable_scroll_chrome() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -4025,6 +4105,7 @@ fn active_document_drag_is_not_stolen_by_scrollbar_hitbox() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let output = engine.update_with_input(
@@ -4042,6 +4123,7 @@ fn active_document_drag_is_not_stolen_by_scrollbar_hitbox() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
 
@@ -4079,6 +4161,7 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let chrome = output
@@ -4108,6 +4191,7 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let chrome = output
@@ -4139,6 +4223,7 @@ fn scroll_chrome_appears_on_container_hover_and_expands_on_hit_strip() {
                 time_seconds: 0.0,
             }),
             scroll_delta: Point::ZERO,
+            keys: Vec::new(),
         },
     );
     let chrome = output

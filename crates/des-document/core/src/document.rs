@@ -1337,6 +1337,14 @@ impl ElementBuilder<'_> {
         self.on(ElementBehaviorEvent::Scroll, command)
     }
 
+    pub fn on_key_down(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::KeyDown, command)
+    }
+
+    pub fn on_key_up(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::KeyUp, command)
+    }
+
     pub fn interactive(mut self) -> Self {
         self.spec.interactive = true;
         self

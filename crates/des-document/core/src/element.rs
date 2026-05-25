@@ -256,6 +256,14 @@ impl ElementSpec {
         self.on(ElementBehaviorEvent::Scroll, command)
     }
 
+    pub fn on_key_down(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::KeyDown, command)
+    }
+
+    pub fn on_key_up(self, command: impl Into<String>) -> Self {
+        self.on(ElementBehaviorEvent::KeyUp, command)
+    }
+
     pub fn interactive(mut self) -> Self {
         self.interactive = true;
         self
@@ -361,6 +369,8 @@ pub enum ElementBehaviorEvent {
     Drag,
     DragEnd,
     Scroll,
+    KeyDown,
+    KeyUp,
 }
 
 impl ElementBehaviorEvent {
@@ -376,6 +386,8 @@ impl ElementBehaviorEvent {
             Self::Drag => "drag",
             Self::DragEnd => "dragend",
             Self::Scroll => "scroll",
+            Self::KeyDown => "keydown",
+            Self::KeyUp => "keyup",
         }
     }
 
@@ -391,6 +403,8 @@ impl ElementBehaviorEvent {
             "drag" => Some(Self::Drag),
             "dragend" => Some(Self::DragEnd),
             "scroll" | "scrollx" | "scroll-x" | "scrolly" | "scroll-y" => Some(Self::Scroll),
+            "keydown" | "key-down" => Some(Self::KeyDown),
+            "keyup" | "key-up" => Some(Self::KeyUp),
             _ => None,
         }
     }
@@ -408,6 +422,8 @@ impl ElementBehaviorEvent {
                 | (Self::Drag, DocumentEventKind::DragMoved)
                 | (Self::DragEnd, DocumentEventKind::DragEnded)
                 | (Self::Scroll, DocumentEventKind::Scrolled(_))
+                | (Self::KeyDown, DocumentEventKind::KeyDown(_))
+                | (Self::KeyUp, DocumentEventKind::KeyUp(_))
         )
     }
 }

@@ -6,7 +6,7 @@ use crate::layout::{hit_path, to_layout_point, to_scroll_axis, to_scroll_rect};
 use crate::scroll::scroll_chrome;
 use crate::state::{
     ChangeSet, DocumentDrag, DocumentEvent, DocumentInput, DocumentMetrics, DocumentOutput,
-    DocumentTextSelection, ElementState, PointerInput, ResolvedElement, ScrollChrome,
+    DocumentTextSelection, ElementState, KeyInput, PointerInput, ResolvedElement, ScrollChrome,
     TextSelectionGranularity,
 };
 use crate::style::{StyleSheet, StyleSheetKey};
@@ -412,6 +412,7 @@ impl DocumentEngine {
             state.scrollbar_hovered_axis = None;
             state.scrollbar_dragged_axis = None;
         }
+        self.apply_keyboard_input(layout, &input.keys, &mut update);
 
         let Some(pointer) = input.pointer else {
             if let Some(drag) = self.active_pointer_drag.take() {
@@ -596,6 +597,28 @@ impl DocumentEngine {
         }
 
         finalize_input_update(update, &self.states, &previous)
+    }
+
+    fn apply_keyboard_input(
+        &mut self,
+        layout: &ResolvedElement,
+        keys: &[KeyInput],
+        update: &mut InputUpdate,
+    ) {
+        if keys.is_empty() {
+            return;
+        }
+        let target = focused_frame(layout)
+            .map(|frame| frame.id.clone())
+            .unwrap_or_else(|| layout.id.clone());
+        update.events.extend(keys.iter().map(|key| {
+            if key.pressed {
+                DocumentEvent::key_down(target.clone(), *key)
+            } else {
+                DocumentEvent::key_up(target.clone(), *key)
+            }
+        }));
+        update.changed = true;
     }
 
     fn update_pointer_drag(
@@ -941,6 +964,13 @@ fn count_resolved_elements(frame: &ResolvedElement) -> usize {
         .iter()
         .map(count_resolved_elements)
         .sum::<usize>()
+}
+
+fn focused_frame(frame: &ResolvedElement) -> Option<&ResolvedElement> {
+    if frame.focused {
+        return Some(frame);
+    }
+    frame.children.iter().find_map(focused_frame)
 }
 
 fn set_f32(target: &mut f32, value: f32) -> bool {

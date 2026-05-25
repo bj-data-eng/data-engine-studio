@@ -259,7 +259,7 @@ impl UiLabState {
 
         let input = document_input(ui, origin);
         let pointer = input.pointer;
-        if self.can_reuse_last_output(viewport_size, debug_overlay, &key, input) {
+        if self.can_reuse_last_output(viewport_size, debug_overlay, &key, &input) {
             let paint_start = Instant::now();
             let output = &self
                 .last_output
@@ -314,7 +314,7 @@ impl UiLabState {
         let mut output = self.document_engine.update_with_input_and_text_measurer(
             &mut retained.document,
             stylesheet,
-            input,
+            input.clone(),
             &mut self.text_paint_resources,
         );
         self.lab_document = Some(retained);
@@ -326,7 +326,7 @@ impl UiLabState {
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
                 stylesheet,
-                input,
+                input.clone(),
                 &mut self.text_paint_resources,
             );
             self.lab_document = Some(retained);
@@ -339,7 +339,7 @@ impl UiLabState {
             output = self.document_engine.update_with_input_and_text_measurer(
                 &mut retained.document,
                 stylesheet,
-                input,
+                input.clone(),
                 &mut self.text_paint_resources,
             );
             self.lab_document = Some(retained);
@@ -406,7 +406,7 @@ impl UiLabState {
         viewport: Size,
         debug_overlay: bool,
         key: &LabDocumentKey,
-        input: DocumentInput,
+        input: &DocumentInput,
     ) -> bool {
         if !inert_pointer_move(input)
             || self.pending_stage_scroll.is_some()
@@ -1301,6 +1301,7 @@ fn repaint_input_after_action(input: DocumentInput) -> DocumentInput {
             pointer
         }),
         scroll_delta: Point::ZERO,
+        keys: Vec::new(),
     }
 }
 
@@ -1580,8 +1581,9 @@ fn egui_color(color: Color) -> egui::Color32 {
     egui::Color32::from_rgba_premultiplied(color.r, color.g, color.b, color.a)
 }
 
-fn inert_pointer_move(input: DocumentInput) -> bool {
+fn inert_pointer_move(input: &DocumentInput) -> bool {
     input.scroll_delta == Point::ZERO
+        && input.keys.is_empty()
         && input.pointer.is_some_and(|pointer| {
             !pointer.primary_down
                 && !pointer.primary_pressed
