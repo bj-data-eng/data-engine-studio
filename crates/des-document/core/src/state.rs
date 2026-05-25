@@ -1411,6 +1411,33 @@ pub struct DocumentCommandDispatchReport {
     pub unhandled: usize,
 }
 
+impl DocumentCommandDispatchReport {
+    /// Returns true when no commands were inspected by this dispatch pass.
+    pub fn is_empty(&self) -> bool {
+        self.commands == 0
+    }
+
+    /// Returns true when at least one command was inspected by this dispatch pass.
+    pub fn has_commands(&self) -> bool {
+        self.commands > 0
+    }
+
+    /// Returns true when at least one command was mapped to a typed action.
+    pub fn has_handled(&self) -> bool {
+        self.handled > 0
+    }
+
+    /// Returns true when at least one command did not have a typed action binding.
+    pub fn has_unhandled(&self) -> bool {
+        self.unhandled > 0
+    }
+
+    /// Returns true when every inspected command was mapped to a typed action.
+    pub fn all_handled(&self) -> bool {
+        self.unhandled == 0
+    }
+}
+
 pub struct DocumentCommandIter<'a> {
     output: &'a DocumentOutput,
     event_index: usize,
