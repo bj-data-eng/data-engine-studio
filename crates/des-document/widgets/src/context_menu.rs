@@ -1,6 +1,7 @@
 use des_document::{
-    DocumentBuilder, DocumentCommandRegistry, DocumentWidget, ElementId, FloatingPlacement,
-    FloatingShift, Insets, Length, Point, Style, StyleSelector, StyleSheet,
+    DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry, DocumentResult, DocumentView,
+    DocumentWidget, ElementId, FloatingPlacement, FloatingShift, Insets, Length, Point, Size,
+    Style, StyleSelector, StyleSheet,
 };
 
 pub const CONTEXT_MENU_CLASS: &str = "context-menu";
@@ -134,6 +135,48 @@ impl ContextMenu {
         let mut registry = DocumentCommandRegistry::new();
         self.push_commands(&mut registry, action_for);
         registry
+    }
+
+    /// Builds a ready-to-drive menu action surface from this widget.
+    pub fn action_surface<Action>(
+        &self,
+        viewport: Size,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentActionSurface<Action> {
+        self.action_surface_with_stylesheet(viewport, StyleSheet::new(), action_for)
+    }
+
+    /// Builds a menu action surface with caller-provided stylesheet rules.
+    pub fn action_surface_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentActionSurface<Action> {
+        self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)
+            .expect("context menu projection targets rendered elements")
+    }
+
+    /// Tries to build a menu action surface, returning document projection errors.
+    pub fn try_action_surface<Action>(
+        &self,
+        viewport: Size,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<DocumentActionSurface<Action>> {
+        self.try_action_surface_with_stylesheet(viewport, StyleSheet::new(), action_for)
+    }
+
+    /// Tries to build a menu action surface with caller-provided stylesheet rules.
+    pub fn try_action_surface_with_stylesheet<Action>(
+        &self,
+        viewport: Size,
+        stylesheet: StyleSheet,
+        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
+    ) -> DocumentResult<DocumentActionSurface<Action>> {
+        let view = DocumentView::compose(viewport)
+            .stylesheet(stylesheet)
+            .try_widget(self)?;
+        Ok(view.action_surface(self.command_registry(action_for)))
     }
 
     /// Pushes typed command bindings for enabled command items into a registry.
@@ -459,6 +502,37 @@ mod tests {
             frame.first_clicked_action().unwrap().target().as_str(),
             "copy"
         );
+    }
+
+    #[test]
+    fn context_menu_builds_action_surface_from_items() {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum MenuAction {
+            Copy,
+            Rename,
+        }
+
+        let menu = ContextMenu::new("row-menu")
+            .command_item("copy", "Copy", "copy-selection")
+            .command_item("rename", "Rename", "rename-selection")
+            .disabled_item("paste", "Paste");
+        let mut surface =
+            menu.action_surface(Size::new(240.0, 140.0), |item| match item.command_name() {
+                Some("copy-selection") => Some(MenuAction::Copy),
+                Some("rename-selection") => Some(MenuAction::Rename),
+                _ => None,
+            });
+
+        let frame =
+            surface.update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let copy = frame.output().snapshot().find("copy").unwrap();
+        let paste = frame.output().snapshot().find("paste").unwrap();
+
+        assert_eq!(surface.commands().bindings().len(), 2);
+        assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
+        assert!(!paste.interactive());
+        assert!(frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(!frame.contains_action(&MenuAction::Rename));
     }
 
     #[test]
