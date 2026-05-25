@@ -2396,7 +2396,7 @@ impl DocumentBuilder {
         id: impl Into<ElementId>,
         spec: ElementSpec,
         add_contents: impl FnOnce(&mut DocumentBuilder),
-    ) {
+    ) -> &mut Self {
         let mut child_builder = DocumentBuilder::default();
         add_contents(&mut child_builder);
         self.children.push(DocumentNode {
@@ -2405,6 +2405,7 @@ impl DocumentBuilder {
             text: None,
             children: child_builder.children,
         });
+        self
     }
 
     pub fn element_if(
@@ -2420,8 +2421,8 @@ impl DocumentBuilder {
         self
     }
 
-    pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) {
-        self.text_element(id, ElementSpec::new(Element::Text), text);
+    pub fn text(&mut self, id: impl Into<ElementId>, text: impl Into<TextContent>) -> &mut Self {
+        self.text_element(id, ElementSpec::new(Element::Text), text)
     }
 
     pub fn text_if(
@@ -2466,13 +2467,14 @@ impl DocumentBuilder {
         id: impl Into<ElementId>,
         spec: ElementSpec,
         text: impl Into<TextContent>,
-    ) {
+    ) -> &mut Self {
         self.children.push(DocumentNode {
             id: id.into(),
             spec,
             text: Some(text.into()),
             children: Vec::new(),
         });
+        self
     }
 
     pub fn text_element_if(
@@ -2488,8 +2490,13 @@ impl DocumentBuilder {
         self
     }
 
-    pub fn visual_clone(&mut self, clone: &VisualElementClone, options: VisualCloneOptions) {
+    pub fn visual_clone(
+        &mut self,
+        clone: &VisualElementClone,
+        options: VisualCloneOptions,
+    ) -> &mut Self {
         self.children.push(clone.to_element(&options, true));
+        self
     }
 
     pub fn visual_clone_if(

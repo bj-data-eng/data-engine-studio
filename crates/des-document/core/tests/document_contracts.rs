@@ -5467,6 +5467,20 @@ fn document_builder_supports_fluent_text_nodes() {
                 .class("metric")
                 .data("kind", "row-count")
                 .text("42 rows");
+            ui.text("caption", "Chainable caption")
+                .text_if("caption-extra", "Extra caption", true)
+                .element(
+                    "semantic",
+                    ElementSpec::new(Element::P).class("semantic"),
+                    |ui| {
+                        ui.text("semantic-text", "Semantic text");
+                    },
+                )
+                .text_element(
+                    "detail",
+                    ElementSpec::new(Element::Text).class("detail"),
+                    "Detail text",
+                );
         });
     });
     let stylesheet = StyleSheet::new()
@@ -5475,6 +5489,11 @@ fn document_builder_supports_fluent_text_nodes() {
     let output = DocumentEngine::default().update(&mut document, &stylesheet);
     let title = output.snapshot().find("title").unwrap();
     let count = output.snapshot().find("count").unwrap();
+    let caption = output.snapshot().find("caption").unwrap();
+    let caption_extra = output.snapshot().find("caption-extra").unwrap();
+    let semantic = output.snapshot().find("semantic").unwrap();
+    let semantic_text = output.snapshot().find("semantic-text").unwrap();
+    let detail = output.snapshot().find("detail").unwrap();
 
     assert_eq!(title.element(), Element::Text);
     assert!(title.has_all_classes(["card-title", "copyable"]));
@@ -5485,6 +5504,13 @@ fn document_builder_supports_fluent_text_nodes() {
     assert_eq!(count.data("kind"), Some("row-count"));
     assert_eq!(count.text(), Some("42 rows".to_owned()));
     assert_eq!(count.rect().size, Size::new(80.0, 20.0));
+    assert_eq!(caption.text(), Some("Chainable caption".to_owned()));
+    assert_eq!(caption_extra.text(), Some("Extra caption".to_owned()));
+    assert_eq!(semantic.element(), Element::P);
+    assert!(semantic.has_class("semantic"));
+    assert_eq!(semantic_text.text(), Some("Semantic text".to_owned()));
+    assert!(detail.has_class("detail"));
+    assert_eq!(detail.text(), Some("Detail text".to_owned()));
 }
 
 #[test]
