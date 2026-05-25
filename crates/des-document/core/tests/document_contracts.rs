@@ -1201,6 +1201,32 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
                 measured_dispatched.push(action.action().clone());
             },
         );
+    let measured_value_projection =
+        DocumentProjection::new().set_text("run", "Measured values explicit");
+    let mut measured_value_dispatched = Vec::new();
+    let (measured_value_report, measured_value_frame, measured_value_action_report) = surface
+        .project_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+            &measured_value_projection,
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut text_measurer,
+            |action| measured_value_dispatched.push(action.clone()),
+        )
+        .expect("action surfaces should dispatch projected measured action values");
+    let mut measured_projected_value_dispatched = Vec::new();
+    let (
+        measured_projected_value_report,
+        measured_projected_value_frame,
+        measured_projected_value_action_report,
+    ) = surface
+        .project_with_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut text_measurer,
+            |projection| {
+                projection.element("run").text("Measured values built");
+            },
+            |action| measured_projected_value_dispatched.push(action.clone()),
+        )
+        .expect("action surfaces should build measured projections and dispatch action values");
 
     assert_eq!(measured_output_report.operations, 1);
     assert_eq!(
@@ -1224,6 +1250,49 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(measured_dispatched, vec![AppAction::Run]);
+    assert_eq!(measured_value_report.operations, 1);
+    assert_eq!(measured_value_report.changed, 1);
+    assert_eq!(
+        measured_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(measured_value_dispatched, vec![AppAction::Run]);
+    assert_eq!(
+        measured_value_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .text(),
+        Some("Measured values explicit".to_owned())
+    );
+    assert_eq!(
+        measured_value_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        64.0
+    );
+    assert_eq!(measured_projected_value_report.operations, 1);
+    assert_eq!(measured_projected_value_report.changed, 1);
+    assert_eq!(
+        measured_projected_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(measured_projected_value_dispatched, vec![AppAction::Run]);
+    assert_eq!(
+        measured_projected_value_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .text(),
+        Some("Measured values built".to_owned())
+    );
 
     let mut direct_view = DocumentView::build(
         Size::new(320.0, 180.0),
@@ -1259,6 +1328,36 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         .snapshot()
         .find("run")
         .unwrap();
+    let mut direct_value_measurer = FixedTextMeasurer;
+    let direct_value_projection =
+        DocumentProjection::new().set_text("run", "Measured direct value");
+    let mut direct_measured_values = Vec::new();
+    let (direct_value_report, direct_value_frame, direct_value_action_report) = direct_view
+        .project_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+            &direct_value_projection,
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut direct_value_measurer,
+            &direct_registry,
+            |action| direct_measured_values.push(action.clone()),
+        )
+        .unwrap();
+    let mut direct_projected_value_measurer = FixedTextMeasurer;
+    let mut direct_projected_values = Vec::new();
+    let (
+        direct_projected_value_report,
+        direct_projected_value_frame,
+        direct_projected_value_action_report,
+    ) = direct_view
+        .project_with_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut direct_projected_value_measurer,
+            |projection| {
+                projection.element("run").text("Measured direct built");
+            },
+            &direct_registry,
+            |action| direct_projected_values.push(action.clone()),
+        )
+        .unwrap();
 
     assert!(direct_update_frame.is_empty());
     assert_eq!(
@@ -1279,6 +1378,38 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(direct_measured_dispatched, vec![AppAction::Run]);
+    assert_eq!(direct_value_report.operations, 1);
+    assert_eq!(direct_value_report.changed, 1);
+    assert_eq!(
+        direct_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(direct_measured_values, vec![AppAction::Run]);
+    assert_eq!(
+        direct_value_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .text(),
+        Some("Measured direct value".to_owned())
+    );
+    assert_eq!(direct_projected_value_report.operations, 1);
+    assert_eq!(direct_projected_value_report.changed, 1);
+    assert_eq!(
+        direct_projected_value_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(direct_projected_values, vec![AppAction::Run]);
+    assert_eq!(
+        direct_projected_value_frame
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .text(),
+        Some("Measured direct built".to_owned())
+    );
 }
 
 #[test]
@@ -3797,6 +3928,65 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
         Some("Ready".to_owned())
     );
     assert!(widget_value_frame.contains_action(&AppAction::Toggle));
+
+    let waiting_status = StatusWidget { ready: false };
+    let ready_status = StatusWidget { ready: true };
+    let mut direct_widgets_view =
+        DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
+    let mut direct_widgets_dispatched = Vec::new();
+    let (direct_widgets_report, direct_widgets_frame, direct_widgets_action_report) =
+        direct_widgets_view
+            .project_widgets_and_update_with_input_and_dispatch_action_values(
+                [&ready_status as &dyn DocumentWidget],
+                DocumentInput::primary_click(Point::new(8.0, 8.0)),
+                &registry,
+                |action| direct_widgets_dispatched.push(*action),
+            )
+            .expect("document views should dispatch values after multi-widget projection");
+
+    assert_eq!(direct_widgets_report.operations, 2);
+    assert_eq!(direct_widgets_report.changed, 2);
+    assert_eq!(
+        direct_widgets_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(direct_widgets_dispatched, vec![AppAction::Toggle]);
+    assert_eq!(
+        direct_widgets_frame
+            .output()
+            .snapshot()
+            .find("status")
+            .unwrap()
+            .text(),
+        Some("Ready".to_owned())
+    );
+
+    let mut surface_widgets_dispatched = Vec::new();
+    let (surface_widgets_report, surface_widgets_frame, surface_widgets_action_report) =
+        widget_surface
+            .project_widgets_and_update_with_input_and_dispatch_action_values(
+                [&waiting_status as &dyn DocumentWidget],
+                DocumentInput::primary_click(Point::new(8.0, 8.0)),
+                |action| surface_widgets_dispatched.push(*action),
+            )
+            .expect("action surfaces should dispatch values after multi-widget projection");
+
+    assert_eq!(surface_widgets_report.operations, 2);
+    assert_eq!(surface_widgets_report.changed, 2);
+    assert_eq!(
+        surface_widgets_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(surface_widgets_dispatched, vec![AppAction::Toggle]);
+    assert_eq!(
+        surface_widgets_frame
+            .output()
+            .snapshot()
+            .find("status")
+            .unwrap()
+            .text(),
+        Some("Waiting".to_owned())
+    );
 }
 
 #[test]
