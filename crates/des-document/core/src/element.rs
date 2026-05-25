@@ -240,10 +240,37 @@ impl ElementSpec {
         self
     }
 
+    pub fn behavior_hooks<I, H>(mut self, hooks: I) -> Self
+    where
+        I: IntoIterator<Item = H>,
+        H: Into<ElementBehaviorHook>,
+    {
+        let previous_len = self.behavior_hooks.len();
+        self.behavior_hooks
+            .extend(hooks.into_iter().map(Into::into));
+        self.interactive |= self.behavior_hooks.len() > previous_len;
+        self
+    }
+
     pub fn on(mut self, event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
         self.behavior_hooks
             .push(ElementBehaviorHook::on(event, command));
         self.interactive = true;
+        self
+    }
+
+    pub fn on_events<I, C>(mut self, events: I) -> Self
+    where
+        I: IntoIterator<Item = (ElementBehaviorEvent, C)>,
+        C: Into<String>,
+    {
+        let previous_len = self.behavior_hooks.len();
+        self.behavior_hooks.extend(
+            events
+                .into_iter()
+                .map(|(event, command)| ElementBehaviorHook::on(event, command)),
+        );
+        self.interactive |= self.behavior_hooks.len() > previous_len;
         self
     }
 

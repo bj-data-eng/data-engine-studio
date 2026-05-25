@@ -1,12 +1,13 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentBuilder, DocumentCommandRegistry,
     DocumentEngine, DocumentEvent, DocumentEventKind, DocumentInput, DocumentKey,
-    DocumentProjection, DocumentView, DocumentWidget, Element, ElementId, ElementSpec,
-    ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers, Length,
-    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
-    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
-    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
-    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentProjection, DocumentView, DocumentWidget, Element, ElementBehaviorEvent, ElementId,
+    ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, KeyInput, KeyModifiers,
+    Length, Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector,
+    StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest,
+    TextLayoutResult, TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow,
+    TextSelectionGranularity, TextTransform, TextWrapMode, Transition, ViewportQuery,
+    VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -78,17 +79,26 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
             .height(Length::Px(32.0)),
     );
     let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
-        ui.button("run").on_click("run-query").text("Run");
+        ui.button("run")
+            .on_events([
+                (ElementBehaviorEvent::Click, "run-query"),
+                (ElementBehaviorEvent::ContextMenu, "open-query-menu"),
+            ])
+            .text("Run");
     });
 
     let output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
     let commands = output.commands();
+    let run = output.snapshot().find("run").unwrap();
+    let hooks = run.behavior_hooks();
 
     assert_eq!(commands.len(), 1);
     assert_eq!(commands[0].target, ElementId::new("run"));
     assert_eq!(commands[0].event, DocumentEventKind::Clicked);
     assert_eq!(commands[0].command, "run-query");
+    assert_eq!(hooks.len(), 2);
+    assert!(hooks.iter().any(|hook| hook.command == "open-query-menu"));
 }
 
 #[test]

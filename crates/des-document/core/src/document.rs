@@ -1,6 +1,6 @@
 use crate::element::{
-    ClassName, DocumentNode, Element, ElementBehaviorEvent, ElementId, ElementSpec, Glyph,
-    VisualCloneOptions, VisualElementClone,
+    ClassName, DocumentNode, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementId,
+    ElementSpec, Glyph, VisualCloneOptions, VisualElementClone,
 };
 use crate::geometry::{
     AlignContent, AlignItems, ClipRect, FlexDirection, FlexWrap, Insets, JustifyContent, Length,
@@ -1359,8 +1359,26 @@ impl ElementBuilder<'_> {
         self
     }
 
+    pub fn behavior_hooks<I, H>(mut self, hooks: I) -> Self
+    where
+        I: IntoIterator<Item = H>,
+        H: Into<ElementBehaviorHook>,
+    {
+        self.spec = self.spec.behavior_hooks(hooks);
+        self
+    }
+
     pub fn on(mut self, event: ElementBehaviorEvent, command: impl Into<String>) -> Self {
         self.spec = self.spec.on(event, command);
+        self
+    }
+
+    pub fn on_events<I, C>(mut self, events: I) -> Self
+    where
+        I: IntoIterator<Item = (ElementBehaviorEvent, C)>,
+        C: Into<String>,
+    {
+        self.spec = self.spec.on_events(events);
         self
     }
 
