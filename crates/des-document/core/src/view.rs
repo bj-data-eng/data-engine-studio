@@ -326,6 +326,44 @@ impl<Action> DocumentActionSurface<Action> {
             .project_with_and_update_with_input_actions(input, project, &self.commands)
     }
 
+    /// Applies a projection, routes input through a host text measurer, and collects actions.
+    pub fn project_and_update_with_input_and_text_measurer_actions(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_and_update_with_input_and_text_measurer_actions(
+                projection,
+                input,
+                text_measurer,
+                &self.commands,
+            )
+    }
+
+    /// Builds a projection, routes input through a host text measurer, and collects actions.
+    pub fn project_with_and_update_with_input_and_text_measurer_actions(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        project: impl FnOnce(&mut DocumentProjection),
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        self.view
+            .project_with_and_update_with_input_and_text_measurer_actions(
+                input,
+                text_measurer,
+                project,
+                &self.commands,
+            )
+    }
+
     /// Applies a widget projection, routes input, and collects typed app actions.
     pub fn project_widget_and_update_with_input_actions(
         &mut self,
@@ -591,6 +629,44 @@ impl DocumentView {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.project_and_update_with_input_actions(&projection, input, registry)
+    }
+
+    /// Applies a projection, routes input with a host text measurer, and collects actions.
+    pub fn project_and_update_with_input_and_text_measurer_actions<Action>(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let report = self.project(projection)?;
+        let frame =
+            self.update_with_input_and_text_measurer_actions(input, text_measurer, registry);
+        Ok((report, frame))
+    }
+
+    /// Builds a projection, routes input with a host text measurer, and collects actions.
+    pub fn project_with_and_update_with_input_and_text_measurer_actions<Action>(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        project: impl FnOnce(&mut DocumentProjection),
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
+    where
+        Action: Clone,
+    {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.project_and_update_with_input_and_text_measurer_actions(
+            &projection,
+            input,
+            text_measurer,
+            registry,
+        )
     }
 
     /// Applies app-state projections declared by a reusable document widget.

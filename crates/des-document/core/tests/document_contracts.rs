@@ -595,8 +595,20 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         Inspect,
     }
 
+    struct FixedTextMeasurer;
+
+    impl TextMeasurer for FixedTextMeasurer {
+        fn cache_key(&self) -> TextMeasurerKey {
+            TextMeasurerKey::new("fixed-action-surface")
+        }
+
+        fn measure_text(&mut self, _request: TextLayoutRequest<'_>) -> TextLayoutResult {
+            TextLayoutResult::new(Size::new(64.0, 18.0), 1, false)
+        }
+    }
+
     let stylesheet = StyleSheet::new()
-        .id("run", Style::default().size(96.0, 32.0))
+        .id("run", Style::default().height(Length::Px(32.0)))
         .id("inspect", Style::default().size(96.0, 32.0));
     let view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
         ui.button("run").on_click("run").text("Run");
@@ -622,6 +634,24 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert_eq!(surface.commands().bindings().len(), 2);
     assert!(hover_frame.contains_action(&AppAction::Inspect));
     assert!(click_frame.contains_action(&AppAction::Run));
+
+    let mut text_measurer = FixedTextMeasurer;
+    let (report, measured_frame) = surface
+        .project_with_and_update_with_input_and_text_measurer_actions(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut text_measurer,
+            |projection| {
+                projection.element("run").text("Run projected");
+            },
+        )
+        .unwrap();
+    let measured_run = measured_frame.output().snapshot().find("run").unwrap();
+
+    assert_eq!(report.operations, 1);
+    assert_eq!(report.changed, 1);
+    assert_eq!(measured_run.text(), Some("Run projected".to_owned()));
+    assert_eq!(measured_run.rect().size.width, 64.0);
+    assert!(measured_frame.contains_action(&AppAction::Run));
 }
 
 #[test]
