@@ -737,6 +737,38 @@ impl<Action> DocumentCommandBinding<Action> {
         Self::on(ElementBehaviorEvent::KeyUp, command, action)
     }
 
+    pub fn event(&self) -> Option<ElementBehaviorEvent> {
+        self.event
+    }
+
+    pub fn intent(&self) -> Option<ElementBehaviorEvent> {
+        self.event
+    }
+
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+
+    pub fn action(&self) -> &Action {
+        &self.action
+    }
+
+    pub fn is_fallback(&self) -> bool {
+        self.event.is_none()
+    }
+
+    pub fn is_event_scoped(&self) -> bool {
+        self.event.is_some()
+    }
+
+    pub fn matches_command(&self, command: &str) -> bool {
+        self.command == command.trim()
+    }
+
+    pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        self.event == Some(intent)
+    }
+
     fn matches(&self, command: DocumentCommandRef<'_>) -> bool {
         self.command == command.command.trim()
             && self
@@ -1823,6 +1855,100 @@ impl<Action> DocumentCommandRegistry<Action> {
 
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
         &self.bindings
+    }
+
+    pub fn binding_count(&self) -> usize {
+        self.bindings.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bindings.is_empty()
+    }
+
+    pub fn has_bindings(&self) -> bool {
+        !self.bindings.is_empty()
+    }
+
+    pub fn iter_bindings(&self) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
+        self.bindings.iter()
+    }
+
+    pub fn bindings_for(
+        &self,
+        command: &str,
+    ) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
+        let command = command.trim().to_owned();
+        self.bindings
+            .iter()
+            .filter(move |binding| binding.command == command)
+    }
+
+    pub fn first_binding_for(&self, command: &str) -> Option<&DocumentCommandBinding<Action>> {
+        self.bindings_for(command).next()
+    }
+
+    pub fn has_binding_for(&self, command: &str) -> bool {
+        self.first_binding_for(command).is_some()
+    }
+
+    pub fn bindings_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
+        self.bindings
+            .iter()
+            .filter(move |binding| binding.event == Some(intent))
+    }
+
+    pub fn first_binding_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentCommandBinding<Action>> {
+        self.bindings_for_intent(intent).next()
+    }
+
+    pub fn has_binding_for_intent(&self, intent: ElementBehaviorEvent) -> bool {
+        self.first_binding_for_intent(intent).is_some()
+    }
+
+    pub fn bindings_for_command_intent(
+        &self,
+        command: &str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
+        let command = command.trim().to_owned();
+        self.bindings
+            .iter()
+            .filter(move |binding| binding.command == command && binding.event == Some(intent))
+    }
+
+    pub fn first_binding_for_command_intent(
+        &self,
+        command: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentCommandBinding<Action>> {
+        self.bindings_for_command_intent(command, intent).next()
+    }
+
+    pub fn has_binding_for_command_intent(
+        &self,
+        command: &str,
+        intent: ElementBehaviorEvent,
+    ) -> bool {
+        self.first_binding_for_command_intent(command, intent)
+            .is_some()
+    }
+
+    pub fn fallback_bindings(&self) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
+        self.bindings
+            .iter()
+            .filter(|binding| binding.event.is_none())
+    }
+
+    pub fn event_scoped_bindings(&self) -> impl Iterator<Item = &DocumentCommandBinding<Action>> {
+        self.bindings
+            .iter()
+            .filter(|binding| binding.event.is_some())
     }
 
     pub fn dispatch<'a, Handler>(

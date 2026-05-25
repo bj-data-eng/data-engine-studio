@@ -549,6 +549,45 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
 
     assert_eq!(registry.action_for("commit"), Some(&AppAction::Fallback));
     assert_eq!(registry.bindings().len(), 6);
+    assert_eq!(registry.binding_count(), 6);
+    assert!(!registry.is_empty());
+    assert!(registry.has_bindings());
+    assert_eq!(registry.iter_bindings().count(), 6);
+    assert_eq!(registry.fallback_bindings().count(), 1);
+    assert_eq!(registry.event_scoped_bindings().count(), 5);
+    assert_eq!(registry.bindings_for(" commit ").count(), 3);
+    assert!(registry.has_binding_for("commit-menu"));
+    assert!(!registry.has_binding_for("missing"));
+    assert_eq!(
+        registry
+            .bindings_for_intent(ElementBehaviorEvent::KeyDown)
+            .map(DocumentCommandBinding::command)
+            .collect::<Vec<_>>(),
+        vec!["commit"]
+    );
+    assert!(registry.has_binding_for_intent(ElementBehaviorEvent::ContextMenu));
+    assert!(!registry.has_binding_for_intent(ElementBehaviorEvent::Drag));
+    assert!(registry.has_binding_for_command_intent("commit", ElementBehaviorEvent::Click));
+    assert!(!registry.has_binding_for_command_intent("commit", ElementBehaviorEvent::ContextMenu));
+    let fallback_binding = registry.first_binding_for("commit").unwrap();
+    let click_binding = registry
+        .first_binding_for_command_intent("commit", ElementBehaviorEvent::Click)
+        .unwrap();
+    assert_eq!(fallback_binding.command(), "commit");
+    assert_eq!(fallback_binding.event(), None);
+    assert_eq!(fallback_binding.intent(), None);
+    assert_eq!(fallback_binding.action(), &AppAction::Fallback);
+    assert!(fallback_binding.is_fallback());
+    assert!(!fallback_binding.is_event_scoped());
+    assert!(fallback_binding.matches_command(" commit "));
+    assert!(!fallback_binding.matches_intent(ElementBehaviorEvent::Click));
+    assert_eq!(click_binding.event(), Some(ElementBehaviorEvent::Click));
+    assert_eq!(click_binding.intent(), Some(ElementBehaviorEvent::Click));
+    assert_eq!(click_binding.action(), &AppAction::CommitByClick);
+    assert!(!click_binding.is_fallback());
+    assert!(click_binding.is_event_scoped());
+    assert!(click_binding.matches_command("commit"));
+    assert!(click_binding.matches_intent(ElementBehaviorEvent::Click));
     assert_eq!(collected_registry.bindings().len(), 2);
     assert_eq!(pushed_registry.bindings().len(), 2);
     assert!(click_output.has_command_intent("commit", ElementBehaviorEvent::Click, "commit"));
