@@ -2311,6 +2311,68 @@ fn document_widget_trait_builds_views_through_its_front_door() {
 }
 
 #[test]
+fn document_widget_can_declare_single_element_projection_patch() {
+    struct StatusBadge {
+        ready: bool,
+    }
+
+    impl DocumentWidget for StatusBadge {
+        fn render(&self, ui: &mut DocumentBuilder) {
+            ui.button("status")
+                .class("status")
+                .data("state", "pending")
+                .text("Pending");
+        }
+
+        fn push_styles(&self, stylesheet: &mut StyleSheet) {
+            stylesheet.push_class("status", Style::default().size(120.0, 32.0));
+            stylesheet.push_class(
+                "is-ready",
+                Style::default().background(Color::rgb(205, 239, 221)),
+            );
+        }
+
+        fn projection_patch(&self) -> Option<(ElementId, ElementProjectionPatch)> {
+            Some((
+                ElementId::new("status"),
+                ElementProjectionPatch::new()
+                    .text(if self.ready { "Ready" } else { "Waiting" })
+                    .data("state", if self.ready { "ready" } else { "waiting" })
+                    .class_if("is-ready", self.ready)
+                    .disabled(!self.ready),
+            ))
+        }
+    }
+
+    let waiting = StatusBadge { ready: false };
+    let ready = StatusBadge { ready: true };
+    let waiting_projection = waiting.projection();
+    let mut view = waiting.view(Size::new(320.0, 180.0));
+    let waiting_output = view.update();
+    let status = waiting_output.snapshot().find("status").unwrap();
+
+    assert_eq!(waiting_projection.len(), 4);
+    assert_eq!(status.text(), Some("Waiting".to_owned()));
+    assert_eq!(status.data("state"), Some("waiting"));
+    assert!(status.disabled());
+    assert!(!status.has_class("is-ready"));
+
+    let (report, ready_output) = view.project_widget_and_update(&ready).unwrap();
+    let ready_status = ready_output.snapshot().find("status").unwrap();
+
+    assert_eq!(report.operations, 4);
+    assert_eq!(report.changed, 4);
+    assert_eq!(ready_status.text(), Some("Ready".to_owned()));
+    assert_eq!(ready_status.data("state"), Some("ready"));
+    assert!(!ready_status.disabled());
+    assert!(ready_status.has_class("is-ready"));
+    assert_eq!(
+        ready_status.style().background,
+        Some(Color::rgb(205, 239, 221))
+    );
+}
+
+#[test]
 fn document_view_widget_composition_can_return_projection_errors() {
     struct BrokenWidget;
 
