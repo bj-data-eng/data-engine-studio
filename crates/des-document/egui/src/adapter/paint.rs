@@ -1618,6 +1618,9 @@ mod tests {
             value: None,
             glyph: None,
             interactive: false,
+            selected: false,
+            disabled: false,
+            focused: false,
             floating: None,
             children: Vec::new(),
         }

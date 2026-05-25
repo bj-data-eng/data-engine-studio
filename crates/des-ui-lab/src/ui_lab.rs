@@ -16,11 +16,11 @@ use views::{
 
 use des_document::{
     Color, Document, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentEventKind,
-    DocumentInput, DocumentMetrics, DocumentOutput, Element, ElementId, ElementSpec,
-    ElementStateSelector, FontStyle, FontWeight, InlineTextStyle, Length, Point, PointerInput,
-    Rect, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
-    TableSpec, TableTrackSize, TextContent, TextDecoration, TextRun, TextVerticalAlign,
-    VisualCloneOptions, VisualElementClone,
+    DocumentInput, DocumentMetrics, DocumentOutput, DocumentProjection, Element, ElementId,
+    ElementSpec, ElementStateSelector, FontStyle, FontWeight, InlineTextStyle, Length, Point,
+    PointerInput, Rect, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec,
+    TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextDecoration, TextRun,
+    TextVerticalAlign, VisualCloneOptions, VisualElementClone,
 };
 use des_widgets::{
     AutoScrollOptions, AutoScroller, ContextMenu, DropZoneId, SortableDocumentConfig,
@@ -1004,19 +1004,21 @@ impl UiLabState {
     }
 
     fn apply_interaction_document_state(&self, document: &mut Document) {
-        document
+        self.interaction_projection()
+            .apply_to(document)
+            .expect("interaction document contains projected loop elements");
+    }
+
+    fn interaction_projection(&self) -> DocumentProjection {
+        let mut projection = DocumentProjection::new()
             .set_text(
                 "loop-button-result",
                 format!("Button events received: {}", self.loop_action_count),
             )
-            .expect("interaction document contains loop-button-result");
-        document
             .set_value(
                 "loop-button-result-box",
                 format!("button-count={}", self.loop_action_count),
             )
-            .expect("interaction document contains loop-button-result-box");
-        document
             .set_text(
                 "loop-checkbox-result",
                 if self.checkbox_enabled {
@@ -1025,11 +1027,7 @@ impl UiLabState {
                     "Profiling: disabled by checkbox"
                 },
             )
-            .expect("interaction document contains loop-checkbox-result");
-        document
             .set_selected("loop-checkbox-result-box", self.checkbox_enabled)
-            .expect("interaction document contains loop-checkbox-result-box");
-        document
             .set_text(
                 "loop-radio-result",
                 format!(
@@ -1037,8 +1035,6 @@ impl UiLabState {
                     ["Local runtime", "Remote worker", "Hybrid"][self.radio_choice]
                 ),
             )
-            .expect("interaction document contains loop-radio-result");
-        document
             .set_text(
                 "loop-dropdown-result",
                 format!(
@@ -1046,8 +1042,6 @@ impl UiLabState {
                     ["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]
                 ),
             )
-            .expect("interaction document contains loop-dropdown-result");
-        document
             .set_text(
                 "loop-summary-result",
                 format!(
@@ -1063,11 +1057,7 @@ impl UiLabState {
                     if self.loop_action_count == 1 { "" } else { "s" }
                 ),
             )
-            .expect("interaction document contains loop-summary-result");
-        document
-            .set_focused("loop-summary-result-box", self.loop_action_count > 0)
-            .expect("interaction document contains loop-summary-result-box");
-
+            .set_focused("loop-summary-result-box", self.loop_action_count > 0);
         for (index, class) in [
             "loop-runtime-local",
             "loop-runtime-remote",
@@ -1076,15 +1066,7 @@ impl UiLabState {
         .iter()
         .enumerate()
         {
-            if self.radio_choice == index {
-                document
-                    .add_class("loop-radio-result-box", *class)
-                    .expect("interaction document contains loop-radio-result-box");
-            } else {
-                document
-                    .remove_class("loop-radio-result-box", *class)
-                    .expect("interaction document contains loop-radio-result-box");
-            }
+            projection.push_class("loop-radio-result-box", *class, self.radio_choice == index);
         }
 
         for (index, class) in [
@@ -1095,16 +1077,13 @@ impl UiLabState {
         .iter()
         .enumerate()
         {
-            if self.dropdown_choice == index {
-                document
-                    .add_class("loop-dropdown-result-box", *class)
-                    .expect("interaction document contains loop-dropdown-result-box");
-            } else {
-                document
-                    .remove_class("loop-dropdown-result-box", *class)
-                    .expect("interaction document contains loop-dropdown-result-box");
-            }
+            projection.push_class(
+                "loop-dropdown-result-box",
+                *class,
+                self.dropdown_choice == index,
+            );
         }
+        projection
     }
 
     #[cfg(test)]

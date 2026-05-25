@@ -143,6 +143,18 @@ impl<'a> ElementSnapshot<'a> {
         self.element.interactive
     }
 
+    pub fn selected(&self) -> bool {
+        self.element.selected
+    }
+
+    pub fn disabled(&self) -> bool {
+        self.element.disabled
+    }
+
+    pub fn focused(&self) -> bool {
+        self.element.focused
+    }
+
     pub fn floating(&self) -> Option<crate::ResolvedFloating> {
         self.element.floating
     }

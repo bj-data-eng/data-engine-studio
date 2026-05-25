@@ -1,6 +1,6 @@
 use crate::{
-    Document, DocumentBuilder, DocumentEngine, DocumentInput, DocumentOutput, DocumentWidget, Size,
-    StyleSheet, TextMeasurer,
+    Document, DocumentBuilder, DocumentEngine, DocumentInput, DocumentOutput, DocumentProjection,
+    DocumentProjectionReport, DocumentResult, DocumentWidget, Size, StyleSheet, TextMeasurer,
 };
 
 /// A ready-to-drive retained document surface.
@@ -46,6 +46,14 @@ impl DocumentView {
     /// Replaces the retained document while keeping engine UI state.
     pub fn replace_document(&mut self, document: Document) {
         self.document = document;
+    }
+
+    /// Applies a batch of app-state projections to the retained document.
+    pub fn project(
+        &mut self,
+        projection: &DocumentProjection,
+    ) -> DocumentResult<DocumentProjectionReport> {
+        projection.apply_to(&mut self.document)
     }
 
     /// Returns the stylesheet used to resolve this document.

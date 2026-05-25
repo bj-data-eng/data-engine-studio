@@ -986,6 +986,9 @@ impl Document {
             value: element.spec.value.clone(),
             glyph: element.spec.glyph,
             interactive: element.spec.interactive && !element.spec.disabled,
+            selected: element.spec.selected,
+            disabled: element.spec.disabled,
+            focused: element.spec.focused,
             floating,
             children,
         })

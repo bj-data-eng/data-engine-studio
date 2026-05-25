@@ -14,6 +14,7 @@ mod element;
 mod engine;
 mod geometry;
 mod layout;
+mod projection;
 mod query;
 mod scroll;
 mod state;
@@ -35,6 +36,7 @@ pub use geometry::{
     AlignContent, AlignItems, AlignSelf, ClipRect, CornerRadii, FlexDirection, FlexWrap, Insets,
     JustifyContent, Length, Overflow, Point, Position, PositionInsets, Rect, ScrollAxis, Size,
 };
+pub use projection::{DocumentProjection, DocumentProjectionOperation, DocumentProjectionReport};
 pub use query::{DocumentSnapshot, ElementSnapshot, HitResult};
 pub use state::{
     ChangeSet, DocumentCommand, DocumentCommandActionRef, DocumentCommandBinding,

@@ -48,6 +48,9 @@ pub struct ResolvedElement {
     pub value: Option<String>,
     pub glyph: Option<Glyph>,
     pub interactive: bool,
+    pub selected: bool,
+    pub disabled: bool,
+    pub focused: bool,
     pub floating: Option<ResolvedFloating>,
     pub children: Vec<ResolvedElement>,
 }

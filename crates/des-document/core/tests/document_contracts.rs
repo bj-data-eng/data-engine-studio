@@ -1,11 +1,11 @@
 use des_document::{
     AlignItems, Color, CornerRadii, Direction, Document, DocumentCommandRegistry, DocumentEngine,
-    DocumentEvent, DocumentEventKind, DocumentInput, DocumentView, Element, ElementId, ElementSpec,
-    ElementStateSelector, FlexWrap, Insets, JustifyContent, Length, Overflow, Point, PointerInput,
-    ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec,
-    TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult, TextLayoutStyle, TextMeasurer,
-    TextMeasurerKey, TextOverflow, TextSelectionGranularity, TextTransform, TextWrapMode,
-    Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
+    DocumentEvent, DocumentEventKind, DocumentInput, DocumentProjection, DocumentView, Element,
+    ElementId, ElementSpec, ElementStateSelector, FlexWrap, Insets, JustifyContent, Length,
+    Overflow, Point, PointerInput, ScrollAxis, Shadow, Size, Style, StyleSelector, StyleSheet,
+    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextLayoutRequest, TextLayoutResult,
+    TextLayoutStyle, TextMeasurer, TextMeasurerKey, TextOverflow, TextSelectionGranularity,
+    TextTransform, TextWrapMode, Transition, ViewportQuery, VisualCloneOptions, WhiteSpace,
 };
 
 fn assert_close(actual: f32, expected: f32) {
@@ -119,6 +119,56 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     assert_eq!(actions[0].event, DocumentEventKind::Clicked);
     assert_eq!(actions[0].command, "run-query");
     assert_eq!(*actions[0].action, AppAction::RunQuery);
+}
+
+#[test]
+fn document_projection_batches_app_state_updates() {
+    let stylesheet = StyleSheet::new()
+        .rule(
+            StyleSelector::class("ready"),
+            Style::default().background(Color::rgb(205, 239, 221)),
+        )
+        .rule(
+            StyleSelector::class("pending"),
+            Style::default().background(Color::rgb(255, 238, 190)),
+        );
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.div("status")
+            .class("pending")
+            .selected(false)
+            .children(|ui| {
+                ui.text("status-label", "Pending");
+            });
+    });
+    let projection = DocumentProjection::new()
+        .set_text("status-label", "Ready")
+        .set_value("status", "ready")
+        .set_selected("status", true)
+        .set_focused("status", true)
+        .set_class("status", "pending", false)
+        .set_class("status", "ready", true);
+
+    let report = view.project(&projection).unwrap();
+    let output = view.update();
+    let status = output.snapshot().find("status").unwrap();
+
+    assert_eq!(report.operations, 6);
+    assert_eq!(report.changed, 6);
+    assert_eq!(
+        output.snapshot().find("status-label").unwrap().text(),
+        Some("Ready".to_owned())
+    );
+    assert_eq!(status.value(), Some("ready"));
+    assert!(status.selected());
+    assert!(status.focused());
+    assert!(status.has_class("ready"));
+    assert!(!status.has_class("pending"));
+    assert_eq!(status.style().background, Some(Color::rgb(205, 239, 221)));
+
+    let unchanged_report = view.project(&projection).unwrap();
+
+    assert_eq!(unchanged_report.operations, 6);
+    assert_eq!(unchanged_report.changed, 0);
 }
 
 #[test]
