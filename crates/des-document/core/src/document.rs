@@ -1512,6 +1512,11 @@ impl DocumentBuilder {
         self
     }
 
+    /// Renders a collection of app items through one immediate-style builder hook.
+    ///
+    /// This is the structure-authoring companion to `DocumentProjection::items`:
+    /// app code can render the retained elements for each item here, then project
+    /// changing item state into those stable elements later.
     pub fn items<I>(
         &mut self,
         items: I,
@@ -1526,6 +1531,7 @@ impl DocumentBuilder {
         self
     }
 
+    /// Conditionally renders a collection of app items.
     pub fn items_if<I>(
         &mut self,
         items: I,
