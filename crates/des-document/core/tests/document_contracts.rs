@@ -1167,10 +1167,32 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert!(surface.stylesheet().has_rule_for_class("run-action"));
     assert!(hover_frame.contains_action(&AppAction::Inspect));
     assert!(click_frame.contains_action(&AppAction::Run));
-    assert!(
-        context_frame
-            .contains_action_for_intent(ElementBehaviorEvent::ContextMenu, &AppAction::Menu)
+    let context_actions = context_frame.context_menu_actions().collect::<Vec<_>>();
+    let context_values = context_frame
+        .context_menu_action_values()
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut context_dispatched = Vec::new();
+    let context_dispatch_report = context_frame
+        .dispatch_context_menu(|action| context_dispatched.push(action.action().clone()));
+
+    assert_eq!(context_actions.len(), 1);
+    assert_eq!(context_actions[0].target.as_str(), "menu");
+    assert_eq!(context_values, vec![AppAction::Menu]);
+    assert_eq!(
+        context_frame.first_context_menu_action().unwrap().command,
+        "menu.open"
     );
+    assert_eq!(
+        context_frame.first_context_menu_action_value(),
+        Some(&AppAction::Menu)
+    );
+    assert!(context_frame.contains_context_menu_action(&AppAction::Menu));
+    assert_eq!(
+        context_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(context_dispatched, vec![AppAction::Menu]);
     assert!(dispatch_frame.contains_clicked_action(&AppAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![AppAction::Run]);

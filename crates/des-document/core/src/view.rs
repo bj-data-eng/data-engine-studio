@@ -216,6 +216,26 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_value_for_intent(ElementBehaviorEvent::Click)
     }
 
+    /// Iterates typed app actions emitted by context-menu intent.
+    pub fn context_menu_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.actions_for_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns the first typed app action emitted by context-menu intent.
+    pub fn first_context_menu_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.first_action_for_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Iterates only typed app action values emitted by context-menu intent.
+    pub fn context_menu_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
+    /// Returns only the first typed app action value emitted by context-menu intent.
+    pub fn first_context_menu_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::ContextMenu)
+    }
+
     /// Iterates typed app actions emitted by pointer-enter intent.
     pub fn pointer_enter_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::PointerEnter)
@@ -475,6 +495,14 @@ impl<Action> DocumentActionFrame<Action> {
         self.contains_action_for_intent(ElementBehaviorEvent::Click, action)
     }
 
+    /// Returns true when context-menu intent emitted the supplied typed action.
+    pub fn contains_context_menu_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.contains_action_for_intent(ElementBehaviorEvent::ContextMenu, action)
+    }
+
     /// Returns true when pointer-enter intent emitted the supplied typed action.
     pub fn contains_pointer_enter_action(&self, action: &Action) -> bool
     where
@@ -638,6 +666,14 @@ impl<Action> DocumentActionFrame<Action> {
         handler: impl FnMut(&'a DocumentCommandAction<Action>),
     ) -> DocumentCommandDispatchReport {
         self.dispatch_intent(ElementBehaviorEvent::Click, handler)
+    }
+
+    /// Dispatches collected typed actions emitted by context-menu intent.
+    pub fn dispatch_context_menu<'a>(
+        &'a self,
+        handler: impl FnMut(&'a DocumentCommandAction<Action>),
+    ) -> DocumentCommandDispatchReport {
+        self.dispatch_intent(ElementBehaviorEvent::ContextMenu, handler)
     }
 
     /// Dispatches collected typed actions emitted by pointer-enter intent.
