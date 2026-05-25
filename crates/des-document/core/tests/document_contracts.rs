@@ -92,6 +92,20 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert_eq!(commands[0].command, "run-query");
     assert_eq!(hooks.len(), 2);
     assert!(hooks.iter().any(|hook| hook.command == "open-query-menu"));
+    assert_eq!(
+        run.behavior_hooks_for(ElementBehaviorEvent::Click)
+            .map(|hook| hook.command.as_str())
+            .collect::<Vec<_>>(),
+        vec!["run-query"]
+    );
+    assert_eq!(
+        run.first_behavior_hook_for(ElementBehaviorEvent::ContextMenu)
+            .map(|hook| hook.command.as_str()),
+        Some("open-query-menu")
+    );
+    assert!(run.has_behavior_hook(ElementBehaviorEvent::Click, "run-query"));
+    assert!(run.has_command_hook("open-query-menu"));
+    assert!(!run.has_behavior_hook(ElementBehaviorEvent::KeyDown, "run-query"));
 }
 
 #[test]

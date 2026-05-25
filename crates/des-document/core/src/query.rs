@@ -284,6 +284,35 @@ impl<'a> ElementSnapshot<'a> {
         &self.element.behavior_hooks
     }
 
+    pub fn behavior_hooks_for(
+        &self,
+        event: crate::ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &crate::ElementBehaviorHook> {
+        self.element
+            .behavior_hooks
+            .iter()
+            .filter(move |hook| crate::ElementBehaviorEvent::from_name(&hook.event) == Some(event))
+    }
+
+    pub fn first_behavior_hook_for(
+        &self,
+        event: crate::ElementBehaviorEvent,
+    ) -> Option<&crate::ElementBehaviorHook> {
+        self.behavior_hooks_for(event).next()
+    }
+
+    pub fn has_behavior_hook(&self, event: crate::ElementBehaviorEvent, command: &str) -> bool {
+        self.behavior_hooks_for(event)
+            .any(|hook| hook.command == command)
+    }
+
+    pub fn has_command_hook(&self, command: &str) -> bool {
+        self.element
+            .behavior_hooks
+            .iter()
+            .any(|hook| hook.command == command)
+    }
+
     pub fn has_class(&self, class: &str) -> bool {
         self.element
             .classes
