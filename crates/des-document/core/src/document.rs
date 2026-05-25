@@ -9,8 +9,8 @@ use crate::geometry::{
 use crate::layout::{child_clip_rect, to_layout_insets, to_layout_size};
 use crate::projection::{DocumentProjection, ElementProjectionPatch};
 use crate::state::{
-    DocumentCommandAction, DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentInput,
-    ElementState, ResolvedElement, ResolvedFloating,
+    DocumentCommandAction, DocumentCommandBinding, DocumentCommandDispatchReport,
+    DocumentCommandRegistry, DocumentInput, ElementState, ResolvedElement, ResolvedFloating,
 };
 use crate::style::{
     ChildPosition, ComputedStyle, StyleMatchContext, StyleResolutionContext, StyleSheet,
@@ -1492,8 +1492,24 @@ pub trait DocumentWidget {
 /// pair authored behavior hooks such as clicks, keyboard input, or context menus
 /// with typed Rust actions without coupling the widget to an egui adapter.
 pub trait DocumentActionWidget<Action>: DocumentWidget {
+    /// Returns a single command binding for simple action widgets.
+    fn command_binding(&self) -> Option<DocumentCommandBinding<Action>> {
+        None
+    }
+
+    /// Returns command bindings declared by this widget.
+    ///
+    /// The default preserves the simpler [`DocumentActionWidget::command_binding`]
+    /// convention. Widgets with several behavior hooks can override this method
+    /// instead of hand-writing [`DocumentActionWidget::push_commands`].
+    fn command_bindings(&self) -> Vec<DocumentCommandBinding<Action>> {
+        self.command_binding().into_iter().collect()
+    }
+
     /// Pushes this widget's command-to-action bindings into a caller-owned registry.
-    fn push_commands(&self, registry: &mut DocumentCommandRegistry<Action>);
+    fn push_commands(&self, registry: &mut DocumentCommandRegistry<Action>) {
+        registry.push_bindings(self.command_bindings());
+    }
 
     /// Builds the command registry declared by this widget.
     fn commands(&self) -> DocumentCommandRegistry<Action> {

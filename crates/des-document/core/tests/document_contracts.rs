@@ -3664,9 +3664,11 @@ fn document_widgets_can_declare_typed_command_bindings() {
     }
 
     impl DocumentActionWidget<WidgetAction> for ToggleWidget {
-        fn push_commands(&self, registry: &mut DocumentCommandRegistry<WidgetAction>) {
-            registry.push_click("toggle", WidgetAction::Toggle);
-            registry.push_context_menu("toggle.context", WidgetAction::Context);
+        fn command_bindings(&self) -> Vec<DocumentCommandBinding<WidgetAction>> {
+            vec![
+                DocumentCommandBinding::click("toggle", WidgetAction::Toggle),
+                DocumentCommandBinding::context_menu("toggle.context", WidgetAction::Context),
+            ]
         }
     }
 
@@ -3677,8 +3679,8 @@ fn document_widgets_can_declare_typed_command_bindings() {
     }
 
     impl DocumentActionWidget<WidgetAction> for CloseWidget {
-        fn push_commands(&self, registry: &mut DocumentCommandRegistry<WidgetAction>) {
-            registry.push_click("close", WidgetAction::Close);
+        fn command_binding(&self) -> Option<DocumentCommandBinding<WidgetAction>> {
+            Some(DocumentCommandBinding::click("close", WidgetAction::Close))
         }
     }
 
@@ -3803,6 +3805,8 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let toggle_commands = toggle.commands();
     let boxed_toggle_commands = boxed_toggle.commands();
     let toggle_registry = toggle.command_registry();
+    let toggle_bindings = toggle.command_bindings();
+    let close_binding = close.command_binding().unwrap();
     let direct_toggle_frame = toggle.update_with_input_actions(
         Size::new(320.0, 180.0),
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
@@ -3870,6 +3874,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(toggle_commands.bindings().len(), 2);
     assert_eq!(boxed_toggle_commands.bindings(), toggle_commands.bindings());
     assert_eq!(toggle_registry.bindings().len(), 2);
+    assert_eq!(toggle_bindings, toggle_commands.bindings());
+    assert_eq!(close_binding.command(), "close");
+    assert_eq!(close_binding.action(), &WidgetAction::Close);
     assert_eq!(toggle_surface.commands().bindings().len(), 2);
     assert_eq!(
         css_output
