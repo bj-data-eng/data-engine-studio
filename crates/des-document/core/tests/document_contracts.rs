@@ -2906,6 +2906,57 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(surface_status.text(), Some("Ready".to_owned()));
     assert!(surface_status.has_class("is-ready"));
     assert!(surface_frame.contains_action(&AppAction::Toggle));
+
+    let mut dispatched = Vec::new();
+    let (dispatch_report, dispatch_frame, action_report) = widget_surface
+        .project_with_and_update_with_input_and_dispatch(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection
+                    .element("status")
+                    .text("Dispatched")
+                    .class("is-dispatched", true);
+            },
+            |action| {
+                dispatched.push(*action.action());
+            },
+        )
+        .unwrap();
+    let dispatched_status = dispatch_frame.output().snapshot().find("status").unwrap();
+
+    assert_eq!(dispatch_report.operations, 2);
+    assert_eq!(dispatch_report.changed, 2);
+    assert_eq!(action_report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![AppAction::Toggle]);
+    assert_eq!(dispatched_status.text(), Some("Dispatched".to_owned()));
+    assert!(dispatched_status.has_class("is-dispatched"));
+    assert!(dispatch_frame.contains_action(&AppAction::Toggle));
+
+    let mut widget_dispatched = Vec::new();
+    let (widget_dispatch_report, widget_dispatch_frame, widget_action_report) = widget_surface
+        .project_widget_and_update_with_input_and_dispatch(
+            &StatusWidget { ready: false },
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| {
+                widget_dispatched.push(*action.action());
+            },
+        )
+        .unwrap();
+    let widget_dispatch_status = widget_dispatch_frame
+        .output()
+        .snapshot()
+        .find("status")
+        .unwrap();
+
+    assert_eq!(widget_dispatch_report.operations, 2);
+    assert_eq!(widget_dispatch_report.changed, 2);
+    assert_eq!(
+        widget_action_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(widget_dispatched, vec![AppAction::Toggle]);
+    assert_eq!(widget_dispatch_status.text(), Some("Waiting".to_owned()));
+    assert!(!widget_dispatch_status.has_class("is-ready"));
 }
 
 #[test]

@@ -867,6 +867,26 @@ impl<Action> DocumentActionSurface<Action> {
             .project_and_update_with_input_actions(projection, input, &self.commands)
     }
 
+    /// Applies a projection, routes input, collects typed actions, and dispatches them.
+    pub fn project_and_update_with_input_and_dispatch(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_and_update_with_input_actions(projection, input)?;
+        let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
     /// Builds a projection, applies it, routes input, and collects typed actions.
     pub fn project_with_and_update_with_input_actions(
         &mut self,
@@ -878,6 +898,26 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .project_with_and_update_with_input_actions(input, project, &self.commands)
+    }
+
+    /// Builds a projection, routes input, collects typed actions, and dispatches them.
+    pub fn project_with_and_update_with_input_and_dispatch(
+        &mut self,
+        input: DocumentInput,
+        project: impl FnOnce(&mut DocumentProjection),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_with_and_update_with_input_actions(input, project)?;
+        let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
     }
 
     /// Applies a projection, routes input through a host text measurer, and collects actions.
@@ -899,6 +939,31 @@ impl<Action> DocumentActionSurface<Action> {
             )
     }
 
+    /// Applies a projection, routes input through a text measurer, and dispatches actions.
+    pub fn project_and_update_with_input_and_text_measurer_and_dispatch(
+        &mut self,
+        projection: &DocumentProjection,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) = self
+            .project_and_update_with_input_and_text_measurer_actions(
+                projection,
+                input,
+                text_measurer,
+            )?;
+        let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
     /// Builds a projection, routes input through a host text measurer, and collects actions.
     pub fn project_with_and_update_with_input_and_text_measurer_actions(
         &mut self,
@@ -918,6 +983,31 @@ impl<Action> DocumentActionSurface<Action> {
             )
     }
 
+    /// Builds a projection, routes input through a text measurer, and dispatches actions.
+    pub fn project_with_and_update_with_input_and_text_measurer_and_dispatch(
+        &mut self,
+        input: DocumentInput,
+        text_measurer: &mut dyn TextMeasurer,
+        project: impl FnOnce(&mut DocumentProjection),
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) = self
+            .project_with_and_update_with_input_and_text_measurer_actions(
+                input,
+                text_measurer,
+                project,
+            )?;
+        let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
+    }
+
     /// Applies a widget projection, routes input, and collects typed app actions.
     pub fn project_widget_and_update_with_input_actions(
         &mut self,
@@ -929,6 +1019,26 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .project_widget_and_update_with_input_actions(widget, input, &self.commands)
+    }
+
+    /// Applies a widget projection, routes input, collects actions, and dispatches them.
+    pub fn project_widget_and_update_with_input_and_dispatch(
+        &mut self,
+        widget: &(impl DocumentWidget + ?Sized),
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_widget_and_update_with_input_actions(widget, input)?;
+        let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
     }
 
     /// Applies widget projections, routes input, and collects typed app actions.
@@ -943,6 +1053,27 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .project_widgets_and_update_with_input_actions(widgets, input, &self.commands)
+    }
+
+    /// Applies widget projections, routes input, collects actions, and dispatches them.
+    pub fn project_widgets_and_update_with_input_and_dispatch<'a, W>(
+        &mut self,
+        widgets: impl IntoIterator<Item = &'a W>,
+        input: DocumentInput,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentProjectionReport,
+        DocumentActionFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        W: DocumentWidget + ?Sized + 'a,
+        Action: Clone,
+    {
+        let (projection_report, frame) =
+            self.project_widgets_and_update_with_input_actions(widgets, input)?;
+        let dispatch_report = frame.dispatch(handler);
+        Ok((projection_report, frame, dispatch_report))
     }
 
     /// Resolves the view and collects typed app actions with the paired registry.
