@@ -379,6 +379,11 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_if(mut self, command: impl Into<String>, action: Action, present: bool) -> Self {
+        self.push_if(command, action, present);
+        self
+    }
+
     pub fn bind_on(
         mut self,
         event: ElementBehaviorEvent,
@@ -389,8 +394,29 @@ impl<Action> DocumentCommandRegistry<Action> {
         self
     }
 
+    pub fn bind_on_if(
+        mut self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_on_if(event, command, action, present);
+        self
+    }
+
     pub fn bind_click(mut self, command: impl Into<String>, action: Action) -> Self {
         self.push_click(command, action);
+        self
+    }
+
+    pub fn bind_click_if(
+        mut self,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) -> Self {
+        self.push_click_if(command, action, present);
         self
     }
 
@@ -408,6 +434,12 @@ impl<Action> DocumentCommandRegistry<Action> {
             .push(DocumentCommandBinding::new(command, action));
     }
 
+    pub fn push_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push(command, action);
+        }
+    }
+
     pub fn push_on(
         &mut self,
         event: ElementBehaviorEvent,
@@ -418,9 +450,27 @@ impl<Action> DocumentCommandRegistry<Action> {
             .push(DocumentCommandBinding::on(event, command, action));
     }
 
+    pub fn push_on_if(
+        &mut self,
+        event: ElementBehaviorEvent,
+        command: impl Into<String>,
+        action: Action,
+        present: bool,
+    ) {
+        if present {
+            self.push_on(event, command, action);
+        }
+    }
+
     pub fn push_click(&mut self, command: impl Into<String>, action: Action) {
         self.bindings
             .push(DocumentCommandBinding::click(command, action));
+    }
+
+    pub fn push_click_if(&mut self, command: impl Into<String>, action: Action, present: bool) {
+        if present {
+            self.push_click(command, action);
+        }
     }
 
     pub fn push_many<I, Command>(&mut self, bindings: I)
