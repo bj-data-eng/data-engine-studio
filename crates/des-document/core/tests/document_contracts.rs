@@ -141,11 +141,7 @@ fn keyboard_input_targets_focused_element_and_emits_hook_command() {
     let output = view.update_with_input(DocumentInput {
         pointer: None,
         scroll_delta: Point::ZERO,
-        keys: vec![KeyInput {
-            key: DocumentKey::Enter,
-            modifiers: KeyModifiers::default(),
-            pressed: true,
-        }],
+        keys: vec![KeyInput::down(DocumentKey::Enter)],
     });
     let commands = output.commands();
 
@@ -160,6 +156,36 @@ fn keyboard_input_targets_focused_element_and_emits_hook_command() {
         })
     );
     assert_eq!(commands[0].command, "submit-search");
+}
+
+#[test]
+fn document_input_builders_express_host_intent_without_struct_literals() {
+    let pointer = PointerInput {
+        position: Point::new(16.0, 24.0),
+        primary_delta: Point::ZERO,
+        primary_down: true,
+        primary_pressed: true,
+        primary_clicked: false,
+        primary_click_count: 0,
+        secondary_clicked: false,
+        time_seconds: 1.5,
+    };
+    let input = DocumentInput::pointer(pointer)
+        .with_scroll(Point::new(0.0, -12.0))
+        .with_key(
+            KeyInput::down(DocumentKey::Enter)
+                .with_modifiers(KeyModifiers::new().command().shift()),
+        )
+        .with_key(KeyInput::up(DocumentKey::Escape));
+
+    assert_eq!(input.pointer, Some(pointer));
+    assert_eq!(input.scroll_delta, Point::new(0.0, -12.0));
+    assert_eq!(input.keys.len(), 2);
+    assert_eq!(input.keys[0].key, DocumentKey::Enter);
+    assert!(input.keys[0].pressed);
+    assert!(input.keys[0].modifiers.command);
+    assert!(input.keys[0].modifiers.shift);
+    assert_eq!(input.keys[1], KeyInput::up(DocumentKey::Escape));
 }
 
 #[test]

@@ -51,16 +51,17 @@ fn document_key_input(event: &egui::Event) -> Option<KeyInput> {
     else {
         return None;
     };
-    Some(KeyInput {
-        key: document_key(*key),
-        modifiers: KeyModifiers {
-            alt: modifiers.alt,
-            ctrl: modifiers.ctrl,
-            shift: modifiers.shift,
-            command: modifiers.command,
-        },
-        pressed: *pressed,
-    })
+    let input = if *pressed {
+        KeyInput::down(document_key(*key))
+    } else {
+        KeyInput::up(document_key(*key))
+    };
+    Some(input.with_modifiers(KeyModifiers {
+        alt: modifiers.alt,
+        ctrl: modifiers.ctrl,
+        shift: modifiers.shift,
+        command: modifiers.command,
+    }))
 }
 
 fn document_key(key: egui::Key) -> DocumentKey {

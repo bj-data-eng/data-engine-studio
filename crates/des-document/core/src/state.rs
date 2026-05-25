@@ -407,6 +407,57 @@ pub struct DocumentInput {
     pub keys: Vec<KeyInput>,
 }
 
+impl DocumentInput {
+    pub fn pointer(pointer: PointerInput) -> Self {
+        Self {
+            pointer: Some(pointer),
+            ..Self::default()
+        }
+    }
+
+    pub fn scroll(delta: Point) -> Self {
+        Self {
+            scroll_delta: delta,
+            ..Self::default()
+        }
+    }
+
+    pub fn key_down(key: DocumentKey) -> Self {
+        Self::key(KeyInput::down(key))
+    }
+
+    pub fn key_up(key: DocumentKey) -> Self {
+        Self::key(KeyInput::up(key))
+    }
+
+    pub fn key(key: KeyInput) -> Self {
+        Self {
+            keys: vec![key],
+            ..Self::default()
+        }
+    }
+
+    pub fn with_pointer(mut self, pointer: PointerInput) -> Self {
+        self.pointer = Some(pointer);
+        self
+    }
+
+    pub fn with_scroll(mut self, delta: Point) -> Self {
+        self.scroll_delta = delta;
+        self
+    }
+
+    pub fn with_key(mut self, key: KeyInput) -> Self {
+        self.keys.push(key);
+        self
+    }
+
+    pub fn with_keys(mut self, keys: impl IntoIterator<Item = KeyInput>) -> Self {
+        self.keys.extend(keys);
+        self
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PointerInput {
     pub position: Point,
@@ -426,12 +477,66 @@ pub struct KeyInput {
     pub pressed: bool,
 }
 
+impl KeyInput {
+    pub fn down(key: DocumentKey) -> Self {
+        Self {
+            key,
+            modifiers: KeyModifiers::default(),
+            pressed: true,
+        }
+    }
+
+    pub fn up(key: DocumentKey) -> Self {
+        Self {
+            key,
+            modifiers: KeyModifiers::default(),
+            pressed: false,
+        }
+    }
+
+    pub fn with_modifiers(mut self, modifiers: KeyModifiers) -> Self {
+        self.modifiers = modifiers;
+        self
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct KeyModifiers {
     pub alt: bool,
     pub ctrl: bool,
     pub shift: bool,
     pub command: bool,
+}
+
+impl KeyModifiers {
+    pub const fn new() -> Self {
+        Self {
+            alt: false,
+            ctrl: false,
+            shift: false,
+            command: false,
+        }
+    }
+
+    pub const fn alt(mut self) -> Self {
+        self.alt = true;
+        self
+    }
+
+    pub const fn ctrl(mut self) -> Self {
+        self.ctrl = true;
+        self
+    }
+
+    pub const fn shift(mut self) -> Self {
+        self.shift = true;
+        self
+    }
+
+    pub const fn command(mut self) -> Self {
+        self.command = true;
+        self
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
