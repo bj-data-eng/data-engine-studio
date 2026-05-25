@@ -1894,6 +1894,62 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &registry,
         )
         .expect("named document should route input through forgiving CSS action helpers");
+    let mut css_dispatched = Vec::new();
+    let (css_dispatch_frame, css_dispatch_report) = set
+        .update_with_input_and_css_and_dispatch(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            "#inline { width: 168px; height: 32px; }",
+            &registry,
+            |action| {
+                css_dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should dispatch strict CSS action frames");
+    let mut css_configured_dispatched = Vec::new();
+    let (css_configured_dispatch_frame, css_configured_dispatch_report) = set
+        .update_with_input_and_css_and_dispatch_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            "#inline { width: 172px; height: 32px; }",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+            |action| {
+                css_configured_dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should configure and dispatch strict CSS action frames");
+    let mut css_forgiving_dispatched = Vec::new();
+    let (css_forgiving_dispatch_frame, css_forgiving_dispatch_report) = set
+        .update_with_input_and_css_forgiving_and_dispatch(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #inline { width: 176px; height: 32px; }",
+            &registry,
+            |action| {
+                css_forgiving_dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should dispatch forgiving CSS action frames");
+    let mut css_forgiving_configured_dispatched = Vec::new();
+    let (css_forgiving_configured_dispatch_frame, css_forgiving_configured_dispatch_report) = set
+        .update_with_input_and_css_forgiving_and_dispatch_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #inline { width: 180px; height: 32px; }",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+            |action| {
+                css_forgiving_configured_dispatched.push(*action.action());
+            },
+        )
+        .expect("named document should configure and dispatch forgiving CSS action frames");
     let styled_surface = set
         .to_action_surface_with_stylesheet(
             "inline",
@@ -2056,6 +2112,74 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .size
             .width,
         156.0
+    );
+    assert!(css_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(css_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        css_dispatch_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        168.0
+    );
+    assert!(css_configured_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_configured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(css_configured_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        css_configured_dispatch_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        172.0
+    );
+    assert!(css_forgiving_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_forgiving_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(css_forgiving_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        css_forgiving_dispatch_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        176.0
+    );
+    assert!(css_forgiving_configured_dispatch_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_forgiving_configured_dispatch_report,
+        DocumentCommandDispatchReport::new(1, 1, 0)
+    );
+    assert_eq!(css_forgiving_configured_dispatched, vec![SetAction::Run]);
+    assert_eq!(
+        css_forgiving_configured_dispatch_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        180.0
     );
     assert_eq!(styled_surface.commands().bindings().len(), 2);
     assert!(css_surface_frame.contains_action(&SetAction::Run));
