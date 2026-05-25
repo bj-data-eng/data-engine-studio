@@ -2390,6 +2390,26 @@ impl HtmlSet {
             .to_view_with_stylesheet(viewport, stylesheet)
     }
 
+    /// Parses CSS and creates a ready-to-update document view from a named document.
+    pub fn to_view_with_css(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+    ) -> HtmlResult<DocumentView> {
+        self.get(name)?.to_view_with_css(viewport, css)
+    }
+
+    /// Parses forgiving CSS and creates a document view from a named document.
+    pub fn to_view_with_css_forgiving(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+    ) -> HtmlResult<DocumentView> {
+        self.get(name)?.to_view_with_css_forgiving(viewport, css)
+    }
+
     /// Creates a named document view, applies retained state projection, and returns both.
     pub fn to_view_with_projection(
         &self,
@@ -2547,6 +2567,30 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         self.get(name)?
             .to_action_surface_with_stylesheet_and(viewport, stylesheet, configure)
+    }
+
+    /// Parses CSS and creates an action surface for a named document.
+    pub fn to_action_surface_with_css<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_css(viewport, css, configure)
+    }
+
+    /// Parses forgiving CSS and creates an action surface for a named document.
+    pub fn to_action_surface_with_css_forgiving<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        self.get(name)?
+            .to_action_surface_with_css_forgiving(viewport, css, configure)
     }
 
     /// Resolves a named HTML document with an empty stylesheet.
@@ -2721,6 +2765,90 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentOutput> {
         self.to_view_with_stylesheet(name, viewport, stylesheet)
             .map(|mut view| view.update())
+    }
+
+    /// Parses CSS and resolves a named HTML document.
+    pub fn update_with_css(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.get(name)?.update_with_css(viewport, css)
+    }
+
+    /// Parses forgiving CSS and resolves a named HTML document.
+    pub fn update_with_css_forgiving(
+        &self,
+        name: &str,
+        viewport: Size,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.get(name)?.update_with_css_forgiving(viewport, css)
+    }
+
+    /// Parses CSS, routes input, and collects typed Rust actions.
+    pub fn update_with_input_actions_and_css<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css(viewport, input, css, registry)
+    }
+
+    /// Parses CSS, routes input, and configures typed Rust actions in one hook.
+    pub fn update_with_input_actions_and_css_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_with(viewport, input, css, configure)
+    }
+
+    /// Parses forgiving CSS, routes input, and collects typed Rust actions.
+    pub fn update_with_input_actions_and_css_forgiving<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_forgiving(viewport, input, css, registry)
+    }
+
+    /// Parses forgiving CSS, routes input, and configures typed actions in one hook.
+    pub fn update_with_input_actions_and_css_forgiving_with<Action>(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionFrame<Action>>
+    where
+        Action: Clone,
+    {
+        self.get(name)?
+            .update_with_input_actions_and_css_forgiving_with(viewport, input, css, configure)
     }
 
     /// Re-reads file-backed HTML documents and returns names that changed.

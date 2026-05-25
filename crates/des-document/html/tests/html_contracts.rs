@@ -1731,10 +1731,62 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 .expect("CSS should parse"),
         )
         .expect("named document should resolve through the set front door");
+    let css_output = set
+        .update_with_css(
+            "inline",
+            Size::new(240.0, 160.0),
+            "#inline { width: 128px; height: 32px; }",
+        )
+        .expect("named document should resolve strict CSS through the set front door");
+    let css_forgiving_output = set
+        .update_with_css_forgiving(
+            "inline",
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #inline { width: 136px; height: 32px; }",
+        )
+        .expect("named document should resolve forgiving CSS through the set front door");
+    let mut css_view = set
+        .to_view_with_css(
+            "inline",
+            Size::new(240.0, 160.0),
+            "#inline { width: 140px; height: 32px; }",
+        )
+        .expect("named document should create strict CSS views through the set front door");
+    let css_view_output = css_view.update();
     let inline = output.snapshot().find("inline").unwrap();
 
     assert_eq!(inline.text(), Some("Inline".to_owned()));
     assert_eq!(inline.rect().size.width, 120.0);
+    assert_eq!(
+        css_output
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        128.0
+    );
+    assert_eq!(
+        css_forgiving_output
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        136.0
+    );
+    assert_eq!(
+        css_view_output
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        140.0
+    );
     let input_output = set
         .update_with_input(
             "inline",
@@ -1813,6 +1865,35 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build intent-mapped action surfaces");
     let intent_surface_frame = intent_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
+    let css_action_frame = set
+        .update_with_input_actions_and_css(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            "#inline { width: 148px; height: 32px; }",
+            &registry,
+        )
+        .expect("named document should route input through strict CSS action helpers");
+    let css_configured_frame = set
+        .update_with_input_actions_and_css_with(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            "#inline { width: 152px; height: 32px; }",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+        )
+        .expect("named document should configure actions through strict CSS helpers");
+    let css_forgiving_action_frame = set
+        .update_with_input_actions_and_css_forgiving(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #inline { width: 156px; height: 32px; }",
+            &registry,
+        )
+        .expect("named document should route input through forgiving CSS action helpers");
     let styled_surface = set
         .to_action_surface_with_stylesheet(
             "inline",
@@ -1822,6 +1903,30 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             registry.clone(),
         )
         .expect("named document should build a styled action surface through the set front door");
+    let mut css_surface = set
+        .to_action_surface_with_css(
+            "inline",
+            Size::new(240.0, 160.0),
+            "#inline { width: 160px; height: 32px; }",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+        )
+        .expect("named document should build strict CSS action surfaces");
+    let css_surface_frame =
+        css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut css_forgiving_surface = set
+        .to_action_surface_with_css_forgiving(
+            "inline",
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #inline { width: 164px; height: 32px; }",
+            |commands| {
+                commands.push_click("inline.run", SetAction::Run);
+            },
+        )
+        .expect("named document should build forgiving CSS action surfaces");
+    let css_forgiving_surface_frame = css_forgiving_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let (project_report, projected_output) = set
         .update_projected_with("inline", Size::new(240.0, 160.0), |projection| {
             projection
@@ -1916,7 +2021,67 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         ElementBehaviorEvent::ContextMenu,
         &SetAction::Menu
     ));
+    assert!(css_action_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_action_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        148.0
+    );
+    assert!(css_configured_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_configured_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        152.0
+    );
+    assert!(css_forgiving_action_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_forgiving_action_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        156.0
+    );
     assert_eq!(styled_surface.commands().bindings().len(), 2);
+    assert!(css_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        160.0
+    );
+    assert!(css_forgiving_surface_frame.contains_action(&SetAction::Run));
+    assert_eq!(
+        css_forgiving_surface_frame
+            .output()
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        164.0
+    );
     assert_eq!(project_report.operations, 2);
     assert_eq!(project_report.changed, 2);
     assert_eq!(projected_inline.text(), Some("Projected".to_owned()));
