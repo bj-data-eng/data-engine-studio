@@ -3215,6 +3215,7 @@ fn document_widgets_can_declare_typed_command_bindings() {
     impl DocumentWidget for ToggleWidget {
         fn render(&self, ui: &mut DocumentBuilder) {
             ui.button("toggle")
+                .class("toggle")
                 .command("toggle")
                 .on_context_menu("toggle.context")
                 .text("Toggle");
@@ -3295,6 +3296,30 @@ fn document_widgets_can_declare_typed_command_bindings() {
             false,
         );
     let toggle_surface = toggle.action_surface(Size::new(320.0, 180.0));
+    let mut css_view = toggle
+        .view_with_css(
+            Size::new(320.0, 180.0),
+            "#toggle { background: rgb(220, 238, 255); }",
+        )
+        .expect("widget CSS should parse");
+    let mut forgiving_css_view = toggle
+        .view_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { border-color: rgb(40, 80, 120); }",
+        )
+        .expect("forgiving widget CSS should keep supported rules");
+    let mut css_surface = toggle
+        .action_surface_with_css(
+            Size::new(320.0, 180.0),
+            ".toggle { background: rgb(230, 245, 236); }",
+        )
+        .expect("widget action CSS should parse");
+    let mut forgiving_css_surface = toggle
+        .action_surface_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 232, 255); }",
+        )
+        .expect("forgiving widget action CSS should keep supported rules");
 
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
@@ -3302,6 +3327,12 @@ fn document_widgets_can_declare_typed_command_bindings() {
         DocumentInput::secondary_click(Point::new(8.0, 8.0)),
         &pushed,
     );
+    let css_output = css_view.update();
+    let forgiving_css_output = forgiving_css_view.update();
+    let css_surface_frame =
+        css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let forgiving_css_surface_frame = forgiving_css_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let toggle_commands = toggle.commands();
     let boxed_toggle_commands = boxed_toggle.commands();
     let toggle_registry = toggle.command_registry();
@@ -3338,6 +3369,46 @@ fn document_widgets_can_declare_typed_command_bindings() {
     assert_eq!(boxed_toggle_commands.bindings(), toggle_commands.bindings());
     assert_eq!(toggle_registry.bindings().len(), 2);
     assert_eq!(toggle_surface.commands().bindings().len(), 2);
+    assert_eq!(
+        css_output
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(220, 238, 255))
+    );
+    assert_eq!(
+        forgiving_css_output
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .border,
+        Some(Color::rgb(40, 80, 120))
+    );
+    assert!(css_surface_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        css_surface_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(230, 245, 236))
+    );
+    assert!(forgiving_css_surface_frame.contains_action(&WidgetAction::Toggle));
+    assert_eq!(
+        forgiving_css_surface_frame
+            .output()
+            .snapshot()
+            .find("toggle")
+            .unwrap()
+            .style()
+            .background,
+        Some(Color::rgb(240, 232, 255))
+    );
     assert!(direct_toggle_frame.contains_action(&WidgetAction::Toggle));
     assert!(try_direct_toggle_frame.contains_action(&WidgetAction::Toggle));
     assert!(direct_dispatch_frame.contains_action(&WidgetAction::Toggle));
