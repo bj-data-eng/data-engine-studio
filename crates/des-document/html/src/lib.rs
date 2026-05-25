@@ -406,10 +406,16 @@ impl HtmlStylesheet {
         viewport: Size,
         commands: DocumentCommandRegistry<Action>,
     ) -> HtmlResult<DocumentActionSurface<Action>> {
-        Ok(DocumentActionSurface::new(
-            self.to_view(viewport)?,
-            commands,
-        ))
+        Ok(self.to_view(viewport)?.action_surface(commands))
+    }
+
+    /// Creates an action surface and configures typed Rust commands in one hook.
+    pub fn to_action_surface_with<Action>(
+        &self,
+        viewport: Size,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self.to_view(viewport)?.action_surface_with(configure))
     }
 
     /// Consumes the parsed HTML/CSS into an action surface paired with typed Rust commands.
@@ -418,10 +424,16 @@ impl HtmlStylesheet {
         viewport: Size,
         commands: DocumentCommandRegistry<Action>,
     ) -> HtmlResult<DocumentActionSurface<Action>> {
-        Ok(DocumentActionSurface::new(
-            self.into_view(viewport)?,
-            commands,
-        ))
+        Ok(self.into_view(viewport)?.action_surface(commands))
+    }
+
+    /// Consumes parsed HTML/CSS into an action surface configured in one hook.
+    pub fn into_action_surface_with<Action>(
+        self,
+        viewport: Size,
+        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
+    ) -> HtmlResult<DocumentActionSurface<Action>> {
+        Ok(self.into_view(viewport)?.action_surface_with(configure))
     }
 
     /// Creates a view, applies retained state projection, and returns both.
