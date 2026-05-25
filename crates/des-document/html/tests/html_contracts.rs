@@ -1753,6 +1753,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should create strict CSS views through the set front door");
     let css_view_output = css_view.update();
+    let mut css_forgiving_view = set
+        .to_view_with_css_forgiving(
+            "inline",
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #inline { width: 144px; height: 32px; }",
+        )
+        .expect("named document should create forgiving CSS views through the set front door");
+    let css_forgiving_view_output = css_forgiving_view.update();
     let inline = output.snapshot().find("inline").unwrap();
 
     assert_eq!(inline.text(), Some("Inline".to_owned()));
@@ -1787,6 +1795,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         140.0
     );
+    assert_eq!(
+        css_forgiving_view_output
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        144.0
+    );
     let input_output = set
         .update_with_input(
             "inline",
@@ -1794,6 +1812,22 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
         )
         .expect("named document should route input through the set front door");
+    let input_css_output = set
+        .update_with_input_and_css(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            "#inline { width: 146px; height: 32px; }",
+        )
+        .expect("named document should route input through strict CSS");
+    let input_css_forgiving_output = set
+        .update_with_input_and_css_forgiving(
+            "inline",
+            Size::new(240.0, 160.0),
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #inline { width: 147px; height: 32px; }",
+        )
+        .expect("named document should route input through forgiving CSS");
     let action_frame = set
         .update_with_input_actions(
             "inline",
@@ -2054,6 +2088,28 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
 
     assert!(input_output.was_clicked("inline"));
+    assert!(input_css_output.was_clicked("inline"));
+    assert_eq!(
+        input_css_output
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        146.0
+    );
+    assert!(input_css_forgiving_output.was_clicked("inline"));
+    assert_eq!(
+        input_css_forgiving_output
+            .snapshot()
+            .find("inline")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        147.0
+    );
     assert!(action_frame.contains_action(&SetAction::Run));
     assert!(dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));

@@ -2787,6 +2787,30 @@ impl HtmlSet {
         self.get(name)?.update_with_css_forgiving(viewport, css)
     }
 
+    /// Parses CSS and routes input through a named HTML document.
+    pub fn update_with_input_and_css(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.get(name)?
+            .update_with_input_and_css(viewport, input, css)
+    }
+
+    /// Parses forgiving CSS and routes input through a named HTML document.
+    pub fn update_with_input_and_css_forgiving(
+        &self,
+        name: &str,
+        viewport: Size,
+        input: DocumentInput,
+        css: &str,
+    ) -> HtmlResult<DocumentOutput> {
+        self.get(name)?
+            .update_with_input_and_css_forgiving(viewport, input, css)
+    }
+
     /// Parses CSS, routes input, and collects typed Rust actions.
     pub fn update_with_input_actions_and_css<Action>(
         &self,
