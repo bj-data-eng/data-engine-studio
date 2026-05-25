@@ -96,6 +96,12 @@ fn document_output_exposes_commands_from_typed_behavior_hooks() {
     assert_eq!(commands[0].target, ElementId::new("run"));
     assert_eq!(commands[0].event, DocumentEventKind::Clicked);
     assert_eq!(commands[0].command, "run-query");
+    assert!(commands[0].matches_target_intent("run", ElementBehaviorEvent::Click));
+    assert!(commands[0].matches_binding("run", ElementBehaviorEvent::Click, "run-query"));
+    assert!(!commands[0].matches_binding("run", ElementBehaviorEvent::ContextMenu, "run-query"));
+    let first_command = output.first_command().unwrap();
+    assert!(first_command.matches_target_intent("run", ElementBehaviorEvent::Click));
+    assert!(first_command.matches_binding("run", ElementBehaviorEvent::Click, "run-query"));
     assert_eq!(hooks.len(), 2);
     assert!(hooks.iter().any(|hook| hook.has_command("open-query-menu")));
     assert_eq!(hooks[0].event(), "click");
@@ -253,6 +259,8 @@ fn document_output_exposes_interaction_query_helpers() {
     assert!(clicked.target_is("run"));
     assert_eq!(clicked.kind(), DocumentEventKind::Clicked);
     assert!(clicked.matches_intent(ElementBehaviorEvent::Click));
+    assert!(clicked.matches_target_intent("run", ElementBehaviorEvent::Click));
+    assert!(!clicked.matches_target_intent("cancel", ElementBehaviorEvent::Click));
     assert!(clicked.is_click());
     assert!(!clicked.is_context_menu());
     assert!(!clicked.is_pointer_enter());
@@ -312,8 +320,28 @@ fn document_output_exposes_context_and_keyboard_query_helpers() {
         context_output.focused_target().map(ElementId::as_str),
         Some("search")
     );
+    assert_eq!(
+        context_output.first_checked_target().map(ElementId::as_str),
+        Some("remember")
+    );
+    assert_eq!(
+        context_output.first_enabled_target().map(ElementId::as_str),
+        Some("root")
+    );
+    assert_eq!(
+        context_output
+            .first_disabled_target()
+            .map(ElementId::as_str),
+        Some("stop")
+    );
     assert!(context_output.focused_target_is("search"));
     assert!(!context_output.focused_target_is("menu"));
+    assert!(context_output.checked_target_is("remember"));
+    assert!(!context_output.checked_target_is("menu"));
+    assert!(context_output.enabled_target_is("root"));
+    assert!(!context_output.enabled_target_is("stop"));
+    assert!(context_output.disabled_target_is("stop"));
+    assert!(!context_output.disabled_target_is("remember"));
     assert_eq!(
         context_output
             .first_focused()
@@ -1596,6 +1624,9 @@ fn document_action_frame_supports_app_update_loop_queries() {
     assert_eq!(click_action.command(), "run");
     assert_eq!(click_action.action(), &AppAction::Run);
     assert!(click_action.matches_intent(ElementBehaviorEvent::Click));
+    assert!(click_action.matches_target_intent("run", ElementBehaviorEvent::Click));
+    assert!(click_action.matches_binding("run", ElementBehaviorEvent::Click, "run"));
+    assert!(!click_action.matches_binding("run", ElementBehaviorEvent::KeyDown, "run"));
     assert!(click_action.is_click());
     assert!(!click_action.is_context_menu());
     assert!(!click_action.is_pointer_enter());
@@ -1604,6 +1635,10 @@ fn document_action_frame_supports_app_update_loop_queries() {
     assert!(!click_action.is_key_up());
     assert!(!click_action.is_drag());
     assert!(click_action.is_action(&AppAction::Run));
+    let owned_click_action = click_action.clone();
+    assert!(owned_click_action.matches_target_intent("run", ElementBehaviorEvent::Click));
+    assert!(owned_click_action.matches_binding("run", ElementBehaviorEvent::Click, "run"));
+    assert!(!owned_click_action.matches_binding("cancel", ElementBehaviorEvent::Click, "run"));
     assert_eq!(click_frame.actions_for("run").count(), 1);
     assert_eq!(
         click_frame
@@ -6538,6 +6573,24 @@ fn document_snapshot_queries_resolved_elements_without_mutation_access() {
     assert!(output.contains_checked());
     assert!(output.contains_enabled());
     assert!(output.contains_disabled());
+    assert_eq!(
+        output.first_checked_target().map(ElementId::as_str),
+        Some("drop-target")
+    );
+    assert_eq!(
+        output.first_enabled_target().map(ElementId::as_str),
+        Some("root")
+    );
+    assert_eq!(
+        output.first_disabled_target().map(ElementId::as_str),
+        Some("plain-card")
+    );
+    assert!(output.checked_target_is("drop-target"));
+    assert!(!output.checked_target_is("plain-card"));
+    assert!(output.enabled_target_is("root"));
+    assert!(!output.enabled_target_is("plain-card"));
+    assert!(output.disabled_target_is("plain-card"));
+    assert!(!output.disabled_target_is("drop-target"));
     assert!(
         output
             .first_checked()

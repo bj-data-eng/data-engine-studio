@@ -146,8 +146,35 @@ impl DocumentOutput {
         focused_element(&self.layout).map(|element| &element.id)
     }
 
+    pub fn first_checked_target(&self) -> Option<&ElementId> {
+        checked_element(&self.layout).map(|element| &element.id)
+    }
+
+    pub fn first_enabled_target(&self) -> Option<&ElementId> {
+        enabled_element(&self.layout).map(|element| &element.id)
+    }
+
+    pub fn first_disabled_target(&self) -> Option<&ElementId> {
+        disabled_element(&self.layout).map(|element| &element.id)
+    }
+
     pub fn focused_target_is(&self, target: &str) -> bool {
         self.first_focused()
+            .is_some_and(|element| element.id_is(target))
+    }
+
+    pub fn checked_target_is(&self, target: &str) -> bool {
+        self.first_checked()
+            .is_some_and(|element| element.id_is(target))
+    }
+
+    pub fn enabled_target_is(&self, target: &str) -> bool {
+        self.first_enabled()
+            .is_some_and(|element| element.id_is(target))
+    }
+
+    pub fn disabled_target_is(&self, target: &str) -> bool {
+        self.first_disabled()
             .is_some_and(|element| element.id_is(target))
     }
 
@@ -625,6 +652,27 @@ fn focused_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
     element.children.iter().find_map(focused_element)
 }
 
+fn checked_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
+    if element.selected {
+        return Some(element);
+    }
+    element.children.iter().find_map(checked_element)
+}
+
+fn enabled_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
+    if !element.disabled {
+        return Some(element);
+    }
+    element.children.iter().find_map(enabled_element)
+}
+
+fn disabled_element(element: &ResolvedElement) -> Option<&ResolvedElement> {
+    if element.disabled {
+        return Some(element);
+    }
+    element.children.iter().find_map(disabled_element)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocumentCommand {
     pub target: ElementId,
@@ -673,6 +721,21 @@ impl DocumentCommand {
     /// Returns true when this command was emitted by the supplied behavior intent.
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
         intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this command was emitted by the supplied element and behavior intent.
+    pub fn matches_target_intent(&self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.target_is(target) && self.matches_intent(intent)
+    }
+
+    /// Returns true when this command matches an authored command binding.
+    pub fn matches_binding(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        command: &str,
+    ) -> bool {
+        self.matches_target_intent(target, intent) && self.command_is(command)
     }
 
     /// Returns true when this command was emitted by click intent.
@@ -763,6 +826,21 @@ impl<'a> DocumentCommandRef<'a> {
     /// Returns true when this command was emitted by the supplied behavior intent.
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
         intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this command was emitted by the supplied element and behavior intent.
+    pub fn matches_target_intent(&self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.target_is(target) && self.matches_intent(intent)
+    }
+
+    /// Returns true when this command matches an authored command binding.
+    pub fn matches_binding(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        command: &str,
+    ) -> bool {
+        self.matches_target_intent(target, intent) && self.command_is(command)
     }
 
     /// Returns true when this command was emitted by click intent.
@@ -2481,6 +2559,21 @@ impl<Action> DocumentCommandActionRef<'_, Action> {
         intent.matches_document_event(&self.event)
     }
 
+    /// Returns true when this action was emitted by the supplied element and behavior intent.
+    pub fn matches_target_intent(&self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.target_is(target) && self.matches_intent(intent)
+    }
+
+    /// Returns true when this typed action matches an authored command binding.
+    pub fn matches_binding(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        command: &str,
+    ) -> bool {
+        self.matches_target_intent(target, intent) && self.command_is(command)
+    }
+
     /// Returns true when this action was emitted by click intent.
     pub fn is_click(&self) -> bool {
         self.matches_intent(ElementBehaviorEvent::Click)
@@ -2583,6 +2676,21 @@ impl<Action> DocumentCommandAction<Action> {
     /// Returns true when this action was emitted by the supplied behavior intent.
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
         intent.matches_document_event(&self.event)
+    }
+
+    /// Returns true when this action was emitted by the supplied element and behavior intent.
+    pub fn matches_target_intent(&self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.target_is(target) && self.matches_intent(intent)
+    }
+
+    /// Returns true when this typed action matches an authored command binding.
+    pub fn matches_binding(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        command: &str,
+    ) -> bool {
+        self.matches_target_intent(target, intent) && self.command_is(command)
     }
 
     /// Returns true when this action was emitted by click intent.
@@ -2766,6 +2874,11 @@ impl DocumentEvent {
     /// Returns true when this event matches the supplied authored behavior intent.
     pub fn matches_intent(&self, intent: ElementBehaviorEvent) -> bool {
         intent.matches_document_event(&self.kind)
+    }
+
+    /// Returns true when this event was emitted by the supplied element and behavior intent.
+    pub fn matches_target_intent(&self, target: &str, intent: ElementBehaviorEvent) -> bool {
+        self.target_is(target) && self.matches_intent(intent)
     }
 
     /// Returns true when this event is click intent.
