@@ -520,6 +520,10 @@ impl ElementSpec {
         self
     }
 
+    pub fn enabled(self, enabled: bool) -> Self {
+        self.disabled(!enabled)
+    }
+
     pub fn disable(self) -> Self {
         self.disabled(true)
     }

@@ -2300,7 +2300,7 @@ fn document_projection_batches_app_state_updates() {
     let restore = DocumentProjection::new()
         .select("status")
         .focus("status")
-        .enable("status");
+        .set_enabled("status", true);
     let restore_report = view.project(&restore).unwrap();
     let restore_output = view.update();
     let restore_status = restore_output.snapshot().find("status").unwrap();
@@ -2509,7 +2509,7 @@ fn element_projection_patch_groups_reusable_state_updates() {
     let reset_patch = ElementProjectionPatch::new()
         .deselect_if(true)
         .enable_if(false)
-        .disable_if(true)
+        .enabled(false)
         .blur_if(true)
         .focus_if(false)
         .data_if("state", "ready", false)
@@ -3477,7 +3477,7 @@ fn document_widget_can_declare_single_element_projection_patch() {
                     .text(if self.ready { "Ready" } else { "Waiting" })
                     .data("state", if self.ready { "ready" } else { "waiting" })
                     .class_if("is-ready", self.ready)
-                    .disabled(!self.ready),
+                    .enabled(self.ready),
             ))
         }
     }
@@ -3686,7 +3686,7 @@ fn document_widgets_can_project_retained_state_through_the_view_front_door() {
                 .text(self.label)
                 .data("state", if self.ready { "ready" } else { "waiting" })
                 .class("is-ready", self.ready)
-                .disabled(!self.ready);
+                .enabled(self.ready);
         }
     }
 
@@ -5613,6 +5613,7 @@ fn document_builder_supports_conditional_authoring_helpers() {
             .aria_if("label", "Run", true)
             .aria_if("disabled", "true", false)
             .select_if(selected)
+            .enabled(!disabled)
             .disable_if(disabled)
             .focus_if(focused)
             .value_if("ready", show_badge)
@@ -5747,6 +5748,7 @@ fn document_builder_supports_conditional_authoring_helpers() {
         .data_if("mode", "demo", true)
         .aria_if("hidden", "true", false)
         .selected_if(true)
+        .enabled(true)
         .disable_if(false)
         .focus_if(true)
         .selectable_text_if(true)
@@ -6213,7 +6215,8 @@ fn document_mutation_can_set_text_value_and_authored_states() {
     assert!(document.remove_data("control", "state").unwrap());
     assert!(document.remove_aria("control", "label").unwrap());
     assert!(document.deselect("control").unwrap());
-    assert!(document.enable("control").unwrap());
+    assert!(document.set_enabled("control", true).unwrap());
+    assert!(!document.set_enabled("control", true).unwrap());
     assert!(document.blur("control").unwrap());
 
     let output = engine.update(&mut document, &stylesheet);

@@ -577,6 +577,10 @@ impl Document {
         Ok(true)
     }
 
+    pub fn set_enabled(&mut self, id: impl Into<ElementId>, enabled: bool) -> DocumentResult<bool> {
+        self.set_disabled(id, !enabled)
+    }
+
     pub fn disable(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
         self.set_disabled(id, true)
     }
@@ -2788,6 +2792,11 @@ impl<'a> ElementBuilder<'a> {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.spec.disabled = disabled;
+        self
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.spec = self.spec.enabled(enabled);
         self
     }
 
