@@ -161,6 +161,14 @@ impl DocumentOutput {
             .filter(move |command| command.event == kind)
     }
 
+    pub fn commands_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = DocumentCommandRef<'_>> {
+        self.command_events()
+            .filter(move |command| intent.matches_document_event(&command.event))
+    }
+
     pub fn commands_for<'a>(
         &'a self,
         target: &'a str,
@@ -177,6 +185,16 @@ impl DocumentOutput {
     pub fn has_command_kind(&self, target: &str, kind: DocumentEventKind, command: &str) -> bool {
         self.commands_for(target)
             .any(|event| event.event == kind && event.command == command)
+    }
+
+    pub fn has_command_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        command: &str,
+    ) -> bool {
+        self.commands_for(target)
+            .any(|event| intent.matches_document_event(&event.event) && event.command == command)
     }
 
     pub fn text_selection(&self) -> Option<&DocumentTextSelection> {
@@ -398,6 +416,22 @@ impl<Action> DocumentCommandRegistry<Action> {
         })
     }
 
+    pub fn command_actions_for_intent<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
+        output.commands_for_intent(intent).filter_map(|command| {
+            let action = self.action_for_event(command)?;
+            Some(DocumentCommandActionRef {
+                target: command.target,
+                event: command.event,
+                command: command.command,
+                action,
+            })
+        })
+    }
+
     pub fn command_actions_for<'a>(
         &'a self,
         output: &'a DocumentOutput,
@@ -411,7 +445,7 @@ impl<Action> DocumentCommandRegistry<Action> {
         &'a self,
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
-        self.command_actions_of_kind(output, DocumentEventKind::Clicked)
+        self.command_actions_for_intent(output, ElementBehaviorEvent::Click)
     }
 
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {
@@ -471,6 +505,33 @@ impl<Action> DocumentCommandRegistry<Action> {
         report
     }
 
+    pub fn dispatch_intent<'a, Handler>(
+        &'a self,
+        output: &'a DocumentOutput,
+        intent: ElementBehaviorEvent,
+        mut handler: Handler,
+    ) -> DocumentCommandDispatchReport
+    where
+        Handler: FnMut(DocumentCommandActionRef<'a, Action>),
+    {
+        let mut report = DocumentCommandDispatchReport::default();
+        for command in output.commands_for_intent(intent) {
+            report.commands += 1;
+            let Some(action) = self.action_for_event(command) else {
+                report.unhandled += 1;
+                continue;
+            };
+            report.handled += 1;
+            handler(DocumentCommandActionRef {
+                target: command.target,
+                event: command.event,
+                command: command.command,
+                action,
+            });
+        }
+        report
+    }
+
     pub fn dispatch_clicked<'a, Handler>(
         &'a self,
         output: &'a DocumentOutput,
@@ -479,7 +540,7 @@ impl<Action> DocumentCommandRegistry<Action> {
     where
         Handler: FnMut(DocumentCommandActionRef<'a, Action>),
     {
-        self.dispatch_kind(output, DocumentEventKind::Clicked, handler)
+        self.dispatch_intent(output, ElementBehaviorEvent::Click, handler)
     }
 }
 

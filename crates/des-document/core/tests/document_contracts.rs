@@ -233,13 +233,27 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
     let click_actions = registry.command_actions(&click_output).collect::<Vec<_>>();
     let key_actions = registry.command_actions(&key_output).collect::<Vec<_>>();
+    let key_intent_actions = registry
+        .command_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown)
+        .collect::<Vec<_>>();
 
     assert_eq!(registry.action_for("commit"), Some(&AppAction::Fallback));
+    assert!(click_output.has_command_intent("commit", ElementBehaviorEvent::Click, "commit"));
+    assert!(key_output.has_command_intent("commit", ElementBehaviorEvent::KeyDown, "commit"));
+    assert_eq!(
+        key_output
+            .commands_for_intent(ElementBehaviorEvent::KeyDown)
+            .map(|command| command.command)
+            .collect::<Vec<_>>(),
+        vec!["commit"]
+    );
     assert_eq!(click_actions.len(), 1);
     assert_eq!(*click_actions[0].action, AppAction::CommitByClick);
     assert_eq!(click_actions[0].event, DocumentEventKind::Clicked);
     assert_eq!(key_actions.len(), 1);
     assert_eq!(*key_actions[0].action, AppAction::CommitByKeyboard);
+    assert_eq!(key_intent_actions.len(), 1);
+    assert_eq!(*key_intent_actions[0].action, AppAction::CommitByKeyboard);
     assert_eq!(
         key_actions[0].event,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter))
@@ -322,6 +336,16 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Escape)),
         |_| {},
     );
+    let mut key_intent = Vec::new();
+    let key_intent_report =
+        registry.dispatch_intent(&key_output, ElementBehaviorEvent::KeyDown, |command| {
+            key_intent.push((
+                command.target.clone(),
+                command.event,
+                command.command.to_owned(),
+                *command.action,
+            ));
+        });
 
     assert_eq!(click_report.commands, 1);
     assert_eq!(click_report.handled, 1);
@@ -336,6 +360,9 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
     assert_eq!(clicked_only_report.handled, 1);
     assert_eq!(clicked_only_report.unhandled, 0);
     assert_eq!(key_only_report.commands, 0);
+    assert_eq!(key_intent_report.commands, 1);
+    assert_eq!(key_intent_report.handled, 1);
+    assert_eq!(key_intent_report.unhandled, 0);
     assert_eq!(
         handled,
         vec![
@@ -360,6 +387,15 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
             DocumentEventKind::Clicked,
             "run-query".to_owned(),
             AppAction::RunQuery,
+        )]
+    );
+    assert_eq!(
+        key_intent,
+        vec![(
+            ElementId::new("cancel"),
+            DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Escape)),
+            "cancel-query".to_owned(),
+            AppAction::CancelQuery,
         )]
     );
 }
