@@ -690,15 +690,21 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     let commit_values = registry
         .action_values_for(&click_output, "commit")
         .collect::<Vec<_>>();
+    let collected_clicked_values = registry.collect_clicked_action_values(&click_output);
     let key_values =
         registry.collect_action_values_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
     let key_kind_values = registry.collect_action_values_of_kind(
         &key_output,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
     );
+    let collected_key_values = registry.collect_key_down_action_values(&key_output);
     let borrowed_key_values = registry
         .key_down_action_values(&key_output)
         .collect::<Vec<_>>();
+    let hover_values = registry
+        .pointer_enter_action_values(&hover_output)
+        .collect::<Vec<_>>();
+    let collected_hover_values = registry.collect_pointer_enter_action_values(&hover_output);
 
     assert_eq!(
         click_actions,
@@ -714,6 +720,7 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     assert_eq!(click_values, vec![AppAction::CommitByClick]);
     assert_eq!(clicked_values, vec![&AppAction::CommitByClick]);
     assert_eq!(commit_values, vec![&AppAction::CommitByClick]);
+    assert_eq!(collected_clicked_values, vec![AppAction::CommitByClick]);
     assert_eq!(
         key_actions,
         vec![DocumentCommandAction {
@@ -725,6 +732,7 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     );
     assert_eq!(key_values, vec![AppAction::CommitByKeyboard]);
     assert_eq!(key_kind_values, vec![AppAction::CommitByKeyboard]);
+    assert_eq!(collected_key_values, vec![AppAction::CommitByKeyboard]);
     assert_eq!(borrowed_key_values, vec![&AppAction::CommitByKeyboard]);
     assert_eq!(
         hover_actions,
@@ -735,6 +743,8 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
             action: AppAction::Inspect,
         }]
     );
+    assert_eq!(hover_values, vec![&AppAction::Inspect]);
+    assert_eq!(collected_hover_values, vec![AppAction::Inspect]);
 }
 
 #[test]
@@ -1050,6 +1060,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .map(|action| &action.action),
         Some(&AppAction::Inspect)
     );
+    assert_eq!(
+        hover_frame
+            .pointer_enter_action_values()
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Inspect]
+    );
+    assert_eq!(
+        hover_frame.first_pointer_enter_action_value(),
+        Some(&AppAction::Inspect)
+    );
     assert!(
         hover_frame
             .first_pointer_enter_action()
@@ -1066,6 +1086,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
         leave_frame
             .first_pointer_leave_action()
             .map(|action| &action.action),
+        Some(&AppAction::Uninspect)
+    );
+    assert_eq!(
+        leave_frame
+            .pointer_leave_action_values()
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Uninspect]
+    );
+    assert_eq!(
+        leave_frame.first_pointer_leave_action_value(),
         Some(&AppAction::Uninspect)
     );
     assert!(
@@ -1093,6 +1123,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .map(|action| &action.action),
         Some(&AppAction::Grab)
     );
+    assert_eq!(
+        pointer_down_frame
+            .pointer_down_action_values()
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Grab]
+    );
+    assert_eq!(
+        pointer_down_frame.first_pointer_down_action_value(),
+        Some(&AppAction::Grab)
+    );
     assert!(pointer_down_frame.contains_pointer_down_action(&AppAction::Grab));
 
     let drag_start_frame = view.update_with_input_actions(
@@ -1112,9 +1152,23 @@ fn document_action_frame_supports_app_update_loop_queries() {
             .map(|action| &action.action),
         Some(&AppAction::Drag)
     );
+    assert_eq!(
+        drag_start_frame
+            .drag_start_action_values()
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Drag]
+    );
+    assert_eq!(
+        drag_start_frame.first_drag_start_action_value(),
+        Some(&AppAction::Drag)
+    );
     assert!(drag_start_frame.contains_drag_start_action(&AppAction::Drag));
     assert_eq!(drag_start_frame.drag_actions().count(), 0);
+    assert_eq!(drag_start_frame.drag_action_values().count(), 0);
+    assert_eq!(drag_start_frame.first_drag_action_value(), None);
     assert_eq!(drag_start_frame.drag_end_actions().count(), 0);
+    assert_eq!(drag_start_frame.drag_end_action_values().count(), 0);
+    assert_eq!(drag_start_frame.first_drag_end_action_value(), None);
 
     let pointer_up_frame = view.update_with_input_actions(
         DocumentInput::pointer_at(Point::new(32.0, 104.0)),
@@ -1131,6 +1185,16 @@ fn document_action_frame_supports_app_update_loop_queries() {
         pointer_up_frame
             .first_pointer_up_action()
             .map(|action| &action.action),
+        Some(&AppAction::Drop)
+    );
+    assert_eq!(
+        pointer_up_frame
+            .pointer_up_action_values()
+            .collect::<Vec<_>>(),
+        vec![&AppAction::Drop]
+    );
+    assert_eq!(
+        pointer_up_frame.first_pointer_up_action_value(),
         Some(&AppAction::Drop)
     );
     assert!(pointer_up_frame.contains_pointer_up_action(&AppAction::Drop));

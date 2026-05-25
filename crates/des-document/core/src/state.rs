@@ -1426,11 +1426,25 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::PointerEnter)
     }
 
+    pub fn pointer_enter_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::PointerEnter)
+    }
+
     pub fn pointer_leave_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::PointerLeave)
+    }
+
+    pub fn pointer_leave_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::PointerLeave)
     }
 
     pub fn pointer_down_actions<'a>(
@@ -1440,11 +1454,25 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::PointerDown)
     }
 
+    pub fn pointer_down_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::PointerDown)
+    }
+
     pub fn pointer_up_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::PointerUp)
+    }
+
+    pub fn pointer_up_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::PointerUp)
     }
 
     pub fn drag_start_actions<'a>(
@@ -1454,11 +1482,25 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::DragStart)
     }
 
+    pub fn drag_start_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::DragStart)
+    }
+
     pub fn drag_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::Drag)
+    }
+
+    pub fn drag_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::Drag)
     }
 
     pub fn drag_end_actions<'a>(
@@ -1468,11 +1510,25 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::DragEnd)
     }
 
+    pub fn drag_end_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::DragEnd)
+    }
+
     pub fn scroll_actions<'a>(
         &'a self,
         output: &'a DocumentOutput,
     ) -> impl Iterator<Item = DocumentCommandActionRef<'a, Action>> + 'a {
         self.command_actions_for_intent(output, ElementBehaviorEvent::Scroll)
+    }
+
+    pub fn scroll_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::Scroll)
     }
 
     pub fn key_down_actions<'a>(
@@ -1496,6 +1552,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.command_actions_for_intent(output, ElementBehaviorEvent::KeyUp)
     }
 
+    pub fn key_up_action_values<'a>(
+        &'a self,
+        output: &'a DocumentOutput,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.action_values_for_intent(output, ElementBehaviorEvent::KeyUp)
+    }
+
     pub fn collect_clicked_actions(
         &self,
         output: &DocumentOutput,
@@ -1506,6 +1569,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.clicked_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
+    }
+
+    pub fn collect_clicked_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.clicked_action_values(output).cloned().collect()
     }
 
     pub fn collect_pointer_enter_actions(
@@ -1520,6 +1590,13 @@ impl<Action> DocumentCommandRegistry<Action> {
             .collect()
     }
 
+    pub fn collect_pointer_enter_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.pointer_enter_action_values(output).cloned().collect()
+    }
+
     pub fn collect_pointer_leave_actions(
         &self,
         output: &DocumentOutput,
@@ -1530,6 +1607,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.pointer_leave_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
+    }
+
+    pub fn collect_pointer_leave_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.pointer_leave_action_values(output).cloned().collect()
     }
 
     pub fn collect_pointer_down_actions(
@@ -1544,6 +1628,13 @@ impl<Action> DocumentCommandRegistry<Action> {
             .collect()
     }
 
+    pub fn collect_pointer_down_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.pointer_down_action_values(output).cloned().collect()
+    }
+
     pub fn collect_pointer_up_actions(
         &self,
         output: &DocumentOutput,
@@ -1554,6 +1645,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.pointer_up_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
+    }
+
+    pub fn collect_pointer_up_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.pointer_up_action_values(output).cloned().collect()
     }
 
     pub fn collect_drag_start_actions(
@@ -1568,6 +1666,13 @@ impl<Action> DocumentCommandRegistry<Action> {
             .collect()
     }
 
+    pub fn collect_drag_start_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.drag_start_action_values(output).cloned().collect()
+    }
+
     pub fn collect_drag_actions(
         &self,
         output: &DocumentOutput,
@@ -1578,6 +1683,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.drag_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
+    }
+
+    pub fn collect_drag_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.drag_action_values(output).cloned().collect()
     }
 
     pub fn collect_drag_end_actions(
@@ -1592,6 +1704,13 @@ impl<Action> DocumentCommandRegistry<Action> {
             .collect()
     }
 
+    pub fn collect_drag_end_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.drag_end_action_values(output).cloned().collect()
+    }
+
     pub fn collect_scroll_actions(
         &self,
         output: &DocumentOutput,
@@ -1602,6 +1721,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.scroll_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
+    }
+
+    pub fn collect_scroll_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.scroll_action_values(output).cloned().collect()
     }
 
     pub fn collect_key_down_actions(
@@ -1616,6 +1742,13 @@ impl<Action> DocumentCommandRegistry<Action> {
             .collect()
     }
 
+    pub fn collect_key_down_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.key_down_action_values(output).cloned().collect()
+    }
+
     pub fn collect_key_up_actions(
         &self,
         output: &DocumentOutput,
@@ -1626,6 +1759,13 @@ impl<Action> DocumentCommandRegistry<Action> {
         self.key_up_actions(output)
             .map(DocumentCommandAction::from)
             .collect()
+    }
+
+    pub fn collect_key_up_action_values(&self, output: &DocumentOutput) -> Vec<Action>
+    where
+        Action: Clone,
+    {
+        self.key_up_action_values(output).cloned().collect()
     }
 
     pub fn bindings(&self) -> &[DocumentCommandBinding<Action>] {

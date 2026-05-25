@@ -185,6 +185,16 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_for_intent(ElementBehaviorEvent::PointerEnter)
     }
 
+    /// Iterates only typed app action values emitted by pointer-enter intent.
+    pub fn pointer_enter_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
+    /// Returns only the first typed app action value emitted by pointer-enter intent.
+    pub fn first_pointer_enter_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::PointerEnter)
+    }
+
     /// Iterates typed app actions emitted by pointer-leave intent.
     pub fn pointer_leave_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::PointerLeave)
@@ -193,6 +203,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by pointer-leave intent.
     pub fn first_pointer_leave_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    /// Iterates only typed app action values emitted by pointer-leave intent.
+    pub fn pointer_leave_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::PointerLeave)
+    }
+
+    /// Returns only the first typed app action value emitted by pointer-leave intent.
+    pub fn first_pointer_leave_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::PointerLeave)
     }
 
     /// Iterates typed app actions emitted by pointer-down intent.
@@ -205,6 +225,16 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_for_intent(ElementBehaviorEvent::PointerDown)
     }
 
+    /// Iterates only typed app action values emitted by pointer-down intent.
+    pub fn pointer_down_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::PointerDown)
+    }
+
+    /// Returns only the first typed app action value emitted by pointer-down intent.
+    pub fn first_pointer_down_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::PointerDown)
+    }
+
     /// Iterates typed app actions emitted by pointer-up intent.
     pub fn pointer_up_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::PointerUp)
@@ -213,6 +243,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by pointer-up intent.
     pub fn first_pointer_up_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::PointerUp)
+    }
+
+    /// Iterates only typed app action values emitted by pointer-up intent.
+    pub fn pointer_up_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::PointerUp)
+    }
+
+    /// Returns only the first typed app action value emitted by pointer-up intent.
+    pub fn first_pointer_up_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::PointerUp)
     }
 
     /// Iterates typed app actions emitted by drag-start intent.
@@ -225,6 +265,16 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_for_intent(ElementBehaviorEvent::DragStart)
     }
 
+    /// Iterates only typed app action values emitted by drag-start intent.
+    pub fn drag_start_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::DragStart)
+    }
+
+    /// Returns only the first typed app action value emitted by drag-start intent.
+    pub fn first_drag_start_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::DragStart)
+    }
+
     /// Iterates typed app actions emitted by drag-move intent.
     pub fn drag_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::Drag)
@@ -233,6 +283,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by drag-move intent.
     pub fn first_drag_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::Drag)
+    }
+
+    /// Iterates only typed app action values emitted by drag-move intent.
+    pub fn drag_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::Drag)
+    }
+
+    /// Returns only the first typed app action value emitted by drag-move intent.
+    pub fn first_drag_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::Drag)
     }
 
     /// Iterates typed app actions emitted by drag-end intent.
@@ -245,6 +305,16 @@ impl<Action> DocumentActionFrame<Action> {
         self.first_action_for_intent(ElementBehaviorEvent::DragEnd)
     }
 
+    /// Iterates only typed app action values emitted by drag-end intent.
+    pub fn drag_end_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::DragEnd)
+    }
+
+    /// Returns only the first typed app action value emitted by drag-end intent.
+    pub fn first_drag_end_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::DragEnd)
+    }
+
     /// Iterates typed app actions emitted by scroll intent.
     pub fn scroll_actions(&self) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
         self.actions_for_intent(ElementBehaviorEvent::Scroll)
@@ -253,6 +323,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by scroll intent.
     pub fn first_scroll_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    /// Iterates only typed app action values emitted by scroll intent.
+    pub fn scroll_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::Scroll)
+    }
+
+    /// Returns only the first typed app action value emitted by scroll intent.
+    pub fn first_scroll_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::Scroll)
     }
 
     /// Iterates typed app actions emitted by key-down intent.
@@ -283,6 +363,16 @@ impl<Action> DocumentActionFrame<Action> {
     /// Returns the first typed app action emitted by key-up intent.
     pub fn first_key_up_action(&self) -> Option<&DocumentCommandAction<Action>> {
         self.first_action_for_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Iterates only typed app action values emitted by key-up intent.
+    pub fn key_up_action_values(&self) -> impl Iterator<Item = &Action> {
+        self.action_values_for_intent(ElementBehaviorEvent::KeyUp)
+    }
+
+    /// Returns only the first typed app action value emitted by key-up intent.
+    pub fn first_key_up_action_value(&self) -> Option<&Action> {
+        self.first_action_value_for_intent(ElementBehaviorEvent::KeyUp)
     }
 
     /// Returns true when the frame contains the supplied typed action.
