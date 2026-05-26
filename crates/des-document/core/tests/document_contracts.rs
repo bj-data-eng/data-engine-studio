@@ -694,12 +694,13 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
         vec![&AppAction::Focus]
     );
     assert_eq!(
-        registry.collect_focus_action_values(focus_frame.output()),
+        registry
+            .collect_action_values_for_intent(focus_frame.output(), ElementBehaviorEvent::Focus),
         vec![AppAction::Focus]
     );
     assert_eq!(
         registry
-            .focus_actions(focus_frame.output())
+            .command_actions_for_intent(focus_frame.output(), ElementBehaviorEvent::Focus)
             .map(|action| action.command().to_owned())
             .collect::<Vec<_>>(),
         vec!["search.focus".to_owned()]
@@ -727,7 +728,7 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
         Some(&AppAction::Blur)
     );
     assert_eq!(
-        registry.collect_blur_action_values(blur_frame.output()),
+        registry.collect_action_values_for_intent(blur_frame.output(), ElementBehaviorEvent::Blur),
         vec![AppAction::Blur]
     );
 
@@ -769,7 +770,8 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
         Some(&AppAction::Select)
     );
     assert_eq!(
-        registry.collect_select_action_values(select_frame.output()),
+        registry
+            .collect_action_values_for_intent(select_frame.output(), ElementBehaviorEvent::Select),
         vec![AppAction::Select]
     );
     assert_eq!(
@@ -854,7 +856,11 @@ fn removing_focused_element_emits_blur_without_dispatching_missing_hook() {
     assert!(focused.focus_event_for("search"));
     assert!(removed.blur_event_for("search"));
     assert!(removed.snapshot().find("search").is_none());
-    assert!(registry.collect_blur_action_values(&removed).is_empty());
+    assert!(
+        registry
+            .collect_action_values_for_intent(&removed, ElementBehaviorEvent::Blur)
+            .is_empty()
+    );
 }
 
 #[test]
@@ -914,7 +920,9 @@ fn document_command_registry_maps_hook_commands_to_typed_actions() {
     let output =
         view.update_with_input(pointer_input(Point::new(8.0, 8.0), true, false, true, 0.0));
     let actions = registry.command_actions(&output).collect::<Vec<_>>();
-    let clicked_actions = registry.clicked_actions(&output).collect::<Vec<_>>();
+    let clicked_actions = registry
+        .command_actions_for_intent(&output, ElementBehaviorEvent::Click)
+        .collect::<Vec<_>>();
     let run_actions = registry
         .command_actions_for(&output, "run")
         .collect::<Vec<_>>();
@@ -1058,16 +1066,20 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
     let context_output =
         view.update_with_input(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
-    let click_actions = registry.clicked_actions(&click_output).collect::<Vec<_>>();
+    let click_actions = registry
+        .command_actions_for_intent(&click_output, ElementBehaviorEvent::Click)
+        .collect::<Vec<_>>();
     let key_actions = registry.command_actions(&key_output).collect::<Vec<_>>();
     let context_actions = registry
-        .context_menu_actions(&context_output)
+        .command_actions_for_intent(&context_output, ElementBehaviorEvent::ContextMenu)
         .collect::<Vec<_>>();
     let context_values = registry
-        .context_menu_action_values(&context_output)
+        .action_values_for_intent(&context_output, ElementBehaviorEvent::ContextMenu)
         .collect::<Vec<_>>();
-    let context_owned_actions = registry.collect_context_menu_actions(&context_output);
-    let context_owned_values = registry.collect_context_menu_action_values(&context_output);
+    let context_owned_actions =
+        registry.collect_actions_for_intent(&context_output, ElementBehaviorEvent::ContextMenu);
+    let context_owned_values = registry
+        .collect_action_values_for_intent(&context_output, ElementBehaviorEvent::ContextMenu);
     let mut dispatched_context_values = Vec::new();
     let context_dispatch_report = registry.dispatch_intent(
         &context_output,
@@ -1077,10 +1089,10 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
         },
     );
     let hover_actions = registry
-        .pointer_enter_actions(&hover_output)
+        .command_actions_for_intent(&hover_output, ElementBehaviorEvent::PointerEnter)
         .collect::<Vec<_>>();
     let leave_actions = registry
-        .pointer_leave_actions(&leave_output)
+        .command_actions_for_intent(&leave_output, ElementBehaviorEvent::PointerLeave)
         .collect::<Vec<_>>();
     let key_intent_actions = registry
         .command_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown)
@@ -1412,32 +1424,38 @@ fn document_command_registry_collects_owned_app_actions_for_update_loops() {
     let key_output = view.update_with_input(DocumentInput::key_down(DocumentKey::Enter));
 
     let click_actions = registry.collect_actions(&click_output);
-    let clicked_actions = registry.collect_clicked_actions(&click_output);
-    let key_actions = registry.collect_key_down_actions(&key_output);
-    let hover_actions = registry.collect_pointer_enter_actions(&hover_output);
+    let clicked_actions =
+        registry.collect_actions_for_intent(&click_output, ElementBehaviorEvent::Click);
+    let key_actions =
+        registry.collect_actions_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
+    let hover_actions =
+        registry.collect_actions_for_intent(&hover_output, ElementBehaviorEvent::PointerEnter);
     let commit_actions = registry.collect_actions_for(&click_output, "commit");
     let click_values = registry.collect_action_values(&click_output);
     let clicked_values = registry
-        .clicked_action_values(&click_output)
+        .action_values_for_intent(&click_output, ElementBehaviorEvent::Click)
         .collect::<Vec<_>>();
     let commit_values = registry
         .action_values_for(&click_output, "commit")
         .collect::<Vec<_>>();
-    let collected_clicked_values = registry.collect_clicked_action_values(&click_output);
+    let collected_clicked_values =
+        registry.collect_action_values_for_intent(&click_output, ElementBehaviorEvent::Click);
     let key_values =
         registry.collect_action_values_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
     let key_kind_values = registry.collect_action_values_of_kind(
         &key_output,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Enter)),
     );
-    let collected_key_values = registry.collect_key_down_action_values(&key_output);
+    let collected_key_values =
+        registry.collect_action_values_for_intent(&key_output, ElementBehaviorEvent::KeyDown);
     let borrowed_key_values = registry
-        .key_down_action_values(&key_output)
+        .action_values_for_intent(&key_output, ElementBehaviorEvent::KeyDown)
         .collect::<Vec<_>>();
     let hover_values = registry
-        .pointer_enter_action_values(&hover_output)
+        .action_values_for_intent(&hover_output, ElementBehaviorEvent::PointerEnter)
         .collect::<Vec<_>>();
-    let collected_hover_values = registry.collect_pointer_enter_action_values(&hover_output);
+    let collected_hover_values = registry
+        .collect_action_values_for_intent(&hover_output, ElementBehaviorEvent::PointerEnter);
 
     assert_eq!(
         click_actions,
