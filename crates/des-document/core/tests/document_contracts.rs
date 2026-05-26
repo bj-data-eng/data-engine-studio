@@ -5010,148 +5010,179 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let toggle_registry = toggle.command_registry();
     let toggle_bindings = toggle.command_bindings();
     let close_binding = close.command_binding().unwrap();
-    let direct_toggle_frame = toggle.update_with_input_actions(
-        Size::new(320.0, 180.0),
-        DocumentInput::primary_click(Point::new(8.0, 8.0)),
-    );
-    let try_direct_toggle_frame = toggle
-        .try_update_with_input_actions(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-        )
-        .unwrap();
+    let mut direct_toggle_surface = toggle.action_surface(Size::new(320.0, 180.0));
+    let direct_toggle_frame = direct_toggle_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mut try_direct_toggle_surface = toggle.try_action_surface(Size::new(320.0, 180.0)).unwrap();
+    let try_direct_toggle_frame = try_direct_toggle_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut dispatched_actions = Vec::new();
-    let (direct_dispatch_frame, direct_dispatch_report) = toggle.update_with_input_and_dispatch(
-        Size::new(320.0, 180.0),
-        DocumentInput::primary_click(Point::new(8.0, 8.0)),
-        |command| dispatched_actions.push(*command.action()),
-    );
+    let mut direct_dispatch_surface = toggle.action_surface(Size::new(320.0, 180.0));
+    let (direct_dispatch_frame, direct_dispatch_report) = direct_dispatch_surface
+        .update_with_input_and_dispatch(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |command| dispatched_actions.push(*command.action()),
+        );
     let mut directly_dispatched_values = Vec::new();
-    let (direct_value_dispatch_frame, direct_value_dispatch_report) = toggle
+    let mut direct_value_dispatch_surface = toggle.action_surface(Size::new(320.0, 180.0));
+    let (direct_value_dispatch_frame, direct_value_dispatch_report) = direct_value_dispatch_surface
         .update_with_input_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             |action| directly_dispatched_values.push(*action),
         );
     let mut try_directly_dispatched_values = Vec::new();
-    let (try_direct_value_dispatch_frame, try_direct_value_dispatch_report) = toggle
-        .try_update_with_input_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
+    let mut try_direct_value_dispatch_surface = toggle
+        .try_action_surface(Size::new(320.0, 180.0))
+        .expect("widget projection should be valid for action dispatch");
+    let (try_direct_value_dispatch_frame, try_direct_value_dispatch_report) =
+        try_direct_value_dispatch_surface.update_with_input_and_dispatch_action_values(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             |action| try_directly_dispatched_values.push(*action),
-        )
-        .expect("widget should dispatch typed action values with explicit projection errors");
+        );
     let mut idle_dispatched_values = Vec::new();
-    let (idle_value_dispatch_frame, idle_value_dispatch_report) = toggle
-        .try_update_and_dispatch_action_values(Size::new(320.0, 180.0), |action| {
+    let mut idle_value_dispatch_surface = toggle
+        .try_action_surface(Size::new(320.0, 180.0))
+        .expect("widget projection should be valid for idle dispatch");
+    let (idle_value_dispatch_frame, idle_value_dispatch_report) = idle_value_dispatch_surface
+        .update_and_dispatch_action_values(|action| {
             idle_dispatched_values.push(*action);
-        })
-        .expect("idle widget value dispatch should return projection errors explicitly");
+        });
     let mut css_dispatched_actions = Vec::new();
-    let (css_dispatch_frame, css_dispatch_report) = toggle
-        .update_with_input_and_css_and_dispatch(
+    let mut css_dispatch_surface = toggle
+        .action_surface_with_css(
             Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".toggle { background: rgb(232, 242, 255); }",
-            |command| css_dispatched_actions.push(*command.action()),
         )
-        .expect("widget should dispatch directly with strict CSS");
-    let mut css_dispatched_values = Vec::new();
-    let (css_value_dispatch_frame, css_value_dispatch_report) = toggle
-        .update_with_input_and_css_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
+        .expect("widget CSS should parse");
+    let (css_dispatch_frame, css_dispatch_report) = css_dispatch_surface
+        .update_with_input_and_dispatch(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |command| css_dispatched_actions.push(*command.action()),
+        );
+    let mut css_dispatched_values = Vec::new();
+    let mut css_value_dispatch_surface = toggle
+        .action_surface_with_css(
+            Size::new(320.0, 180.0),
             ".toggle { background: rgb(234, 244, 255); }",
-            |action| css_dispatched_values.push(*action),
         )
-        .expect("widget should dispatch action values directly with strict CSS");
+        .expect("widget CSS should parse");
+    let (css_value_dispatch_frame, css_value_dispatch_report) = css_value_dispatch_surface
+        .update_with_input_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| css_dispatched_values.push(*action),
+        );
     let mut css_idle_dispatched_values = Vec::new();
-    let (css_idle_value_dispatch_frame, css_idle_value_dispatch_report) = toggle
-        .update_and_dispatch_action_values_with_css(
+    let mut css_idle_value_dispatch_surface = toggle
+        .action_surface_with_css(
             Size::new(320.0, 180.0),
             ".toggle { background: rgb(236, 246, 255); }",
-            |action| css_idle_dispatched_values.push(*action),
         )
-        .expect("widget should dispatch idle action values directly with strict CSS");
+        .expect("widget CSS should parse");
+    let (css_idle_value_dispatch_frame, css_idle_value_dispatch_report) =
+        css_idle_value_dispatch_surface
+            .update_and_dispatch_action_values(|action| css_idle_dispatched_values.push(*action));
     let mut try_css_dispatched_actions = Vec::new();
-    let (try_css_dispatch_frame, try_css_dispatch_report) = toggle
-        .try_update_with_input_and_css_and_dispatch(
+    let mut try_css_dispatch_surface = toggle
+        .try_action_surface_with_css(
             Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".toggle { background: rgb(226, 240, 252); }",
-            |command| try_css_dispatched_actions.push(*command.action()),
         )
-        .expect("widget should dispatch directly with strict CSS and explicit errors");
-    let mut try_css_dispatched_values = Vec::new();
-    let (try_css_value_dispatch_frame, try_css_value_dispatch_report) = toggle
-        .try_update_with_input_and_css_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
+        .expect("widget CSS and projection should be valid");
+    let (try_css_dispatch_frame, try_css_dispatch_report) = try_css_dispatch_surface
+        .update_with_input_and_dispatch(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |command| try_css_dispatched_actions.push(*command.action()),
+        );
+    let mut try_css_dispatched_values = Vec::new();
+    let mut try_css_value_dispatch_surface = toggle
+        .try_action_surface_with_css(
+            Size::new(320.0, 180.0),
             ".toggle { background: rgb(228, 242, 253); }",
-            |action| try_css_dispatched_values.push(*action),
         )
-        .expect("widget should dispatch strict CSS action values with explicit errors");
+        .expect("widget CSS and projection should be valid");
+    let (try_css_value_dispatch_frame, try_css_value_dispatch_report) =
+        try_css_value_dispatch_surface.update_with_input_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| try_css_dispatched_values.push(*action),
+        );
     let mut try_css_idle_dispatched_values = Vec::new();
-    let (try_css_idle_value_dispatch_frame, try_css_idle_value_dispatch_report) = toggle
-        .try_update_and_dispatch_action_values_with_css(
+    let mut try_css_idle_value_dispatch_surface = toggle
+        .try_action_surface_with_css(
             Size::new(320.0, 180.0),
             ".toggle { background: rgb(224, 238, 250); }",
-            |action| try_css_idle_dispatched_values.push(*action),
         )
-        .expect("widget should dispatch idle strict CSS action values with explicit errors");
+        .expect("widget CSS and projection should be valid");
+    let (try_css_idle_value_dispatch_frame, try_css_idle_value_dispatch_report) =
+        try_css_idle_value_dispatch_surface.update_and_dispatch_action_values(|action| {
+            try_css_idle_dispatched_values.push(*action)
+        });
     let mut forgiving_dispatch_actions = Vec::new();
-    let (forgiving_dispatch_frame, forgiving_dispatch_report) = toggle
-        .update_and_dispatch_with_css_forgiving(
+    let mut forgiving_dispatch_surface = toggle
+        .action_surface_with_css_forgiving(
             Size::new(320.0, 180.0),
             ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 238, 255); }",
-            |command| forgiving_dispatch_actions.push(*command.action()),
         )
-        .expect("widget should dispatch directly with forgiving CSS");
+        .expect("forgiving widget CSS should keep supported rules");
+    let (forgiving_dispatch_frame, forgiving_dispatch_report) = forgiving_dispatch_surface
+        .update_and_dispatch(|command| forgiving_dispatch_actions.push(*command.action()));
     let mut forgiving_idle_dispatched_values = Vec::new();
-    let (forgiving_idle_value_dispatch_frame, forgiving_idle_value_dispatch_report) = toggle
-        .update_and_dispatch_action_values_with_css_forgiving(
+    let mut forgiving_idle_value_dispatch_surface = toggle
+        .action_surface_with_css_forgiving(
             Size::new(320.0, 180.0),
             ".ignored { unknown-property: yes; } .toggle { background: rgb(242, 240, 255); }",
-            |action| forgiving_idle_dispatched_values.push(*action),
         )
-        .expect("widget should dispatch idle action values directly with forgiving CSS");
+        .expect("forgiving widget CSS should keep supported rules");
+    let (forgiving_idle_value_dispatch_frame, forgiving_idle_value_dispatch_report) =
+        forgiving_idle_value_dispatch_surface.update_and_dispatch_action_values(|action| {
+            forgiving_idle_dispatched_values.push(*action)
+        });
     let mut try_forgiving_idle_dispatched_values = Vec::new();
+    let mut try_forgiving_idle_value_dispatch_surface = toggle
+        .try_action_surface_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(244, 242, 255); }",
+        )
+        .expect("forgiving widget CSS and projection should be valid");
     let (try_forgiving_idle_value_dispatch_frame, try_forgiving_idle_value_dispatch_report) =
-        toggle
-            .try_update_and_dispatch_action_values_with_css_forgiving(
-                Size::new(320.0, 180.0),
-                ".ignored { unknown-property: yes; } .toggle { background: rgb(244, 242, 255); }",
-                |action| try_forgiving_idle_dispatched_values.push(*action),
-            )
-            .expect("widget should dispatch idle forgiving CSS action values explicitly");
+        try_forgiving_idle_value_dispatch_surface.update_and_dispatch_action_values(|action| {
+            try_forgiving_idle_dispatched_values.push(*action);
+        });
     let mut forgiving_input_dispatch_actions = Vec::new();
-    let (forgiving_input_dispatch_frame, forgiving_input_dispatch_report) = toggle
-        .try_update_with_input_and_css_forgiving_and_dispatch(
+    let mut forgiving_input_dispatch_surface = toggle
+        .try_action_surface_with_css_forgiving(
             Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 252); }",
-            |command| forgiving_input_dispatch_actions.push(*command.action()),
         )
-        .expect("widget should dispatch input directly with forgiving CSS and explicit errors");
-    let mut forgiving_input_dispatched_values = Vec::new();
-    let (forgiving_input_value_dispatch_frame, forgiving_input_value_dispatch_report) = toggle
-        .update_with_input_and_css_forgiving_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
+        .expect("forgiving widget CSS and projection should be valid");
+    let (forgiving_input_dispatch_frame, forgiving_input_dispatch_report) =
+        forgiving_input_dispatch_surface.update_with_input_and_dispatch(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |command| forgiving_input_dispatch_actions.push(*command.action()),
+        );
+    let mut forgiving_input_dispatched_values = Vec::new();
+    let mut forgiving_input_value_dispatch_surface = toggle
+        .action_surface_with_css_forgiving(
+            Size::new(320.0, 180.0),
             ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 254); }",
-            |action| forgiving_input_dispatched_values.push(*action),
         )
-        .expect("widget should dispatch input action values directly with forgiving CSS");
+        .expect("forgiving widget CSS should keep supported rules");
+    let (forgiving_input_value_dispatch_frame, forgiving_input_value_dispatch_report) =
+        forgiving_input_value_dispatch_surface.update_with_input_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| forgiving_input_dispatched_values.push(*action),
+        );
     let mut try_forgiving_input_dispatched_values = Vec::new();
+    let mut try_forgiving_input_value_dispatch_surface = toggle
+        .try_action_surface_with_css_forgiving(
+            Size::new(320.0, 180.0),
+            ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 234, 252); }",
+        )
+        .expect("forgiving widget CSS and projection should be valid");
     let (try_forgiving_input_value_dispatch_frame, try_forgiving_input_value_dispatch_report) =
-        toggle
-            .try_update_with_input_and_css_forgiving_and_dispatch_action_values(
-                Size::new(320.0, 180.0),
-                DocumentInput::primary_click(Point::new(8.0, 8.0)),
-                ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 234, 252); }",
-                |action| try_forgiving_input_dispatched_values.push(*action),
-            )
-            .expect("widget should dispatch forgiving CSS action values with explicit errors");
+        try_forgiving_input_value_dispatch_surface.update_with_input_and_dispatch_action_values(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |action| try_forgiving_input_dispatched_values.push(*action),
+        );
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
@@ -5642,29 +5673,11 @@ fn document_widget_css_helpers_return_authoring_errors_without_panics() {
         Ok(_) => panic!("action widget projection errors should be returned after CSS parses"),
         Err(error) => error,
     };
-    let dispatch_projection_error = match widget.try_update_with_input_and_css_and_dispatch(
-        Size::new(320.0, 180.0),
-        DocumentInput::primary_click(Point::new(8.0, 8.0)),
-        "#rendered { width: 120px; }",
-        |_| {},
-    ) {
-        Ok(_) => panic!("dispatch widget projection errors should be returned after CSS parses"),
-        Err(error) => error,
-    };
     let forgiving_projection_error = match widget.try_action_surface_with_css_forgiving(
         Size::new(320.0, 180.0),
         ".ignored { unknown-property: yes; } #rendered { width: 120px; }",
     ) {
         Ok(_) => panic!("forgiving CSS should still report widget projection errors"),
-        Err(error) => error,
-    };
-    let forgiving_dispatch_projection_error = match widget
-        .try_update_and_dispatch_with_css_forgiving(
-            Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } #rendered { width: 120px; }",
-            |_| {},
-        ) {
-        Ok(_) => panic!("forgiving dispatch should still report widget projection errors"),
         Err(error) => error,
     };
 
@@ -5678,15 +5691,7 @@ fn document_widget_css_helpers_return_authoring_errors_without_panics() {
         DocumentAuthoringError::Document(_)
     ));
     assert!(matches!(
-        dispatch_projection_error,
-        DocumentAuthoringError::Document(_)
-    ));
-    assert!(matches!(
         forgiving_projection_error,
-        DocumentAuthoringError::Document(_)
-    ));
-    assert!(matches!(
-        forgiving_dispatch_projection_error,
         DocumentAuthoringError::Document(_)
     ));
     assert!(projection_error.to_string().contains("missing"));
