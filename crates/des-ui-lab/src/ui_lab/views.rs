@@ -3399,85 +3399,11 @@ fn sample_table_rows() -> [[&'static str; 5]; 6] {
 }
 
 fn render_nesting_view(ui: &mut des_document::DocumentBuilder) {
-    ui.text_element(
-        "nesting-heading",
-        ElementSpec::new(Element::Text).class("heading"),
-        "Nested Relative Boxes",
-    );
-    ui.text_element(
-        "nesting-copy",
-        ElementSpec::new(Element::Text).class("muted"),
-        "Each child is positioned relative to its parent content rect. Absolute positioning comes next.",
-    );
-    ui.element(
-        "nest-outer",
-        ElementSpec::new(Element::Div).class("nest-outer"),
-        |ui| {
-            ui.text_element(
-                "nest-outer-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Outer panel",
-            );
-            ui.element(
-                "nest-middle",
-                ElementSpec::new(Element::Div).class("nest-middle"),
-                |ui| {
-                    ui.text_element(
-                        "nest-middle-title",
-                        ElementSpec::new(Element::Text).class("card-title"),
-                        "Middle card",
-                    );
-                    ui.element(
-                        "nest-inner",
-                        ElementSpec::new(Element::Div)
-                            .class("nest-inner")
-                            .interactive(),
-                        |ui| {
-                            ui.text_element(
-                                "nest-inner-title",
-                                ElementSpec::new(Element::Text).class("card-title"),
-                                "Inner interactive box",
-                            );
-                            ui.text_element(
-                                "nest-inner-body",
-                                ElementSpec::new(Element::Text).class("muted"),
-                                "Hover proves hit testing through nested relative frames.",
-                            );
-                        },
-                    );
-                },
-            );
-        },
-    );
+    super::html::append_nesting(ui);
 }
 
 fn render_graph_view(ui: &mut des_document::DocumentBuilder) {
-    ui.text_element(
-        "graph-heading",
-        ElementSpec::new(Element::Text).class("heading"),
-        "Graph Surface Plan",
-    );
-    ui.text_element(
-        "graph-copy",
-        ElementSpec::new(Element::Text).class("muted"),
-        "This placeholder reserves the lab view for canvas, layers, custom geometry, and bezier hit testing.",
-    );
-    ui.element(
-        "graph-canvas-placeholder",
-        ElementSpec::new(Element::Canvas).class("canvas-placeholder"),
-        |ui| {
-            ui.text_element(
-                "graph-canvas-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Canvas adapter target",
-            );
-            ui.text_element(
-                "graph-canvas-body",
-                ElementSpec::new(Element::Text).class("muted"),
-                "Next: document-managed canvas bounds with egui/epaint geometry inside.",
-            );
-        },
-    );
+    super::html::append_graph(ui);
 }
 
 fn interactive_labeled_row(

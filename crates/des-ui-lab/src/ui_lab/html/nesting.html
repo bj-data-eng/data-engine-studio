@@ -1,0 +1,16 @@
+<h2 id="nesting-heading" class="heading">Nested Relative Boxes</h2>
+<p id="nesting-copy" class="muted">
+  Each child is positioned relative to its parent content rect. Absolute positioning comes next.
+</p>
+<section id="nest-outer" class="nest-outer">
+  <h3 id="nest-outer-title" class="card-title">Outer panel</h3>
+  <article id="nest-middle" class="nest-middle">
+    <h3 id="nest-middle-title" class="card-title">Middle card</h3>
+    <section id="nest-inner" class="nest-inner" data-interactive="true">
+      <h3 id="nest-inner-title" class="card-title">Inner interactive box</h3>
+      <p id="nest-inner-body" class="muted">
+        Hover proves hit testing through nested relative frames.
+      </p>
+    </section>
+  </article>
+</section>

@@ -984,6 +984,43 @@ fn interaction_cards_are_authored_from_html_fragment() {
 }
 
 #[test]
+fn nesting_view_is_authored_from_html_fragment() {
+    let output = lab_output("nesting");
+    let heading = frame(&output, "nesting-heading");
+    let copy = frame(&output, "nesting-copy");
+    let outer = frame(&output, "nest-outer");
+    let middle = frame(&output, "nest-middle");
+    let inner = frame(&output, "nest-inner");
+
+    assert_eq!(heading.element, Element::H2);
+    assert_eq!(copy.element, Element::P);
+    assert_eq!(outer.element, Element::Section);
+    assert_eq!(middle.element, Element::Article);
+    assert_eq!(inner.element, Element::Section);
+    assert!(inner.interactive);
+    assert_eq!(
+        frame_text(&output, "nest-inner-title"),
+        Some("Inner interactive box")
+    );
+}
+
+#[test]
+fn graph_view_is_authored_from_html_fragment() {
+    let output = lab_output("graph");
+    let heading = frame(&output, "graph-heading");
+    let copy = frame(&output, "graph-copy");
+    let canvas = frame(&output, "graph-canvas-placeholder");
+
+    assert_eq!(heading.element, Element::H2);
+    assert_eq!(copy.element, Element::P);
+    assert_eq!(canvas.element, Element::Canvas);
+    assert_eq!(
+        frame_text(&output, "graph-canvas-title"),
+        Some("Canvas adapter target")
+    );
+}
+
+#[test]
 fn lab_shell_tracks_document_viewport_size() {
     for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
         let output = lab_output_with_size("layout", viewport);
