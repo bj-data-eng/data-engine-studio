@@ -2201,6 +2201,13 @@ fn scrolling_view_exercises_direct_and_nested_axis_overflow() {
     let output = lab_output("scrolling");
     assert!(output.metrics.style_nodes_visited > 0);
 
+    assert_eq!(frame(&output, "scroll-heading").element, Element::H2);
+    assert_eq!(frame(&output, "scroll-copy").element, Element::P);
+    assert_eq!(frame(&output, "scroll-direct-title").element, Element::H3);
+    assert_eq!(frame(&output, "scroll-row").element, Element::Section);
+    assert_eq!(frame(&output, "scroll-panel-a").element, Element::Article);
+    assert!(frame(&output, "scroll-panel-a-row-0").interactive);
+
     assert_scroll_chrome(&output, "scroll-panel-a-list", ScrollAxis::Vertical);
     assert_scroll_chrome(&output, "scroll-panel-b-list", ScrollAxis::Horizontal);
     assert_scroll_chrome(

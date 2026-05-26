@@ -24,6 +24,8 @@ const TEXT_SPECIMENS_HTML: &str = include_str!("html/text-specimens.html");
 const TABLE_HTML: &str = include_str!("html/table.html");
 #[cfg(not(debug_assertions))]
 const LAYOUT_HTML: &str = include_str!("html/layout.html");
+#[cfg(not(debug_assertions))]
+const SCROLLING_HTML: &str = include_str!("html/scrolling.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -65,6 +67,10 @@ pub(super) fn append_layout(ui: &mut DocumentBuilder) {
     layout_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_scrolling(ui: &mut DocumentBuilder) {
+    scrolling_fragment().append_to_builder(ui);
+}
+
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
@@ -77,6 +83,7 @@ pub(super) fn asset_revision() -> u64 {
     text_specimens_source().hash(&mut hasher);
     table_source().hash(&mut hasher);
     layout_source().hash(&mut hasher);
+    scrolling_source().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -122,6 +129,10 @@ fn table_fragment() -> HtmlDocument {
 
 fn layout_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&layout_source()).expect("lab layout HTML is valid")
+}
+
+fn scrolling_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&scrolling_source()).expect("lab scrolling HTML is valid")
 }
 
 fn topbar_source() -> Cow<'static, str> {
@@ -291,5 +302,22 @@ fn layout_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(LAYOUT_HTML)
+    }
+}
+
+fn scrolling_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/scrolling.html"
+            ))
+            .expect("lab scrolling HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(SCROLLING_HTML)
     }
 }
