@@ -5739,53 +5739,9 @@ fn document_prelude_exposes_common_app_authoring_surface() {
         &registry,
     );
     let run = frame.output().snapshot().find("run").unwrap();
-    let inline = InlineTextStyle {
-        font_weight: Some(FontWeight::BOLD),
-        font_stretch: Some(FontStretch::CONDENSED),
-        font_style: Some(FontStyle::Italic),
-        ..InlineTextStyle::default()
-    };
-    let text_style = TextLayoutStyle {
-        white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
-        overflow_wrap: OverflowWrap::Anywhere,
-        word_break: WordBreak::BreakAll,
-        ..TextLayoutStyle::default()
-    };
     let projection = DocumentProjection::new()
         .set_text("run", "Run now")
         .set_class("run", "is-ready", true);
-    let _normalized: Option<NormalizedText> = None;
-    let _layout_line: Option<TextLayoutLine> = None;
-    let _layout_run: Option<TextLayoutRun> = None;
-    let _measurer_key: Option<TextMeasurerKey> = None;
-    let _clip_rect: Option<ClipRect> = None;
-    let _corner_style: Option<CornerStyle> = None;
-    let _floating_arrow: Option<FloatingArrow> = None;
-    let _floating_arrow_data: Option<FloatingArrowData> = None;
-    let _floating_auto_placement: Option<FloatingAutoPlacement> = None;
-    let _floating_axis_offset: Option<FloatingAxisOffset> = None;
-    let _floating_boundary: Option<FloatingBoundary> = None;
-    let _floating_fallback_axis: Option<FloatingFallbackAxisSideDirection> = None;
-    let _floating_fallback_strategy: Option<FloatingFallbackStrategy> = None;
-    let _floating_flip: Option<FloatingFlip> = None;
-    let _floating_flip_cross_axis: Option<FloatingFlipCrossAxis> = None;
-    let _floating_hide: Option<FloatingHide> = None;
-    let _floating_hide_data: Option<FloatingHideData> = None;
-    let _floating_hide_strategy: Option<FloatingHideStrategy> = None;
-    let _floating_inline: Option<FloatingInline> = None;
-    let _floating_offset: Option<FloatingOffset> = None;
-    let _floating_options: Option<FloatingOptions> = None;
-    let _floating_shift: Option<FloatingShift> = None;
-    let _floating_shift_limiter: Option<FloatingShiftLimiter> = None;
-    let _floating_size: Option<FloatingSize> = None;
-    let _floating_visibility: Option<FloatingVisibility> = None;
-    let _grid_placement_line: Option<GridPlacementLine> = None;
-    let _grid_template_repetition: Option<GridTemplateRepetition> = None;
-    let _max_track: Option<MaxTrackSizingFunction> = None;
-    let _min_track: Option<MinTrackSizingFunction> = None;
-    let _repetition_count: Option<RepetitionCount> = None;
-    let _selector_combinator: Option<SelectorCombinator> = None;
-    let _track_sizing: Option<TrackSizingFunction> = None;
 
     assert_eq!(frame.actions().len(), 1);
     assert_eq!(frame.actions()[0].action, AppAction::Run);
@@ -5793,15 +5749,6 @@ fn document_prelude_exposes_common_app_authoring_surface() {
     assert_eq!(run.aria("label"), Some("Run"));
     assert_eq!(run.rect().size, Size::new(72.0, 28.0));
     assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
-    assert_eq!(inline.font_weight, Some(FontWeight::BOLD));
-    assert_eq!(inline.font_stretch, Some(FontStretch::CONDENSED));
-    assert_eq!(inline.font_style, Some(FontStyle::Italic));
-    assert_eq!(
-        text_style.white_space_collapse,
-        WhiteSpaceCollapse::PreserveBreaks
-    );
-    assert_eq!(text_style.overflow_wrap, OverflowWrap::Anywhere);
-    assert_eq!(text_style.word_break, WordBreak::BreakAll);
     assert!(projection.has_operation_for_kind("run", DocumentProjectionOperationKind::Text));
     assert_eq!(
         projection

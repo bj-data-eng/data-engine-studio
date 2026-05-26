@@ -79,22 +79,19 @@
 //!     .expect("valid app stylesheet");
 //!
 //! let mut actions = Vec::new();
-//! let (projection, frame, dispatch) = surface
-//!     .project_with_and_update_with_input_and_dispatch_action_values(
-//!         DocumentInput::primary_click(Point::new(20.0, 20.0)),
-//!         |projection| {
-//!             projection
-//!                 .element("run-query")
-//!                 .data("state", "ready")
-//!                 .class_if("is-ready", true)
-//!                 .enabled(true);
-//!         },
-//!         |action| actions.push(*action),
-//!     )
+//! let frame = surface
+//!     .update_request()
+//!     .input(DocumentInput::primary_click(Point::new(20.0, 20.0)))
+//!     .project_with(|projection| {
+//!         projection
+//!             .element("run-query")
+//!             .data("state", "ready")
+//!             .class_if("is-ready", true)
+//!             .enabled(true);
+//!     })
+//!     .dispatch_action_values(|action| actions.push(*action))
 //!     .expect("widget projection targets rendered elements");
 //!
-//! assert_eq!(projection.changed, 3);
-//! assert_eq!(dispatch.handled_count(), 1);
 //! assert_eq!(actions, vec![AppAction::Run]);
 //! assert!(frame.output().snapshot().find("run-query").unwrap().has_class("is-ready"));
 //! ```
@@ -177,45 +174,32 @@ pub use view::{
 
 /// Common app-facing imports for authoring document UIs.
 ///
-/// This prelude intentionally collects the fluent Rust authoring surface,
-/// browser-inspired style/document primitives, retained-state projection, and
-/// interaction outputs most application code needs. Lower-level layout,
-/// animation, and host-adapter details remain available from the crate root.
+/// This prelude intentionally stays small: it collects the fluent Rust
+/// authoring surface, common style/document primitives, retained-state
+/// projection, input, output, and typed command APIs most application and
+/// widget code needs. Specialized layout, text shaping, floating, grid, table,
+/// animation, and host-adapter types remain available from the crate root.
 pub mod prelude {
     pub use crate::{
-        AlignContent, AlignItems, AlignSelf, Anchor, AnchorPlacement, BorderStyle, ChangeSet,
-        ClassName, ClipRect, Color, ComplexSelector, CompoundSelector, ComputedStyle,
-        ContainerQuery, CornerRadii, CornerStyle, CssParseError, Direction, Display, Document,
-        DocumentActionFrame, DocumentActionSurface, DocumentActionSurfaceUpdateRequest,
-        DocumentActionUpdateFrame, DocumentActionWidget, DocumentAuthoringError,
-        DocumentAuthoringResult, DocumentBuilder, DocumentCommand, DocumentCommandAction,
-        DocumentCommandActionRef, DocumentCommandBinding, DocumentCommandDispatchReport,
-        DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
-        DocumentEvent, DocumentEventKind, DocumentInput, DocumentInteractionState, DocumentKey,
-        DocumentMetrics, DocumentOutput, DocumentProjection, DocumentProjectionOperation,
-        DocumentProjectionOperationKind, DocumentProjectionReport, DocumentQueryError,
-        DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentUpdateFrame,
-        DocumentUpdateRequest, DocumentView, DocumentViewBuilder, DocumentWidget, Easing,
-        EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementBuilder, ElementId,
-        ElementProjection, ElementProjectionPatch, ElementSnapshot, ElementSpec, ElementState,
-        ElementStateSelector, FallbackTextMeasurer, FlexDirection, FlexWrap, FloatingArrow,
-        FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
-        FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
-        FloatingFlipCrossAxis, FloatingHide, FloatingHideData, FloatingHideStrategy,
-        FloatingInline, FloatingOffset, FloatingOptions, FloatingPlacement, FloatingShift,
-        FloatingShiftLimiter, FloatingSize, FloatingVisibility, FontStretch, FontStyle, FontWeight,
-        Glyph, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,
-        GridTemplateComponent, GridTemplateRepetition, GridTrack, HitResult, InlineTextStyle,
-        Insets, JustifyContent, KeyInput, KeyModifiers, Length, MaxTrackSizingFunction,
-        MinTrackSizingFunction, NormalizedText, NthChildFormula, Overflow, OverflowWrap, Point,
-        PointerInput, Position, PositionInsets, Rect, RepetitionCount, ResolvedElement,
-        ResolvedFloating, ScrollAxis, ScrollChrome, SelectorCombinator, Shadow, Size, Style,
-        StyleCondition, StyleRule, StyleSelector, StyleSheet, TableCellSpec, TableColumnId,
-        TableColumnSpec, TableSpec, TableTrackSize, TextAlign, TextContent, TextDecoration,
-        TextLayoutLine, TextLayoutRequest, TextLayoutResult, TextLayoutRun, TextLayoutStyle,
-        TextMeasurer, TextMeasurerKey, TextOverflow, TextRun, TextSelectionGranularity,
-        TextTransform, TextVerticalAlign, TextWrapMode, TrackSizingFunction, Transition,
-        ViewportQuery, VisualCloneOptions, VisualElementClone, WhiteSpace, WhiteSpaceCollapse,
-        WordBreak,
+        AlignContent, AlignItems, AlignSelf, BorderStyle, ChangeSet, ClassName, Color,
+        ComplexSelector, CompoundSelector, ComputedStyle, ContainerQuery, CornerRadii,
+        CssParseError, Direction, Display, Document, DocumentActionFrame, DocumentActionSurface,
+        DocumentActionSurfaceUpdateRequest, DocumentActionUpdateFrame, DocumentActionWidget,
+        DocumentAuthoringError, DocumentAuthoringResult, DocumentBuilder, DocumentCommand,
+        DocumentCommandAction, DocumentCommandActionRef, DocumentCommandBinding,
+        DocumentCommandDispatchReport, DocumentCommandRef, DocumentCommandRegistry, DocumentDrag,
+        DocumentEngine, DocumentError, DocumentEvent, DocumentEventKind, DocumentInput,
+        DocumentInteractionState, DocumentKey, DocumentMetrics, DocumentOutput, DocumentProjection,
+        DocumentProjectionOperation, DocumentProjectionOperationKind, DocumentProjectionReport,
+        DocumentQueryError, DocumentResult, DocumentSnapshot, DocumentTextSelection,
+        DocumentUpdateFrame, DocumentUpdateRequest, DocumentView, DocumentViewBuilder,
+        DocumentWidget, EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook,
+        ElementBuilder, ElementId, ElementProjection, ElementProjectionPatch, ElementSnapshot,
+        ElementSpec, ElementState, ElementStateSelector, FlexDirection, FlexWrap, HitResult,
+        Insets, JustifyContent, KeyInput, KeyModifiers, Length, Overflow, Point, PointerInput,
+        Position, PositionInsets, Rect, ResolvedElement, ScrollAxis, ScrollChrome, Shadow, Size,
+        Style, StyleCondition, StyleRule, StyleSelector, StyleSheet, TextAlign, TextContent,
+        TextDecoration, TextOverflow, TextRun, TextSelectionGranularity, TextTransform,
+        TextWrapMode, Transition, ViewportQuery, WhiteSpace,
     };
 }
