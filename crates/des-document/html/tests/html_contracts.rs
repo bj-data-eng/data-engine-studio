@@ -1685,64 +1685,78 @@ fn html_document_projects_state_without_css_plumbing() {
     assert!(mapped_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run));
 
     let mut dispatched = Vec::new();
-    let (dispatch_report, dispatch_frame, action_report) = html
-        .update_with_input_projection_and_dispatch(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &projection,
-            &registry,
-            |action| {
-                dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML document should create a view for projected dispatch");
+    let (dispatch_frame, action_report) = dispatch_view
+        .update_request()
+        .projection(projection.clone())
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            dispatched.push(*action.action());
+        })
         .expect("HTML document should project state and dispatch actions without CSS");
+    let dispatch_report = dispatch_frame
+        .projection_report()
+        .expect("projection report should be available");
     let dispatch_run = dispatch_frame.output().snapshot().find("run").unwrap();
     let mut value_dispatched = Vec::new();
-    let (value_dispatch_report, value_dispatch_frame, value_action_report) = html
-        .update_with_input_projection_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &projection,
-            &registry,
-            |action| value_dispatched.push(*action),
-        )
+    let mut value_dispatch_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML document should create a view for projected value dispatch");
+    let (value_dispatch_frame, value_action_report) = value_dispatch_view
+        .update_request()
+        .projection(projection.clone())
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| value_dispatched.push(*action))
         .expect("HTML document should project state and dispatch action values without CSS");
+    let value_dispatch_report = value_dispatch_frame
+        .projection_report()
+        .expect("projection report should be available");
     let value_dispatch_run = value_dispatch_frame
         .output()
         .snapshot()
         .find("run")
         .unwrap();
     let mut configured_dispatched = Vec::new();
-    let (configured_report, configured_frame, configured_action_report) = html
-        .update_with_input_projected_with_and_dispatch_with(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("run").text("Configured");
-            },
-            |commands| {
-                commands.push_click("project.run", HtmlAction::Run);
-            },
-            |action| {
-                configured_dispatched.push(*action.action());
-            },
-        )
+    let mut configured_registry = DocumentCommandRegistry::new();
+    configured_registry.push_click("project.run", HtmlAction::Run);
+    let mut configured_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML document should create a view for configured projected dispatch");
+    let (configured_frame, configured_action_report) = configured_view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("run").text("Configured");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&configured_registry, |action| {
+            configured_dispatched.push(*action.action());
+        })
         .expect("HTML document should build projection, configure actions, and dispatch");
+    let configured_report = configured_frame
+        .projection_report()
+        .expect("projection report should be available");
     let configured_run = configured_frame.output().snapshot().find("run").unwrap();
     let mut configured_value_dispatched = Vec::new();
-    let (configured_value_report, configured_value_frame, configured_value_action_report) = html
-        .update_with_input_projected_with_and_dispatch_action_values_with(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("run").text("Configured value");
-            },
-            |commands| {
-                commands.push_click("project.run", HtmlAction::Run);
-            },
-            |action| configured_value_dispatched.push(*action),
-        )
+    let mut configured_value_registry = DocumentCommandRegistry::new();
+    configured_value_registry.push_click("project.run", HtmlAction::Run);
+    let mut configured_value_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML document should create a view for configured projected value dispatch");
+    let (configured_value_frame, configured_value_action_report) = configured_value_view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("run").text("Configured value");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&configured_value_registry, |action| {
+            configured_value_dispatched.push(*action);
+        })
         .expect("HTML document should build projection, configure actions, and dispatch values");
+    let configured_value_report = configured_value_frame
+        .projection_report()
+        .expect("projection report should be available");
     let configured_value_run = configured_value_frame
         .output()
         .snapshot()
@@ -2502,67 +2516,82 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         .find("select")
         .unwrap();
     let mut projected_dispatched = Vec::new();
-    let (dispatch_report, dispatch_frame, action_report) = bundle
-        .update_with_input_projection_and_dispatch(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 32.0)),
-            &projection,
-            &registry,
-            |action| {
-                projected_dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML bundle should create a view for projected dispatch");
+    let (dispatch_frame, action_report) = dispatch_view
+        .update_request()
+        .projection(projection.clone())
+        .input(DocumentInput::primary_click(Point::new(8.0, 32.0)))
+        .dispatch(&registry, |action| {
+            projected_dispatched.push(*action.action());
+        })
         .expect("HTML bundle should project state and dispatch actions in one call");
+    let dispatch_report = dispatch_frame
+        .projection_report()
+        .expect("projection report should be available");
     let dispatch_select = dispatch_frame.output().snapshot().find("select").unwrap();
     let mut projected_value_dispatched = Vec::new();
-    let (value_dispatch_report, value_dispatch_frame, value_action_report) = bundle
-        .update_with_input_projection_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 32.0)),
-            &projection,
-            &registry,
-            |action| projected_value_dispatched.push(*action),
-        )
+    let mut value_dispatch_view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML bundle should create a view for projected value dispatch");
+    let (value_dispatch_frame, value_action_report) = value_dispatch_view
+        .update_request()
+        .projection(projection.clone())
+        .input(DocumentInput::primary_click(Point::new(8.0, 32.0)))
+        .dispatch_action_values(&registry, |action| {
+            projected_value_dispatched.push(*action);
+        })
         .expect("HTML bundle should project state and dispatch action values in one call");
+    let value_dispatch_report = value_dispatch_frame
+        .projection_report()
+        .expect("projection report should be available");
     let value_dispatch_select = value_dispatch_frame
         .output()
         .snapshot()
         .find("select")
         .unwrap();
     let mut projected_with_dispatched = Vec::new();
-    let (dispatch_with_report, dispatch_with_frame, dispatch_with_action_report) = bundle
-        .update_with_input_projected_with_and_dispatch_with(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("run").text("Dispatch configured");
-            },
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-                commands.push_click("project.select", HtmlAction::Select);
-            },
-            |action| {
-                projected_with_dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_with_registry = DocumentCommandRegistry::new();
+    dispatch_with_registry.push("project.run", HtmlAction::Run);
+    dispatch_with_registry.push_click("project.select", HtmlAction::Select);
+    let mut dispatch_with_view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML bundle should create a view for configured projected dispatch");
+    let (dispatch_with_frame, dispatch_with_action_report) = dispatch_with_view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("run").text("Dispatch configured");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&dispatch_with_registry, |action| {
+            projected_with_dispatched.push(*action.action());
+        })
         .expect("HTML bundle should build projection, configure actions, and dispatch");
+    let dispatch_with_report = dispatch_with_frame
+        .projection_report()
+        .expect("projection report should be available");
     let dispatch_with_run = dispatch_with_frame.output().snapshot().find("run").unwrap();
     let mut projected_with_value_dispatched = Vec::new();
-    let (dispatch_with_value_report, dispatch_with_value_frame, dispatch_with_value_action_report) =
-        bundle
-            .update_with_input_projected_with_and_dispatch_action_values_with(
-                Size::new(320.0, 180.0),
-                DocumentInput::primary_click(Point::new(8.0, 8.0)),
-                |projection| {
-                    projection.element("run").text("Dispatch value");
-                },
-                |commands| {
-                    commands.push("project.run", HtmlAction::Run);
-                    commands.push_click("project.select", HtmlAction::Select);
-                },
-                |action| projected_with_value_dispatched.push(*action),
-            )
-            .expect("HTML bundle should build projection and dispatch action values");
+    let mut dispatch_with_value_registry = DocumentCommandRegistry::new();
+    dispatch_with_value_registry.push("project.run", HtmlAction::Run);
+    dispatch_with_value_registry.push_click("project.select", HtmlAction::Select);
+    let mut dispatch_with_value_view = bundle
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML bundle should create a view for configured projected value dispatch");
+    let (dispatch_with_value_frame, dispatch_with_value_action_report) = dispatch_with_value_view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("run").text("Dispatch value");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&dispatch_with_value_registry, |action| {
+            projected_with_value_dispatched.push(*action);
+        })
+        .expect("HTML bundle should build projection and dispatch action values");
+    let dispatch_with_value_report = dispatch_with_value_frame
+        .projection_report()
+        .expect("projection report should be available");
     let dispatch_with_value_run = dispatch_with_value_frame
         .output()
         .snapshot()
@@ -3648,73 +3677,87 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should project state and map actions through the set front door");
     let mut projected_dispatched = Vec::new();
-    let (dispatch_project_report, dispatch_project_frame, dispatch_project_action_report) = set
-        .update_with_input_projected_with_and_dispatch(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("inline").text("Dispatched");
-            },
-            &registry,
-            |action| {
-                projected_dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_project_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for projected dispatch");
+    let (dispatch_project_frame, dispatch_project_action_report) = dispatch_project_view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("inline").text("Dispatched");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            projected_dispatched.push(*action.action());
+        })
         .expect("named document should project state and dispatch actions");
+    let dispatch_project_report = dispatch_project_frame
+        .projection_report()
+        .expect("projection report should be available");
     let mut projected_value_dispatched = Vec::new();
-    let (value_project_report, value_project_frame, value_project_action_report) = set
-        .update_with_input_projected_with_and_dispatch_action_values(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("inline").text("Value dispatched");
-            },
-            &registry,
-            |action| projected_value_dispatched.push(*action),
-        )
+    let mut value_project_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for projected value dispatch");
+    let (value_project_frame, value_project_action_report) = value_project_view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("inline").text("Value dispatched");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| {
+            projected_value_dispatched.push(*action);
+        })
         .expect("named document should project state and dispatch action values");
+    let value_project_report = value_project_frame
+        .projection_report()
+        .expect("projection report should be available");
     let mut configured_projected_dispatched = Vec::new();
-    let (
-        configured_dispatch_project_report,
-        configured_dispatch_project_frame,
-        configured_dispatch_project_action_report,
-    ) = set
-        .update_with_input_projected_with_and_dispatch_with(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
+    let mut configured_project_registry = DocumentCommandRegistry::new();
+    configured_project_registry.push_click("inline.run", SetAction::Run);
+    let mut configured_dispatch_project_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for configured projected dispatch");
+    let (configured_dispatch_project_frame, configured_dispatch_project_action_report) =
+        configured_dispatch_project_view
+            .update_request()
+            .project_with(|projection| {
                 projection.element("inline").text("Configured dispatch");
-            },
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| {
+            })
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch(&configured_project_registry, |action| {
                 configured_projected_dispatched.push(*action.action());
-            },
-        )
-        .expect("named document should configure projected dispatch actions");
+            })
+            .expect("named document should configure projected dispatch actions");
+    let configured_dispatch_project_report = configured_dispatch_project_frame
+        .projection_report()
+        .expect("projection report should be available");
     let mut configured_projected_value_dispatched = Vec::new();
-    let (
-        configured_value_project_report,
-        configured_value_project_frame,
-        configured_value_project_action_report,
-    ) = set
-        .update_with_input_projected_with_and_dispatch_action_values_with(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
+    let mut configured_value_project_registry = DocumentCommandRegistry::new();
+    configured_value_project_registry.push_click("inline.run", SetAction::Run);
+    let mut configured_value_project_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for configured projected value dispatch");
+    let (configured_value_project_frame, configured_value_project_action_report) =
+        configured_value_project_view
+            .update_request()
+            .project_with(|projection| {
                 projection.element("inline").text("Configured value");
-            },
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| configured_projected_value_dispatched.push(*action),
-        )
-        .expect("named document should configure projected value dispatch actions");
+            })
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch_action_values(&configured_value_project_registry, |action| {
+                configured_projected_value_dispatched.push(*action);
+            })
+            .expect("named document should configure projected value dispatch actions");
+    let configured_value_project_report = configured_value_project_frame
+        .projection_report()
+        .expect("projection report should be available");
     let (intent_project_report, intent_project_frame) = set
         .update_with_input_projected_with_and_intent_actions(
             "shared",
