@@ -1804,12 +1804,12 @@ fn html_document_projects_state_without_css_plumbing() {
     );
 
     let (surface_report, mut surface) = html
-        .to_action_surface_projected_with_actions(
+        .to_action_surface_projected_with(
             Size::new(320.0, 180.0),
             |projection| {
                 projection.element("run").text("Ready");
             },
-            [("project.run", HtmlAction::Run)],
+            html.command_action_registry([("project.run", HtmlAction::Run)]),
         )
         .expect("HTML document should create projected mapped action surfaces without CSS");
     let surface_frame =
@@ -1857,12 +1857,12 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
         })
         .expect("HTML should configure an action surface without CSS");
     let mut mapped_surface = html
-        .to_action_surface_with_actions(
+        .to_action_surface(
             Size::new(320.0, 180.0),
-            [
+            html.command_action_registry([
                 ("project.run", HtmlAction::Run),
                 ("project.menu", HtmlAction::Menu),
-            ],
+            ]),
         )
         .expect("HTML should map command names into an action surface");
     let stylesheet = des_document::StyleSheet::parse_css("#run { width: 96px; height: 32px; }")
@@ -1905,16 +1905,16 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
     )
     .expect("HTML should parse shared command hooks");
     let mut intent_surface = intent_html
-        .to_action_surface_with_intent_actions(
+        .to_action_surface(
             Size::new(320.0, 180.0),
-            [
+            intent_html.command_intent_action_registry([
                 (ElementBehaviorEvent::Click, "project.open", HtmlAction::Run),
                 (
                     ElementBehaviorEvent::ContextMenu,
                     "project.open",
                     HtmlAction::Menu,
                 ),
-            ],
+            ]),
         )
         .expect("HTML should map one command differently by event intent");
 
@@ -2650,12 +2650,12 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         ("project.select", HtmlAction::Select),
     ]);
     let mut mapped_surface = bundle
-        .to_action_surface_with_actions(
+        .to_action_surface(
             Size::new(320.0, 180.0),
-            [
+            bundle.command_action_registry([
                 ("project.run", HtmlAction::Run),
                 ("project.select", HtmlAction::Select),
-            ],
+            ]),
         )
         .expect("HTML bundle should create mapped action surfaces");
     let mapped_frame = mapped_surface
@@ -2664,31 +2664,31 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         .to_action_surface_with_projection(Size::new(320.0, 180.0), &projection, projected_registry)
         .expect("HTML bundle should create a projected action surface");
     let (mapped_surface_report, mut mapped_projected_surface) = bundle
-        .to_action_surface_projected_with_actions(
+        .to_action_surface_projected_with(
             Size::new(320.0, 180.0),
             |projection| {
                 projection.element("select").add_class("is-selected");
             },
-            [
+            bundle.command_action_registry([
                 ("project.run", HtmlAction::Run),
                 ("project.select", HtmlAction::Select),
-            ],
+            ]),
         )
         .expect("HTML bundle should create mapped projected action surfaces");
     let (intent_surface_report, mut intent_projected_surface) = bundle
-        .to_action_surface_projected_with_intent_actions(
+        .to_action_surface_projected_with(
             Size::new(320.0, 180.0),
             |projection| {
                 projection.element("select").add_class("is-selected");
             },
-            [
+            bundle.command_intent_action_registry([
                 (
                     ElementBehaviorEvent::Click,
                     "project.select",
                     HtmlAction::Select,
                 ),
                 (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
-            ],
+            ]),
         )
         .expect("HTML bundle should create intent-mapped projected action surfaces");
     let surface_frame =
@@ -2843,11 +2843,9 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     assert!(bundle.stylesheet().rule_count() >= 4);
     assert!(bundle.stylesheet().has_rule_for_class("primary"));
 
+    let commands = bundle.command_action_registry([("project.run", HtmlAction::Run)]);
     let mut surface = bundle
-        .into_action_surface_with_actions(
-            Size::new(320.0, 180.0),
-            [("project.run", HtmlAction::Run)],
-        )
+        .into_action_surface(Size::new(320.0, 180.0), commands)
         .expect("prelude-authored HTML should create an action surface");
     let frame: DocumentActionFrame<HtmlAction> =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
@@ -3275,19 +3273,17 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build an action surface through the set front door");
     let surface_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mapped_surface_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create mapped action registries");
     let mut mapped_surface = set
-        .to_action_surface_with_actions(
-            "inline",
-            Size::new(240.0, 160.0),
-            [("inline.run", SetAction::Run)],
-        )
+        .to_action_surface("inline", Size::new(240.0, 160.0), mapped_surface_registry)
         .expect("named document should build mapped action surfaces");
     let mapped_surface_frame = mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let mut intent_surface = set
-        .to_action_surface_with_intent_actions(
+    let intent_surface_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
             [
                 (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
                 (
@@ -3297,6 +3293,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 ),
             ],
         )
+        .expect("named document should create intent-mapped action registries");
+    let mut intent_surface = set
+        .to_action_surface("shared", Size::new(240.0, 160.0), intent_surface_registry)
         .expect("named document should build intent-mapped action surfaces");
     let intent_surface_frame = intent_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
@@ -3747,25 +3746,24 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             ],
         )
         .expect("named document should project state and map intent-scoped actions");
+    let projected_surface_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create projected mapped action registries");
     let (projected_surface_report, mut projected_surface) = set
-        .to_action_surface_projected_with_actions(
+        .to_action_surface_projected_with(
             "inline",
             Size::new(240.0, 160.0),
             |projection| {
                 projection.element("inline").text("Surface");
             },
-            [("inline.run", SetAction::Run)],
+            projected_surface_registry,
         )
         .expect("named document should build projected mapped action surfaces");
     let projected_surface_frame = projected_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let (intent_surface_report, mut intent_projected_surface) = set
-        .to_action_surface_projected_with_intent_actions(
+    let intent_projected_surface_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
-            |projection| {
-                projection.element("shared").text("Surface menu");
-            },
             [
                 (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
                 (
@@ -3774,6 +3772,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                     SetAction::Menu,
                 ),
             ],
+        )
+        .expect("named document should create projected intent action registries");
+    let (intent_surface_report, mut intent_projected_surface) = set
+        .to_action_surface_projected_with(
+            "shared",
+            Size::new(240.0, 160.0),
+            |projection| {
+                projection.element("shared").text("Surface menu");
+            },
+            intent_projected_surface_registry,
         )
         .expect("named document should build projected intent-mapped action surfaces");
     let intent_projected_surface_frame = intent_projected_surface
