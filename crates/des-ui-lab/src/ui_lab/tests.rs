@@ -967,6 +967,26 @@ fn interaction_update_loop_is_authored_from_html_fragment() {
 }
 
 #[test]
+fn interaction_shell_is_authored_from_html_fragment() {
+    let output = lab_output("interaction");
+    let heading = frame(&output, "interaction-heading");
+    let copy = frame(&output, "interaction-copy");
+
+    assert_eq!(heading.element, Element::H2);
+    assert_eq!(copy.element, Element::P);
+    assert_eq!(
+        frame_text(&output, "interaction-heading"),
+        Some("Document Interaction")
+    );
+    assert_eq!(
+        frame_text(&output, "interaction-copy"),
+        Some(
+            "Hover and click styles are resolved by document state. Inner text does not own clicks."
+        )
+    );
+}
+
+#[test]
 fn interaction_cards_are_authored_from_html_fragment() {
     let output = lab_output("interaction");
     let row = frame(&output, "interaction-row");

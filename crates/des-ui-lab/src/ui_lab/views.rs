@@ -156,16 +156,7 @@ fn render_layout_view(
 }
 
 fn render_interaction_view(ui: &mut des_document::DocumentBuilder) {
-    ui.text_element(
-        "interaction-heading",
-        ElementSpec::new(Element::Text).class("heading"),
-        "Document Interaction",
-    );
-    ui.text_element(
-        "interaction-copy",
-        ElementSpec::new(Element::Text).class("muted"),
-        "Hover and click styles are resolved by document state. Inner text does not own clicks.",
-    );
+    super::html::append_interaction_shell(ui);
     super::html::append_interaction_cards(ui);
     super::html::append_interaction_controls(ui);
     render_document_update_loop(ui);

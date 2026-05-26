@@ -9,6 +9,8 @@ const TOPBAR_HTML: &str = include_str!("html/topbar.html");
 #[cfg(not(debug_assertions))]
 const NAV_HTML: &str = include_str!("html/nav.html");
 #[cfg(not(debug_assertions))]
+const INTERACTION_SHELL_HTML: &str = include_str!("html/interaction-shell.html");
+#[cfg(not(debug_assertions))]
 const INTERACTION_CARDS_HTML: &str = include_str!("html/interaction-cards.html");
 #[cfg(not(debug_assertions))]
 const INTERACTION_CONTROLS_HTML: &str = include_str!("html/interaction-controls.html");
@@ -45,6 +47,10 @@ pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
 
 pub(super) fn append_nav(ui: &mut DocumentBuilder) {
     nav_fragment().append_to_builder(ui);
+}
+
+pub(super) fn append_interaction_shell(ui: &mut DocumentBuilder) {
+    interaction_shell_fragment().append_to_builder(ui);
 }
 
 pub(super) fn append_interaction_cards(ui: &mut DocumentBuilder) {
@@ -111,6 +117,7 @@ pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
     nav_source().hash(&mut hasher);
+    interaction_shell_source().hash(&mut hasher);
     interaction_cards_source().hash(&mut hasher);
     interaction_controls_source().hash(&mut hasher);
     interaction_loop_source().hash(&mut hasher);
@@ -135,6 +142,11 @@ fn topbar_fragment() -> HtmlDocument {
 
 fn nav_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&nav_source()).expect("lab nav HTML is valid")
+}
+
+fn interaction_shell_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&interaction_shell_source())
+        .expect("lab interaction shell HTML is valid")
 }
 
 fn interaction_cards_fragment() -> HtmlDocument {
@@ -236,6 +248,23 @@ fn nav_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(NAV_HTML)
+    }
+}
+
+fn interaction_shell_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/interaction-shell.html"
+            ))
+            .expect("lab interaction shell HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(INTERACTION_SHELL_HTML)
     }
 }
 
