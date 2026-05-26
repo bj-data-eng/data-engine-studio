@@ -1,4 +1,5 @@
 mod html;
+mod shadow_styler;
 mod styles;
 #[cfg(test)]
 mod tests;
@@ -17,15 +18,16 @@ use views::{
 
 use des_document::{
     Color, Document, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentEventKind,
-    DocumentInput, DocumentMetrics, DocumentOutput, DocumentProjection, Element, ElementId,
-    ElementSpec, ElementStateSelector, Length, Point, PointerInput, Rect, Shadow, Size, Style,
-    StyleSelector, StyleSheet, VisualCloneOptions, VisualElementClone,
+    DocumentInput, DocumentMetrics, DocumentOutput, DocumentProjection, DocumentWidget, Element,
+    ElementId, ElementSpec, Length, Point, PointerInput, Rect, Size, Style, StyleSelector,
+    StyleSheet, VisualCloneOptions, VisualElementClone,
 };
 use des_widgets::{
     AutoScrollOptions, AutoScroller, ContextMenu, DropZoneId, SortableDocumentConfig,
     SortableDropPreview, SortableItemId, SortableModel,
 };
 use eframe::egui;
+use shadow_styler::{ShadowStyler, ShadowStylerAction, ShadowTuneState, ShadowTuneTarget};
 use std::time::{Duration, Instant};
 
 #[cfg(test)]
@@ -844,15 +846,7 @@ impl UiLabState {
                 self.dropdown_open = false;
             }
             LabAction::IncrementLoopAction => self.loop_action_count += 1,
-            LabAction::AdjustShadowTune {
-                target,
-                layer,
-                field,
-                direction,
-            } => self.shadow_tune_mut(target).adjust(layer, field, direction),
-            LabAction::ToggleShadowLayer { target, layer } => {
-                self.shadow_tune_mut(target).toggle(layer)
-            }
+            LabAction::ShadowStyler(action) => self.apply_shadow_styler_action(action),
             LabAction::CopyTextSelection => {}
         }
     }
@@ -961,17 +955,7 @@ impl UiLabState {
             stylesheet.push_rule(StyleSelector::id("drag-overlay"), overlay_style);
         }
         if self.view == LabView::Styling {
-            stylesheet.push_rule(
-                StyleSelector::class("shadow-tune-preview-card"),
-                Style::default().shadows(self.shadow_tune.shadows(SHADOW_COLOR)),
-            );
-            stylesheet.push_rule(
-                StyleSelector::class_state(
-                    "shadow-tune-preview-card",
-                    ElementStateSelector::Hovered,
-                ),
-                Style::default().shadows(self.shadow_hover_tune.shadows(SHADOW_COLOR)),
-            );
+            self.shadow_styler().push_styles(&mut stylesheet);
         }
         if let Some(menu) = self.text_context_menu.as_ref() {
             let menu = text_context_menu_widget(menu);
@@ -984,6 +968,24 @@ impl UiLabState {
         match target {
             ShadowTuneTarget::Base => &mut self.shadow_tune,
             ShadowTuneTarget::Hover => &mut self.shadow_hover_tune,
+        }
+    }
+
+    fn shadow_styler(&self) -> ShadowStyler {
+        ShadowStyler::new(self.shadow_tune, self.shadow_hover_tune).shadow_color(SHADOW_COLOR)
+    }
+
+    fn apply_shadow_styler_action(&mut self, action: ShadowStylerAction) {
+        match action {
+            ShadowStylerAction::Adjust {
+                target,
+                layer,
+                field,
+                direction,
+            } => self.shadow_tune_mut(target).adjust(layer, field, direction),
+            ShadowStylerAction::ToggleLayer { target, layer } => {
+                self.shadow_tune_mut(target).toggle(layer)
+            }
         }
     }
 
@@ -1255,7 +1257,7 @@ fn lab_action_for_command(command: &str) -> Option<LabAction> {
     lab_action_registry()
         .action_for(command)
         .copied()
-        .or_else(|| shadow_tune_action_for_id(command))
+        .or_else(|| ShadowStyler::action_for_command(command).map(LabAction::ShadowStyler))
 }
 
 fn lab_action_registry() -> DocumentCommandRegistry<LabAction> {
@@ -1354,195 +1356,8 @@ enum LabAction {
     ToggleDropdown,
     SelectDropdown(usize),
     IncrementLoopAction,
-    AdjustShadowTune {
-        target: ShadowTuneTarget,
-        layer: usize,
-        field: ShadowTuneField,
-        direction: i8,
-    },
-    ToggleShadowLayer {
-        target: ShadowTuneTarget,
-        layer: usize,
-    },
+    ShadowStyler(ShadowStylerAction),
     CopyTextSelection,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ShadowTuneTarget {
-    Base,
-    Hover,
-}
-
-impl ShadowTuneTarget {
-    fn id_prefix(self) -> &'static str {
-        match self {
-            Self::Base => "base",
-            Self::Hover => "hover",
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::Base => "Base",
-            Self::Hover => "Hover",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ShadowTuneField {
-    X,
-    Y,
-    Blur,
-    Spread,
-    Alpha,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct ShadowTuneState {
-    layers: [ShadowTuneLayer; 2],
-}
-
-impl Default for ShadowTuneState {
-    fn default() -> Self {
-        Self {
-            layers: [
-                ShadowTuneLayer {
-                    enabled: true,
-                    x: 0.0,
-                    y: 0.0,
-                    blur: 7.0,
-                    spread: -7.0,
-                    alpha: 80,
-                },
-                ShadowTuneLayer {
-                    enabled: false,
-                    x: 0.0,
-                    y: 0.0,
-                    blur: 0.0,
-                    spread: 0.0,
-                    alpha: 0,
-                },
-            ],
-        }
-    }
-}
-
-impl ShadowTuneState {
-    fn hover_default() -> Self {
-        Self {
-            layers: [
-                ShadowTuneLayer {
-                    enabled: true,
-                    x: 0.0,
-                    y: 5.0,
-                    blur: 20.0,
-                    spread: -15.0,
-                    alpha: 80,
-                },
-                ShadowTuneLayer {
-                    enabled: false,
-                    x: 10.0,
-                    y: 20.0,
-                    blur: 15.0,
-                    spread: -15.0,
-                    alpha: 10,
-                },
-            ],
-        }
-    }
-
-    fn adjust(&mut self, layer: usize, field: ShadowTuneField, direction: i8) {
-        let Some(layer) = self.layers.get_mut(layer) else {
-            return;
-        };
-        let sign = if direction < 0 { -1.0 } else { 1.0 };
-        match field {
-            ShadowTuneField::X => layer.x = (layer.x + sign).clamp(-80.0, 80.0),
-            ShadowTuneField::Y => layer.y = (layer.y + sign).clamp(-80.0, 80.0),
-            ShadowTuneField::Blur => layer.blur = (layer.blur + sign).clamp(0.0, 120.0),
-            ShadowTuneField::Spread => layer.spread = (layer.spread + sign).clamp(-40.0, 40.0),
-            ShadowTuneField::Alpha => {
-                let next = layer.alpha as i16 + if direction < 0 { -1 } else { 1 };
-                layer.alpha = next.clamp(0, 255) as u8;
-            }
-        }
-    }
-
-    fn toggle(&mut self, layer: usize) {
-        if let Some(layer) = self.layers.get_mut(layer) {
-            layer.enabled = !layer.enabled;
-        }
-    }
-
-    fn shadows(self, color: Color) -> Vec<Shadow> {
-        self.layers
-            .into_iter()
-            .filter(|layer| layer.enabled && layer.alpha > 0)
-            .map(|layer| Shadow {
-                offset: Point::new(layer.x, layer.y),
-                blur: layer.blur,
-                spread: layer.spread,
-                color: Color {
-                    a: layer.alpha,
-                    ..color
-                },
-            })
-            .collect()
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct ShadowTuneLayer {
-    enabled: bool,
-    x: f32,
-    y: f32,
-    blur: f32,
-    spread: f32,
-    alpha: u8,
-}
-
-fn shadow_tune_action_for_id(id: &str) -> Option<LabAction> {
-    let rest = id.strip_prefix("shadow-tune-")?;
-    let (target, rest) = if let Some(rest) = rest.strip_prefix("base-") {
-        (ShadowTuneTarget::Base, rest)
-    } else if let Some(rest) = rest.strip_prefix("hover-") {
-        (ShadowTuneTarget::Hover, rest)
-    } else {
-        return None;
-    };
-    if let Some(layer) = rest
-        .strip_prefix("layer-")
-        .and_then(|value| value.strip_suffix("-toggle"))
-        .and_then(|value| value.parse::<usize>().ok())
-    {
-        return Some(LabAction::ToggleShadowLayer { target, layer });
-    }
-
-    let mut parts = rest.split('-');
-    let layer = parts.next()?.strip_prefix("l")?.parse::<usize>().ok()?;
-    let field = match parts.next()? {
-        "x" => ShadowTuneField::X,
-        "y" => ShadowTuneField::Y,
-        "blur" => ShadowTuneField::Blur,
-        "spread" => ShadowTuneField::Spread,
-        "alpha" => ShadowTuneField::Alpha,
-        _ => return None,
-    };
-    let direction = match parts.next()? {
-        "dec" => -1,
-        "inc" => 1,
-        _ => return None,
-    };
-    if parts.next().is_some() {
-        return None;
-    }
-    Some(LabAction::AdjustShadowTune {
-        target,
-        layer,
-        field,
-        direction,
-    })
 }
 
 fn paint_legacy_text_path_comparison(ui: &egui::Ui, origin: egui::Pos2, output: &DocumentOutput) {

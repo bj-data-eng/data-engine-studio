@@ -1158,6 +1158,41 @@ fn styling_view_renders_structural_selector_specimens() {
 }
 
 #[test]
+fn shadow_styler_widget_declares_typed_commands_and_projects_styles() {
+    let mut state = UiLabState::new(Some("styling"));
+    let before = state_output(&state);
+    let command_button = frame(&before, "shadow-tune-base-l0-blur-inc");
+    let command = command_button
+        .behavior_hooks
+        .iter()
+        .find(|hook| hook.event == "click")
+        .map(|hook| hook.command.as_str())
+        .expect("shadow styler increment button should declare a click command");
+    assert_eq!(command, "shadow-tune-base-l0-blur-inc");
+    assert!(
+        super::shadow_styler::ShadowStyler::action_for_command(
+            "shadow-tune-base-l0-blur-inc-extra"
+        )
+        .is_none(),
+        "shadow styler command grammar should reject malformed ids"
+    );
+
+    let before_shadow = frame(&before, "shadow-tune-preview-card-1").style.shadows[0];
+    state.apply_lab_action(lab_action_for_command(command).expect("command should route"));
+    let after = state_output(&state);
+    let after_shadow = frame(&after, "shadow-tune-preview-card-1").style.shadows[0];
+
+    assert_eq!(before_shadow.blur, 7.0);
+    assert_eq!(after_shadow.blur, 8.0);
+    assert!(
+        frame_text(&after, "shadow-tune-output")
+            .expect("shadow styler should render a copyable recipe")
+            .contains("base L1 on: x 0, y 0, blur 8"),
+        "shadow styler output should reflect projected app state"
+    );
+}
+
+#[test]
 fn interaction_view_renders_common_control_elements() {
     let output = lab_output("interaction");
 
