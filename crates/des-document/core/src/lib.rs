@@ -169,7 +169,11 @@ pub use text::{
     TextRun, TextTransform, TextVerticalAlign, TextWrapMode, WhiteSpace, WhiteSpaceCollapse,
     WordBreak,
 };
-pub use view::{DocumentActionFrame, DocumentActionSurface, DocumentView, DocumentViewBuilder};
+pub use view::{
+    DocumentActionFrame, DocumentActionSurface, DocumentActionSurfaceUpdateRequest,
+    DocumentActionUpdateFrame, DocumentUpdateFrame, DocumentUpdateRequest, DocumentView,
+    DocumentViewBuilder,
+};
 
 /// Common app-facing imports for authoring document UIs.
 ///
@@ -182,20 +186,22 @@ pub mod prelude {
         AlignContent, AlignItems, AlignSelf, Anchor, AnchorPlacement, BorderStyle, ChangeSet,
         ClassName, ClipRect, Color, ComplexSelector, CompoundSelector, ComputedStyle,
         ContainerQuery, CornerRadii, CornerStyle, CssParseError, Direction, Display, Document,
-        DocumentActionFrame, DocumentActionSurface, DocumentActionWidget, DocumentAuthoringError,
+        DocumentActionFrame, DocumentActionSurface, DocumentActionSurfaceUpdateRequest,
+        DocumentActionUpdateFrame, DocumentActionWidget, DocumentAuthoringError,
         DocumentAuthoringResult, DocumentBuilder, DocumentCommand, DocumentCommandAction,
         DocumentCommandActionRef, DocumentCommandBinding, DocumentCommandDispatchReport,
         DocumentCommandRef, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentError,
         DocumentEvent, DocumentEventKind, DocumentInput, DocumentInteractionState, DocumentKey,
         DocumentMetrics, DocumentOutput, DocumentProjection, DocumentProjectionOperation,
         DocumentProjectionOperationKind, DocumentProjectionReport, DocumentQueryError,
-        DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentView, DocumentViewBuilder,
-        DocumentWidget, Easing, EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook,
-        ElementBuilder, ElementId, ElementProjection, ElementProjectionPatch, ElementSnapshot,
-        ElementSpec, ElementState, ElementStateSelector, FallbackTextMeasurer, FlexDirection,
-        FlexWrap, FloatingArrow, FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset,
-        FloatingBoundary, FloatingFallbackAxisSideDirection, FloatingFallbackStrategy,
-        FloatingFlip, FloatingFlipCrossAxis, FloatingHide, FloatingHideData, FloatingHideStrategy,
+        DocumentResult, DocumentSnapshot, DocumentTextSelection, DocumentUpdateFrame,
+        DocumentUpdateRequest, DocumentView, DocumentViewBuilder, DocumentWidget, Easing,
+        EdgeStyle, Element, ElementBehaviorEvent, ElementBehaviorHook, ElementBuilder, ElementId,
+        ElementProjection, ElementProjectionPatch, ElementSnapshot, ElementSpec, ElementState,
+        ElementStateSelector, FallbackTextMeasurer, FlexDirection, FlexWrap, FloatingArrow,
+        FloatingArrowData, FloatingAutoPlacement, FloatingAxisOffset, FloatingBoundary,
+        FloatingFallbackAxisSideDirection, FloatingFallbackStrategy, FloatingFlip,
+        FloatingFlipCrossAxis, FloatingHide, FloatingHideData, FloatingHideStrategy,
         FloatingInline, FloatingOffset, FloatingOptions, FloatingPlacement, FloatingShift,
         FloatingShiftLimiter, FloatingSize, FloatingVisibility, FontStretch, FontStyle, FontWeight,
         Glyph, GridAutoFlow, GridPlacement, GridPlacementLine, GridTemplateArea,

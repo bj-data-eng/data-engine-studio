@@ -903,6 +903,179 @@ impl<Action> DocumentActionFrame<Action> {
     }
 }
 
+/// Output from a fluent document update request.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentUpdateFrame {
+    projection_report: Option<DocumentProjectionReport>,
+    output: DocumentOutput,
+}
+
+impl DocumentUpdateFrame {
+    /// Returns the projection report when this request applied app state first.
+    pub fn projection_report(&self) -> Option<&DocumentProjectionReport> {
+        self.projection_report.as_ref()
+    }
+
+    /// Returns the resolved document output for rendering and interaction queries.
+    pub fn output(&self) -> &DocumentOutput {
+        &self.output
+    }
+
+    /// Consumes this frame into its optional projection report and output.
+    pub fn into_parts(self) -> (Option<DocumentProjectionReport>, DocumentOutput) {
+        (self.projection_report, self.output)
+    }
+}
+
+/// Typed actions collected from a fluent document update request.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentActionUpdateFrame<Action> {
+    projection_report: Option<DocumentProjectionReport>,
+    frame: DocumentActionFrame<Action>,
+}
+
+impl<Action> DocumentActionUpdateFrame<Action> {
+    /// Returns the projection report when this request applied app state first.
+    pub fn projection_report(&self) -> Option<&DocumentProjectionReport> {
+        self.projection_report.as_ref()
+    }
+
+    /// Returns the resolved document output and collected typed actions.
+    pub fn frame(&self) -> &DocumentActionFrame<Action> {
+        &self.frame
+    }
+
+    /// Returns the resolved document output for rendering and interaction queries.
+    pub fn output(&self) -> &DocumentOutput {
+        self.frame.output()
+    }
+
+    /// Returns the collected typed app actions in document event order.
+    pub fn actions(&self) -> &[DocumentCommandAction<Action>] {
+        self.frame.actions()
+    }
+
+    /// Consumes this frame into its optional projection report and action frame.
+    pub fn into_parts(
+        self,
+    ) -> (
+        Option<DocumentProjectionReport>,
+        DocumentActionFrame<Action>,
+    ) {
+        (self.projection_report, self.frame)
+    }
+}
+
+/// Fluent request for uncommon document update combinations.
+///
+/// Prefer the short `update`/`update_with_input` helpers for the simplest
+/// frames. Use this request when a frame needs projection, host input, action
+/// collection, or dispatch without adding another long method permutation.
+pub struct DocumentUpdateRequest<'view> {
+    view: &'view mut DocumentView,
+    projection: Option<DocumentProjection>,
+    input: DocumentInput,
+}
+
+impl<'view> DocumentUpdateRequest<'view> {
+    fn new(view: &'view mut DocumentView) -> Self {
+        Self {
+            view,
+            projection: None,
+            input: DocumentInput::default(),
+        }
+    }
+
+    /// Applies this projection before routing input and resolving the frame.
+    pub fn projection(mut self, projection: DocumentProjection) -> Self {
+        self.projection = Some(projection);
+        self
+    }
+
+    /// Builds and applies a projection before routing input and resolving the frame.
+    pub fn project_with(mut self, project: impl FnOnce(&mut DocumentProjection)) -> Self {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.projection = Some(projection);
+        self
+    }
+
+    /// Routes host input through this update frame.
+    pub fn input(mut self, input: DocumentInput) -> Self {
+        self.input = input;
+        self
+    }
+
+    /// Resolves the requested frame.
+    pub fn update(self) -> DocumentResult<DocumentUpdateFrame> {
+        let projection_report = if let Some(projection) = self.projection {
+            Some(self.view.project(&projection)?)
+        } else {
+            None
+        };
+        let output = self.view.update_with_input(self.input);
+        Ok(DocumentUpdateFrame {
+            projection_report,
+            output,
+        })
+    }
+
+    /// Resolves the requested frame and collects typed app actions.
+    pub fn update_actions<Action>(
+        self,
+        registry: &DocumentCommandRegistry<Action>,
+    ) -> DocumentResult<DocumentActionUpdateFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let projection_report = if let Some(projection) = self.projection {
+            Some(self.view.project(&projection)?)
+        } else {
+            None
+        };
+        let output = self.view.update_with_input(self.input);
+        let frame = DocumentView::collect_action_frame(registry, output);
+        Ok(DocumentActionUpdateFrame {
+            projection_report,
+            frame,
+        })
+    }
+
+    /// Resolves the requested frame, collects typed app actions, and dispatches them.
+    pub fn dispatch<Action>(
+        self,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentActionUpdateFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_actions(registry)?;
+        let report = frame.frame.dispatch(handler);
+        Ok((frame, report))
+    }
+
+    /// Resolves the requested frame and dispatches only typed app action values.
+    pub fn dispatch_action_values<Action>(
+        self,
+        registry: &DocumentCommandRegistry<Action>,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> DocumentResult<(
+        DocumentActionUpdateFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let frame = self.update_actions(registry)?;
+        let report = frame.frame.dispatch_action_values(handler);
+        Ok((frame, report))
+    }
+}
+
 /// A retained document view paired with the typed command registry that drives it.
 ///
 /// Action surfaces are the ergonomic app-facing shape for reusable widgets:
@@ -914,10 +1087,101 @@ pub struct DocumentActionSurface<Action> {
     commands: DocumentCommandRegistry<Action>,
 }
 
+/// Fluent request for updating an action surface with its bound commands.
+pub struct DocumentActionSurfaceUpdateRequest<'surface, Action> {
+    surface: &'surface mut DocumentActionSurface<Action>,
+    projection: Option<DocumentProjection>,
+    input: DocumentInput,
+}
+
+impl<'surface, Action> DocumentActionSurfaceUpdateRequest<'surface, Action> {
+    fn new(surface: &'surface mut DocumentActionSurface<Action>) -> Self {
+        Self {
+            surface,
+            projection: None,
+            input: DocumentInput::default(),
+        }
+    }
+
+    /// Applies this projection before routing input and collecting actions.
+    pub fn projection(mut self, projection: DocumentProjection) -> Self {
+        self.projection = Some(projection);
+        self
+    }
+
+    /// Builds and applies a projection before routing input and collecting actions.
+    pub fn project_with(mut self, project: impl FnOnce(&mut DocumentProjection)) -> Self {
+        let mut projection = DocumentProjection::new();
+        project(&mut projection);
+        self.projection = Some(projection);
+        self
+    }
+
+    /// Routes host input through this update frame.
+    pub fn input(mut self, input: DocumentInput) -> Self {
+        self.input = input;
+        self
+    }
+
+    /// Resolves the requested frame and collects typed app actions.
+    pub fn update(self) -> DocumentResult<DocumentActionUpdateFrame<Action>>
+    where
+        Action: Clone,
+    {
+        let projection_report = if let Some(projection) = self.projection {
+            Some(self.surface.project(&projection)?)
+        } else {
+            None
+        };
+        let frame = self.surface.update_with_input_actions(self.input);
+        Ok(DocumentActionUpdateFrame {
+            projection_report,
+            frame,
+        })
+    }
+
+    /// Resolves the requested frame, collects typed app actions, and dispatches them.
+    pub fn dispatch(
+        self,
+        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
+    ) -> DocumentResult<(
+        DocumentActionUpdateFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let frame = self.update()?;
+        let report = frame.frame.dispatch(handler);
+        Ok((frame, report))
+    }
+
+    /// Resolves the requested frame and dispatches only typed app action values.
+    pub fn dispatch_action_values(
+        self,
+        handler: impl for<'frame> FnMut(&'frame Action),
+    ) -> DocumentResult<(
+        DocumentActionUpdateFrame<Action>,
+        DocumentCommandDispatchReport,
+    )>
+    where
+        Action: Clone,
+    {
+        let frame = self.update()?;
+        let report = frame.frame.dispatch_action_values(handler);
+        Ok((frame, report))
+    }
+}
+
 impl<Action> DocumentActionSurface<Action> {
     /// Creates an action surface from an already-built view and command registry.
     pub fn new(view: DocumentView, commands: DocumentCommandRegistry<Action>) -> Self {
         Self { view, commands }
+    }
+
+    /// Starts a fluent update request using this surface's bound command registry.
+    pub fn update_request(&mut self) -> DocumentActionSurfaceUpdateRequest<'_, Action> {
+        DocumentActionSurfaceUpdateRequest::new(self)
     }
 
     /// Returns the retained document view.
@@ -2729,6 +2993,11 @@ impl DocumentView {
     /// Returns the retained document engine for advanced state access.
     pub fn engine_mut(&mut self) -> &mut DocumentEngine {
         &mut self.engine
+    }
+
+    /// Starts a fluent update request for projection, input, actions, or dispatch.
+    pub fn update_request(&mut self) -> DocumentUpdateRequest<'_> {
+        DocumentUpdateRequest::new(self)
     }
 
     /// Resolves the document using the current stylesheet and no new input.

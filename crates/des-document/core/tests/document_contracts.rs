@@ -1563,6 +1563,66 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
 }
 
 #[test]
+fn document_update_request_combines_projection_input_actions_and_dispatch() {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Run,
+    }
+
+    let stylesheet = StyleSheet::new().id("run", Style::default().size(96.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet.clone(), |ui| {
+        ui.button("run").disabled(true).on_click("run").text("Run");
+    });
+    let registry = DocumentCommandRegistry::new().bind_click("run", AppAction::Run);
+
+    let requested = view
+        .update_request()
+        .project_with(|projection| {
+            projection.element("run").enable().data("state", "ready");
+        })
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .update_actions(&registry)
+        .expect("projection and update should share one request path");
+
+    assert_eq!(requested.projection_report().unwrap().changed, 2);
+    assert_eq!(
+        requested.output().snapshot().find("run").unwrap().value(),
+        None
+    );
+    assert_eq!(
+        requested
+            .output()
+            .snapshot()
+            .find("run")
+            .unwrap()
+            .attribute("data-state"),
+        Some("ready")
+    );
+    assert_eq!(requested.actions().len(), 1);
+    assert!(requested.frame().contains_action_for_target_intent(
+        "run",
+        ElementBehaviorEvent::Click,
+        &AppAction::Run
+    ));
+
+    let mut surface = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.button("run").disabled(true).on_click("run").text("Run");
+    })
+    .action_surface(registry);
+    let mut dispatched = Vec::new();
+    let (frame, report) = surface
+        .update_request()
+        .projection(DocumentProjection::new().enable("run"))
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(|action| dispatched.push(action.clone()))
+        .expect("action surface request should dispatch through bound commands");
+
+    assert_eq!(frame.projection_report().unwrap().changed, 1);
+    assert_eq!(report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![AppAction::Run]);
+}
+
+#[test]
 fn document_view_can_be_lifted_into_a_configured_action_surface() {
     #[derive(Clone, Debug, Eq, PartialEq)]
     enum AppAction {
