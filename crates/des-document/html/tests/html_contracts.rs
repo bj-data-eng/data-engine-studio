@@ -1,7 +1,8 @@
 use des_document::{
-    Document, DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine,
+    Color, Document, DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine,
     DocumentInput, DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId,
-    ElementSpec, Length, Point, Size, Style, StyleSheet,
+    ElementSpec, FontStyle, FontWeight, Length, Point, Size, Style, StyleSheet, TextDecoration,
+    TextVerticalAlign,
 };
 #[cfg(debug_assertions)]
 use des_html::HtmlStylesheetFile;
@@ -696,6 +697,90 @@ fn html_document_preserves_mixed_content_boundary_spaces() {
     assert_eq!(
         snapshot.find("html/text-0-2").unwrap().text().as_deref(),
         Some(" again")
+    );
+}
+
+#[test]
+fn html_document_maps_opt_in_inline_markup_to_rich_text_runs() {
+    let html = HtmlDocument::parse_fragment(
+        r##"
+        <p id="message" data-rich-text data-selectable-text>
+          normal <b>bold</b> <i>italic</i> <u>under</u>
+          <span style="font-weight: 300; font-style: oblique; letter-spacing: 2px; text-decoration: underline #6750a4 1px; vertical-align: super">styled</span>
+        </p>
+        "##,
+    )
+    .expect("rich inline HTML should parse");
+    let mut document = html
+        .to_document(Size::new(320.0, 180.0))
+        .expect("rich inline HTML should emit a document");
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let snapshot = output.snapshot();
+    let message = snapshot
+        .find("message")
+        .expect("rich text host should be retained");
+    let text = message
+        .text_content()
+        .expect("rich text host should retain text content");
+    let runs = text.runs();
+
+    assert_eq!(message.element(), Element::P);
+    assert!(message.selectable_text());
+    assert!(snapshot.find("target").is_none());
+    for word in ["normal", "bold", "italic", "under", "styled"] {
+        assert!(
+            text.semantic_text()
+                .split_whitespace()
+                .any(|token| token == word),
+            "rich text semantic content should contain `{word}`"
+        );
+    }
+    assert!(
+        runs.iter()
+            .any(|run| { run.text == "bold" && run.style.font_weight == Some(FontWeight::BOLD) })
+    );
+    assert!(
+        runs.iter()
+            .any(|run| { run.text == "italic" && run.style.font_style == Some(FontStyle::Italic) })
+    );
+    assert!(runs.iter().any(|run| {
+        run.text == "under"
+            && run
+                .style
+                .text_decoration
+                .is_some_and(|decoration| decoration.underline)
+    }));
+    let styled = runs
+        .iter()
+        .find(|run| run.text == "styled")
+        .expect("styled span should become a run");
+    assert_eq!(styled.style.font_weight, Some(FontWeight::new(300)));
+    assert_eq!(styled.style.font_style, Some(FontStyle::Oblique));
+    assert_eq!(styled.style.letter_spacing, Some(2.0));
+    assert_eq!(styled.style.vertical_align, Some(TextVerticalAlign::Super));
+    assert_eq!(
+        styled.style.text_decoration,
+        Some(
+            TextDecoration::UNDERLINE
+                .color(Color::rgb(103, 80, 164))
+                .thickness(1.0)
+        )
+    );
+}
+
+#[test]
+fn html_document_rejects_malformed_inline_style_attributes() {
+    let error = HtmlDocument::parse_fragment(
+        r#"<p id="message" data-rich-text><span style="font-weight: loud">bad</span></p>"#,
+    )
+    .expect_err("unsupported inline text CSS should be rejected");
+
+    assert!(
+        error
+            .to_string()
+            .contains("invalid inline style on `<span>` attribute `style`")
     );
 }
 

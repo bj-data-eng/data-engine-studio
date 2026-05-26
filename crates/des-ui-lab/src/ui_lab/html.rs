@@ -18,6 +18,8 @@ const NESTING_HTML: &str = include_str!("html/nesting.html");
 const GRAPH_HTML: &str = include_str!("html/graph.html");
 #[cfg(not(debug_assertions))]
 const STRUCTURAL_SELECTORS_HTML: &str = include_str!("html/structural-selectors.html");
+#[cfg(not(debug_assertions))]
+const TEXT_SPECIMENS_HTML: &str = include_str!("html/text-specimens.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -47,6 +49,10 @@ pub(super) fn append_structural_selectors(ui: &mut DocumentBuilder) {
     structural_selectors_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_text_specimens(ui: &mut DocumentBuilder) {
+    text_specimens_fragment().append_to_builder(ui);
+}
+
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
@@ -56,6 +62,7 @@ pub(super) fn asset_revision() -> u64 {
     nesting_source().hash(&mut hasher);
     graph_source().hash(&mut hasher);
     structural_selectors_source().hash(&mut hasher);
+    text_specimens_source().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -88,6 +95,11 @@ fn graph_fragment() -> HtmlDocument {
 fn structural_selectors_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&structural_selectors_source())
         .expect("lab structural selectors HTML is valid")
+}
+
+fn text_specimens_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&text_specimens_source())
+        .expect("lab text specimens HTML is valid")
 }
 
 fn topbar_source() -> Cow<'static, str> {
@@ -206,5 +218,22 @@ fn structural_selectors_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(STRUCTURAL_SELECTORS_HTML)
+    }
+}
+
+fn text_specimens_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/text-specimens.html"
+            ))
+            .expect("lab text specimens HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(TEXT_SPECIMENS_HTML)
     }
 }

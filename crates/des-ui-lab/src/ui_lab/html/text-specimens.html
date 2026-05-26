@@ -1,0 +1,95 @@
+<h2 id="text-heading" class="heading">Text Specimens</h2>
+<p id="text-copy" class="muted text-copy">
+  These specimens exercise the document text contract with egui/epaint providing real measurement and galley painting.
+</p>
+<section id="text-specimen-grid" class="text-specimen-grid">
+  <article id="text-extend" class="text-specimen-card">
+    <h3 id="text-extend-title" class="card-title">Extend</h3>
+    <p id="text-extend-rule" class="muted text-rule">width: Px(220); text-wrap: Extend</p>
+    <p id="text-extend-body" class="text-box text-box-extend" data-selectable-text="true">Long labels stay on one measured line and can extend past a narrow box.</p>
+  </article>
+  <article id="text-wrap" class="text-specimen-card">
+    <h3 id="text-wrap-title" class="card-title">Wrap</h3>
+    <p id="text-wrap-rule" class="muted text-rule">width: Px(220); text-wrap: Wrap</p>
+    <p id="text-wrap-body" class="text-box text-box-wrap" data-selectable-text="true">Long labels wrap naturally inside the fixed content width using epaint line breaking.</p>
+  </article>
+  <article id="text-break-word" class="text-specimen-card">
+    <h3 id="text-break-word-title" class="card-title">Break word</h3>
+    <p id="text-break-word-rule" class="muted text-rule">overflow-wrap: break-word</p>
+    <p id="text-break-word-body" class="text-box text-box-break-word" data-selectable-text="true">supercalifragilisticexpialidocious_filename_without_separators.parquet</p>
+  </article>
+  <article id="text-truncate" class="text-specimen-card">
+    <h3 id="text-truncate-title" class="card-title">Truncate</h3>
+    <p id="text-truncate-rule" class="muted text-rule">width: Px(220); text-wrap: Truncate</p>
+    <p id="text-truncate-body" class="text-box text-box-truncate" data-selectable-text="true">A compact field title should elide when the value is too wide for its container.</p>
+  </article>
+  <article id="text-max-lines" class="text-specimen-card">
+    <h3 id="text-max-lines-title" class="card-title">Max lines</h3>
+    <p id="text-max-lines-rule" class="muted text-rule">width: Px(220); text-wrap: Wrap; max-lines: 2</p>
+    <p id="text-max-lines-body" class="text-box text-box-max-lines" data-selectable-text="true">Preview descriptions can wrap for two lines and then stop cleanly when they still have more content.</p>
+  </article>
+  <article id="text-pre" class="text-specimen-card">
+    <h3 id="text-pre-title" class="card-title">Preserved</h3>
+    <p id="text-pre-rule" class="muted text-rule">white-space: pre</p>
+    <p id="text-pre-body" class="text-box text-box-pre" data-selectable-text="true">columns:&#9;alpha&#9;beta&#10;spaces:   one   two   three</p>
+  </article>
+  <article id="text-break-spaces" class="text-specimen-card">
+    <h3 id="text-break-spaces-title" class="card-title">Break spaces</h3>
+    <p id="text-break-spaces-rule" class="muted text-rule">white-space: break-spaces</p>
+    <p id="text-break-spaces-body" class="text-box text-box-break-spaces" data-selectable-text="true">trailing spaces   &#10;wraps after every preserved space</p>
+  </article>
+  <article id="text-transform" class="text-specimen-card">
+    <h3 id="text-transform-title" class="card-title">Transform</h3>
+    <p id="text-transform-rule" class="muted text-rule">text-transform: uppercase</p>
+    <p id="text-transform-body" class="text-box text-box-uppercase" data-selectable-text="true">Stra&szlig;e mixed Case analytics text stays semantic when copied.</p>
+  </article>
+  <article id="text-rtl-start" class="text-specimen-card">
+    <h3 id="text-rtl-start-title" class="card-title">RTL start</h3>
+    <p id="text-rtl-start-rule" class="muted text-rule">direction: rtl; text-align: start</p>
+    <p id="text-rtl-start-body" class="text-box text-box-rtl" data-selectable-text="true">Start aligned RTL containers should hug the right edge.</p>
+  </article>
+</section>
+<section id="text-render-path-panel" class="text-antialias-panel">
+  <h2 id="text-render-path-title" class="section-title">Rendering Path Comparison</h2>
+  <p id="text-cosmic-diagnostics" class="muted text-diagnostics">cosmic-text advanced shaping + Swash raster, Inter Variable proportional, JetBrains Mono Variable mono, bundled-only default, egui texture compositing</p>
+  <section id="text-render-path-row" class="text-render-path-row">
+    <article id="text-legacy-100-pane" class="text-render-path-pane">
+      <p id="text-legacy-100-label" class="muted">legacy simple LayoutJob</p>
+      <div id="text-legacy-100-slot" class="text-render-path-slot" value="Ag 100px"></div>
+    </article>
+    <article id="text-rich-100-pane" class="text-render-path-pane">
+      <p id="text-rich-100-label" class="muted">cosmic-text document path</p>
+      <p id="text-rich-100-sample" class="text-render-path-slot text-size-100" data-selectable-text="true">Ag 100px</p>
+    </article>
+  </section>
+</section>
+<section id="text-antialias-panel" class="text-antialias-panel">
+  <h2 id="text-antialias-title" class="section-title">Raster Quality Ramp</h2>
+  <p id="text-ramp-9" class="text-ramp-line text-size-9" data-selectable-text="true">9px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-10" class="text-ramp-line text-size-10" data-selectable-text="true">10px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-11" class="text-ramp-line text-size-11" data-selectable-text="true">11px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-12" class="text-ramp-line text-size-12" data-selectable-text="true">12px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-13" class="text-ramp-line text-size-13" data-selectable-text="true">13px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-14" class="text-ramp-line text-size-14" data-selectable-text="true">14px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-16" class="text-ramp-line text-size-16" data-selectable-text="true">16px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-18" class="text-ramp-line text-size-18" data-selectable-text="true">18px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-22" class="text-ramp-line text-size-22" data-selectable-text="true">22px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-28" class="text-ramp-line text-size-28" data-selectable-text="true">28px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+  <p id="text-ramp-36" class="text-ramp-line text-size-36" data-selectable-text="true">36px  Hamburgefonts AVATAR 0123456789  Il1|/\ .,:; curved edges</p>
+</section>
+<section id="text-tones-panel" class="text-antialias-panel">
+  <h2 id="text-tones-title" class="section-title">Tone And Subpixel Checks</h2>
+  <p id="text-tone-dark" class="text-tone-line text-tone-dark" data-selectable-text="true">dark text on pale surface: O0 Cc e o s S 1lI &lt;&gt; /\ -</p>
+  <p id="text-tone-muted" class="text-tone-line text-tone-muted" data-selectable-text="true">muted text on pale surface: O0 Cc e o s S 1lI &lt;&gt; /\ -</p>
+  <p id="text-tone-accent" class="text-tone-line text-tone-accent" data-selectable-text="true">accent text on pale surface: O0 Cc e o s S 1lI &lt;&gt; /\ -</p>
+  <p id="text-tone-inverse" class="text-tone-line text-tone-inverse" data-selectable-text="true">light text on dark surface: O0 Cc e o s S 1lI &lt;&gt; /\ -</p>
+</section>
+<section id="text-rich-panel" class="text-antialias-panel">
+  <h2 id="text-rich-title" class="section-title">Rich Inline Runs</h2>
+  <p id="text-rich-weight" class="text-rich-line" data-rich-text="true" data-selectable-text="true"><span style="font-weight: 300">w300 </span><span style="font-weight: 400">w400 </span><span style="font-weight: 600">w600 </span><b>w700 </b>edge comparison: mm nn oo ee</p>
+  <p id="text-rich-shape" class="text-rich-line" data-rich-text="true" data-selectable-text="true">normal <i>italic </i><span style="font-style: oblique">oblique</span></p>
+  <p id="text-rich-spacing" class="text-rich-line" data-rich-text="true" data-selectable-text="true"><span style="letter-spacing: -0.75px">tight tracking </span><span style="letter-spacing: 0px">normal tracking </span><span style="letter-spacing: 2px">loose tracking</span></p>
+  <p id="text-rich-decoration" class="text-rich-line" data-rich-text="true" data-selectable-text="true"><span style="text-decoration: underline #6750a4 1px">underline</span> <span style="text-decoration: line-through #7a4700 1px">strike</span> <span style="text-decoration: overline #005f66 1px">overline</span> <span style="text-decoration: underline overline line-through #564500 1px">combo</span> <span style="background: #eaddffb4; color: #1d1b20">highlight</span></p>
+  <p id="text-rich-family" class="text-rich-line" data-rich-text="true" data-selectable-text="true"><span style="font-family: Aptos, Inter, sans-serif">fallback Aptos -&gt; Inter </span><span style="font-family: sans-serif">generic sans </span><span style="font-family: monospace">bundled mono</span></p>
+  <p id="text-rich-baseline" class="text-rich-line" data-rich-text="true" data-selectable-text="true">baseline H<sup style="font-size: 10px">2</sup>O + CO<sub style="font-size: 10px">2</sub> with small shifted glyphs</p>
+</section>

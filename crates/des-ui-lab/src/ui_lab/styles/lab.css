@@ -931,6 +931,8 @@ text {
   padding: 8px;
   font-size: 13px;
   line-height: 18px;
+  text-selection-background: #6750a4dc;
+  text-selection-color: #fffbfe;
   background: #fffbfe;
   border: 1px solid #cac4d0;
   border-radius: 4px;
@@ -983,6 +985,8 @@ text {
   white-space: pre-wrap;
   font-size: 17px;
   line-height: 26px;
+  text-selection-background: #6750a4dc;
+  text-selection-color: #fffbfe;
   padding: 6px 10px;
   background: #faf4fc;
   border: 1px solid #cac4d0;

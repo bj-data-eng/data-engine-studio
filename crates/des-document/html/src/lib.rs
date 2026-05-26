@@ -42,9 +42,11 @@
 //! ```
 
 use des_document::{
-    Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry,
-    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView,
-    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
+    Color, Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder,
+    DocumentCommandRegistry, DocumentInput, DocumentOutput, DocumentProjection,
+    DocumentProjectionReport, DocumentView, Element, ElementBehaviorEvent, ElementBehaviorHook,
+    ElementSpec, FontStretch, FontStyle, FontWeight, InlineTextStyle, Size, StyleSheet,
+    TextContent, TextDecoration, TextRun, TextTransform, TextVerticalAlign,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{ParseOpts, QualName, local_name, ns, parse_document, parse_fragment};
@@ -1492,6 +1494,10 @@ impl HtmlNode {
         self.tag == "#text"
     }
 
+    fn is_whitespace_text_node(&self) -> bool {
+        self.is_text() && self.text.as_ref().is_none_or(|text| text.trim().is_empty())
+    }
+
     /// Returns the parsed tag name, or `#text` for explicit text nodes.
     pub fn tag(&self) -> &str {
         &self.tag
@@ -1692,6 +1698,11 @@ impl HtmlNode {
             spec = spec.interactive();
         }
 
+        if html_boolean_attribute(&self.attributes, "data-rich-text") {
+            builder.text_element(id, spec, self.rich_text_content());
+            return;
+        }
+
         if self.children.is_empty() {
             if let Some(text) = &self.text {
                 builder.text_element(id, spec, text.clone());
@@ -1708,6 +1719,42 @@ impl HtmlNode {
                 child.write_to_document_builder(builder, &child_path);
             }
         });
+    }
+
+    fn rich_text_content(&self) -> TextContent {
+        let mut runs = Vec::new();
+        let base_style = inline_style_from_style_attr(self.attributes.get("style"));
+        if let Some(text) = &self.text {
+            push_text_run(&mut runs, text, base_style.clone());
+        }
+        for child in &self.children {
+            child.push_rich_text_runs(&mut runs, base_style.clone());
+        }
+        TextContent::new(runs)
+    }
+
+    fn push_rich_text_runs(&self, runs: &mut Vec<TextRun>, inherited: InlineTextStyle) {
+        if self.is_text() {
+            if let Some(text) = &self.text {
+                push_text_run(runs, text, inherited);
+            }
+            return;
+        }
+
+        let mut style = inherited;
+        apply_inline_tag_style(&mut style, &self.tag);
+        apply_inline_style(
+            &mut style,
+            inline_style_from_style_attr(self.attributes.get("style")),
+        );
+
+        if let Some(text) = &self.text {
+            push_text_run(runs, text, style);
+            return;
+        }
+        for child in &self.children {
+            child.push_rich_text_runs(runs, style.clone());
+        }
     }
 }
 
@@ -2787,9 +2834,9 @@ fn rcdom_document_children_to_html(
         find_body_handle(child, &mut body);
     }
     if let Some(body) = body {
-        rcdom_children_to_html(&body.children.borrow(), diagnostics)
+        rcdom_children_to_html(&body.children.borrow(), diagnostics).map(trim_boundary_whitespace)
     } else {
-        rcdom_children_to_html(children, diagnostics)
+        rcdom_children_to_html(children, diagnostics).map(trim_boundary_whitespace)
     }
 }
 
@@ -2797,16 +2844,29 @@ fn rcdom_fragment_children_to_html(
     children: &[Handle],
     diagnostics: &mut Vec<HtmlDiagnostic>,
 ) -> HtmlResult<Vec<HtmlNode>> {
-    let mut nodes = rcdom_children_to_html(children, diagnostics)?;
+    let mut nodes = trim_boundary_whitespace(rcdom_children_to_html(children, diagnostics)?);
     loop {
         if nodes.len() != 1 {
             return Ok(nodes);
         }
         match nodes[0].tag.as_str() {
-            "html" | "body" => nodes = nodes.remove(0).children,
+            "html" | "body" => nodes = trim_boundary_whitespace(nodes.remove(0).children),
             _ => return Ok(nodes),
         }
     }
+}
+
+fn trim_boundary_whitespace(nodes: Vec<HtmlNode>) -> Vec<HtmlNode> {
+    let first = nodes
+        .iter()
+        .position(|node| !node.is_whitespace_text_node())
+        .unwrap_or(nodes.len());
+    let last = nodes
+        .iter()
+        .rposition(|node| !node.is_whitespace_text_node())
+        .map(|index| index + 1)
+        .unwrap_or(first);
+    nodes[first..last].to_vec()
 }
 
 fn find_body_handle(handle: &Handle, body: &mut Option<Handle>) {
@@ -2837,9 +2897,7 @@ fn append_rcdom_node(
         NodeData::Doctype { .. } | NodeData::Comment { .. } => {}
         NodeData::Text { contents } => {
             let text = sanitize_parsed_html_string(contents.borrow().to_string(), "text content")?;
-            if !text.trim().is_empty() {
-                nodes.push(HtmlNode::text_node(text));
-            }
+            nodes.push(HtmlNode::text_node(text));
         }
         NodeData::Element { name, attrs, .. } => {
             let tag = sanitize_parsed_html_string(name.local.to_string(), "tag name")?;
@@ -2895,12 +2953,29 @@ fn append_rcdom_node(
                         Some(name),
                     ));
                 } else {
+                    if name == "style" {
+                        parse_inline_text_style(&value).map_err(|message| HtmlError::Parse {
+                            source: None,
+                            offset: 0,
+                            line: 1,
+                            column: 1,
+                            message: format!(
+                                "invalid inline style on `<{tag}>` attribute `style`: {message}"
+                            ),
+                        })?;
+                    }
                     attributes.insert(name, value);
                 }
             }
 
             let children = rcdom_children_to_html(&handle.children.borrow(), diagnostics)?;
-            let text = if children.len() == 1 && children[0].is_text() {
+            let text = if children.len() == 1
+                && children[0].is_text()
+                && children[0]
+                    .text
+                    .as_ref()
+                    .is_some_and(|text| !text.trim().is_empty())
+            {
                 children[0].text.clone()
             } else {
                 None
@@ -2934,6 +3009,223 @@ fn html_boolean_attribute(attributes: &BTreeMap<String, String>, name: &str) -> 
     attributes
         .get(name)
         .is_some_and(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "false" | "0"))
+}
+
+fn push_text_run(runs: &mut Vec<TextRun>, text: &str, style: InlineTextStyle) {
+    if !text.is_empty() {
+        runs.push(TextRun::styled(text.to_owned(), style));
+    }
+}
+
+fn apply_inline_tag_style(style: &mut InlineTextStyle, tag: &str) {
+    match tag {
+        "b" | "strong" => style.font_weight = Some(FontWeight::BOLD),
+        "i" | "em" => style.font_style = Some(FontStyle::Italic),
+        "u" => merge_text_decoration(style, TextDecoration::UNDERLINE),
+        "s" | "strike" => merge_text_decoration(style, TextDecoration::LINE_THROUGH),
+        "sub" => style.vertical_align = Some(TextVerticalAlign::Sub),
+        "sup" => style.vertical_align = Some(TextVerticalAlign::Super),
+        _ => {}
+    }
+}
+
+fn inline_style_from_style_attr(value: Option<&String>) -> InlineTextStyle {
+    value
+        .and_then(|value| parse_inline_text_style(value).ok())
+        .unwrap_or_default()
+}
+
+fn apply_inline_style(style: &mut InlineTextStyle, next: InlineTextStyle) {
+    if next.color.is_some() {
+        style.color = next.color;
+    }
+    if next.font_size.is_some() {
+        style.font_size = next.font_size;
+    }
+    if next.line_height.is_some() {
+        style.line_height = next.line_height;
+    }
+    if next.letter_spacing.is_some() {
+        style.letter_spacing = next.letter_spacing;
+    }
+    if next.font_family.is_some() {
+        style.font_family = next.font_family;
+    }
+    if next.font_weight.is_some() {
+        style.font_weight = next.font_weight;
+    }
+    if next.font_stretch.is_some() {
+        style.font_stretch = next.font_stretch;
+    }
+    if next.font_style.is_some() {
+        style.font_style = next.font_style;
+    }
+    if next.text_transform.is_some() {
+        style.text_transform = next.text_transform;
+    }
+    if next.text_decoration.is_some() {
+        style.text_decoration = next.text_decoration;
+    }
+    if next.vertical_align.is_some() {
+        style.vertical_align = next.vertical_align;
+    }
+    if next.background.is_some() {
+        style.background = next.background;
+    }
+}
+
+fn merge_text_decoration(style: &mut InlineTextStyle, next: TextDecoration) {
+    let mut decoration = style.text_decoration.unwrap_or_default();
+    decoration.underline |= next.underline;
+    decoration.overline |= next.overline;
+    decoration.line_through |= next.line_through;
+    if next.color.is_some() {
+        decoration.color = next.color;
+    }
+    if next.thickness.is_some() {
+        decoration.thickness = next.thickness;
+    }
+    style.text_decoration = Some(decoration);
+}
+
+fn parse_inline_text_style(input: &str) -> Result<InlineTextStyle, String> {
+    let mut style = InlineTextStyle::default();
+    for declaration in input.split(';') {
+        let declaration = declaration.trim();
+        if declaration.is_empty() {
+            continue;
+        }
+        let (property, value) = declaration
+            .split_once(':')
+            .ok_or_else(|| format!("inline style declaration `{declaration}` is missing `:`"))?;
+        apply_inline_text_declaration(&mut style, property.trim(), value.trim())?;
+    }
+    Ok(style)
+}
+
+fn apply_inline_text_declaration(
+    style: &mut InlineTextStyle,
+    property: &str,
+    value: &str,
+) -> Result<(), String> {
+    match property {
+        "color" | "text-color" => style.color = Some(parse_inline_color(value)?),
+        "background" | "background-color" => style.background = Some(parse_inline_color(value)?),
+        "font-size" => style.font_size = Some(parse_inline_px(value)?),
+        "line-height" => style.line_height = Some(parse_inline_px(value)?),
+        "letter-spacing" => style.letter_spacing = Some(parse_inline_px(value)?),
+        "font-family" => style.font_family = Some(value.to_owned()),
+        "font-weight" => style.font_weight = Some(parse_inline_font_weight(value)?),
+        "font-stretch" => style.font_stretch = Some(parse_inline_font_stretch(value)?),
+        "font-style" => style.font_style = Some(parse_inline_font_style(value)?),
+        "text-transform" => style.text_transform = Some(parse_inline_text_transform(value)?),
+        "text-decoration" => style.text_decoration = Some(parse_inline_text_decoration(value)?),
+        "vertical-align" => style.vertical_align = Some(parse_inline_vertical_align(value)?),
+        other => return Err(format!("unsupported inline text property `{other}`")),
+    }
+    Ok(())
+}
+
+fn parse_inline_font_weight(input: &str) -> Result<FontWeight, String> {
+    match input {
+        "normal" => Ok(FontWeight::NORMAL),
+        "bold" => Ok(FontWeight::BOLD),
+        value => value
+            .parse::<u16>()
+            .map(FontWeight::new)
+            .map_err(|_| format!("unsupported font-weight `{input}`")),
+    }
+}
+
+fn parse_inline_font_stretch(input: &str) -> Result<FontStretch, String> {
+    match input {
+        "normal" => Ok(FontStretch::NORMAL),
+        "condensed" => Ok(FontStretch::CONDENSED),
+        "expanded" => Ok(FontStretch::EXPANDED),
+        value => value
+            .strip_suffix('%')
+            .ok_or_else(|| format!("unsupported font-stretch `{input}`"))?
+            .parse::<f32>()
+            .map(FontStretch::percent)
+            .map_err(|_| format!("unsupported font-stretch `{input}`")),
+    }
+}
+
+fn parse_inline_font_style(input: &str) -> Result<FontStyle, String> {
+    match input {
+        "normal" => Ok(FontStyle::Normal),
+        "italic" => Ok(FontStyle::Italic),
+        "oblique" => Ok(FontStyle::Oblique),
+        _ => Err(format!("unsupported font-style `{input}`")),
+    }
+}
+
+fn parse_inline_text_transform(input: &str) -> Result<TextTransform, String> {
+    match input {
+        "none" => Ok(TextTransform::None),
+        "uppercase" => Ok(TextTransform::Uppercase),
+        "lowercase" => Ok(TextTransform::Lowercase),
+        "capitalize" => Ok(TextTransform::Capitalize),
+        _ => Err(format!("unsupported text-transform `{input}`")),
+    }
+}
+
+fn parse_inline_vertical_align(input: &str) -> Result<TextVerticalAlign, String> {
+    match input {
+        "baseline" => Ok(TextVerticalAlign::Baseline),
+        "top" => Ok(TextVerticalAlign::Top),
+        "middle" => Ok(TextVerticalAlign::Middle),
+        "bottom" => Ok(TextVerticalAlign::Bottom),
+        "sub" => Ok(TextVerticalAlign::Sub),
+        "super" => Ok(TextVerticalAlign::Super),
+        _ => Err(format!("unsupported vertical-align `{input}`")),
+    }
+}
+
+fn parse_inline_text_decoration(input: &str) -> Result<TextDecoration, String> {
+    if input == "none" {
+        return Ok(TextDecoration::NONE);
+    }
+
+    let mut decoration = TextDecoration::NONE;
+    for part in input.split_whitespace() {
+        match part {
+            "underline" => decoration.underline = true,
+            "overline" => decoration.overline = true,
+            "line-through" => decoration.line_through = true,
+            value if value.ends_with("px") => decoration.thickness = Some(parse_inline_px(value)?),
+            value if value.starts_with('#') => decoration.color = Some(parse_inline_color(value)?),
+            other => return Err(format!("unsupported text-decoration token `{other}`")),
+        }
+    }
+    Ok(decoration)
+}
+
+fn parse_inline_px(input: &str) -> Result<f32, String> {
+    input
+        .trim_end_matches("px")
+        .parse::<f32>()
+        .map_err(|_| format!("expected pixel length, got `{input}`"))
+}
+
+fn parse_inline_color(input: &str) -> Result<Color, String> {
+    let hex = input
+        .strip_prefix('#')
+        .ok_or_else(|| format!("expected hex color, got `{input}`"))?;
+    let channel = |range: std::ops::Range<usize>| -> Result<u8, String> {
+        u8::from_str_radix(&hex[range], 16)
+            .map_err(|_| format!("expected hex color, got `{input}`"))
+    };
+    match hex.len() {
+        6 => Ok(Color::rgb(channel(0..2)?, channel(2..4)?, channel(4..6)?)),
+        8 => Ok(Color::rgba(
+            channel(0..2)?,
+            channel(2..4)?,
+            channel(4..6)?,
+            channel(6..8)?,
+        )),
+        _ => Err(format!("expected 6 or 8 digit hex color, got `{input}`")),
+    }
 }
 
 fn push_behavior_hook(
@@ -3091,6 +3383,7 @@ fn element_for_tag(tag: &str) -> Element {
         "h5" => Element::H5,
         "h6" => Element::H6,
         "span" => Element::Span,
+        "b" | "strong" | "i" | "em" | "u" | "s" | "strike" | "sub" | "sup" => Element::Span,
         "button" => Element::Button,
         "input" => Element::Input,
         "select" => Element::Select,

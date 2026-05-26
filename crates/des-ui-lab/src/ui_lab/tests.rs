@@ -4,9 +4,9 @@ use crate::graphics_testing::{
     test_harness,
 };
 use des_document::{
-    DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle, Insets, Length,
-    OverflowWrap, Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size, Style,
-    StyleSelector, StyleSheet, TextDecoration, TextOverflow, TextWrapMode,
+    DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle, FontWeight,
+    Insets, Length, OverflowWrap, Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size,
+    Style, StyleSelector, StyleSheet, TextDecoration, TextOverflow, TextWrapMode,
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
@@ -2459,42 +2459,46 @@ fn text_view_renders_wrapped_and_truncated_specimens() {
     assert_eq!(spacing_runs[0].style.letter_spacing, Some(-0.75));
     assert_eq!(spacing_runs[1].style.letter_spacing, Some(0.0));
     assert_eq!(spacing_runs[2].style.letter_spacing, Some(2.0));
+    let decoration_for = |needle: &str| {
+        decoration_runs
+            .iter()
+            .find(|run| run.text.contains(needle))
+            .unwrap_or_else(|| panic!("expected decoration run containing {needle}"))
+            .style
+            .text_decoration
+    };
     assert_eq!(
-        decoration_runs[0].style.text_decoration,
+        decoration_for("underline"),
         Some(
             TextDecoration::UNDERLINE
                 .color(Color::rgb(103, 80, 164))
                 .thickness(1.0)
         )
     );
-    assert!(decoration_runs[1].style.text_decoration.is_none());
     assert_eq!(
-        decoration_runs[2].style.text_decoration,
+        decoration_for("strike"),
         Some(
             TextDecoration::LINE_THROUGH
                 .color(Color::rgb(122, 71, 0))
                 .thickness(1.0)
         )
     );
-    assert!(decoration_runs[3].style.text_decoration.is_none());
     assert_eq!(
-        decoration_runs[4].style.text_decoration,
+        decoration_for("overline"),
         Some(
             TextDecoration::OVERLINE
                 .color(Color::rgb(0, 95, 102))
                 .thickness(1.0)
         )
     );
-    assert!(decoration_runs[5].style.text_decoration.is_none());
     assert_eq!(
-        decoration_runs[6].style.text_decoration,
+        decoration_for("combo"),
         Some(
             TextDecoration::lines(true, true, true)
                 .color(Color::rgb(86, 69, 0))
                 .thickness(1.0)
         )
     );
-    assert!(decoration_runs[7].style.text_decoration.is_none());
     assert_eq!(
         family_runs[0].style.font_family.as_deref(),
         Some("Aptos, Inter, sans-serif")
