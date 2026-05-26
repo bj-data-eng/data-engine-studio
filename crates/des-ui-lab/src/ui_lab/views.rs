@@ -172,12 +172,7 @@ fn render_interaction_view(ui: &mut des_document::DocumentBuilder) {
 }
 
 fn render_draggable_view(ui: &mut des_document::DocumentBuilder, drag: DragLabState<'_>) {
-    ui.child("draggable-heading", Element::Text)
-        .class("heading")
-        .text("Document Draggables");
-    ui.child("draggable-copy", Element::Text)
-        .class("muted")
-        .text("Sortable drag/drop uses document events, visual subtree clones, optional handles, and style-owned overlays.");
+    super::html::append_draggable_shell(ui);
     render_drag_drop_lab(ui, drag);
 }
 
@@ -197,9 +192,6 @@ fn render_drag_drop_lab(ui: &mut des_document::DocumentBuilder, drag: DragLabSta
         drag_drop_preview,
         scroll_list_drop_preview,
     } = drag;
-    ui.child("drag-title", Element::Text)
-        .class("section-title")
-        .text("Drag and drop grid");
     ui.div("drag-workbench")
         .class("drag-workbench")
         .children(|ui| {

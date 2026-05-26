@@ -1104,6 +1104,32 @@ fn styling_overview_is_authored_from_html_fragment_and_projected_from_state() {
 }
 
 #[test]
+fn draggable_shell_is_authored_from_html_fragment() {
+    let output = lab_output("draggable");
+    let heading = frame(&output, "draggable-heading");
+    let copy = frame(&output, "draggable-copy");
+    let title = frame(&output, "drag-title");
+    let workbench = frame(&output, "drag-workbench");
+
+    assert_eq!(heading.element, Element::H2);
+    assert_eq!(copy.element, Element::P);
+    assert_eq!(title.element, Element::H2);
+    assert_eq!(
+        frame_text(&output, "draggable-heading"),
+        Some("Document Draggables")
+    );
+    assert_eq!(
+        frame_text(&output, "drag-title"),
+        Some("Drag and drop grid")
+    );
+    assert_eq!(
+        frame_text(&output, "drag-scroll-list-title"),
+        Some("Scrollable list target")
+    );
+    assert_eq!(workbench.element, Element::Div);
+}
+
+#[test]
 fn lab_shell_tracks_document_viewport_size() {
     for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
         let output = lab_output_with_size("layout", viewport);

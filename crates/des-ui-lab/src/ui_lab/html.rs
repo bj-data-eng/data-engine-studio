@@ -15,6 +15,8 @@ const INTERACTION_CONTROLS_HTML: &str = include_str!("html/interaction-controls.
 #[cfg(not(debug_assertions))]
 const INTERACTION_LOOP_HTML: &str = include_str!("html/interaction-loop.html");
 #[cfg(not(debug_assertions))]
+const DRAGGABLE_SHELL_HTML: &str = include_str!("html/draggable-shell.html");
+#[cfg(not(debug_assertions))]
 const NESTING_HTML: &str = include_str!("html/nesting.html");
 #[cfg(not(debug_assertions))]
 const GRAPH_HTML: &str = include_str!("html/graph.html");
@@ -55,6 +57,10 @@ pub(super) fn append_interaction_controls(ui: &mut DocumentBuilder) {
 
 pub(super) fn append_interaction_loop(ui: &mut DocumentBuilder) {
     interaction_loop_fragment().append_to_builder(ui);
+}
+
+pub(super) fn append_draggable_shell(ui: &mut DocumentBuilder) {
+    draggable_shell_fragment().append_to_builder(ui);
 }
 
 pub(super) fn append_nesting(ui: &mut DocumentBuilder) {
@@ -108,6 +114,7 @@ pub(super) fn asset_revision() -> u64 {
     interaction_cards_source().hash(&mut hasher);
     interaction_controls_source().hash(&mut hasher);
     interaction_loop_source().hash(&mut hasher);
+    draggable_shell_source().hash(&mut hasher);
     nesting_source().hash(&mut hasher);
     graph_source().hash(&mut hasher);
     structural_selectors_source().hash(&mut hasher);
@@ -143,6 +150,11 @@ fn interaction_controls_fragment() -> HtmlDocument {
 fn interaction_loop_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&interaction_loop_source())
         .expect("lab interaction loop HTML is valid")
+}
+
+fn draggable_shell_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&draggable_shell_source())
+        .expect("lab draggable shell HTML is valid")
 }
 
 fn nesting_fragment() -> HtmlDocument {
@@ -275,6 +287,23 @@ fn interaction_loop_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(INTERACTION_LOOP_HTML)
+    }
+}
+
+fn draggable_shell_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/draggable-shell.html"
+            ))
+            .expect("lab draggable shell HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DRAGGABLE_SHELL_HTML)
     }
 }
 
