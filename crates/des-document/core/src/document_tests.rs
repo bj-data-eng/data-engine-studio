@@ -1221,6 +1221,21 @@ fn css_stylesheet_parse_errors_report_author_location() {
 }
 
 #[test]
+fn css_stylesheet_parser_rejects_malformed_string_content() {
+    let control_error = StyleSheet::parse_css(".panel {\n  width\u{0007}: 1px;\n}").unwrap_err();
+    let replacement_error = StyleSheet::parse_css(".panel {\n  width: \u{FFFD};\n}").unwrap_err();
+
+    assert_eq!(
+        control_error.to_string(),
+        "CSS parse error at 2:8: CSS contains unsupported control character U+0007"
+    );
+    assert_eq!(
+        replacement_error.to_string(),
+        "CSS parse error at 2:10: CSS contains a replacement character"
+    );
+}
+
+#[test]
 fn document_engine_invalidates_cached_layout_when_stylesheet_key_changes() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document

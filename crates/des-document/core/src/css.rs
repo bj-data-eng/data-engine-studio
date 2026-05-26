@@ -99,6 +99,7 @@ struct CssSource {
 
 impl CssSource {
     fn new(input: &str) -> Result<Self, CssParseError> {
+        validate_css_source(input)?;
         let (css, offsets) = strip_comments(input)?;
         Ok(Self {
             original: input.to_owned(),
@@ -120,6 +121,27 @@ impl CssSource {
     fn error_at(&self, stripped_offset: usize, message: impl Into<String>) -> CssParseError {
         CssParseError::new(message).at(self.location(stripped_offset))
     }
+}
+
+fn validate_css_source(input: &str) -> Result<(), CssParseError> {
+    for (offset, ch) in input.char_indices() {
+        if ch == '\0' {
+            return Err(CssParseError::new("CSS contains a null character")
+                .at(source_location(input, offset)));
+        }
+        if ch == '\u{FFFD}' {
+            return Err(CssParseError::new("CSS contains a replacement character")
+                .at(source_location(input, offset)));
+        }
+        if ch.is_control() && !matches!(ch, '\t' | '\n' | '\r') {
+            return Err(CssParseError::new(format!(
+                "CSS contains unsupported control character U+{:04X}",
+                ch as u32
+            ))
+            .at(source_location(input, offset)));
+        }
+    }
+    Ok(())
 }
 
 fn strip_comments(input: &str) -> Result<(String, Vec<usize>), CssParseError> {
