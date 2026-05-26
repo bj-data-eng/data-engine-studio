@@ -1,0 +1,125 @@
+<h2 id="floating-heading" class="heading">Floating Layout</h2>
+<p id="floating-copy" class="muted">
+  Anchored surfaces use document styles for placement, fallback, shift, and optional arrow geometry.
+</p>
+<section id="floating-playground" class="floating-playground">
+  <article id="floating-offset-specimen" class="floating-specimen-box">
+    <h3 id="floating-offset-specimen-title" class="card-title">Floating offset</h3>
+    <div id="floating-offset-row" class="floating-offset-row">
+      <button id="floating-offset-zero-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-offset-zero-reference-label" class="floating-offset-reference-label">0px</span></button>
+      <button id="floating-offset-ten-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-offset-ten-reference-label" class="floating-offset-reference-label">10px</span></button>
+      <button id="floating-offset-zero-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-offset-zero-popover-label" class="floating-offset-popover-label">Floating</span></button>
+      <button id="floating-offset-ten-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-offset-ten-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    </div>
+  </article>
+  <article id="floating-main-axis-specimen" class="floating-specimen-box floating-main-axis-specimen">
+    <h3 id="floating-main-axis-specimen-title" class="card-title">Main axis</h3>
+    <div id="floating-main-axis-stack" class="floating-main-axis-stack">
+      <div id="floating-main-axis-row-vertical" class="floating-main-axis-row">
+        <button id="floating-main-axis-top-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-main-axis-top-reference-label" class="floating-offset-reference-label">top</span></button>
+        <button id="floating-main-axis-bottom-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-main-axis-bottom-reference-label" class="floating-offset-reference-label">bottom</span></button>
+      </div>
+      <div id="floating-main-axis-row-horizontal" class="floating-main-axis-row">
+        <button id="floating-main-axis-left-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-main-axis-left-reference-label" class="floating-offset-reference-label">left</span></button>
+        <button id="floating-main-axis-right-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-main-axis-right-reference-label" class="floating-offset-reference-label">right</span></button>
+      </div>
+    </div>
+    <button id="floating-main-axis-top-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-main-axis-top-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-main-axis-bottom-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-main-axis-bottom-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-main-axis-left-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-main-axis-left-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-main-axis-right-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-main-axis-right-popover-label" class="floating-offset-popover-label">Floating</span></button>
+  </article>
+  <article id="floating-cross-axis-specimen" class="floating-specimen-box floating-main-axis-specimen">
+    <h3 id="floating-cross-axis-specimen-title" class="card-title">Cross axis</h3>
+    <div id="floating-cross-axis-stack" class="floating-main-axis-stack">
+      <div id="floating-cross-axis-row-vertical" class="floating-main-axis-row">
+        <button id="floating-cross-axis-top-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-cross-axis-top-reference-label" class="floating-offset-reference-label">top</span></button>
+        <button id="floating-cross-axis-bottom-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-cross-axis-bottom-reference-label" class="floating-offset-reference-label">bottom</span></button>
+      </div>
+      <div id="floating-cross-axis-row-horizontal" class="floating-main-axis-row">
+        <button id="floating-cross-axis-left-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-cross-axis-left-reference-label" class="floating-offset-reference-label">left</span></button>
+        <button id="floating-cross-axis-right-reference" class="floating-offset-reference floating-main-axis-reference" data-interactive="true"><span id="floating-cross-axis-right-reference-label" class="floating-offset-reference-label">right</span></button>
+      </div>
+    </div>
+    <button id="floating-cross-axis-top-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-cross-axis-top-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-cross-axis-bottom-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-cross-axis-bottom-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-cross-axis-left-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-cross-axis-left-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-cross-axis-right-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-cross-axis-right-popover-label" class="floating-offset-popover-label">Floating</span></button>
+  </article>
+  <article id="floating-alignment-axis-specimen" class="floating-specimen-box floating-main-axis-specimen">
+    <h3 id="floating-alignment-axis-specimen-title" class="card-title">Alignment axis</h3>
+    <div id="floating-alignment-axis-stack" class="floating-main-axis-stack">
+      <div id="floating-alignment-axis-cross-row" class="floating-main-axis-row">
+        <button id="floating-alignment-axis-cross-start-reference" class="floating-offset-reference floating-alignment-axis-reference" data-interactive="true"><span id="floating-alignment-axis-cross-start-reference-placement" class="floating-alignment-axis-placement-label">top-start</span><span id="floating-alignment-axis-cross-start-reference-axis" class="floating-alignment-axis-axis-label">cross_axis</span></button>
+        <button id="floating-alignment-axis-cross-end-reference" class="floating-offset-reference floating-alignment-axis-reference" data-interactive="true"><span id="floating-alignment-axis-cross-end-reference-placement" class="floating-alignment-axis-placement-label">top-end</span><span id="floating-alignment-axis-cross-end-reference-axis" class="floating-alignment-axis-axis-label">cross_axis</span></button>
+      </div>
+      <div id="floating-alignment-axis-aligned-row" class="floating-main-axis-row">
+        <button id="floating-alignment-axis-start-reference" class="floating-offset-reference floating-alignment-axis-reference" data-interactive="true"><span id="floating-alignment-axis-start-reference-placement" class="floating-alignment-axis-placement-label">top-start</span><span id="floating-alignment-axis-start-reference-axis" class="floating-alignment-axis-axis-label">alignment_axis</span></button>
+        <button id="floating-alignment-axis-end-reference" class="floating-offset-reference floating-alignment-axis-reference" data-interactive="true"><span id="floating-alignment-axis-end-reference-placement" class="floating-alignment-axis-placement-label">top-end</span><span id="floating-alignment-axis-end-reference-axis" class="floating-alignment-axis-axis-label">alignment_axis</span></button>
+      </div>
+    </div>
+    <button id="floating-alignment-axis-cross-start-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-alignment-axis-cross-start-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-alignment-axis-cross-end-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-alignment-axis-cross-end-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-alignment-axis-start-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-alignment-axis-start-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    <button id="floating-alignment-axis-end-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-alignment-axis-end-popover-label" class="floating-offset-popover-label">Floating</span></button>
+  </article>
+  <article id="floating-centered-axis-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-centered-axis-specimen-title" class="card-title">Centered axes</h3>
+    <div id="floating-centered-axis-row" class="floating-centered-axis-row">
+      <button id="floating-centered-axis-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-centered-axis-reference-label" class="floating-offset-reference-label"></span></button>
+      <button id="floating-centered-axis-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-centered-axis-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    </div>
+  </article>
+  <article id="floating-top-start-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-top-start-specimen-title" class="card-title">Top start</h3>
+    <div id="floating-top-start-row" class="floating-centered-axis-row">
+      <button id="floating-top-start-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-top-start-reference-label" class="floating-offset-reference-label"></span></button>
+      <button id="floating-top-start-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-top-start-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    </div>
+  </article>
+  <article id="floating-scroll-shift-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-scroll-shift-specimen-title" class="card-title">Horizontal scroll boundary</h3>
+    <div id="floating-scroll-shift-panel" class="floating-scroll-shift-panel styled-scrollbar">
+      <div id="floating-scroll-shift-track" class="floating-scroll-shift-track">
+        <button id="floating-scroll-shift-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-scroll-shift-reference-label" class="floating-offset-reference-label"></span></button>
+      </div>
+      <button id="floating-scroll-shift-popover" class="floating-offset-popover floating-scroll-shift-popover" data-interactive="true"><span id="floating-scroll-shift-popover-label" class="floating-offset-popover-label">A floating element that shifts along the x-axis</span></button>
+    </div>
+  </article>
+  <article id="floating-scroll-attach-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-scroll-attach-specimen-title" class="card-title">Horizontal scroll attached</h3>
+    <div id="floating-scroll-attach-panel" class="floating-scroll-shift-panel styled-scrollbar">
+      <div id="floating-scroll-attach-track" class="floating-scroll-shift-track">
+        <button id="floating-scroll-attach-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-scroll-attach-reference-label" class="floating-offset-reference-label"></span></button>
+      </div>
+      <button id="floating-scroll-attach-popover" class="floating-offset-popover floating-scroll-shift-popover" data-interactive="true"><span id="floating-scroll-attach-popover-label" class="floating-offset-popover-label">A floating element that does not shift along the x-axis</span></button>
+    </div>
+  </article>
+  <article id="floating-vertical-overlap-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-vertical-overlap-specimen-title" class="card-title">Vertical scroll boundary</h3>
+    <div id="floating-vertical-overlap-panel" class="floating-vertical-overlap-panel styled-scrollbar">
+      <div id="floating-vertical-overlap-track" class="floating-vertical-overlap-track">
+        <button id="floating-vertical-overlap-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-vertical-overlap-reference-label" class="floating-offset-reference-label"></span></button>
+      </div>
+      <button id="floating-vertical-overlap-popover" class="floating-offset-popover floating-vertical-overlap-popover" data-interactive="true"><span id="floating-vertical-overlap-popover-label" class="floating-offset-popover-label">I can overlap my reference element</span></button>
+    </div>
+  </article>
+  <article id="floating-vertical-flip-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-vertical-flip-specimen-title" class="card-title">Vertical scroll flip</h3>
+    <div id="floating-vertical-flip-panel" class="floating-vertical-flip-panel styled-scrollbar">
+      <div id="floating-vertical-flip-track" class="floating-vertical-flip-track">
+        <button id="floating-vertical-flip-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-vertical-flip-reference-label" class="floating-offset-reference-label"></span></button>
+      </div>
+      <button id="floating-vertical-flip-popover" class="floating-offset-popover" data-interactive="true"><span id="floating-vertical-flip-popover-label" class="floating-offset-popover-label">Floating</span></button>
+    </div>
+  </article>
+  <article id="floating-edge-flip-specimen" class="floating-specimen-box floating-centered-axis-specimen">
+    <h3 id="floating-edge-flip-specimen-title" class="card-title">Two-axis edge flip</h3>
+    <div id="floating-edge-flip-panel" class="floating-edge-flip-panel styled-scrollbar">
+      <div id="floating-edge-flip-track" class="floating-edge-flip-track">
+        <button id="floating-edge-flip-reference" class="floating-offset-reference" data-interactive="true"><span id="floating-edge-flip-reference-label" class="floating-offset-reference-label"></span></button>
+      </div>
+      <button id="floating-edge-flip-popover" class="floating-offset-popover floating-edge-flip-popover" data-interactive="true"><span id="floating-edge-flip-popover-label" class="floating-offset-popover-label">I will check cross axis overflow (default)</span></button>
+    </div>
+  </article>
+</section>

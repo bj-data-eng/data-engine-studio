@@ -30,6 +30,8 @@ const SCROLLING_HTML: &str = include_str!("html/scrolling.html");
 const SHADOW_SPECIMENS_HTML: &str = include_str!("html/shadow-specimens.html");
 #[cfg(not(debug_assertions))]
 const ANIMATION_HTML: &str = include_str!("html/animation.html");
+#[cfg(not(debug_assertions))]
+const FLOATING_HTML: &str = include_str!("html/floating.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -83,6 +85,10 @@ pub(super) fn append_animation(ui: &mut DocumentBuilder) {
     animation_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_floating(ui: &mut DocumentBuilder) {
+    floating_fragment().append_to_builder(ui);
+}
+
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
@@ -98,6 +104,7 @@ pub(super) fn asset_revision() -> u64 {
     scrolling_source().hash(&mut hasher);
     shadow_specimens_source().hash(&mut hasher);
     animation_source().hash(&mut hasher);
+    floating_source().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -156,6 +163,10 @@ fn shadow_specimens_fragment() -> HtmlDocument {
 
 fn animation_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&animation_source()).expect("lab animation HTML is valid")
+}
+
+fn floating_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&floating_source()).expect("lab floating HTML is valid")
 }
 
 fn topbar_source() -> Cow<'static, str> {
@@ -376,5 +387,22 @@ fn animation_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(ANIMATION_HTML)
+    }
+}
+
+fn floating_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/floating.html"
+            ))
+            .expect("lab floating HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(FLOATING_HTML)
     }
 }

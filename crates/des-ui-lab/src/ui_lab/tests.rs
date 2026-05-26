@@ -444,6 +444,14 @@ fn floating_view_exercises_fallback_shift_and_optional_arrow_body() {
     let edge_flip_reference = frame(&output, "floating-edge-flip-reference");
     let edge_flip_popover = frame(&output, "floating-edge-flip-popover");
 
+    assert_eq!(frame(&output, "floating-heading").element, Element::H2);
+    assert_eq!(frame(&output, "floating-copy").element, Element::P);
+    assert_eq!(playground.element, Element::Section);
+    assert_eq!(specimen.element, Element::Article);
+    assert_eq!(specimen_title.element, Element::H3);
+    assert_eq!(zero_reference.element, Element::Button);
+    assert!(zero_reference.interactive);
+
     assert_eq!(specimen.style.position, Position::Flow);
     assert_eq!(main_axis_specimen.style.position, Position::Flow);
     assert_eq!(cross_axis_specimen.style.position, Position::Flow);
