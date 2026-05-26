@@ -603,13 +603,20 @@ impl Document {
 
     pub fn set_focused(&mut self, id: impl Into<ElementId>, focused: bool) -> DocumentResult<bool> {
         let id = id.into();
-        let element = self.element_mut(&id)?;
-        if element.spec.focused == focused {
-            return Ok(false);
+        self.element(&id)?;
+        let mut changed = false;
+        if focused {
+            changed |= self.clear_focused_except(Some(&id));
         }
-        element.spec.focused = focused;
-        self.revision = self.revision.wrapping_add(1);
-        Ok(true)
+        let element = self.element_mut(&id)?;
+        if element.spec.focused != focused {
+            element.spec.focused = focused;
+            changed = true;
+        }
+        if changed {
+            self.revision = self.revision.wrapping_add(1);
+        }
+        Ok(changed)
     }
 
     pub fn focus(&mut self, id: impl Into<ElementId>) -> DocumentResult<bool> {
@@ -1079,6 +1086,9 @@ impl Document {
         self.layout
             .add_child(parent_node, node)
             .map_err(layout_error)?;
+        if spec.focused {
+            self.clear_focused_except(Some(&id));
+        }
         self.layout_to_element.insert(node, id.clone());
         self.elements.insert(
             id.clone(),
@@ -1094,6 +1104,20 @@ impl Document {
         self.revision = self.revision.wrapping_add(1);
 
         Ok(node)
+    }
+
+    fn clear_focused_except(&mut self, except: Option<&ElementId>) -> bool {
+        let mut changed = false;
+        for element in self.elements.values_mut() {
+            if except.is_some_and(|id| &element.id == id) {
+                continue;
+            }
+            if element.spec.focused {
+                element.spec.focused = false;
+                changed = true;
+            }
+        }
+        changed
     }
 
     fn remove_subtree(&mut self, id: &ElementId) -> DocumentResult<()> {

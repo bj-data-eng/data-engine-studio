@@ -757,6 +757,82 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
 }
 
 #[test]
+fn focus_state_is_singular_and_last_authored_focus_wins() {
+    let stylesheet = StyleSheet::new()
+        .id("search", Style::default().size(160.0, 32.0))
+        .id("filter", Style::default().size(160.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.input("search").focused(true).empty();
+        ui.input("filter").focused(true).empty();
+    });
+
+    let output = view.update();
+
+    assert_eq!(output.count_focused(), 1);
+    assert!(!output.snapshot().find("search").unwrap().focused());
+    assert!(output.snapshot().find("filter").unwrap().focused());
+    assert_eq!(
+        output.focused_target().map(ElementId::as_str),
+        Some("filter")
+    );
+    assert!(output.focus_event_for("filter"));
+    assert!(!output.focus_event_for("search"));
+}
+
+#[test]
+fn focusing_an_element_clears_previous_focus_peer() {
+    let stylesheet = StyleSheet::new()
+        .id("search", Style::default().size(160.0, 32.0))
+        .id("filter", Style::default().size(160.0, 32.0));
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.input("search").focused(true).empty();
+        ui.input("filter").empty();
+    });
+    let initial = view.update();
+    let (_, projected) = view
+        .project_and_update(&DocumentProjection::new().focus("filter"))
+        .expect("focus projection should apply");
+
+    assert_eq!(
+        initial.focused_target().map(ElementId::as_str),
+        Some("search")
+    );
+    assert_eq!(projected.count_focused(), 1);
+    assert!(!projected.snapshot().find("search").unwrap().focused());
+    assert!(projected.snapshot().find("filter").unwrap().focused());
+    assert!(projected.blur_event_for("search"));
+    assert!(projected.focus_event_for("filter"));
+}
+
+#[test]
+fn removing_focused_element_emits_blur_without_dispatching_missing_hook() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum AppAction {
+        Blur,
+    }
+
+    let stylesheet = StyleSheet::new().id("search", Style::default().size(160.0, 32.0));
+    let registry = DocumentCommandRegistry::new().bind_blur("search.blur", AppAction::Blur);
+    let mut view = DocumentView::build(Size::new(320.0, 180.0), stylesheet, |ui| {
+        ui.input("search")
+            .focused(true)
+            .on_blur("search.blur")
+            .empty();
+    });
+
+    let focused = view.update();
+    view.document_mut()
+        .remove("search")
+        .expect("focused element should be removable");
+    let removed = view.update();
+
+    assert!(focused.focus_event_for("search"));
+    assert!(removed.blur_event_for("search"));
+    assert!(removed.snapshot().find("search").is_none());
+    assert!(registry.collect_blur_action_values(&removed).is_empty());
+}
+
+#[test]
 fn document_builder_expresses_default_and_event_scoped_commands() {
     let stylesheet = StyleSheet::new()
         .id("run", Style::default().size(96.0, 32.0))
