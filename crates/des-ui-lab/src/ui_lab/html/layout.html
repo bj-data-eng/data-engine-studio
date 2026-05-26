@@ -1,0 +1,276 @@
+<h2 id="layout-heading" class="heading">Box Model Specimens</h2>
+<p id="layout-copy" class="muted">
+  Each subject isolates one layout contract. Selector rules are printed above the specimen.
+</p>
+<section id="box-model-grid" class="box-model-grid">
+  <div id="box-row-size" class="box-model-row">
+    <article id="box-auto" class="box-model-case">
+      <h3 id="box-auto-title" class="box-label">Auto</h3>
+      <p id="box-auto-note" class="box-note">content-sized container</p>
+      <code id="box-auto-rule-0" class="box-rule">width: Auto; height: Auto</code>
+      <div id="box-auto-frame" class="box-subject-frame">
+        <div id="box-auto-subject" class="box-subject box-subject-auto">
+          <div id="box-auto-chip-0" class="box-chip"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-px" class="box-model-case">
+      <h3 id="box-px-title" class="box-label">Fixed size</h3>
+      <p id="box-px-note" class="box-note">width 96 pixels, height 44 pixels</p>
+      <code id="box-px-rule-0" class="box-rule">width: Px(96); height: Px(44)</code>
+      <div id="box-px-frame" class="box-subject-frame">
+        <div id="box-px-subject" class="box-subject box-subject-px"></div>
+      </div>
+    </article>
+    <article id="box-min" class="box-model-case">
+      <h3 id="box-min-title" class="box-label">Min size</h3>
+      <p id="box-min-note" class="box-note">empty element expands to minimum size</p>
+      <code id="box-min-rule-0" class="box-rule">width: Auto; height: Auto; minimum size: 40 by 40</code>
+      <div id="box-min-frame" class="box-subject-frame">
+        <div id="box-min-subject" class="box-subject box-subject-min"></div>
+      </div>
+    </article>
+    <article id="box-max" class="box-model-case">
+      <h3 id="box-max-title" class="box-label">Max size</h3>
+      <p id="box-max-note" class="box-note">auto content is clamped by maximum size</p>
+      <code id="box-max-rule-0" class="box-rule">width: Auto; height: Auto; child size 88 by 48; maximum size 52 by 34</code>
+      <div id="box-max-frame" class="box-subject-frame">
+        <div id="box-max-subject" class="box-subject box-subject-max">
+          <div id="box-max-wide-child" class="box-max-wide-child"></div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-parent-relative" class="box-model-row">
+    <article id="box-fill" class="box-model-case">
+      <h3 id="box-fill-title" class="box-label">Width fill</h3>
+      <p id="box-fill-note" class="box-note">fills parent content width</p>
+      <code id="box-fill-rule-0" class="box-rule">width: Fill; height: Px(28)</code>
+      <div id="box-fill-frame" class="box-subject-frame">
+        <div id="box-fill-subject" class="box-subject box-subject-fill"></div>
+      </div>
+    </article>
+    <article id="box-percent" class="box-model-case">
+      <h3 id="box-percent-title" class="box-label">Width 50%</h3>
+      <p id="box-percent-note" class="box-note">resolves from parent content width</p>
+      <code id="box-percent-rule-0" class="box-rule">width: Percent(0.5); height: Px(28)</code>
+      <div id="box-percent-frame" class="box-subject-frame">
+        <div id="box-percent-subject" class="box-subject box-subject-percent"></div>
+      </div>
+    </article>
+    <article id="box-height-fill" class="box-model-case">
+      <h3 id="box-height-fill-title" class="box-label">Height fill</h3>
+      <p id="box-height-fill-note" class="box-note">fills parent content height</p>
+      <code id="box-height-fill-rule-0" class="box-rule">width: Px(64); height: Fill</code>
+      <div id="box-height-fill-frame" class="box-subject-frame">
+        <div id="box-height-fill-subject" class="box-subject box-subject-height-fill"></div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-insets" class="box-model-row">
+    <article id="box-margin" class="box-model-case">
+      <h3 id="box-margin-title" class="box-label">Margin</h3>
+      <p id="box-margin-note" class="box-note">12 pixels outside the border box</p>
+      <code id="box-margin-rule-0" class="box-rule">size: 32 by 32; margin: all sides 12</code>
+      <div id="box-margin-frame" class="box-subject-frame">
+        <div id="box-margin-subject" class="box-subject box-subject-margin"></div>
+      </div>
+    </article>
+    <article id="box-padding" class="box-model-case">
+      <h3 id="box-padding-title" class="box-label">Padding</h3>
+      <p id="box-padding-note" class="box-note">12 pixels inside the border box</p>
+      <code id="box-padding-rule-0" class="box-rule">width: Auto; height: Auto; padding: all sides 12</code>
+      <div id="box-padding-frame" class="box-subject-frame">
+        <div id="box-padding-subject" class="box-subject box-subject-padding">
+          <div id="box-padding-chip-0" class="box-chip"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-border" class="box-model-case">
+      <h3 id="box-border-title" class="box-label">Border</h3>
+      <p id="box-border-note" class="box-note">5 pixels on every side</p>
+      <code id="box-border-rule-0" class="box-rule">size: 44 by 44; border width: all sides 5</code>
+      <div id="box-border-frame" class="box-subject-frame">
+        <div id="box-border-subject" class="box-subject box-subject-border"></div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-flow" class="box-model-row">
+    <article id="box-row-gap" class="box-model-case">
+      <h3 id="box-row-gap-title" class="box-label">Row gap</h3>
+      <p id="box-row-gap-note" class="box-note">3 children</p>
+      <code id="box-row-gap-rule-0" class="box-rule">flex_direction: Row; width: Auto; height: Auto; gap: 10</code>
+      <div id="box-row-gap-frame" class="box-subject-frame">
+        <div id="box-row-gap-subject" class="box-subject box-subject-row-gap">
+          <div id="box-row-gap-chip-0" class="box-chip"></div>
+          <div id="box-row-gap-chip-1" class="box-chip"></div>
+          <div id="box-row-gap-chip-2" class="box-chip"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-column-gap" class="box-model-case">
+      <h3 id="box-column-gap-title" class="box-label">Column gap</h3>
+      <p id="box-column-gap-note" class="box-note">3 children</p>
+      <code id="box-column-gap-rule-0" class="box-rule">flex_direction: Column; width: Auto; height: Auto; gap: 6</code>
+      <div id="box-column-gap-frame" class="box-subject-frame">
+        <div id="box-column-gap-subject" class="box-subject box-subject-column-gap">
+          <div id="box-column-gap-chip-0" class="box-chip"></div>
+          <div id="box-column-gap-chip-1" class="box-chip"></div>
+          <div id="box-column-gap-chip-2" class="box-chip"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-visible-overflow" class="box-model-case">
+      <h3 id="box-visible-overflow-title" class="box-label">Overflow visible</h3>
+      <p id="box-visible-overflow-note" class="box-note">unclipped child</p>
+      <code id="box-visible-overflow-rule-0" class="box-rule">size: 44 by 44; vertical overflow: Visible</code>
+      <div id="box-visible-overflow-frame" class="box-subject-frame">
+        <div id="box-visible-overflow-subject" class="box-subject box-subject-visible-overflow">
+          <div id="box-visible-overflow-overflow-child" class="box-overflow-child"></div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-alignment" class="box-model-row">
+    <article id="box-row-align" class="box-model-case">
+      <h3 id="box-row-align-title" class="box-label">Row alignment</h3>
+      <p id="box-row-align-note" class="box-note">children centered on main axis and end-aligned on cross axis</p>
+      <code id="box-row-align-rule-0" class="box-rule">flex_direction: Row; size: 96 by 54; gap: 8; justify content: Center; align items: End</code>
+      <div id="box-row-align-frame" class="box-subject-frame">
+        <div id="box-row-align-subject" class="box-subject box-subject-row-align">
+          <div id="box-row-align-chip-0" class="box-chip"></div>
+          <div id="box-row-align-chip-1" class="box-chip"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-column-align" class="box-model-case">
+      <h3 id="box-column-align-title" class="box-label">Column alignment</h3>
+      <p id="box-column-align-note" class="box-note">children spaced on main axis and centered on cross axis</p>
+      <code id="box-column-align-rule-0" class="box-rule">flex_direction: Column; size: 80 by 92; gap: 4; justify content: SpaceBetween; align items: Center</code>
+      <div id="box-column-align-frame" class="box-subject-frame">
+        <div id="box-column-align-subject" class="box-subject box-subject-column-align">
+          <div id="box-column-align-chip-0" class="box-chip"></div>
+          <div id="box-column-align-chip-1" class="box-chip"></div>
+          <div id="box-column-align-chip-2" class="box-chip"></div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-overflow" class="box-model-row">
+    <article id="box-scroll-overflow" class="box-model-case">
+      <h3 id="box-scroll-overflow-title" class="box-label">Overflow scroll</h3>
+      <p id="box-scroll-overflow-note" class="box-note">clipped content</p>
+      <code id="box-scroll-overflow-rule-0" class="box-rule">size: 44 by 44; vertical overflow: Scroll</code>
+      <div id="box-scroll-overflow-frame" class="box-subject-frame">
+        <div id="box-scroll-overflow-subject" class="box-subject box-subject-scroll-overflow styled-scrollbar">
+          <div id="box-scroll-overflow-overflow-child" class="box-overflow-child"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-scroll-x-overflow" class="box-model-case">
+      <h3 id="box-scroll-x-overflow-title" class="box-label">Overflow x scroll</h3>
+      <p id="box-scroll-x-overflow-note" class="box-note">horizontal clipped content</p>
+      <code id="box-scroll-x-overflow-rule-0" class="box-rule">size: 44 by 44; horizontal overflow: Scroll; vertical overflow: Visible</code>
+      <div id="box-scroll-x-overflow-frame" class="box-subject-frame">
+        <div id="box-scroll-x-overflow-subject" class="box-subject box-subject-scroll-x-overflow styled-scrollbar">
+          <div id="box-scroll-x-overflow-overflow-child" class="box-overflow-child"></div>
+        </div>
+      </div>
+    </article>
+    <article id="box-scroll-xy-overflow" class="box-model-case">
+      <h3 id="box-scroll-xy-overflow-title" class="box-label">Overflow two-axis</h3>
+      <p id="box-scroll-xy-overflow-note" class="box-note">horizontal and vertical clipped content</p>
+      <code id="box-scroll-xy-overflow-rule-0" class="box-rule">size: 44 by 44; horizontal overflow: Scroll; vertical overflow: Scroll</code>
+      <div id="box-scroll-xy-overflow-frame" class="box-subject-frame">
+        <div id="box-scroll-xy-overflow-subject" class="box-subject box-subject-scroll-xy-overflow styled-scrollbar">
+          <div id="box-scroll-xy-overflow-overflow-child" class="box-overflow-child"></div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-edges" class="box-model-row">
+    <article id="box-side-radius" class="box-model-case">
+      <h3 id="box-side-radius-title" class="box-label">Side + corner overrides</h3>
+      <p id="box-side-radius-note" class="box-note">CSS-like layered edges</p>
+      <code id="box-side-radius-rule-0" class="box-rule">base: border width all sides 2; radius all corners 4</code>
+      <code id="box-side-radius-rule-1" class="box-rule">override: left border width 8; bottom border width 5</code>
+      <code id="box-side-radius-rule-2" class="box-rule">override: top-right radius 14; bottom-left radius 0</code>
+      <div id="box-side-radius-frame" class="box-subject-frame">
+        <div id="box-side-radius-subject" class="box-subject box-subject-side-radius"></div>
+      </div>
+    </article>
+  </div>
+  <div id="box-row-positioning" class="box-model-row">
+    <article id="box-absolute-parent" class="box-model-case">
+      <h3 id="box-absolute-parent-title" class="box-label">Absolute parent</h3>
+      <p id="box-absolute-parent-note" class="box-note">child is anchored to parent content</p>
+      <code id="box-absolute-parent-rule-0" class="box-rule">parent: size 88 by 64; padding all sides 8; border width all sides 2</code>
+      <code id="box-absolute-parent-rule-1" class="box-rule">child: position AbsoluteParent; top 8; left 14</code>
+      <div id="box-absolute-parent-frame" class="box-subject-frame">
+        <div id="box-absolute-parent-subject" class="box-subject box-subject-absolute-parent">
+          <div id="box-absolute-parent-parent" class="box-absolute-parent-frame">
+            <div id="box-absolute-parent-flow-child" class="box-absolute-flow-child"></div>
+            <div id="box-absolute-parent-child" class="box-absolute-parent-child"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+    <article id="box-absolute-window" class="box-model-case">
+      <h3 id="box-absolute-window-title" class="box-label">Absolute window</h3>
+      <p id="box-absolute-window-note" class="box-note">child is anchored to viewport coordinates</p>
+      <code id="box-absolute-window-rule-0" class="box-rule">child: position AbsoluteViewport; top 140; left 420</code>
+      <div id="box-absolute-window-frame" class="box-subject-frame">
+        <div id="box-absolute-window-subject" class="box-subject box-subject-absolute-window">
+          <div id="box-absolute-window-host" class="box-absolute-window-host">
+            <div id="box-absolute-window-child" class="box-absolute-window-child"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <h3 id="box-combo-title" class="box-section-label">Nested Awareness</h3>
+  <div id="box-row-combinations-one" class="box-model-row">
+    <article id="box-nested-nine" class="box-model-case">
+      <h3 id="box-nested-nine-title" class="box-label">Nested auto grid</h3>
+      <p id="box-nested-nine-note" class="box-note">outer margin + inner border</p>
+      <code id="box-nested-nine-rule-0" class="box-rule">outer: Auto size; margin all sides 8; border width all sides 3</code>
+      <code id="box-nested-nine-rule-1" class="box-rule">inner: Auto size; padding all sides 5; border width all sides 2</code>
+      <div id="box-nested-nine-frame" class="box-subject-frame">
+        <div id="box-nested-nine-subject" class="box-subject box-subject-nested-nine">
+          <div id="box-nested-nine-outer" class="box-nested-outer">
+            <div id="box-nested-nine-inner" class="box-nested-inner">
+              <div id="box-nested-nine-row-0" class="box-nested-row">
+                <div id="box-nested-nine-cell-0-0" class="box-nested-cell"></div>
+                <div id="box-nested-nine-cell-0-1" class="box-nested-cell"></div>
+                <div id="box-nested-nine-cell-0-2" class="box-nested-cell"></div>
+              </div>
+              <div id="box-nested-nine-row-1" class="box-nested-row">
+                <div id="box-nested-nine-cell-1-0" class="box-nested-cell"></div>
+                <div id="box-nested-nine-cell-1-1" class="box-nested-cell"></div>
+                <div id="box-nested-nine-cell-1-2" class="box-nested-cell"></div>
+              </div>
+              <div id="box-nested-nine-row-2" class="box-nested-row">
+                <div id="box-nested-nine-cell-2-0" class="box-nested-cell"></div>
+                <div id="box-nested-nine-cell-2-1" class="box-nested-cell"></div>
+                <div id="box-nested-nine-cell-2-2" class="box-nested-cell"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+    <article id="box-inset-percent" class="box-model-case">
+      <h3 id="box-inset-percent-title" class="box-label">Percent insets</h3>
+      <p id="box-inset-percent-note" class="box-note">child resolves from content rect</p>
+      <code id="box-inset-percent-rule-0" class="box-rule">parent: size 88 by 88; padding all sides 8; border width all sides 2</code>
+      <code id="box-inset-percent-rule-1" class="box-rule">child: width Percent(0.5); height Percent(0.5)</code>
+      <div id="box-inset-percent-frame" class="box-subject-frame">
+        <div id="box-inset-percent-subject" class="box-subject box-subject-inset-percent">
+          <div id="box-inset-percent-parent" class="box-inset-percent-parent">
+            <div id="box-inset-percent-child" class="box-inset-percent-child"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>

@@ -1989,6 +1989,12 @@ fn draggable_view_reuses_retained_document_on_warm_update() {
 fn box_model_specimens_cover_size_inset_and_flow_contracts() {
     let output = lab_output_with_size("layout", Size::new(TEST_WIDTH, 1600.0));
 
+    assert_eq!(frame(&output, "layout-heading").element, Element::H2);
+    assert_eq!(frame(&output, "layout-copy").element, Element::P);
+    assert_eq!(frame(&output, "box-model-grid").element, Element::Section);
+    assert_eq!(frame(&output, "box-auto").element, Element::Article);
+    assert_eq!(frame(&output, "box-auto-title").element, Element::H3);
+
     assert!(
         output.scroll_chrome.iter().any(|chrome| {
             chrome.element_id.as_str() == "stage"

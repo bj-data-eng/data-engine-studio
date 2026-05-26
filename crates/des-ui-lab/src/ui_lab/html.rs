@@ -22,6 +22,8 @@ const STRUCTURAL_SELECTORS_HTML: &str = include_str!("html/structural-selectors.
 const TEXT_SPECIMENS_HTML: &str = include_str!("html/text-specimens.html");
 #[cfg(not(debug_assertions))]
 const TABLE_HTML: &str = include_str!("html/table.html");
+#[cfg(not(debug_assertions))]
+const LAYOUT_HTML: &str = include_str!("html/layout.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -59,6 +61,10 @@ pub(super) fn append_table(ui: &mut DocumentBuilder) {
     table_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_layout(ui: &mut DocumentBuilder) {
+    layout_fragment().append_to_builder(ui);
+}
+
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
@@ -70,6 +76,7 @@ pub(super) fn asset_revision() -> u64 {
     structural_selectors_source().hash(&mut hasher);
     text_specimens_source().hash(&mut hasher);
     table_source().hash(&mut hasher);
+    layout_source().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -111,6 +118,10 @@ fn text_specimens_fragment() -> HtmlDocument {
 
 fn table_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&table_source()).expect("lab table HTML is valid")
+}
+
+fn layout_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&layout_source()).expect("lab layout HTML is valid")
 }
 
 fn topbar_source() -> Cow<'static, str> {
@@ -263,5 +274,22 @@ fn table_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(TABLE_HTML)
+    }
+}
+
+fn layout_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/layout.html"
+            ))
+            .expect("lab layout HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(LAYOUT_HTML)
     }
 }
