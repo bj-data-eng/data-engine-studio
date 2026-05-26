@@ -1,0 +1,46 @@
+<h2 id="structural-selector-title" class="section-title">Structural Selectors</h2>
+<p id="structural-selector-copy" class="muted">
+  first-child, last-child, and nth-child are resolved from document nesting.
+</p>
+<section id="structural-selector-grid" class="structural-grid">
+  <section id="structural-main-list" class="structural-list">
+    <article id="structural-main-one" class="structural-item">
+      <h3 id="structural-main-one-label" class="card-title">first-child</h3>
+      <p id="structural-main-one-body" class="muted">.structural-item:first-child -&gt; green surface</p>
+    </article>
+    <article id="structural-main-two" class="structural-item">
+      <h3 id="structural-main-two-label" class="card-title">nth-child(2)</h3>
+      <p id="structural-main-two-body" class="muted">.structural-item:nth-child(2) -&gt; accent surface</p>
+    </article>
+    <article id="structural-main-three" class="structural-item">
+      <h3 id="structural-main-three-label" class="card-title">nth-child(3)</h3>
+      <p id="structural-main-three-body" class="muted">.structural-item:nth-child(3) -&gt; purple left rail</p>
+    </article>
+    <article id="structural-main-four" class="structural-item">
+      <h3 id="structural-main-four-label" class="card-title">last-child</h3>
+      <p id="structural-main-four-body" class="muted">.structural-item:last-child -&gt; purple border</p>
+    </article>
+  </section>
+  <section id="structural-nested-shell" class="structural-nested-shell">
+    <section id="structural-nested-list-a" class="structural-list">
+      <article id="structural-nested-a-one" class="structural-item">
+        <h3 id="structural-nested-a-one-label" class="card-title">Project A</h3>
+        <p id="structural-nested-a-one-body" class="muted">first child</p>
+      </article>
+      <article id="structural-nested-a-two" class="structural-item">
+        <h3 id="structural-nested-a-two-label" class="card-title">Pipeline</h3>
+        <p id="structural-nested-a-two-body" class="muted">last child</p>
+      </article>
+    </section>
+    <section id="structural-nested-list-b" class="structural-list">
+      <article id="structural-nested-b-one" class="structural-item">
+        <h3 id="structural-nested-b-one-label" class="card-title">Project B</h3>
+        <p id="structural-nested-b-one-body" class="muted">first child</p>
+      </article>
+      <article id="structural-nested-b-two" class="structural-item">
+        <h3 id="structural-nested-b-two-label" class="card-title">Pipeline</h3>
+        <p id="structural-nested-b-two-body" class="muted">last child</p>
+      </article>
+    </section>
+  </section>
+</section>

@@ -1059,6 +1059,34 @@ fn styling_view_renders_structural_selector_specimens() {
     let output = lab_output("styling");
 
     assert_eq!(
+        frame(&output, "structural-selector-title").element,
+        Element::H2
+    );
+    assert_eq!(
+        frame(&output, "structural-selector-copy").element,
+        Element::P
+    );
+    assert_eq!(
+        frame(&output, "structural-selector-grid").element,
+        Element::Section
+    );
+    assert_eq!(
+        frame(&output, "structural-main-list").element,
+        Element::Section
+    );
+    assert_eq!(
+        frame(&output, "structural-main-one").element,
+        Element::Article
+    );
+    assert_eq!(
+        frame(&output, "structural-main-one-label").element,
+        Element::H3
+    );
+    assert_eq!(
+        frame(&output, "structural-main-one-body").element,
+        Element::P
+    );
+    assert_eq!(
         frame(&output, "structural-main-one").style.background,
         Some(SUCCESS_CONTAINER)
     );

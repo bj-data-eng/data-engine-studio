@@ -16,6 +16,8 @@ const INTERACTION_LOOP_HTML: &str = include_str!("html/interaction-loop.html");
 const NESTING_HTML: &str = include_str!("html/nesting.html");
 #[cfg(not(debug_assertions))]
 const GRAPH_HTML: &str = include_str!("html/graph.html");
+#[cfg(not(debug_assertions))]
+const STRUCTURAL_SELECTORS_HTML: &str = include_str!("html/structural-selectors.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -41,6 +43,10 @@ pub(super) fn append_graph(ui: &mut DocumentBuilder) {
     graph_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_structural_selectors(ui: &mut DocumentBuilder) {
+    structural_selectors_fragment().append_to_builder(ui);
+}
+
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
@@ -49,6 +55,7 @@ pub(super) fn asset_revision() -> u64 {
     interaction_loop_source().hash(&mut hasher);
     nesting_source().hash(&mut hasher);
     graph_source().hash(&mut hasher);
+    structural_selectors_source().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -76,6 +83,11 @@ fn nesting_fragment() -> HtmlDocument {
 
 fn graph_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&graph_source()).expect("lab graph HTML is valid")
+}
+
+fn structural_selectors_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&structural_selectors_source())
+        .expect("lab structural selectors HTML is valid")
 }
 
 fn topbar_source() -> Cow<'static, str> {
@@ -177,5 +189,22 @@ fn graph_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(GRAPH_HTML)
+    }
+}
+
+fn structural_selectors_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/structural-selectors.html"
+            ))
+            .expect("lab structural selectors HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(STRUCTURAL_SELECTORS_HTML)
     }
 }
