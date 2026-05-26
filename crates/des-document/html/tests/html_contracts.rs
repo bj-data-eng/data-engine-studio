@@ -1481,12 +1481,13 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
         )
         .expect("HTML should map commands for one update");
     let mapped_click_values = html
-        .update_with_input_action_values_with_actions(
+        .update_with_input_actions_with_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             [("project.run", HtmlAction::Run)],
         )
-        .expect("HTML should map commands directly to action values");
+        .expect("HTML should map commands directly to action values")
+        .into_action_values();
     let intent_mapped_key_frame = html
         .update_with_input_actions_with_intent_actions(
             Size::new(320.0, 180.0),
@@ -1499,7 +1500,7 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
         )
         .expect("HTML should map intent-scoped commands for one update");
     let intent_mapped_key_values = html
-        .update_with_input_action_values_with_intent_actions(
+        .update_with_input_actions_with_intent_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
             [(
@@ -1508,7 +1509,8 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
                 HtmlAction::Search,
             )],
         )
-        .expect("HTML should map intent-scoped commands directly to action values");
+        .expect("HTML should map intent-scoped commands directly to action values")
+        .into_action_values();
     let configured_empty_frame = html
         .update_actions_with(Size::new(320.0, 180.0), |commands| {
             commands.push_click("project.run", HtmlAction::Run);
@@ -1518,17 +1520,16 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
         .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
         .expect("HTML should map commands for a no-input update");
     let mapped_empty_values = html
-        .update_action_values_with_actions(
-            Size::new(320.0, 180.0),
-            [("project.run", HtmlAction::Run)],
-        )
-        .expect("HTML should map no-input commands directly to action values");
+        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .expect("HTML should map no-input commands directly to action values")
+        .into_action_values();
     let intent_mapped_empty_values = html
-        .update_action_values_with_intent_actions(
+        .update_actions_with_intent_actions(
             Size::new(320.0, 180.0),
             [(ElementBehaviorEvent::Click, "project.run", HtmlAction::Run)],
         )
-        .expect("HTML should map no-input intent commands directly to action values");
+        .expect("HTML should map no-input intent commands directly to action values")
+        .into_action_values();
     let key_input_frame = html
         .update_with_input_actions(
             Size::new(320.0, 180.0),
@@ -2279,12 +2280,13 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         )
         .expect("HTML bundle should map commands for one update");
     let mapped_click_values = bundle
-        .update_with_input_action_values_with_actions(
+        .update_with_input_actions_with_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             [("project.run", HtmlAction::Run)],
         )
-        .expect("HTML bundle should map commands directly to action values");
+        .expect("HTML bundle should map commands directly to action values")
+        .into_action_values();
     let intent_mapped_key_frame = bundle
         .update_with_input_actions_with_intent_actions(
             Size::new(320.0, 180.0),
@@ -2297,7 +2299,7 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         )
         .expect("HTML bundle should map intent-scoped commands for one update");
     let intent_mapped_key_values = bundle
-        .update_with_input_action_values_with_intent_actions(
+        .update_with_input_actions_with_intent_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
             [(
@@ -2306,7 +2308,8 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
                 HtmlAction::Filter,
             )],
         )
-        .expect("HTML bundle should map intent-scoped commands directly to action values");
+        .expect("HTML bundle should map intent-scoped commands directly to action values")
+        .into_action_values();
     let configured_empty_frame = bundle
         .update_actions_with(Size::new(320.0, 180.0), |commands| {
             commands.push("project.run", HtmlAction::Run);
@@ -2316,17 +2319,16 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
         .expect("HTML bundle should map commands for a no-input update");
     let mapped_empty_values = bundle
-        .update_action_values_with_actions(
-            Size::new(320.0, 180.0),
-            [("project.run", HtmlAction::Run)],
-        )
-        .expect("HTML bundle should map no-input commands directly to action values");
+        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .expect("HTML bundle should map no-input commands directly to action values")
+        .into_action_values();
     let intent_mapped_empty_values = bundle
-        .update_action_values_with_intent_actions(
+        .update_actions_with_intent_actions(
             Size::new(320.0, 180.0),
             [(ElementBehaviorEvent::Click, "project.run", HtmlAction::Run)],
         )
-        .expect("HTML bundle should map no-input intent commands directly to action values");
+        .expect("HTML bundle should map no-input intent commands directly to action values")
+        .into_action_values();
     let mut dispatched = Vec::new();
     let (dispatch_frame, dispatch_report) = bundle
         .update_with_input_and_dispatch(
@@ -3185,13 +3187,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should map commands through the set front door");
     let mapped_action_values = set
-        .update_with_input_action_values_with_actions(
+        .update_with_input_actions_with_actions(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             [("inline.run", SetAction::Run)],
         )
-        .expect("named document should map commands directly to action values");
+        .expect("named document should map commands directly to action values")
+        .into_action_values();
     let intent_mapped_action_frame = set
         .update_with_input_actions_with_intent_actions(
             "shared",
@@ -3205,7 +3208,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should map intent-scoped commands through the set front door");
     let intent_mapped_action_values = set
-        .update_with_input_action_values_with_intent_actions(
+        .update_with_input_actions_with_intent_actions(
             "shared",
             Size::new(240.0, 160.0),
             DocumentInput::secondary_click(Point::new(8.0, 8.0)),
@@ -3215,7 +3218,8 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 SetAction::Menu,
             )],
         )
-        .expect("named document should map intent-scoped commands directly to action values");
+        .expect("named document should map intent-scoped commands directly to action values")
+        .into_action_values();
     let mut dispatched = Vec::new();
     let mut dispatch_view = set
         .get("inline")
@@ -3284,19 +3288,21 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should map commands during update");
     let mapped_empty_values = set
-        .update_action_values_with_actions(
+        .update_actions_with_actions(
             "inline",
             Size::new(240.0, 160.0),
             [("inline.run", SetAction::Run)],
         )
-        .expect("named document should map no-input commands directly to action values");
+        .expect("named document should map no-input commands directly to action values")
+        .into_action_values();
     let intent_mapped_empty_values = set
-        .update_action_values_with_intent_actions(
+        .update_actions_with_intent_actions(
             "inline",
             Size::new(240.0, 160.0),
             [(ElementBehaviorEvent::Click, "inline.run", SetAction::Run)],
         )
-        .expect("named document should map no-input intent commands directly to action values");
+        .expect("named document should map no-input intent commands directly to action values")
+        .into_action_values();
     let mut surface = set
         .to_action_surface_with("inline", Size::new(240.0, 160.0), |commands| {
             commands.push_click("inline.run", SetAction::Run);
