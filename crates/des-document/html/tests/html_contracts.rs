@@ -39,7 +39,7 @@ impl Drop for TempHtmlPath {
 }
 
 fn node_text(node: &HtmlNode) -> Option<&str> {
-    node.text.as_deref()
+    node.text()
 }
 
 #[test]
@@ -66,34 +66,33 @@ fn html_document_parser_handles_void_elements_entities_and_comments() {
     )
     .expect("browser-grade parser should parse common HTML syntax");
 
-    let main = &html.children[0];
-    assert_eq!(main.tag, "main");
-    assert_eq!(main.id.as_deref(), Some("app"));
-    assert_eq!(main.classes, ["shell", "primary"]);
-    assert_eq!(main.role.as_deref(), Some("application"));
+    let main = &html.children()[0];
+    assert_eq!(main.tag(), "main");
+    assert_eq!(main.id(), Some("app"));
+    assert_eq!(main.classes(), ["shell", "primary"]);
+    assert_eq!(main.role(), Some("application"));
     assert_eq!(
-        main.attributes.get("data-mode").map(String::as_str),
+        main.attributes().get("data-mode").map(String::as_str),
         Some("demo")
     );
     assert_eq!(
-        main.attributes.get("aria-label").map(String::as_str),
+        main.attributes().get("aria-label").map(String::as_str),
         Some("Workspace")
     );
-    assert!(main.children.iter().any(|child| {
+    assert!(main.children().iter().any(|child| {
         child
-            .text
-            .as_deref()
+            .text()
             .is_some_and(|text| text.contains("Hello & welcome"))
     }));
 
     let input = main
-        .children
+        .children()
         .iter()
-        .find(|child| child.tag == "input")
+        .find(|child| child.tag() == "input")
         .expect("input should be a parsed void element");
-    assert_eq!(input.id.as_deref(), Some("search"));
+    assert_eq!(input.id(), Some("search"));
     assert_eq!(
-        input.attributes.get("value").map(String::as_str),
+        input.attributes().get("value").map(String::as_str),
         Some("A \"quote\"")
     );
 }
@@ -137,39 +136,30 @@ fn html_document_exposes_parsed_tree_queries() {
             .to_string()
             .contains("missing html node with id `missing`")
     );
-    assert_eq!(
-        html.first_by_tag("button").unwrap().id.as_deref(),
-        Some("run")
-    );
-    assert_eq!(
-        app.first_by_tag("button").unwrap().id.as_deref(),
-        Some("run")
-    );
+    assert_eq!(html.first_by_tag("button").unwrap().id(), Some("run"));
+    assert_eq!(app.first_by_tag("button").unwrap().id(), Some("run"));
     assert_eq!(
         app.nodes_by_tag("button")
             .into_iter()
-            .map(|node| node.id.as_deref())
+            .map(|node| node.id())
             .collect::<Vec<_>>(),
         [Some("run"), Some("stop")]
     );
     assert_eq!(
         sections
             .into_iter()
-            .map(|node| node.id.as_deref())
+            .map(|node| node.id())
             .collect::<Vec<_>>(),
         [Some("primary"), Some("secondary")]
     );
     assert_eq!(
         controls
             .into_iter()
-            .map(|node| node.id.as_deref())
+            .map(|node| node.id())
             .collect::<Vec<_>>(),
         [Some("run"), Some("stop")]
     );
-    assert_eq!(
-        app.nodes_with_class("danger")[0].id.as_deref(),
-        Some("stop")
-    );
+    assert_eq!(app.nodes_with_class("danger")[0].id(), Some("stop"));
 }
 
 #[test]
@@ -177,16 +167,16 @@ fn html_document_preserves_braces_as_text_not_logic() {
     let html = HtmlDocument::parse_fragment("<section>{if loading}<p>{title}</p>{/if}</section>")
         .expect("curly-brace text should be valid HTML text");
 
-    let section = &html.children[0];
-    assert_eq!(section.tag, "section");
+    let section = &html.children()[0];
+    assert_eq!(section.tag(), "section");
     assert!(
         section
-            .children
+            .children()
             .iter()
             .any(|child| node_text(child).is_some_and(|text| text.contains("{if loading}")))
     );
-    assert_eq!(section.children[1].tag, "p");
-    assert_eq!(section.children[1].text.as_deref(), Some("{title}"));
+    assert_eq!(section.children()[1].tag(), "p");
+    assert_eq!(section.children()[1].text(), Some("{title}"));
 }
 
 #[test]
@@ -196,22 +186,18 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
     )
     .expect("HTML should parse");
 
-    let button = &html.children[0];
-    assert_eq!(button.id.as_deref(), Some("open"));
-    assert_eq!(button.behavior_hooks.len(), 2);
-    assert_eq!(button.behavior_hooks[0].event, "click");
-    assert_eq!(button.behavior_hooks[0].command, "project.open");
-    assert_eq!(button.behavior_hooks[0].event(), "click");
-    assert_eq!(button.behavior_hooks[0].command(), "project.open");
-    assert!(button.behavior_hooks[0].has_command("project.open"));
-    assert!(button.behavior_hooks[0].has_command(" project.open "));
-    assert_eq!(
-        button.behavior_hooks[0].intent(),
-        Some(ElementBehaviorEvent::Click)
-    );
-    assert!(button.behavior_hooks[0].matches_intent(ElementBehaviorEvent::Click));
-    assert!(button.behavior_hooks[0].is_click());
-    assert!(!button.behavior_hooks[0].is_key_down());
+    let button = &html.children()[0];
+    let hooks = button.behavior_hooks();
+    assert_eq!(button.id(), Some("open"));
+    assert_eq!(hooks.len(), 2);
+    assert_eq!(hooks[0].event(), "click");
+    assert_eq!(hooks[0].command(), "project.open");
+    assert!(hooks[0].has_command("project.open"));
+    assert!(hooks[0].has_command(" project.open "));
+    assert_eq!(hooks[0].intent(), Some(ElementBehaviorEvent::Click));
+    assert!(hooks[0].matches_intent(ElementBehaviorEvent::Click));
+    assert!(hooks[0].is_click());
+    assert!(!hooks[0].is_key_down());
     assert!(button.has_behavior_hook(ElementBehaviorEvent::Click, "project.open"));
     assert!(button.has_behavior_hook(ElementBehaviorEvent::Click, " project.open "));
     assert!(button.has_command_hook(" project.filter "));
@@ -236,9 +222,9 @@ fn html_document_parser_extracts_rust_behavior_hooks() {
             .map(HtmlBehaviorHook::command),
         Some("project.open")
     );
-    assert_eq!(button.behavior_hooks[1].event, "input");
-    assert_eq!(button.behavior_hooks[1].command, "project.filter");
-    assert_eq!(button.behavior_hooks[1].intent(), None);
+    assert_eq!(hooks[1].event(), "input");
+    assert_eq!(hooks[1].command(), "project.filter");
+    assert_eq!(hooks[1].intent(), None);
 }
 
 #[test]
@@ -256,24 +242,24 @@ fn html_document_keeps_command_metadata_out_of_behavior_hooks() {
     let metadata = html.require_by_id("metadata").unwrap();
     let run = html.require_by_id("run").unwrap();
 
-    assert!(metadata.behavior_hooks.is_empty());
+    assert!(metadata.behavior_hooks().is_empty());
     assert_eq!(
         metadata
-            .attributes
+            .attributes()
             .get("data-command-id")
             .map(String::as_str),
         Some("project.delete")
     );
     assert_eq!(
         metadata
-            .attributes
+            .attributes()
             .get("data-command-kind")
             .map(String::as_str),
         Some("danger")
     );
     assert_eq!(
-        run.behavior_hooks
-            .iter()
+        run.behavior_hooks()
+            .into_iter()
             .map(|hook| (hook.event(), hook.command()))
             .collect::<Vec<_>>(),
         [("click", "project.run"), ("keydown", "project.key")]
@@ -403,7 +389,7 @@ fn html_public_string_constructors_sanitize_malformed_content() {
     let text = HtmlNode::text_node("ok\u{0007}\u{FFFD}");
     let hook = HtmlBehaviorHook::new(" click\u{0007} ", " run\u{FFFD} ");
 
-    assert_eq!(text.text.as_deref(), Some("ok"));
+    assert_eq!(text.text(), Some("ok"));
     assert_eq!(hook.event(), "click");
     assert_eq!(hook.command(), "run");
 }
@@ -414,18 +400,18 @@ fn html_document_preserves_non_handler_on_attributes() {
         r#"<section once="ready" onboarding="visible" on:click="run">Run</section>"#,
     )
     .expect("HTML should parse handler and non-handler on attributes");
-    let section = &html.children[0];
+    let section = &html.children()[0];
 
     assert_eq!(
-        section.attributes.get("once").map(String::as_str),
+        section.attributes().get("once").map(String::as_str),
         Some("ready")
     );
     assert_eq!(
-        section.attributes.get("onboarding").map(String::as_str),
+        section.attributes().get("onboarding").map(String::as_str),
         Some("visible")
     );
-    assert_eq!(section.behavior_hooks[0].command(), "run");
-    assert!(html.diagnostics.is_empty());
+    assert_eq!(section.behavior_hooks()[0].command(), "run");
+    assert!(html.diagnostics().is_empty());
 }
 
 #[test]
@@ -590,9 +576,9 @@ fn html_document_parse_projects_body_without_head_metadata() {
     let snapshot = output.snapshot();
 
     assert_eq!(
-        html.children
+        html.children()
             .iter()
-            .map(|child| child.tag.as_str())
+            .map(|child| child.tag())
             .collect::<Vec<_>>(),
         ["main"]
     );
@@ -615,9 +601,9 @@ fn html_document_parse_fragment_keeps_explicit_html_structure() {
     )
     .expect("fragment parsing should stay separate from full-document body projection");
 
-    assert_eq!(html.children.len(), 2);
-    assert_eq!(html.children[0].tag, "title");
-    assert_eq!(html.children[1].tag, "main");
+    assert_eq!(html.children().len(), 2);
+    assert_eq!(html.children()[0].tag(), "title");
+    assert_eq!(html.children()[1].tag(), "main");
     assert!(html.first_by_tag("title").is_some());
     assert!(html.find_by_id("app").is_some());
 }
@@ -636,8 +622,8 @@ fn html_document_preserves_mixed_content_boundary_spaces() {
     let output = engine.update(&mut document, &StyleSheet::new());
     let snapshot = output.snapshot();
 
-    assert_eq!(paragraph.children[0].text.as_deref(), Some("Hello "));
-    assert_eq!(paragraph.children[2].text.as_deref(), Some(" again"));
+    assert_eq!(paragraph.children()[0].text(), Some("Hello "));
+    assert_eq!(paragraph.children()[2].text(), Some(" again"));
     assert_eq!(
         snapshot.find("html/text-0-0").unwrap().text().as_deref(),
         Some("Hello ")
@@ -2033,20 +2019,15 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
             .unwrap()
             .first_by_tag("button")
             .unwrap()
-            .id
-            .as_deref(),
+            .id(),
         Some("run")
     );
     assert_eq!(
-        bundle
-            .find_by_id("commit")
-            .and_then(|node| node.id.as_deref()),
+        bundle.find_by_id("commit").and_then(|node| node.id()),
         Some("commit")
     );
     assert_eq!(
-        bundle
-            .first_by_tag("button")
-            .and_then(|node| node.id.as_deref()),
+        bundle.first_by_tag("button").and_then(|node| node.id()),
         Some("run")
     );
     assert_eq!(bundle.nodes_by_tag("button").len(), 2);
@@ -2806,8 +2787,8 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         r#"<button id="run" class="primary" on:click="project.run">Run</button>"#,
     )
     .map(|html| {
-        html.with(|html| html.diagnostics.clear())
-            .when(false, |html| html.children.clear())
+        html.with(|html| assert!(html.diagnostics().is_empty()))
+            .when(false, |_| {})
     })
     .and_then(|html| {
         html.try_with(|html| {
@@ -2855,7 +2836,7 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         })
         .expect("HTML and CSS should compile together from the prelude");
     assert!(bundle.html().is_clean());
-    assert_eq!(bundle.html().children()[0].id.as_deref(), Some("run"));
+    assert_eq!(bundle.html().children()[0].id(), Some("run"));
     assert!(bundle.stylesheet().rule_count() >= 4);
     assert!(bundle.stylesheet().has_rule_for_class("primary"));
 
@@ -2892,9 +2873,9 @@ fn html_document_and_stylesheet_load_from_files() {
 
     let html = HtmlDocument::load(html_fixture.path()).expect("HTML document should load");
     assert!(
-        html.children
+        html.children()
             .iter()
-            .any(|node| node.tag == "html" || node.id.as_deref() == Some("loaded")),
+            .any(|node| node.tag() == "html" || node.id() == Some("loaded")),
         "document parsing should return browser document structure"
     );
 
@@ -2938,7 +2919,7 @@ fn html_file_hot_reloads_when_source_changes() {
     assert!(
         file.document()
             .find_by_id("status")
-            .is_some_and(|node| node.text.as_deref() == Some("Before"))
+            .is_some_and(|node| node.text() == Some("Before"))
     );
 
     std::thread::sleep(Duration::from_millis(5));
@@ -2954,9 +2935,9 @@ fn html_file_hot_reloads_when_source_changes() {
 
     assert!(status.changed);
     assert!(
-        file.document().find_by_id("status").is_some_and(
-            |node| node.classes == ["changed"] && node.text.as_deref() == Some("After")
-        )
+        file.document()
+            .find_by_id("status")
+            .is_some_and(|node| node.classes() == ["changed"] && node.text() == Some("After"))
     );
 }
 
@@ -2987,7 +2968,7 @@ fn html_file_hot_reload_detects_same_mtime_content_changes() {
     assert!(
         file.document()
             .find_by_id("status")
-            .is_some_and(|node| node.text.as_deref() == Some("After"))
+            .is_some_and(|node| node.text() == Some("After"))
     );
 }
 
@@ -3130,9 +3111,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     assert!(
         set.get("inline")
             .expect("inline document should exist")
-            .children
+            .children()
             .iter()
-            .any(|node| node.id.as_deref() == Some("inline"))
+            .any(|node| node.id() == Some("inline"))
     );
     assert!(
         set.get("file")
@@ -4479,6 +4460,6 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         set.get("file")
             .expect("file document should exist")
             .find_by_id("file")
-            .is_some_and(|node| node.text.as_deref() == Some("After"))
+            .is_some_and(|node| node.text() == Some("After"))
     );
 }

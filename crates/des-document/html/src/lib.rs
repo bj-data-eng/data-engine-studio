@@ -143,9 +143,9 @@ enum HtmlParseKind {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HtmlDocument {
     /// Top-level HTML nodes in source order.
-    pub children: Vec<HtmlNode>,
+    children: Vec<HtmlNode>,
     /// Non-fatal authoring diagnostics collected while mapping HTML semantics.
-    pub diagnostics: Vec<HtmlDiagnostic>,
+    diagnostics: Vec<HtmlDiagnostic>,
 }
 
 impl HtmlDocument {
@@ -1429,21 +1429,21 @@ impl HtmlStylesheet {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HtmlNode {
     /// Element tag name, or `#text` for explicit text nodes.
-    pub tag: String,
+    tag: String,
     /// Element id from the `id` attribute, when present.
-    pub id: Option<String>,
+    id: Option<String>,
     /// Class names from the `class` attribute.
-    pub classes: Vec<String>,
+    classes: Vec<String>,
     /// Element role from the `role` attribute, when present.
-    pub role: Option<String>,
+    role: Option<String>,
     /// Non-id/class/role attributes.
-    pub attributes: BTreeMap<String, String>,
+    attributes: BTreeMap<String, String>,
     /// Rust behavior hooks declared through `on:*` or `data-command` attributes.
-    pub behavior_hooks: Vec<HtmlBehaviorHook>,
+    behavior_hooks: Vec<HtmlBehaviorHook>,
     /// Text content when this is a text node or a text-only element.
-    pub text: Option<String>,
+    text: Option<String>,
     /// Child nodes.
-    pub children: Vec<HtmlNode>,
+    children: Vec<HtmlNode>,
 }
 
 impl HtmlNode {
@@ -1464,6 +1464,41 @@ impl HtmlNode {
     /// Returns true when this node represents parsed text.
     pub fn is_text(&self) -> bool {
         self.tag == "#text"
+    }
+
+    /// Returns the parsed tag name, or `#text` for explicit text nodes.
+    pub fn tag(&self) -> &str {
+        &self.tag
+    }
+
+    /// Returns the parsed HTML id when present.
+    pub fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
+    /// Returns parsed class names in source order.
+    pub fn classes(&self) -> &[String] {
+        &self.classes
+    }
+
+    /// Returns the parsed role when present.
+    pub fn role(&self) -> Option<&str> {
+        self.role.as_deref()
+    }
+
+    /// Returns parsed non-id/class/role attributes.
+    pub fn attributes(&self) -> &BTreeMap<String, String> {
+        &self.attributes
+    }
+
+    /// Returns parsed text content when present.
+    pub fn text(&self) -> Option<&str> {
+        self.text.as_deref()
+    }
+
+    /// Returns parsed child nodes in source order.
+    pub fn children(&self) -> &[HtmlNode] {
+        &self.children
     }
 
     /// Returns true when this parsed element has the supplied class.
@@ -1651,9 +1686,9 @@ impl HtmlNode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HtmlBehaviorHook {
     /// Event name such as `click`, `input`, or `submit`.
-    pub event: String,
+    event: String,
     /// Rust command/event intent declared by the author.
-    pub command: String,
+    command: String,
 }
 
 impl HtmlBehaviorHook {
