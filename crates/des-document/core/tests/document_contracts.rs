@@ -670,8 +670,9 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
         .project_and_update_actions(&DocumentProjection::new().blur("search"), &registry)
         .expect("focus projection should update retained document state");
     let mut dispatched_focus = Vec::new();
-    let focus_dispatch =
-        focus_frame.dispatch_focus(|action| dispatched_focus.push(*action.action()));
+    let focus_dispatch = focus_frame.dispatch_intent(ElementBehaviorEvent::Focus, |action| {
+        dispatched_focus.push(*action.action())
+    });
 
     assert!(focus_frame.output().focus_event_for("search"));
     assert!(focus_frame.contains_action_for_intent(ElementBehaviorEvent::Focus, &AppAction::Focus));
@@ -1044,9 +1045,13 @@ fn document_command_registry_can_scope_actions_by_authored_event_intent() {
     let context_owned_actions = registry.collect_context_menu_actions(&context_output);
     let context_owned_values = registry.collect_context_menu_action_values(&context_output);
     let mut dispatched_context_values = Vec::new();
-    let context_dispatch_report = registry.dispatch_context_menu(&context_output, |action| {
-        dispatched_context_values.push(*action.action);
-    });
+    let context_dispatch_report = registry.dispatch_intent(
+        &context_output,
+        ElementBehaviorEvent::ContextMenu,
+        |action| {
+            dispatched_context_values.push(*action.action);
+        },
+    );
     let hover_actions = registry
         .pointer_enter_actions(&hover_output)
         .collect::<Vec<_>>();
@@ -1496,7 +1501,7 @@ fn document_view_can_update_and_collect_typed_actions_in_one_front_door_call() {
         ));
     });
     let mut clicked = Vec::new();
-    let clicked_report = frame.dispatch_clicked(|action| {
+    let clicked_report = frame.dispatch_intent(ElementBehaviorEvent::Click, |action| {
         clicked.push(action.action().clone());
     });
     let mut values = Vec::new();
@@ -1740,7 +1745,9 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         .collect::<Vec<_>>();
     let mut context_dispatched = Vec::new();
     let context_dispatch_report = context_frame
-        .dispatch_context_menu(|action| context_dispatched.push(action.action().clone()));
+        .dispatch_intent(ElementBehaviorEvent::ContextMenu, |action| {
+            context_dispatched.push(action.action().clone())
+        });
 
     assert_eq!(context_actions.len(), 1);
     assert_eq!(context_actions[0].target.as_str(), "menu");
@@ -2497,14 +2504,15 @@ fn document_command_registry_dispatches_typed_actions_with_context() {
     });
     let unknown_report = registry.dispatch(&unknown_output, |_| {});
     let mut clicked_only = Vec::new();
-    let clicked_only_report = registry.dispatch_clicked(&click_output, |command| {
-        clicked_only.push((
-            command.target.clone(),
-            command.event,
-            command.command.to_owned(),
-            *command.action,
-        ));
-    });
+    let clicked_only_report =
+        registry.dispatch_intent(&click_output, ElementBehaviorEvent::Click, |command| {
+            clicked_only.push((
+                command.target.clone(),
+                command.event,
+                command.command.to_owned(),
+                *command.action,
+            ));
+        });
     let key_only_report = registry.dispatch_kind(
         &click_output,
         DocumentEventKind::KeyDown(KeyInput::down(DocumentKey::Escape)),
