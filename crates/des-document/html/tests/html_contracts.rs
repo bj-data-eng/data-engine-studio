@@ -3,9 +3,7 @@ use des_document::{
     DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Length, Point, Size,
     Style, StyleSheet,
 };
-use des_html::{
-    HtmlBehaviorHook, HtmlDiagnosticCode, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet,
-};
+use des_html::{HtmlBehaviorHook, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -43,17 +41,14 @@ fn node_text(node: &HtmlNode) -> Option<&str> {
 }
 
 #[test]
-fn html_document_parser_recovers_like_browser_html() {
-    let html = HtmlDocument::parse_fragment("<section><p>One<p>Two</section>")
-        .expect("browser-grade parser should recover malformed nesting");
+fn html_document_parser_rejects_malformed_html() {
+    let error = HtmlDocument::parse_fragment("<section><p>One<p>Two</section>")
+        .expect_err("malformed nesting should not be recovered");
 
-    assert_eq!(html.children.len(), 1);
-    assert_eq!(html.children[0].tag, "section");
-    assert_eq!(html.children[0].children.len(), 2);
-    assert_eq!(html.children[0].children[0].tag, "p");
-    assert_eq!(html.children[0].children[0].text.as_deref(), Some("One"));
-    assert_eq!(html.children[0].children[1].tag, "p");
-    assert_eq!(html.children[0].children[1].text.as_deref(), Some("Two"));
+    assert_eq!(
+        error.to_string(),
+        "html parse error in inline HTML at 1:22 (offset 21): HTML closing tag `</section>` does not match open `<p>`"
+    );
 }
 
 #[test]
@@ -349,64 +344,43 @@ fn html_authored_focus_blur_and_selection_hooks_dispatch_to_typed_actions() {
 }
 
 #[test]
-fn html_document_parser_reports_behavior_hook_diagnostics() {
-    let html =
+fn html_document_parser_rejects_empty_behavior_hooks() {
+    let error =
         HtmlDocument::parse_fragment(r#"<button on:click="" data-command:input="">Run</button>"#)
-            .expect("HTML should parse with non-fatal diagnostics");
+            .expect_err("empty behavior hooks should be rejected");
 
-    assert!(html.children[0].behavior_hooks.is_empty());
-    assert_eq!(html.diagnostics.len(), 2);
     assert_eq!(
-        html.diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.code)
-            .collect::<Vec<_>>(),
-        vec![
-            HtmlDiagnosticCode::EmptyBehaviorCommand,
-            HtmlDiagnosticCode::EmptyBehaviorCommand,
-        ]
+        error.to_string(),
+        "html parse error in inline HTML at 1:1 (offset 0): behavior hook is missing a Rust command"
     );
-    assert!(html.diagnostics.iter().all(|diagnostic| {
-        diagnostic.tag.as_deref() == Some("button")
-            && diagnostic.message.contains("missing a Rust command")
-    }));
 }
 
 #[test]
-fn html_document_parser_keeps_javascript_out_of_runtime() {
-    let html = HtmlDocument::parse_fragment(
+fn html_document_parser_rejects_javascript_runtime_content() {
+    let script_error = HtmlDocument::parse_fragment(
         r#"<section><script>alert("nope")</script><button onclick="alert(1)" on:click="run">Run</button></section>"#,
     )
-    .expect("HTML should parse with JavaScript diagnostics");
+    .expect_err("script elements should be rejected");
+    let handler_error =
+        HtmlDocument::parse_fragment(r#"<button onclick="alert(1)" on:click="run">Run</button>"#)
+            .expect_err("JavaScript event attributes should be rejected");
 
-    let section = &html.children[0];
     assert!(
-        section.children.iter().all(|child| child.tag != "script"),
-        "script elements should not be emitted into document HTML"
+        script_error
+            .to_string()
+            .contains("script elements are not allowed")
     );
-    let button = section
-        .children
-        .iter()
-        .find(|child| child.tag == "button")
-        .unwrap();
-    assert_eq!(button.behavior_hooks.len(), 1);
-    assert_eq!(button.behavior_hooks[0].command, "run");
-    assert_eq!(
-        html.diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.code)
-            .collect::<Vec<_>>(),
-        vec![
-            HtmlDiagnosticCode::ScriptElementIgnored,
-            HtmlDiagnosticCode::JavaScriptEventAttributeIgnored,
-        ]
+    assert!(
+        handler_error
+            .to_string()
+            .contains("JavaScript event attributes are ignored")
     );
 }
 
 #[test]
 fn html_document_preserves_non_handler_on_attributes() {
     let html = HtmlDocument::parse_fragment(
-        r#"<section once="ready" onboarding="visible" onclick="drop()" on:click="run">Run</section>"#,
+        r#"<section once="ready" onboarding="visible" on:click="run">Run</section>"#,
     )
     .expect("HTML should parse handler and non-handler on attributes");
     let section = &html.children[0];
@@ -419,15 +393,8 @@ fn html_document_preserves_non_handler_on_attributes() {
         section.attributes.get("onboarding").map(String::as_str),
         Some("visible")
     );
-    assert!(!section.attributes.contains_key("onclick"));
     assert_eq!(section.behavior_hooks[0].command(), "run");
-    assert_eq!(
-        html.diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.code)
-            .collect::<Vec<_>>(),
-        vec![HtmlDiagnosticCode::JavaScriptEventAttributeIgnored]
-    );
+    assert!(html.diagnostics.is_empty());
 }
 
 #[test]
@@ -2805,20 +2772,24 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
     }
 
     let html = HtmlDocument::parse_fragment(
-        r#"<script>ignored()</script><button id="run" class="primary" on:click="project.run">Run</button>"#,
+        r#"<button id="run" class="primary" on:click="project.run">Run</button>"#,
     )
     .map(|html| {
         html.with(|html| html.diagnostics.clear())
             .when(false, |html| html.children.clear())
     })
-    .and_then(|html| html.try_with(|html| {
-        assert!(html.find_by_id("run").is_some());
-        Ok::<_, HtmlError>(())
-    }))
-    .and_then(|html| html.try_when(true, |html| {
-        assert!(html.has_command_hook("project.run"));
-        Ok::<_, HtmlError>(())
-    }))
+    .and_then(|html| {
+        html.try_with(|html| {
+            assert!(html.find_by_id("run").is_some());
+            Ok::<_, HtmlError>(())
+        })
+    })
+    .and_then(|html| {
+        html.try_when(true, |html| {
+            assert!(html.has_command_hook("project.run"));
+            Ok::<_, HtmlError>(())
+        })
+    })
     .expect("HTML should compile and configure from the prelude");
     let bundle = html
         .with_css(r#".primary { width: 96px; height: 32px; }"#)

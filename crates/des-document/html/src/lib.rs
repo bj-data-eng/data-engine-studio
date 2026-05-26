@@ -47,7 +47,7 @@ use des_document::{
     Element, ElementBehaviorEvent, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
-use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
+use html5ever::{ParseOpts, QualName, local_name, ns, parse_document, parse_fragment};
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
 use std::collections::BTreeMap;
 use std::collections::hash_map::DefaultHasher;
@@ -80,6 +80,7 @@ pub type HtmlResult<T> = Result<T, HtmlError>;
 pub enum HtmlError {
     /// The HTML source could not be mapped into the document contract.
     Parse {
+        source: Option<String>,
         offset: usize,
         line: usize,
         column: usize,
@@ -97,14 +98,18 @@ impl fmt::Display for HtmlError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Parse {
+                source,
                 offset,
                 line,
                 column,
                 message,
-            } => write!(
-                f,
-                "html parse error at {line}:{column} (offset {offset}): {message}"
-            ),
+            } => {
+                f.write_str("html parse error")?;
+                if let Some(source) = source {
+                    write!(f, " in {source}")?;
+                }
+                write!(f, " at {line}:{column} (offset {offset}): {message}")
+            }
             Self::Css(message) => write!(f, "html css error: {message}"),
             Self::Io(message) => write!(f, "html io error: {message}"),
             Self::Document(message) => write!(f, "html document error: {message}"),
@@ -126,6 +131,12 @@ impl From<des_document::DocumentError> for HtmlError {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HtmlParseKind {
+    Document,
+    Fragment,
+}
+
 /// Browser-parsed HTML document or fragment.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HtmlDocument {
@@ -138,41 +149,60 @@ pub struct HtmlDocument {
 impl HtmlDocument {
     /// Parses an HTML document using HTML5 tree-construction rules.
     pub fn parse(source: &str) -> HtmlResult<Self> {
-        let dom = parse_document(RcDom::default(), Default::default()).one(source);
+        Self::parse_with_source(source, "inline HTML", HtmlParseKind::Document)
+    }
+
+    fn parse_with_source(
+        source: &str,
+        source_label: impl Into<String>,
+        kind: HtmlParseKind,
+    ) -> HtmlResult<Self> {
+        let source_label = source_label.into();
+        validate_html_source(source, &source_label)?;
+        let opts = strict_html_parse_opts();
+        let dom = match kind {
+            HtmlParseKind::Document => parse_document(RcDom::default(), opts).one(source),
+            HtmlParseKind::Fragment => {
+                let context = QualName::new(None, ns!(html), local_name!("body"));
+                parse_fragment(RcDom::default(), opts, context, Vec::new(), false).one(source)
+            }
+        };
         let mut diagnostics = Vec::new();
+        let children = match kind {
+            HtmlParseKind::Document => {
+                rcdom_document_children_to_html(&dom.document.children.borrow(), &mut diagnostics)
+            }
+            HtmlParseKind::Fragment => {
+                rcdom_fragment_children_to_html(&dom.document.children.borrow(), &mut diagnostics)
+            }
+        };
+        if let Some(diagnostic) = diagnostics.first() {
+            return Err(html_parse_error(
+                source,
+                &source_label,
+                0,
+                diagnostic.message.clone(),
+            ));
+        }
         Ok(Self {
-            children: rcdom_document_children_to_html(
-                &dom.document.children.borrow(),
-                &mut diagnostics,
-            ),
+            children,
             diagnostics,
         })
     }
 
     /// Reads and parses an HTML document file using HTML5 tree-construction rules.
     pub fn load(path: impl AsRef<Path>) -> HtmlResult<Self> {
-        Self::parse(&fs::read_to_string(path)?)
+        let path = path.as_ref();
+        Self::parse_with_source(
+            &fs::read_to_string(path)?,
+            path.display().to_string(),
+            HtmlParseKind::Document,
+        )
     }
 
     /// Parses an HTML fragment using a `body` context element.
     pub fn parse_fragment(source: &str) -> HtmlResult<Self> {
-        let context = QualName::new(None, ns!(html), local_name!("body"));
-        let dom = parse_fragment(
-            RcDom::default(),
-            Default::default(),
-            context,
-            Vec::new(),
-            false,
-        )
-        .one(source);
-        let mut diagnostics = Vec::new();
-        Ok(Self {
-            children: rcdom_fragment_children_to_html(
-                &dom.document.children.borrow(),
-                &mut diagnostics,
-            ),
-            diagnostics,
-        })
+        Self::parse_with_source(source, "inline HTML", HtmlParseKind::Fragment)
     }
 
     /// Configures the parsed HTML tree and returns it.
@@ -238,6 +268,7 @@ impl HtmlDocument {
     /// Returns the first parsed node with the supplied HTML id, or an explicit HTML error.
     pub fn require_by_id(&self, id: &str) -> HtmlResult<&HtmlNode> {
         self.find_by_id(id).ok_or_else(|| HtmlError::Parse {
+            source: None,
             offset: 0,
             line: 1,
             column: 1,
@@ -1449,6 +1480,7 @@ impl HtmlNode {
     /// Returns the first node in this subtree with the supplied HTML id, or an explicit HTML error.
     pub fn require_by_id(&self, id: &str) -> HtmlResult<&HtmlNode> {
         self.find_by_id(id).ok_or_else(|| HtmlError::Parse {
+            source: None,
             offset: 0,
             line: 1,
             column: 1,
@@ -1892,6 +1924,7 @@ impl HtmlSet {
             .get(name)
             .map(HtmlEntry::document)
             .ok_or_else(|| HtmlError::Parse {
+                source: None,
                 offset: 0,
                 line: 1,
                 column: 1,
@@ -2306,6 +2339,228 @@ impl HtmlFingerprint {
 fn parse_stylesheet(css: &str, source: impl Into<String>) -> HtmlResult<StyleSheet> {
     StyleSheet::parse_css(css)
         .map_err(|error| HtmlError::Css(error.with_source_label(source).to_string()))
+}
+
+fn strict_html_parse_opts() -> ParseOpts {
+    let mut opts = ParseOpts::default();
+    opts.tokenizer.exact_errors = true;
+    opts.tree_builder.exact_errors = true;
+    opts
+}
+
+fn validate_html_source(source: &str, source_label: &str) -> HtmlResult<()> {
+    for (offset, ch) in source.char_indices() {
+        if ch == '\0' {
+            return Err(html_parse_error(
+                source,
+                source_label,
+                offset,
+                "HTML contains a null character",
+            ));
+        }
+        if ch.is_control() && !matches!(ch, '\t' | '\n' | '\r') {
+            return Err(html_parse_error(
+                source,
+                source_label,
+                offset,
+                format!(
+                    "HTML contains unsupported control character U+{:04X}",
+                    ch as u32
+                ),
+            ));
+        }
+    }
+
+    let mut stack: Vec<HtmlOpenTag> = Vec::new();
+    let mut cursor = 0;
+    while let Some(relative) = source[cursor..].find('<') {
+        let open = cursor + relative;
+        if source[open..].starts_with("<!--") {
+            let Some(end) = source[open + 4..].find("-->") else {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    "HTML comment is missing closing `-->`",
+                ));
+            };
+            cursor = open + 4 + end + 3;
+            continue;
+        }
+        if source[open..].starts_with("<!") || source[open..].starts_with("<?") {
+            let Some(end) = source[open..].find('>') else {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    "HTML declaration is missing closing `>`",
+                ));
+            };
+            cursor = open + end + 1;
+            continue;
+        }
+        let Some(end) = source[open..].find('>').map(|offset| open + offset) else {
+            return Err(html_parse_error(
+                source,
+                source_label,
+                open,
+                "HTML tag is missing closing `>`",
+            ));
+        };
+        let body = source[open + 1..end].trim();
+        if body.is_empty() {
+            return Err(html_parse_error(
+                source,
+                source_label,
+                open,
+                "HTML tag is missing a name",
+            ));
+        }
+        if let Some(close_name) = body.strip_prefix('/') {
+            let close_name = read_html_tag_name(close_name.trim_start());
+            if close_name.is_empty() {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    "HTML closing tag is missing a name",
+                ));
+            }
+            let close_name = close_name.to_ascii_lowercase();
+            let Some(open_tag) = stack.pop() else {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    format!("HTML closing tag `</{close_name}>` has no open element"),
+                ));
+            };
+            if open_tag.name != close_name {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    format!(
+                        "HTML closing tag `</{close_name}>` does not match open `<{}>`",
+                        open_tag.name
+                    ),
+                ));
+            }
+        } else {
+            let tag_name = read_html_tag_name(body).to_ascii_lowercase();
+            if tag_name.is_empty() {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    "HTML tag is missing a name",
+                ));
+            }
+            if tag_name == "script" {
+                return Err(html_parse_error(
+                    source,
+                    source_label,
+                    open,
+                    "script elements are not allowed in document HTML",
+                ));
+            }
+            let self_closing = body.ends_with('/');
+            if !self_closing && !is_html_void_element(&tag_name) {
+                stack.push(HtmlOpenTag {
+                    name: tag_name,
+                    offset: open,
+                });
+            }
+        }
+        cursor = end + 1;
+    }
+
+    if let Some(open_tag) = stack.pop() {
+        return Err(html_parse_error(
+            source,
+            source_label,
+            open_tag.offset,
+            format!(
+                "HTML element `<{}>` is missing a closing tag",
+                open_tag.name
+            ),
+        ));
+    }
+
+    Ok(())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct HtmlOpenTag {
+    name: String,
+    offset: usize,
+}
+
+fn read_html_tag_name(input: &str) -> &str {
+    let end = input
+        .char_indices()
+        .find_map(|(offset, ch)| {
+            if ch.is_whitespace() || matches!(ch, '/' | '>') {
+                Some(offset)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(input.len());
+    &input[..end]
+}
+
+fn is_html_void_element(name: &str) -> bool {
+    matches!(
+        name,
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
+    )
+}
+
+fn html_parse_error(
+    source: &str,
+    source_label: impl Into<String>,
+    offset: usize,
+    message: impl Into<String>,
+) -> HtmlError {
+    let (line, column) = html_source_location(source, offset);
+    HtmlError::Parse {
+        source: Some(source_label.into()),
+        offset,
+        line,
+        column,
+        message: message.into(),
+    }
+}
+
+fn html_source_location(source: &str, target: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut column = 1;
+    for (offset, ch) in source.char_indices() {
+        if offset >= target {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
 }
 
 fn rcdom_children_to_html(
