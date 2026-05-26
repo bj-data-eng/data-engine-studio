@@ -415,6 +415,195 @@ impl<Action> DocumentActionUpdateFrame<Action> {
         self.frame.actions()
     }
 
+    /// Returns true when this frame collected no typed app actions.
+    pub fn is_empty(&self) -> bool {
+        self.frame.is_empty()
+    }
+
+    /// Returns the number of typed app actions collected for this frame.
+    pub fn len(&self) -> usize {
+        self.frame.len()
+    }
+
+    /// Returns the first typed app action, when one was collected.
+    pub fn first_action(&self) -> Option<&DocumentCommandAction<Action>> {
+        self.frame.first_action()
+    }
+
+    /// Iterates only the typed app action values collected for this frame.
+    pub fn action_values(&self) -> impl Iterator<Item = &Action> {
+        self.frame.action_values()
+    }
+
+    /// Returns only the first typed app action value, when one was collected.
+    pub fn first_action_value(&self) -> Option<&Action> {
+        self.frame.first_action_value()
+    }
+
+    /// Iterates typed app actions emitted by one element.
+    pub fn actions_for<'a>(
+        &'a self,
+        target: &'a str,
+    ) -> impl Iterator<Item = &'a DocumentCommandAction<Action>> + 'a {
+        self.frame.actions_for(target)
+    }
+
+    /// Returns the first typed app action emitted by one element.
+    pub fn first_action_for(&self, target: &str) -> Option<&DocumentCommandAction<Action>> {
+        self.frame.first_action_for(target)
+    }
+
+    /// Iterates only typed app action values emitted by one element.
+    pub fn action_values_for<'a>(
+        &'a self,
+        target: &'a str,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.frame.action_values_for(target)
+    }
+
+    /// Returns only the first typed app action value emitted by one element.
+    pub fn first_action_value_for(&self, target: &str) -> Option<&Action> {
+        self.frame.first_action_value_for(target)
+    }
+
+    /// Iterates typed app actions emitted by one resolved document event kind.
+    pub fn actions_of_kind(
+        &self,
+        kind: DocumentEventKind,
+    ) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.frame.actions_of_kind(kind)
+    }
+
+    /// Returns the first typed app action emitted by one resolved document event kind.
+    pub fn first_action_of_kind(
+        &self,
+        kind: DocumentEventKind,
+    ) -> Option<&DocumentCommandAction<Action>> {
+        self.frame.first_action_of_kind(kind)
+    }
+
+    /// Iterates only typed app action values emitted by one resolved event kind.
+    pub fn action_values_of_kind(&self, kind: DocumentEventKind) -> impl Iterator<Item = &Action> {
+        self.frame.action_values_of_kind(kind)
+    }
+
+    /// Returns only the first typed app action value emitted by one resolved event kind.
+    pub fn first_action_value_of_kind(&self, kind: DocumentEventKind) -> Option<&Action> {
+        self.frame.first_action_value_of_kind(kind)
+    }
+
+    /// Iterates typed app actions emitted by one authored behavior intent.
+    pub fn actions_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &DocumentCommandAction<Action>> {
+        self.frame.actions_for_intent(intent)
+    }
+
+    /// Returns the first typed app action emitted by one authored behavior intent.
+    pub fn first_action_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentCommandAction<Action>> {
+        self.frame.first_action_for_intent(intent)
+    }
+
+    /// Iterates only typed app action values emitted by one behavior intent.
+    pub fn action_values_for_intent(
+        &self,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &Action> {
+        self.frame.action_values_for_intent(intent)
+    }
+
+    /// Returns only the first typed app action value emitted by one behavior intent.
+    pub fn first_action_value_for_intent(&self, intent: ElementBehaviorEvent) -> Option<&Action> {
+        self.frame.first_action_value_for_intent(intent)
+    }
+
+    /// Iterates typed app actions emitted by one element and authored behavior intent.
+    pub fn actions_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a DocumentCommandAction<Action>> + 'a {
+        self.frame.actions_for_target_intent(target, intent)
+    }
+
+    /// Returns the first typed app action emitted by one element and behavior intent.
+    pub fn first_action_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&DocumentCommandAction<Action>> {
+        self.frame.first_action_for_target_intent(target, intent)
+    }
+
+    /// Iterates only typed app action values emitted by one element and behavior intent.
+    pub fn action_values_for_target_intent<'a>(
+        &'a self,
+        target: &'a str,
+        intent: ElementBehaviorEvent,
+    ) -> impl Iterator<Item = &'a Action> + 'a {
+        self.frame.action_values_for_target_intent(target, intent)
+    }
+
+    /// Returns only the first typed app action value emitted by one element and intent.
+    pub fn first_action_value_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+    ) -> Option<&Action> {
+        self.frame
+            .first_action_value_for_target_intent(target, intent)
+    }
+
+    /// Returns true when the frame contains the supplied typed action.
+    pub fn contains_action(&self, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.frame.contains_action(action)
+    }
+
+    /// Returns true when the supplied element emitted the supplied typed action.
+    pub fn contains_action_for(&self, target: &str, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.frame.contains_action_for(target, action)
+    }
+
+    /// Returns true when the supplied event kind emitted the supplied typed action.
+    pub fn contains_action_of_kind(&self, kind: DocumentEventKind, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.frame.contains_action_of_kind(kind, action)
+    }
+
+    /// Returns true when the supplied behavior intent emitted the supplied typed action.
+    pub fn contains_action_for_intent(&self, intent: ElementBehaviorEvent, action: &Action) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.frame.contains_action_for_intent(intent, action)
+    }
+
+    /// Returns true when the supplied element and behavior intent emitted the action.
+    pub fn contains_action_for_target_intent(
+        &self,
+        target: &str,
+        intent: ElementBehaviorEvent,
+        action: &Action,
+    ) -> bool
+    where
+        Action: PartialEq,
+    {
+        self.frame
+            .contains_action_for_target_intent(target, intent, action)
+    }
+
     /// Consumes this frame into its optional projection report and action frame.
     pub fn into_parts(
         self,

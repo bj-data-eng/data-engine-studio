@@ -1064,90 +1064,101 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
     let skipped_forgiving_surface_click = skipped_forgiving_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut dispatched = Vec::new();
-    let (dispatch_frame, dispatch_report) = html
-        .update_with_input_and_css_and_dispatch(
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            css,
-            &registry,
-            |action| {
-                dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_view = html
+        .to_view_with_css(Size::new(240.0, 160.0), css)
+        .expect("HTML and CSS should create a view for dispatch");
+    let (dispatch_frame, dispatch_report) = dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            dispatched.push(*action.action());
+        })
         .expect("HTML and CSS should dispatch typed actions directly");
     let mut dispatched_values = Vec::new();
-    let (value_dispatch_frame, value_dispatch_report) = html
-        .update_with_input_and_css_and_dispatch_action_values(
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            css,
-            &registry,
-            |action| dispatched_values.push(*action),
-        )
+    let mut value_dispatch_view = html
+        .to_view_with_css(Size::new(240.0, 160.0), css)
+        .expect("HTML and CSS should create a view for value dispatch");
+    let (value_dispatch_frame, value_dispatch_report) = value_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| dispatched_values.push(*action))
         .expect("HTML and CSS should dispatch typed action values directly");
     let mut configured_dispatched = Vec::new();
-    let (configured_dispatch_frame, configured_dispatch_report) = html
-        .update_with_input_and_css_and_dispatch_with(
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            css,
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-                commands.push_key_down("project.filter", HtmlAction::Filter);
-            },
-            |action| {
-                configured_dispatched.push(*action.action());
-            },
-        )
+    let mut configured_registry = DocumentCommandRegistry::new();
+    configured_registry.push("project.run", HtmlAction::Run);
+    configured_registry.push_key_down("project.filter", HtmlAction::Filter);
+    let mut configured_dispatch_view = html
+        .to_view_with_css(Size::new(240.0, 160.0), css)
+        .expect("HTML and CSS should create a view for configured dispatch");
+    let (configured_dispatch_frame, configured_dispatch_report) = configured_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&configured_registry, |action| {
+            configured_dispatched.push(*action.action());
+        })
         .expect("HTML and CSS should configure and dispatch typed actions directly");
     let mut configured_dispatched_values = Vec::new();
-    let (configured_value_dispatch_frame, configured_value_dispatch_report) = html
-        .update_with_input_and_css_and_dispatch_action_values_with(
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            css,
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-                commands.push_key_down("project.filter", HtmlAction::Filter);
-            },
-            |action| configured_dispatched_values.push(*action),
-        )
-        .expect("HTML and CSS should configure and dispatch typed action values directly");
+    let mut configured_value_registry = DocumentCommandRegistry::new();
+    configured_value_registry.push("project.run", HtmlAction::Run);
+    configured_value_registry.push_key_down("project.filter", HtmlAction::Filter);
+    let mut configured_value_dispatch_view = html
+        .to_view_with_css(Size::new(240.0, 160.0), css)
+        .expect("HTML and CSS should create a view for configured value dispatch");
+    let (configured_value_dispatch_frame, configured_value_dispatch_report) =
+        configured_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch_action_values(&configured_value_registry, |action| {
+                configured_dispatched_values.push(*action);
+            })
+            .expect("HTML and CSS should configure and dispatch typed action values directly");
     let mut forgiving_dispatched = Vec::new();
-    let (forgiving_dispatch_frame, forgiving_dispatch_report) = html
-        .update_with_input_and_css_forgiving_and_dispatch(
+    let mut forgiving_dispatch_view = html
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
-            DocumentInput::key_down(DocumentKey::Enter),
             ".broken { width: ; } .card { width: 180px; height: 72px; }",
-            &registry,
-            |action| {
-                forgiving_dispatched.push(*action.action());
-            },
         )
+        .expect("forgiving CSS should create a view for dispatch");
+    let (forgiving_dispatch_frame, forgiving_dispatch_report) = forgiving_dispatch_view
+        .update_request()
+        .input(DocumentInput::key_down(DocumentKey::Enter))
+        .dispatch(&registry, |action| {
+            forgiving_dispatched.push(*action.action());
+        })
         .expect("forgiving CSS should dispatch typed actions directly");
     let mut forgiving_dispatched_values = Vec::new();
-    let (forgiving_value_dispatch_frame, forgiving_value_dispatch_report) = html
-        .update_with_input_and_css_forgiving_and_dispatch_action_values(
+    let mut forgiving_value_dispatch_view = html
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
-            DocumentInput::key_down(DocumentKey::Enter),
             ".broken { width: ; } .card { width: 180px; height: 72px; }",
-            &registry,
-            |action| forgiving_dispatched_values.push(*action),
         )
-        .expect("forgiving CSS should dispatch typed action values directly");
+        .expect("forgiving CSS should create a view for value dispatch");
+    let (forgiving_value_dispatch_frame, forgiving_value_dispatch_report) =
+        forgiving_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::key_down(DocumentKey::Enter))
+            .dispatch_action_values(&registry, |action| {
+                forgiving_dispatched_values.push(*action);
+            })
+            .expect("forgiving CSS should dispatch typed action values directly");
     let mut forgiving_configured_dispatched_values = Vec::new();
-    let (forgiving_configured_value_dispatch_frame, forgiving_configured_value_dispatch_report) =
-        html.update_with_input_and_css_forgiving_and_dispatch_action_values_with(
+    let mut forgiving_configured_registry = DocumentCommandRegistry::new();
+    forgiving_configured_registry.push("project.run", HtmlAction::Run);
+    forgiving_configured_registry.push_key_down("project.filter", HtmlAction::Filter);
+    let mut forgiving_configured_value_dispatch_view = html
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
-            DocumentInput::key_down(DocumentKey::Enter),
             ".broken { width: ; } .card { width: 180px; height: 72px; }",
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-                commands.push_key_down("project.filter", HtmlAction::Filter);
-            },
-            |action| forgiving_configured_dispatched_values.push(*action),
         )
-        .expect("forgiving CSS should configure and dispatch typed action values directly");
+        .expect("forgiving CSS should create a view for configured value dispatch");
+    let (forgiving_configured_value_dispatch_frame, forgiving_configured_value_dispatch_report) =
+        forgiving_configured_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::key_down(DocumentKey::Enter))
+            .dispatch_action_values(&forgiving_configured_registry, |action| {
+                forgiving_configured_dispatched_values.push(*action);
+            })
+            .expect("forgiving CSS should configure and dispatch typed action values directly");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -1526,51 +1537,54 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
         )
         .expect("HTML should collect keyboard actions without CSS");
     let mut dispatched = Vec::new();
-    let (dispatch_frame, dispatch_report) = html
-        .update_with_input_and_dispatch(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &registry,
-            |action| {
-                dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML should create a view for dispatch");
+    let (dispatch_frame, dispatch_report) = dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            dispatched.push(*action.action());
+        })
         .expect("HTML should dispatch typed actions without CSS");
     let mut dispatched_values = Vec::new();
-    let (value_dispatch_frame, value_dispatch_report) = html
-        .update_with_input_and_dispatch_action_values(
-            Size::new(320.0, 180.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &registry,
-            |action| dispatched_values.push(*action),
-        )
+    let mut value_dispatch_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML should create a view for value dispatch");
+    let (value_dispatch_frame, value_dispatch_report) = value_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| dispatched_values.push(*action))
         .expect("HTML should dispatch typed action values without CSS");
     let mut configured_dispatched = Vec::new();
-    let (configured_dispatch_frame, configured_dispatch_report) = html
-        .update_with_input_and_dispatch_with(
-            Size::new(320.0, 180.0),
-            DocumentInput::key_down(DocumentKey::Enter),
-            |commands| {
-                commands.push_click("project.run", HtmlAction::Run);
-                commands.push_key_down("project.search", HtmlAction::Search);
-            },
-            |action| {
-                configured_dispatched.push(*action.action());
-            },
-        )
+    let mut configured_registry = DocumentCommandRegistry::new();
+    configured_registry.push_click("project.run", HtmlAction::Run);
+    configured_registry.push_key_down("project.search", HtmlAction::Search);
+    let mut configured_dispatch_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML should create a view for configured dispatch");
+    let (configured_dispatch_frame, configured_dispatch_report) = configured_dispatch_view
+        .update_request()
+        .input(DocumentInput::key_down(DocumentKey::Enter))
+        .dispatch(&configured_registry, |action| {
+            configured_dispatched.push(*action.action());
+        })
         .expect("HTML should configure and dispatch typed actions without CSS");
     let mut configured_dispatched_values = Vec::new();
-    let (configured_value_dispatch_frame, configured_value_dispatch_report) = html
-        .update_with_input_and_dispatch_action_values_with(
-            Size::new(320.0, 180.0),
-            DocumentInput::key_down(DocumentKey::Enter),
-            |commands| {
-                commands.push_click("project.run", HtmlAction::Run);
-                commands.push_key_down("project.search", HtmlAction::Search);
-            },
-            |action| configured_dispatched_values.push(*action),
-        )
-        .expect("HTML should configure and dispatch typed action values without CSS");
+    let mut configured_value_registry = DocumentCommandRegistry::new();
+    configured_value_registry.push_click("project.run", HtmlAction::Run);
+    configured_value_registry.push_key_down("project.search", HtmlAction::Search);
+    let mut configured_value_dispatch_view = html
+        .to_view(Size::new(320.0, 180.0))
+        .expect("HTML should create a view for configured value dispatch");
+    let (configured_value_dispatch_frame, configured_value_dispatch_report) =
+        configured_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::key_down(DocumentKey::Enter))
+            .dispatch_action_values(&configured_value_registry, |action| {
+                configured_dispatched_values.push(*action);
+            })
+            .expect("HTML should configure and dispatch typed action values without CSS");
     let input_output = html
         .update_with_input(
             Size::new(320.0, 180.0),
@@ -3174,55 +3188,62 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should map intent-scoped commands directly to action values");
     let mut dispatched = Vec::new();
-    let (dispatch_frame, dispatch_report) = set
-        .update_with_input_and_dispatch(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &registry,
-            |action| {
-                dispatched.push(*action.action());
-            },
-        )
+    let mut dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for dispatch");
+    let (dispatch_frame, dispatch_report) = dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            dispatched.push(*action.action());
+        })
         .expect("named document should dispatch typed actions through the set front door");
     let mut dispatched_values = Vec::new();
-    let (value_dispatch_frame, value_dispatch_report) = set
-        .update_with_input_and_dispatch_action_values(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &registry,
-            |action| dispatched_values.push(*action),
-        )
+    let mut value_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for value dispatch");
+    let (value_dispatch_frame, value_dispatch_report) = value_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| dispatched_values.push(*action))
         .expect("named document should dispatch typed action values through the set front door");
     let mut configured_dispatched = Vec::new();
-    let (configured_dispatch_frame, configured_dispatch_report) = set
-        .update_with_input_and_dispatch_with(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| {
-                configured_dispatched.push(*action.action());
-            },
-        )
+    let mut configured_registry = DocumentCommandRegistry::new();
+    configured_registry.push_click("inline.run", SetAction::Run);
+    let mut configured_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for configured dispatch");
+    let (configured_dispatch_frame, configured_dispatch_report) = configured_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&configured_registry, |action| {
+            configured_dispatched.push(*action.action());
+        })
         .expect(
             "named document should configure and dispatch typed actions through the set front door",
         );
     let mut configured_dispatched_values = Vec::new();
-    let (configured_value_dispatch_frame, configured_value_dispatch_report) = set
-        .update_with_input_and_dispatch_action_values_with(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| configured_dispatched_values.push(*action),
-        )
-        .expect("named document should configure and dispatch typed action values");
+    let mut configured_value_registry = DocumentCommandRegistry::new();
+    configured_value_registry.push_click("inline.run", SetAction::Run);
+    let mut configured_value_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view(Size::new(240.0, 160.0))
+        .expect("named document should create a view for configured value dispatch");
+    let (configured_value_dispatch_frame, configured_value_dispatch_report) =
+        configured_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch_action_values(&configured_value_registry, |action| {
+                configured_dispatched_values.push(*action);
+            })
+            .expect("named document should configure and dispatch typed action values");
     let empty_frame = set
         .update_actions("inline", Size::new(240.0, 160.0), &registry)
         .expect("named document should update and collect actions through the set front door");
@@ -3353,111 +3374,145 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should map intent actions through forgiving CSS helpers");
     let mut css_dispatched = Vec::new();
-    let (css_dispatch_frame, css_dispatch_report) = set
-        .update_with_input_and_css_and_dispatch(
-            "inline",
+    let mut css_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             "#inline { width: 168px; height: 32px; }",
-            &registry,
-            |action| {
-                css_dispatched.push(*action.action());
-            },
         )
+        .expect("named document should create a strict CSS view for dispatch");
+    let (css_dispatch_frame, css_dispatch_report) = css_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            css_dispatched.push(*action.action());
+        })
         .expect("named document should dispatch strict CSS action frames");
     let mut css_dispatched_values = Vec::new();
-    let (css_value_dispatch_frame, css_value_dispatch_report) = set
-        .update_with_input_and_css_and_dispatch_action_values(
-            "inline",
+    let mut css_value_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             "#inline { width: 169px; height: 32px; }",
-            &registry,
-            |action| css_dispatched_values.push(*action),
         )
+        .expect("named document should create a strict CSS view for value dispatch");
+    let (css_value_dispatch_frame, css_value_dispatch_report) = css_value_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| css_dispatched_values.push(*action))
         .expect("named document should dispatch strict CSS action values");
     let mut css_configured_dispatched = Vec::new();
-    let (css_configured_dispatch_frame, css_configured_dispatch_report) = set
-        .update_with_input_and_css_and_dispatch_with(
-            "inline",
+    let mut css_configured_registry = DocumentCommandRegistry::new();
+    css_configured_registry.push_click("inline.run", SetAction::Run);
+    let mut css_configured_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             "#inline { width: 172px; height: 32px; }",
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| {
+        )
+        .expect("named document should create a strict CSS view for configured dispatch");
+    let (css_configured_dispatch_frame, css_configured_dispatch_report) =
+        css_configured_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch(&css_configured_registry, |action| {
                 css_configured_dispatched.push(*action.action());
-            },
-        )
-        .expect("named document should configure and dispatch strict CSS action frames");
+            })
+            .expect("named document should configure and dispatch strict CSS action frames");
     let mut css_configured_dispatched_values = Vec::new();
-    let (css_configured_value_dispatch_frame, css_configured_value_dispatch_report) = set
-        .update_with_input_and_css_and_dispatch_action_values_with(
-            "inline",
+    let mut css_configured_value_registry = DocumentCommandRegistry::new();
+    css_configured_value_registry.push_click("inline.run", SetAction::Run);
+    let mut css_configured_value_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             "#inline { width: 173px; height: 32px; }",
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| css_configured_dispatched_values.push(*action),
         )
-        .expect("named document should configure and dispatch strict CSS action values");
+        .expect("named document should create a strict CSS view for configured value dispatch");
+    let (css_configured_value_dispatch_frame, css_configured_value_dispatch_report) =
+        css_configured_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch_action_values(&css_configured_value_registry, |action| {
+                css_configured_dispatched_values.push(*action);
+            })
+            .expect("named document should configure and dispatch strict CSS action values");
     let mut css_forgiving_dispatched = Vec::new();
-    let (css_forgiving_dispatch_frame, css_forgiving_dispatch_report) = set
-        .update_with_input_and_css_forgiving_and_dispatch(
-            "inline",
+    let mut css_forgiving_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".ignored { unknown-property: yes; } #inline { width: 176px; height: 32px; }",
-            &registry,
-            |action| {
-                css_forgiving_dispatched.push(*action.action());
-            },
         )
+        .expect("named document should create a forgiving CSS view for dispatch");
+    let (css_forgiving_dispatch_frame, css_forgiving_dispatch_report) = css_forgiving_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch(&registry, |action| {
+            css_forgiving_dispatched.push(*action.action());
+        })
         .expect("named document should dispatch forgiving CSS action frames");
     let mut css_forgiving_dispatched_values = Vec::new();
-    let (css_forgiving_value_dispatch_frame, css_forgiving_value_dispatch_report) = set
-        .update_with_input_and_css_forgiving_and_dispatch_action_values(
-            "inline",
+    let mut css_forgiving_value_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".ignored { unknown-property: yes; } #inline { width: 177px; height: 32px; }",
-            &registry,
-            |action| css_forgiving_dispatched_values.push(*action),
         )
-        .expect("named document should dispatch forgiving CSS action values");
+        .expect("named document should create a forgiving CSS view for value dispatch");
+    let (css_forgiving_value_dispatch_frame, css_forgiving_value_dispatch_report) =
+        css_forgiving_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch_action_values(&registry, |action| {
+                css_forgiving_dispatched_values.push(*action);
+            })
+            .expect("named document should dispatch forgiving CSS action values");
     let mut css_forgiving_configured_dispatched = Vec::new();
-    let (css_forgiving_configured_dispatch_frame, css_forgiving_configured_dispatch_report) = set
-        .update_with_input_and_css_forgiving_and_dispatch_with(
-            "inline",
+    let mut css_forgiving_configured_registry = DocumentCommandRegistry::new();
+    css_forgiving_configured_registry.push_click("inline.run", SetAction::Run);
+    let mut css_forgiving_configured_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".ignored { unknown-property: yes; } #inline { width: 180px; height: 32px; }",
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| {
-                css_forgiving_configured_dispatched.push(*action.action());
-            },
         )
-        .expect("named document should configure and dispatch forgiving CSS action frames");
+        .expect("named document should create a forgiving CSS view for configured dispatch");
+    let (css_forgiving_configured_dispatch_frame, css_forgiving_configured_dispatch_report) =
+        css_forgiving_configured_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch(&css_forgiving_configured_registry, |action| {
+                css_forgiving_configured_dispatched.push(*action.action());
+            })
+            .expect("named document should configure and dispatch forgiving CSS action frames");
     let mut css_forgiving_configured_dispatched_values = Vec::new();
+    let mut css_forgiving_configured_value_registry = DocumentCommandRegistry::new();
+    css_forgiving_configured_value_registry.push_click("inline.run", SetAction::Run);
+    let mut css_forgiving_configured_value_dispatch_view = set
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css_forgiving(
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #inline { width: 181px; height: 32px; }",
+        )
+        .expect("named document should create a forgiving CSS view for configured value dispatch");
     let (
         css_forgiving_configured_value_dispatch_frame,
         css_forgiving_configured_value_dispatch_report,
-    ) = set
-        .update_with_input_and_css_forgiving_and_dispatch_action_values_with(
-            "inline",
-            Size::new(240.0, 160.0),
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            ".ignored { unknown-property: yes; } #inline { width: 181px; height: 32px; }",
-            |commands| {
-                commands.push_click("inline.run", SetAction::Run);
-            },
-            |action| css_forgiving_configured_dispatched_values.push(*action),
-        )
+    ) = css_forgiving_configured_value_dispatch_view
+        .update_request()
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&css_forgiving_configured_value_registry, |action| {
+            css_forgiving_configured_dispatched_values.push(*action);
+        })
         .expect("named document should configure and dispatch forgiving CSS action values");
     let styled_surface = set
         .to_action_surface_with_stylesheet(
