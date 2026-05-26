@@ -65,6 +65,8 @@ use std::time::SystemTime;
 /// prelude because parsed HTML emits the same egui-free document contracts as
 /// Rust-authored widgets.
 pub mod prelude {
+    #[cfg(debug_assertions)]
+    pub use crate::HtmlStylesheetFile;
     pub use crate::{
         HtmlBehaviorHook, HtmlDiagnostic, HtmlDiagnosticCode, HtmlDocument, HtmlError, HtmlFile,
         HtmlNode, HtmlResult, HtmlSet, HtmlStylesheet, ReloadStatus,
@@ -1840,11 +1842,16 @@ impl HtmlFile {
         let source = fs::read_to_string(&path)?;
         let metadata = fs::metadata(&path)?;
         let fingerprint = HtmlFingerprint::new(&source);
+        let document = HtmlDocument::parse_with_source(
+            &source,
+            path.display().to_string(),
+            HtmlParseKind::Document,
+        )?;
         Ok(Self {
             path,
             modified: metadata.modified().ok(),
             fingerprint,
-            document: HtmlDocument::parse(&source)?,
+            document,
         })
     }
 
@@ -1863,9 +1870,93 @@ impl HtmlFile {
             return Ok(ReloadStatus { changed: false });
         }
 
-        self.document = HtmlDocument::parse(&source)?;
+        self.document = HtmlDocument::parse_with_source(
+            &source,
+            self.path.display().to_string(),
+            HtmlParseKind::Document,
+        )?;
         self.modified = modified;
         self.fingerprint = fingerprint;
+        Ok(ReloadStatus { changed: true })
+    }
+}
+
+/// Dev-only file-backed HTML/CSS bundle for polling-style hot reload.
+#[cfg(debug_assertions)]
+#[derive(Clone, Debug)]
+pub struct HtmlStylesheetFile {
+    html_path: PathBuf,
+    css_path: PathBuf,
+    html_modified: Option<SystemTime>,
+    css_modified: Option<SystemTime>,
+    html_fingerprint: HtmlFingerprint,
+    css_fingerprint: HtmlFingerprint,
+    bundle: HtmlStylesheet,
+}
+
+#[cfg(debug_assertions)]
+impl HtmlStylesheetFile {
+    /// Loads and parses an HTML file plus companion CSS file.
+    pub fn load(html_path: impl AsRef<Path>, css_path: impl AsRef<Path>) -> HtmlResult<Self> {
+        let html_path = html_path.as_ref().to_path_buf();
+        let css_path = css_path.as_ref().to_path_buf();
+        let html_source = fs::read_to_string(&html_path)?;
+        let css_source = fs::read_to_string(&css_path)?;
+        let html_metadata = fs::metadata(&html_path)?;
+        let css_metadata = fs::metadata(&css_path)?;
+        let html_fingerprint = HtmlFingerprint::new(&html_source);
+        let css_fingerprint = HtmlFingerprint::new(&css_source);
+        let html = HtmlDocument::parse_with_source(
+            &html_source,
+            html_path.display().to_string(),
+            HtmlParseKind::Document,
+        )?;
+        let stylesheet = parse_stylesheet(&css_source, css_path.display().to_string())?;
+        Ok(Self {
+            html_path,
+            css_path,
+            html_modified: html_metadata.modified().ok(),
+            css_modified: css_metadata.modified().ok(),
+            html_fingerprint,
+            css_fingerprint,
+            bundle: HtmlStylesheet::new(html, stylesheet),
+        })
+    }
+
+    /// Returns the current parsed HTML/CSS bundle.
+    pub fn bundle(&self) -> &HtmlStylesheet {
+        &self.bundle
+    }
+
+    /// Re-reads and reparses the HTML/CSS bundle if either file changed.
+    pub fn reload_if_changed(&mut self) -> HtmlResult<ReloadStatus> {
+        let html_source = fs::read_to_string(&self.html_path)?;
+        let css_source = fs::read_to_string(&self.css_path)?;
+        let html_metadata = fs::metadata(&self.html_path)?;
+        let css_metadata = fs::metadata(&self.css_path)?;
+        let html_modified = html_metadata.modified().ok();
+        let css_modified = css_metadata.modified().ok();
+        let html_fingerprint = HtmlFingerprint::new(&html_source);
+        let css_fingerprint = HtmlFingerprint::new(&css_source);
+        if html_modified == self.html_modified
+            && css_modified == self.css_modified
+            && html_fingerprint == self.html_fingerprint
+            && css_fingerprint == self.css_fingerprint
+        {
+            return Ok(ReloadStatus { changed: false });
+        }
+
+        let html = HtmlDocument::parse_with_source(
+            &html_source,
+            self.html_path.display().to_string(),
+            HtmlParseKind::Document,
+        )?;
+        let stylesheet = parse_stylesheet(&css_source, self.css_path.display().to_string())?;
+        self.bundle = HtmlStylesheet::new(html, stylesheet);
+        self.html_modified = html_modified;
+        self.css_modified = css_modified;
+        self.html_fingerprint = html_fingerprint;
+        self.css_fingerprint = css_fingerprint;
         Ok(ReloadStatus { changed: true })
     }
 }

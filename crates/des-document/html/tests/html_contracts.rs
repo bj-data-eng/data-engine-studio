@@ -3,6 +3,8 @@ use des_document::{
     DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Length, Point, Size,
     Style, StyleSheet,
 };
+#[cfg(debug_assertions)]
+use des_html::HtmlStylesheetFile;
 use des_html::{HtmlBehaviorHook, HtmlDocument, HtmlFile, HtmlNode, HtmlSet, HtmlStylesheet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -2957,6 +2959,92 @@ fn html_file_hot_reload_detects_same_mtime_content_changes() {
         file.document()
             .find_by_id("status")
             .is_some_and(|node| node.text.as_deref() == Some("After"))
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn html_stylesheet_file_hot_reloads_html_and_css_changes() {
+    let html_fixture = TempHtmlPath::new("des-html-bundle-hot-reload", "html");
+    let css_fixture = TempHtmlPath::new("des-css-bundle-hot-reload", "css");
+    fs::write(
+        html_fixture.path(),
+        r#"<section id="status" class="card">Before</section>"#,
+    )
+    .expect("html fixture should be writable");
+    fs::write(css_fixture.path(), ".card { width: 88px; height: 24px; }")
+        .expect("css fixture should be writable");
+    let mut file = HtmlStylesheetFile::load(html_fixture.path(), css_fixture.path())
+        .expect("html/css bundle should load");
+
+    let mut view = file
+        .bundle()
+        .to_view(Size::new(240.0, 160.0))
+        .expect("bundle should create a view");
+    let before = view.update();
+    assert_eq!(
+        before.snapshot().find("status").unwrap().rect().size.width,
+        88.0
+    );
+
+    fs::write(
+        html_fixture.path(),
+        r#"<section id="status" class="card changed">After</section>"#,
+    )
+    .expect("html fixture should update");
+    fs::write(css_fixture.path(), ".card { width: 104px; height: 24px; }")
+        .expect("css fixture should update");
+
+    let status = file
+        .reload_if_changed()
+        .expect("html/css bundle should hot reload");
+
+    assert!(status.changed);
+    let mut view = file
+        .bundle()
+        .to_view(Size::new(240.0, 160.0))
+        .expect("reloaded bundle should create a view");
+    let after = view.update();
+    let status = after.snapshot().find("status").unwrap();
+    assert!(status.has_class("changed"));
+    assert_eq!(status.text(), Some("After".to_owned()));
+    assert_eq!(status.rect().size.width, 104.0);
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn html_stylesheet_file_keeps_previous_bundle_when_reload_fails() {
+    let html_fixture = TempHtmlPath::new("des-html-bundle-hot-reload-fail", "html");
+    let css_fixture = TempHtmlPath::new("des-css-bundle-hot-reload-fail", "css");
+    fs::write(
+        html_fixture.path(),
+        r#"<section id="status" class="card">Before</section>"#,
+    )
+    .expect("html fixture should be writable");
+    fs::write(css_fixture.path(), ".card { width: 88px; height: 24px; }")
+        .expect("css fixture should be writable");
+    let mut file = HtmlStylesheetFile::load(html_fixture.path(), css_fixture.path())
+        .expect("html/css bundle should load");
+
+    fs::write(css_fixture.path(), ".card { width: nope; }")
+        .expect("css fixture should update with invalid CSS");
+    let error = file
+        .reload_if_changed()
+        .expect_err("invalid hotloaded CSS should be rejected");
+
+    assert!(
+        error
+            .to_string()
+            .contains(css_fixture.path().to_string_lossy().as_ref())
+    );
+    let mut view = file
+        .bundle()
+        .to_view(Size::new(240.0, 160.0))
+        .expect("previous valid bundle should remain available");
+    let output = view.update();
+    assert_eq!(
+        output.snapshot().find("status").unwrap().rect().size.width,
+        88.0
     );
 }
 
