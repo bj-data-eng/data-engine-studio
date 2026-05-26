@@ -1749,29 +1749,27 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     let measured_value_projection =
         DocumentProjection::new().set_text("run", "Measured values explicit");
     let mut measured_value_dispatched = Vec::new();
-    let (measured_value_report, measured_value_frame, measured_value_action_report) = surface
-        .project_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+    let (measured_value_report, measured_value_frame) = surface
+        .project_and_update_with_input_and_text_measurer_actions(
             &measured_value_projection,
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &mut text_measurer,
-            |action| measured_value_dispatched.push(action.clone()),
         )
-        .expect("action surfaces should dispatch projected measured action values");
+        .expect("action surfaces should collect projected measured action values");
+    let measured_value_action_report = measured_value_frame
+        .dispatch_action_values(|action| measured_value_dispatched.push(action.clone()));
     let mut measured_projected_value_dispatched = Vec::new();
-    let (
-        measured_projected_value_report,
-        measured_projected_value_frame,
-        measured_projected_value_action_report,
-    ) = surface
-        .project_with_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+    let (measured_projected_value_report, measured_projected_value_frame) = surface
+        .project_with_and_update_with_input_and_text_measurer_actions(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &mut text_measurer,
             |projection| {
                 projection.element("run").text("Measured values built");
             },
-            |action| measured_projected_value_dispatched.push(action.clone()),
         )
-        .expect("action surfaces should build measured projections and dispatch action values");
+        .expect("action surfaces should build measured projections and collect action values");
+    let measured_projected_value_action_report = measured_projected_value_frame
+        .dispatch_action_values(|action| measured_projected_value_dispatched.push(action.clone()));
 
     assert_eq!(measured_output_report.operations, 1);
     assert_eq!(
@@ -1854,20 +1852,19 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         });
     let mut direct_measurer = FixedTextMeasurer;
     let mut direct_measured_dispatched = Vec::new();
-    let (direct_measured_report, direct_measured_frame, direct_measured_action_report) =
-        direct_view
-            .project_with_and_update_with_input_and_text_measurer_and_dispatch(
-                DocumentInput::primary_click(Point::new(8.0, 8.0)),
-                &mut direct_measurer,
-                |projection| {
-                    projection.element("run").text("Measured direct");
-                },
-                &direct_registry,
-                |action| {
-                    direct_measured_dispatched.push(action.action().clone());
-                },
-            )
-            .unwrap();
+    let (direct_measured_report, direct_measured_frame) = direct_view
+        .project_with_and_update_with_input_and_text_measurer_actions(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &mut direct_measurer,
+            |projection| {
+                projection.element("run").text("Measured direct");
+            },
+            &direct_registry,
+        )
+        .unwrap();
+    let direct_measured_action_report = direct_measured_frame.dispatch(|action| {
+        direct_measured_dispatched.push(action.action().clone());
+    });
     let direct_measured_run = direct_measured_frame
         .output()
         .snapshot()
@@ -1877,32 +1874,30 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     let direct_value_projection =
         DocumentProjection::new().set_text("run", "Measured direct value");
     let mut direct_measured_values = Vec::new();
-    let (direct_value_report, direct_value_frame, direct_value_action_report) = direct_view
-        .project_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+    let (direct_value_report, direct_value_frame) = direct_view
+        .project_and_update_with_input_and_text_measurer_actions(
             &direct_value_projection,
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &mut direct_value_measurer,
             &direct_registry,
-            |action| direct_measured_values.push(action.clone()),
         )
         .unwrap();
+    let direct_value_action_report = direct_value_frame
+        .dispatch_action_values(|action| direct_measured_values.push(action.clone()));
     let mut direct_projected_value_measurer = FixedTextMeasurer;
     let mut direct_projected_values = Vec::new();
-    let (
-        direct_projected_value_report,
-        direct_projected_value_frame,
-        direct_projected_value_action_report,
-    ) = direct_view
-        .project_with_and_update_with_input_and_text_measurer_and_dispatch_action_values(
+    let (direct_projected_value_report, direct_projected_value_frame) = direct_view
+        .project_with_and_update_with_input_and_text_measurer_actions(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &mut direct_projected_value_measurer,
             |projection| {
                 projection.element("run").text("Measured direct built");
             },
             &direct_registry,
-            |action| direct_projected_values.push(action.clone()),
         )
         .unwrap();
+    let direct_projected_value_action_report = direct_projected_value_frame
+        .dispatch_action_values(|action| direct_projected_values.push(action.clone()));
 
     assert!(direct_update_frame.is_empty());
     assert_eq!(
@@ -4426,16 +4421,16 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
 
     let direct_projection = DocumentProjection::new().set_text("refresh", "Dispatch refresh");
     let mut projected_dispatched = Vec::new();
-    let (direct_projection_report, direct_projection_frame, direct_projection_action_report) = view
-        .project_and_update_with_input_and_dispatch(
+    let (direct_projection_report, direct_projection_frame) = view
+        .project_and_update_with_input_actions(
             &direct_projection,
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &registry,
-            |action| {
-                projected_dispatched.push(*action.action());
-            },
         )
         .unwrap();
+    let direct_projection_action_report = direct_projection_frame.dispatch(|action| {
+        projected_dispatched.push(*action.action());
+    });
     let direct_projected_refresh = direct_projection_frame
         .output()
         .snapshot()
@@ -4455,18 +4450,18 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert_eq!(projected_dispatched, vec![AppAction::Refresh]);
 
     let mut projected_with_dispatched = Vec::new();
-    let (direct_with_report, direct_with_frame, direct_with_action_report) = view
-        .project_with_and_update_with_input_and_dispatch(
+    let (direct_with_report, direct_with_frame) = view
+        .project_with_and_update_with_input_actions(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             |projection| {
                 projection.element("refresh").text("Dispatch with");
             },
             &registry,
-            |action| {
-                projected_with_dispatched.push(*action.action());
-            },
         )
         .unwrap();
+    let direct_with_action_report = direct_with_frame.dispatch(|action| {
+        projected_with_dispatched.push(*action.action());
+    });
 
     assert_eq!(direct_with_report.operations, 1);
     assert_eq!(
@@ -4612,16 +4607,16 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(no_input_widgets_frame.is_empty());
 
     let mut direct_widget_dispatched = Vec::new();
-    let (direct_widget_report, direct_widget_frame, direct_widget_action_report) = widget_view
-        .project_widget_and_update_with_input_and_dispatch(
+    let (direct_widget_report, direct_widget_frame) = widget_view
+        .project_widget_and_update_with_input_actions(
             &StatusWidget { ready: false },
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &registry,
-            |action| {
-                direct_widget_dispatched.push(*action.action());
-            },
         )
         .unwrap();
+    let direct_widget_action_report = direct_widget_frame.dispatch(|action| {
+        direct_widget_dispatched.push(*action.action());
+    });
 
     assert_eq!(direct_widget_report.operations, 2);
     assert!(direct_widget_frame.contains_action(&AppAction::Toggle));
@@ -4648,8 +4643,8 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(surface_frame.contains_action(&AppAction::Toggle));
 
     let mut dispatched = Vec::new();
-    let (dispatch_report, dispatch_frame, action_report) = widget_surface
-        .project_with_and_update_with_input_and_dispatch(
+    let (dispatch_report, dispatch_frame) = widget_surface
+        .project_with_and_update_with_input_actions(
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             |projection| {
                 projection
@@ -4657,11 +4652,11 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
                     .text("Dispatched")
                     .class("is-dispatched", true);
             },
-            |action| {
-                dispatched.push(*action.action());
-            },
         )
         .unwrap();
+    let action_report = dispatch_frame.dispatch(|action| {
+        dispatched.push(*action.action());
+    });
     let dispatched_status = dispatch_frame.output().snapshot().find("status").unwrap();
 
     assert_eq!(dispatch_report.operations, 2);
@@ -4674,13 +4669,14 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
 
     let explicit_projection = DocumentProjection::new().set_text("status", "Value dispatched");
     let mut value_dispatched = Vec::new();
-    let (value_dispatch_report, value_dispatch_frame, value_action_report) = widget_surface
-        .project_and_update_with_input_and_dispatch_action_values(
+    let (value_dispatch_report, value_dispatch_frame) = widget_surface
+        .project_and_update_with_input_actions(
             &explicit_projection,
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| value_dispatched.push(*action),
         )
         .unwrap();
+    let value_action_report =
+        value_dispatch_frame.dispatch_action_values(|action| value_dispatched.push(*action));
     let value_dispatched_status = value_dispatch_frame
         .output()
         .snapshot()
@@ -4701,16 +4697,16 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(value_dispatch_frame.contains_action(&AppAction::Toggle));
 
     let mut projected_value_dispatched = Vec::new();
-    let (projected_value_report, projected_value_frame, projected_value_action_report) =
-        widget_surface
-            .project_with_and_update_with_input_and_dispatch_action_values(
-                DocumentInput::primary_click(Point::new(8.0, 8.0)),
-                |projection| {
-                    projection.element("status").text("Projected value");
-                },
-                |action| projected_value_dispatched.push(*action),
-            )
-            .unwrap();
+    let (projected_value_report, projected_value_frame) = widget_surface
+        .project_with_and_update_with_input_actions(
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            |projection| {
+                projection.element("status").text("Projected value");
+            },
+        )
+        .unwrap();
+    let projected_value_action_report = projected_value_frame
+        .dispatch_action_values(|action| projected_value_dispatched.push(*action));
 
     assert_eq!(projected_value_report.operations, 1);
     assert_eq!(projected_value_report.changed, 1);
@@ -4730,15 +4726,15 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     );
 
     let mut widget_dispatched = Vec::new();
-    let (widget_dispatch_report, widget_dispatch_frame, widget_action_report) = widget_surface
-        .project_widget_and_update_with_input_and_dispatch(
+    let (widget_dispatch_report, widget_dispatch_frame) = widget_surface
+        .project_widget_and_update_with_input_actions(
             &StatusWidget { ready: false },
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| {
-                widget_dispatched.push(*action.action());
-            },
         )
         .unwrap();
+    let widget_action_report = widget_dispatch_frame.dispatch(|action| {
+        widget_dispatched.push(*action.action());
+    });
     let widget_dispatch_status = widget_dispatch_frame
         .output()
         .snapshot()
@@ -4756,13 +4752,14 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(!widget_dispatch_status.has_class("is-ready"));
 
     let mut widget_value_dispatched = Vec::new();
-    let (widget_value_report, widget_value_frame, widget_value_action_report) = widget_surface
-        .project_widget_and_update_with_input_and_dispatch_action_values(
+    let (widget_value_report, widget_value_frame) = widget_surface
+        .project_widget_and_update_with_input_actions(
             &StatusWidget { ready: true },
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| widget_value_dispatched.push(*action),
         )
         .unwrap();
+    let widget_value_action_report =
+        widget_value_frame.dispatch_action_values(|action| widget_value_dispatched.push(*action));
 
     assert_eq!(widget_value_report.operations, 2);
     assert_eq!(widget_value_report.changed, 2);
@@ -4785,15 +4782,15 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     let mut direct_widgets_view =
         DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
     let mut direct_widgets_dispatched = Vec::new();
-    let (direct_widgets_report, direct_widgets_frame, direct_widgets_action_report) =
-        direct_widgets_view
-            .project_widgets_and_update_with_input_and_dispatch_action_values(
-                [&ready_status as &dyn DocumentWidget],
-                DocumentInput::primary_click(Point::new(8.0, 8.0)),
-                &registry,
-                |action| direct_widgets_dispatched.push(*action),
-            )
-            .expect("document views should dispatch values after multi-widget projection");
+    let (direct_widgets_report, direct_widgets_frame) = direct_widgets_view
+        .project_widgets_and_update_with_input_actions(
+            [&ready_status as &dyn DocumentWidget],
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+            &registry,
+        )
+        .expect("document views should collect values after multi-widget projection");
+    let direct_widgets_action_report = direct_widgets_frame
+        .dispatch_action_values(|action| direct_widgets_dispatched.push(*action));
 
     assert_eq!(direct_widgets_report.operations, 2);
     assert_eq!(direct_widgets_report.changed, 2);
@@ -4813,14 +4810,14 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     );
 
     let mut surface_widgets_dispatched = Vec::new();
-    let (surface_widgets_report, surface_widgets_frame, surface_widgets_action_report) =
-        widget_surface
-            .project_widgets_and_update_with_input_and_dispatch_action_values(
-                [&waiting_status as &dyn DocumentWidget],
-                DocumentInput::primary_click(Point::new(8.0, 8.0)),
-                |action| surface_widgets_dispatched.push(*action),
-            )
-            .expect("action surfaces should dispatch values after multi-widget projection");
+    let (surface_widgets_report, surface_widgets_frame) = widget_surface
+        .project_widgets_and_update_with_input_actions(
+            [&waiting_status as &dyn DocumentWidget],
+            DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        )
+        .expect("action surfaces should collect values after multi-widget projection");
+    let surface_widgets_action_report = surface_widgets_frame
+        .dispatch_action_values(|action| surface_widgets_dispatched.push(*action));
 
     assert_eq!(surface_widgets_report.operations, 2);
     assert_eq!(surface_widgets_report.changed, 2);
