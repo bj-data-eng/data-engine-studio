@@ -50,11 +50,16 @@ use html5ever::tendril::TendrilSink;
 use html5ever::{ParseOpts, QualName, local_name, ns, parse_document, parse_fragment};
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
 use std::collections::BTreeMap;
+#[cfg(debug_assertions)]
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::fs;
+#[cfg(debug_assertions)]
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(debug_assertions)]
+use std::path::PathBuf;
+#[cfg(debug_assertions)]
 use std::time::SystemTime;
 
 /// Common app-facing imports for browser-authored document UIs.
@@ -65,12 +70,12 @@ use std::time::SystemTime;
 /// prelude because parsed HTML emits the same egui-free document contracts as
 /// Rust-authored widgets.
 pub mod prelude {
-    #[cfg(debug_assertions)]
-    pub use crate::HtmlStylesheetFile;
     pub use crate::{
         HtmlBehaviorHook, HtmlDiagnostic, HtmlDiagnosticCode, HtmlDocument, HtmlError, HtmlFile,
-        HtmlNode, HtmlResult, HtmlSet, HtmlStylesheet, ReloadStatus,
+        HtmlNode, HtmlResult, HtmlSet, HtmlStylesheet,
     };
+    #[cfg(debug_assertions)]
+    pub use crate::{HtmlStylesheetFile, ReloadStatus};
     pub use des_document::prelude::*;
 }
 
@@ -1857,6 +1862,7 @@ pub enum HtmlDiagnosticCode {
 }
 
 /// Hot-reload status returned after checking an HTML file.
+#[cfg(debug_assertions)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReloadStatus {
     /// True when the file changed and the HTML document was reloaded.
@@ -1866,8 +1872,11 @@ pub struct ReloadStatus {
 /// File-backed browser HTML document for polling-style hot reload.
 #[derive(Clone, Debug)]
 pub struct HtmlFile {
+    #[cfg(debug_assertions)]
     path: PathBuf,
+    #[cfg(debug_assertions)]
     modified: Option<SystemTime>,
+    #[cfg(debug_assertions)]
     fingerprint: HtmlFingerprint,
     document: HtmlDocument,
 }
@@ -1877,7 +1886,9 @@ impl HtmlFile {
     pub fn load(path: impl AsRef<Path>) -> HtmlResult<Self> {
         let path = path.as_ref().to_path_buf();
         let source = fs::read_to_string(&path)?;
+        #[cfg(debug_assertions)]
         let metadata = fs::metadata(&path)?;
+        #[cfg(debug_assertions)]
         let fingerprint = HtmlFingerprint::new(&source);
         let document = HtmlDocument::parse_with_source(
             &source,
@@ -1885,8 +1896,11 @@ impl HtmlFile {
             HtmlParseKind::Document,
         )?;
         Ok(Self {
+            #[cfg(debug_assertions)]
             path,
+            #[cfg(debug_assertions)]
             modified: metadata.modified().ok(),
+            #[cfg(debug_assertions)]
             fingerprint,
             document,
         })
@@ -1898,6 +1912,7 @@ impl HtmlFile {
     }
 
     /// Re-reads and reparses the HTML document if the file changed.
+    #[cfg(debug_assertions)]
     pub fn reload_if_changed(&mut self) -> HtmlResult<ReloadStatus> {
         let source = fs::read_to_string(&self.path)?;
         let metadata = fs::metadata(&self.path)?;
@@ -2417,6 +2432,7 @@ impl HtmlSet {
     }
 
     /// Re-reads file-backed HTML documents and returns names that changed.
+    #[cfg(debug_assertions)]
     pub fn reload_changed(&mut self) -> HtmlResult<Vec<String>> {
         let mut updated = self.documents.clone();
         let mut changed = Vec::new();
@@ -2447,12 +2463,14 @@ impl HtmlEntry {
     }
 }
 
+#[cfg(debug_assertions)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct HtmlFingerprint {
     len: usize,
     hash: u64,
 }
 
+#[cfg(debug_assertions)]
 impl HtmlFingerprint {
     fn new(source: &str) -> Self {
         let mut hasher = DefaultHasher::new();

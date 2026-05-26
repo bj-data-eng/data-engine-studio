@@ -2908,6 +2908,7 @@ fn html_document_and_strict_stylesheet_load_from_files() {
     assert_eq!(loaded.rect().size.height, 24.0);
 }
 
+#[cfg(debug_assertions)]
 #[test]
 fn html_file_hot_reloads_when_source_changes() {
     let fixture = TempHtmlPath::new("des-html-hot-reload", "html");
@@ -2941,6 +2942,7 @@ fn html_file_hot_reloads_when_source_changes() {
     );
 }
 
+#[cfg(debug_assertions)]
 #[test]
 fn html_file_hot_reload_detects_same_mtime_content_changes() {
     let fixture = TempHtmlPath::new("des-html-hot-reload-fingerprint", "html");
@@ -3058,6 +3060,7 @@ fn html_stylesheet_file_keeps_previous_bundle_when_reload_fails() {
     );
 }
 
+#[cfg(debug_assertions)]
 #[test]
 fn html_set_manages_named_inline_and_file_backed_documents() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
