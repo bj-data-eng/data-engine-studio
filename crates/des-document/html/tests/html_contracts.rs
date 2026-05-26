@@ -380,6 +380,35 @@ fn html_document_parser_rejects_javascript_runtime_content() {
 }
 
 #[test]
+fn html_document_parser_rejects_malformed_string_content() {
+    let control_error = HtmlDocument::parse_fragment("<section>bad\u{0007}</section>")
+        .expect_err("raw control characters should be rejected");
+    let decoded_error = HtmlDocument::parse_fragment("<section>&#xfffd;</section>")
+        .expect_err("decoded replacement characters should be rejected");
+
+    assert!(
+        control_error
+            .to_string()
+            .contains("unsupported control character")
+    );
+    assert!(
+        decoded_error
+            .to_string()
+            .contains("malformed string character U+FFFD")
+    );
+}
+
+#[test]
+fn html_public_string_constructors_sanitize_malformed_content() {
+    let text = HtmlNode::text_node("ok\u{0007}\u{FFFD}");
+    let hook = HtmlBehaviorHook::new(" click\u{0007} ", " run\u{FFFD} ");
+
+    assert_eq!(text.text.as_deref(), Some("ok"));
+    assert_eq!(hook.event(), "click");
+    assert_eq!(hook.command(), "run");
+}
+
+#[test]
 fn html_document_preserves_non_handler_on_attributes() {
     let html = HtmlDocument::parse_fragment(
         r#"<section once="ready" onboarding="visible" on:click="run">Run</section>"#,

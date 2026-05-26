@@ -172,10 +172,10 @@ impl HtmlDocument {
         let mut diagnostics = Vec::new();
         let children = match kind {
             HtmlParseKind::Document => {
-                rcdom_document_children_to_html(&dom.document.children.borrow(), &mut diagnostics)
+                rcdom_document_children_to_html(&dom.document.children.borrow(), &mut diagnostics)?
             }
             HtmlParseKind::Fragment => {
-                rcdom_fragment_children_to_html(&dom.document.children.borrow(), &mut diagnostics)
+                rcdom_fragment_children_to_html(&dom.document.children.borrow(), &mut diagnostics)?
             }
         };
         if let Some(diagnostic) = diagnostics.first() {
@@ -1456,7 +1456,7 @@ impl HtmlNode {
             role: None,
             attributes: BTreeMap::new(),
             behavior_hooks: Vec::new(),
-            text: Some(text.into()),
+            text: Some(sanitize_author_string_lossy(text.into())),
             children: Vec::new(),
         }
     }
@@ -1660,8 +1660,10 @@ impl HtmlBehaviorHook {
     /// Creates a behavior hook from an HTML-authored event name.
     pub fn new(event: impl Into<String>, command: impl Into<String>) -> Self {
         Self {
-            event: event.into().trim().to_owned(),
-            command: command.into().trim().to_owned(),
+            event: sanitize_author_string_lossy(event.into()).trim().to_owned(),
+            command: sanitize_author_string_lossy(command.into())
+                .trim()
+                .to_owned(),
         }
     }
 
@@ -2654,21 +2656,55 @@ fn html_source_location(source: &str, target: usize) -> (usize, usize) {
     (line, column)
 }
 
+fn sanitize_parsed_html_string(
+    value: impl Into<String>,
+    context: impl AsRef<str>,
+) -> HtmlResult<String> {
+    let value = value.into();
+    for (offset, ch) in value.char_indices() {
+        if is_malformed_html_string_char(ch) {
+            return Err(HtmlError::Parse {
+                source: None,
+                offset,
+                line: 1,
+                column: offset + 1,
+                message: format!(
+                    "HTML {} contains malformed string character U+{:04X}",
+                    context.as_ref(),
+                    ch as u32
+                ),
+            });
+        }
+    }
+    Ok(value)
+}
+
+fn sanitize_author_string_lossy(value: String) -> String {
+    value
+        .chars()
+        .filter(|ch| !is_malformed_html_string_char(*ch))
+        .collect()
+}
+
+fn is_malformed_html_string_char(ch: char) -> bool {
+    ch == '\0' || ch == '\u{FFFD}' || (ch.is_control() && !matches!(ch, '\t' | '\n' | '\r'))
+}
+
 fn rcdom_children_to_html(
     children: &[Handle],
     diagnostics: &mut Vec<HtmlDiagnostic>,
-) -> Vec<HtmlNode> {
+) -> HtmlResult<Vec<HtmlNode>> {
     let mut nodes = Vec::new();
     for child in children {
-        append_rcdom_node(child, &mut nodes, diagnostics);
+        append_rcdom_node(child, &mut nodes, diagnostics)?;
     }
-    nodes
+    Ok(nodes)
 }
 
 fn rcdom_document_children_to_html(
     children: &[Handle],
     diagnostics: &mut Vec<HtmlDiagnostic>,
-) -> Vec<HtmlNode> {
+) -> HtmlResult<Vec<HtmlNode>> {
     let mut body = None;
     for child in children {
         find_body_handle(child, &mut body);
@@ -2683,15 +2719,15 @@ fn rcdom_document_children_to_html(
 fn rcdom_fragment_children_to_html(
     children: &[Handle],
     diagnostics: &mut Vec<HtmlDiagnostic>,
-) -> Vec<HtmlNode> {
-    let mut nodes = rcdom_children_to_html(children, diagnostics);
+) -> HtmlResult<Vec<HtmlNode>> {
+    let mut nodes = rcdom_children_to_html(children, diagnostics)?;
     loop {
         if nodes.len() != 1 {
-            return nodes;
+            return Ok(nodes);
         }
         match nodes[0].tag.as_str() {
             "html" | "body" => nodes = nodes.remove(0).children,
-            _ => return nodes,
+            _ => return Ok(nodes),
         }
     }
 }
@@ -2715,21 +2751,21 @@ fn append_rcdom_node(
     handle: &Handle,
     nodes: &mut Vec<HtmlNode>,
     diagnostics: &mut Vec<HtmlDiagnostic>,
-) {
+) -> HtmlResult<()> {
     match &handle.data {
         NodeData::Document => nodes.extend(rcdom_children_to_html(
             &handle.children.borrow(),
             diagnostics,
-        )),
+        )?),
         NodeData::Doctype { .. } | NodeData::Comment { .. } => {}
         NodeData::Text { contents } => {
-            let text = contents.borrow().to_string();
+            let text = sanitize_parsed_html_string(contents.borrow().to_string(), "text content")?;
             if !text.trim().is_empty() {
                 nodes.push(HtmlNode::text_node(text));
             }
         }
         NodeData::Element { name, attrs, .. } => {
-            let tag = name.local.to_string();
+            let tag = sanitize_parsed_html_string(name.local.to_string(), "tag name")?;
             if tag == "script" {
                 diagnostics.push(HtmlDiagnostic::new(
                     HtmlDiagnosticCode::ScriptElementIgnored,
@@ -2737,7 +2773,7 @@ fn append_rcdom_node(
                     Some(tag),
                     None,
                 ));
-                return;
+                return Ok(());
             }
 
             let mut id = None;
@@ -2747,8 +2783,15 @@ fn append_rcdom_node(
             let mut behavior_hooks = Vec::new();
 
             for attr in attrs.borrow().iter() {
-                let name = html_attribute_name(&attr.name);
-                let value = attr.value.to_string();
+                let name =
+                    sanitize_parsed_html_string(html_attribute_name(&attr.name), "attribute name")?;
+                let mut value = sanitize_parsed_html_string(
+                    attr.value.to_string(),
+                    format!("attribute `{name}`"),
+                )?;
+                if name.starts_with("data-") {
+                    value = value.trim().to_owned();
+                }
                 if name == "id" {
                     id = Some(value);
                 } else if name == "class" {
@@ -2779,7 +2822,7 @@ fn append_rcdom_node(
                 }
             }
 
-            let children = rcdom_children_to_html(&handle.children.borrow(), diagnostics);
+            let children = rcdom_children_to_html(&handle.children.borrow(), diagnostics)?;
             let text = if children.len() == 1 && children[0].is_text() {
                 children[0].text.clone()
             } else {
@@ -2799,6 +2842,7 @@ fn append_rcdom_node(
         }
         NodeData::ProcessingInstruction { .. } => {}
     }
+    Ok(())
 }
 
 fn html_attribute_name(name: &QualName) -> String {
