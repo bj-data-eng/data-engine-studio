@@ -2316,38 +2316,6 @@ impl HtmlStylesheet {
         let report = frame.dispatch_action_values(handler);
         Ok((frame, report))
     }
-
-    /// Creates a view, configures typed actions in one hook, routes input, and dispatches them.
-    pub fn update_with_input_and_dispatch_with<Action>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
-    where
-        Action: Clone,
-    {
-        let mut registry = DocumentCommandRegistry::new();
-        configure(&mut registry);
-        self.update_with_input_and_dispatch(viewport, input, &registry, handler)
-    }
-
-    /// Creates a styled view, configures typed actions, and dispatches action values.
-    pub fn update_with_input_and_dispatch_action_values_with<Action>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-        handler: impl for<'frame> FnMut(&'frame Action),
-    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
-    where
-        Action: Clone,
-    {
-        let mut registry = DocumentCommandRegistry::new();
-        configure(&mut registry);
-        self.update_with_input_and_dispatch_action_values(viewport, input, &registry, handler)
-    }
 }
 
 /// A parsed HTML element or text node.

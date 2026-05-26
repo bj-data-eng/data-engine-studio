@@ -2350,31 +2350,28 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         )
         .expect("HTML bundle should dispatch typed action values directly");
     let mut configured_dispatched = Vec::new();
+    let configured_registry = DocumentCommandRegistry::new()
+        .bind("project.run", HtmlAction::Run)
+        .bind_key_down("project.filter", HtmlAction::Filter);
     let (configured_dispatch_frame, configured_dispatch_report) = bundle
-        .update_with_input_and_dispatch_with(
+        .update_with_input_and_dispatch(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-                commands.push_key_down("project.filter", HtmlAction::Filter);
-            },
+            &configured_registry,
             |action| {
                 configured_dispatched.push(*action.action());
             },
         )
-        .expect("HTML bundle should configure and dispatch typed actions directly");
+        .expect("HTML bundle should dispatch configured typed actions directly");
     let mut configured_dispatched_values = Vec::new();
     let (configured_value_dispatch_frame, configured_value_dispatch_report) = bundle
-        .update_with_input_and_dispatch_action_values_with(
+        .update_with_input_and_dispatch_action_values(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-                commands.push_key_down("project.filter", HtmlAction::Filter);
-            },
+            &configured_registry,
             |action| configured_dispatched_values.push(*action),
         )
-        .expect("HTML bundle should configure and dispatch typed action values directly");
+        .expect("HTML bundle should dispatch configured typed action values directly");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
