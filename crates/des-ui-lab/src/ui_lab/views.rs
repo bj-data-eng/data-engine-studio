@@ -673,54 +673,11 @@ fn drag_overlay_placeholder(ui: &mut des_document::DocumentBuilder) {
 
 fn render_styling_view(
     ui: &mut des_document::DocumentBuilder,
-    dense_mode: bool,
+    _dense_mode: bool,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
 ) {
-    ui.text_element(
-        "styling-heading",
-        ElementSpec::new(Element::Text).class("heading"),
-        "Deterministic Styling",
-    );
-    ui.text_element(
-        "styling-copy",
-        ElementSpec::new(Element::Text).class("muted"),
-        "Style order is element, class, state, id. No CSS specificity maze.",
-    );
-    ui.element(
-        "style-stack",
-        ElementSpec::new(Element::Div).class("stack"),
-        |ui| {
-            interactive_labeled_row(
-                ui,
-                "style-row-element",
-                "Element",
-                "Element::Div stays structural; classes define surfaces.",
-            );
-            interactive_labeled_row(
-                ui,
-                "style-row-class",
-                "Class",
-                ".feature-card changes color, radius, and size.",
-            );
-            interactive_labeled_row(
-                ui,
-                "style-row-state",
-                "State",
-                ".feature-card:hover and :pressed adjust paint.",
-            );
-            interactive_labeled_row(
-                ui,
-                "style-row-density",
-                "App State",
-                if dense_mode {
-                    "Dense mode is active from the layout view toggle."
-                } else {
-                    "Dense mode is inactive from the layout view toggle."
-                },
-            );
-        },
-    );
+    super::html::append_styling_overview(ui);
     render_shadow_specimens(ui);
     render_shadow_tuner(ui, shadow_tune, shadow_hover_tune);
     render_structural_selector_specimens(ui);
@@ -768,31 +725,4 @@ fn render_nesting_view(ui: &mut des_document::DocumentBuilder) {
 
 fn render_graph_view(ui: &mut des_document::DocumentBuilder) {
     super::html::append_graph(ui);
-}
-
-fn interactive_labeled_row(
-    ui: &mut des_document::DocumentBuilder,
-    id: &'static str,
-    label: &'static str,
-    body: &'static str,
-) {
-    ui.element(
-        id,
-        ElementSpec::new(Element::Div)
-            .class("list-row")
-            .class("specificity-proof")
-            .interactive(),
-        |ui| {
-            ui.text_element(
-                format!("{id}-label"),
-                ElementSpec::new(Element::Text).class("card-title"),
-                label,
-            );
-            ui.text_element(
-                format!("{id}-body"),
-                ElementSpec::new(Element::Text).class("muted"),
-                body,
-            );
-        },
-    );
 }

@@ -1078,6 +1078,32 @@ fn graph_view_is_authored_from_html_fragment() {
 }
 
 #[test]
+fn styling_overview_is_authored_from_html_fragment_and_projected_from_state() {
+    let mut state = UiLabState::new(Some("styling"));
+    state.dense_mode = true;
+
+    let output = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+    let heading = frame(&output, "styling-heading");
+    let copy = frame(&output, "styling-copy");
+    let stack = frame(&output, "style-stack");
+    let density = frame(&output, "style-row-density");
+
+    assert_eq!(heading.element, Element::H2);
+    assert_eq!(copy.element, Element::P);
+    assert_eq!(stack.element, Element::Section);
+    assert_eq!(density.element, Element::Article);
+    assert!(density.interactive);
+    assert_eq!(
+        frame_text(&output, "style-row-element-label"),
+        Some("Element")
+    );
+    assert_eq!(
+        frame_text(&output, "style-row-density-body"),
+        Some("Dense mode is active from the layout view toggle.")
+    );
+}
+
+#[test]
 fn lab_shell_tracks_document_viewport_size() {
     for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
         let output = lab_output_with_size("layout", viewport);

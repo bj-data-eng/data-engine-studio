@@ -907,6 +907,9 @@ impl UiLabState {
         if self.view == LabView::Interaction {
             self.apply_interaction_document_state(&mut document);
         }
+        if self.view == LabView::Styling {
+            self.apply_styling_document_state(&mut document);
+        }
         document
     }
 
@@ -1019,6 +1022,24 @@ impl UiLabState {
         self.interaction_projection()
             .apply_to(document)
             .expect("interaction document contains projected loop elements");
+    }
+
+    fn apply_styling_document_state(&self, document: &mut Document) {
+        self.styling_projection()
+            .apply_to(document)
+            .expect("styling document contains projected state rows");
+    }
+
+    fn styling_projection(&self) -> DocumentProjection {
+        let mut projection = DocumentProjection::new();
+        projection
+            .element("style-row-density-body")
+            .text(if self.dense_mode {
+                "Dense mode is active from the layout view toggle."
+            } else {
+                "Dense mode is inactive from the layout view toggle."
+            });
+        projection
     }
 
     fn interaction_projection(&self) -> DocumentProjection {

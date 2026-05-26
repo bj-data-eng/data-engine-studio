@@ -1,0 +1,20 @@
+<h2 id="styling-heading" class="heading">Deterministic Styling</h2>
+<p id="styling-copy" class="muted">Style order is element, class, state, id. No CSS specificity maze.</p>
+<section id="style-stack" class="stack">
+  <article id="style-row-element" class="list-row specificity-proof" data-interactive="true">
+    <h3 id="style-row-element-label" class="card-title">Element</h3>
+    <p id="style-row-element-body" class="muted">Element::Div stays structural; classes define surfaces.</p>
+  </article>
+  <article id="style-row-class" class="list-row specificity-proof" data-interactive="true">
+    <h3 id="style-row-class-label" class="card-title">Class</h3>
+    <p id="style-row-class-body" class="muted">.feature-card changes color, radius, and size.</p>
+  </article>
+  <article id="style-row-state" class="list-row specificity-proof" data-interactive="true">
+    <h3 id="style-row-state-label" class="card-title">State</h3>
+    <p id="style-row-state-body" class="muted">.feature-card:hover and :pressed adjust paint.</p>
+  </article>
+  <article id="style-row-density" class="list-row specificity-proof" data-interactive="true">
+    <h3 id="style-row-density-label" class="card-title">App State</h3>
+    <p id="style-row-density-body" class="muted">Dense mode is inactive from the layout view toggle.</p>
+  </article>
+</section>
