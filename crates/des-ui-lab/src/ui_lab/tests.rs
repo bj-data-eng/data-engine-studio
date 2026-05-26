@@ -1122,6 +1122,21 @@ fn styling_view_renders_structural_selector_specimens() {
     );
     assert_eq!(frame(&output, "shadow-single").style.shadows.len(), 1);
     assert_eq!(frame(&output, "shadow-layered").style.shadows.len(), 1);
+    assert_eq!(frame(&output, "shadow-specimen-title").element, Element::H3);
+    assert_eq!(frame(&output, "shadow-specimen-copy").element, Element::P);
+    assert_eq!(
+        frame(&output, "shadow-specimen-grid").element,
+        Element::Section
+    );
+    assert_eq!(frame(&output, "shadow-single").element, Element::Article);
+    assert_eq!(
+        frame(&output, "shadow-light-top-handle").element,
+        Element::Icon
+    );
+    assert_eq!(
+        frame(&output, "shadow-light-top-handle").glyph,
+        Some(des_document::Glyph::DragHandle)
+    );
     assert_eq!(frame(&output, "shadow-light-top").style.shadows.len(), 1);
     assert_eq!(frame(&output, "shadow-web-top").style.shadows.len(), 1);
     assert_eq!(frame(&output, "shadow-web-bottom").style.shadows.len(), 0);

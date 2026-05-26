@@ -987,56 +987,7 @@ fn render_styling_view(
 }
 
 fn render_shadow_specimens(ui: &mut des_document::DocumentBuilder) {
-    ui.text_element(
-        "shadow-specimen-title",
-        ElementSpec::new(Element::Text).class("section-title"),
-        "Shadow Styling",
-    );
-    ui.text_element(
-        "shadow-specimen-copy",
-        ElementSpec::new(Element::Text).class("muted"),
-        "Single soft shadows are paint-only; spread can contract or expand the source shape.",
-    );
-    ui.element(
-        "shadow-specimen-grid",
-        ElementSpec::new(Element::Div).class("shadow-grid"),
-        |ui| {
-            shadow_item(
-                ui,
-                "shadow-single",
-                "Elevation level 2",
-                "single soft layer",
-            );
-            shadow_item(
-                ui,
-                "shadow-layered",
-                "Elevation level 3",
-                "menu/card emphasis",
-            );
-            shadow_item(
-                ui,
-                "shadow-negative-spread",
-                "Elevation level 5",
-                "dragged surface",
-            );
-        },
-    );
-    ui.element(
-        "shadow-light-stage",
-        ElementSpec::new(Element::Div).class("shadow-light-stage"),
-        |ui| {
-            light_shadow_card(ui, "shadow-light-top", "48", true);
-            light_shadow_card(ui, "shadow-light-bottom", "30", false);
-        },
-    );
-    ui.element(
-        "shadow-web-stage",
-        ElementSpec::new(Element::Div).class("shadow-web-stage"),
-        |ui| {
-            web_shadow_card(ui, "shadow-web-top", "46", true);
-            web_shadow_card(ui, "shadow-web-bottom", "48", false);
-        },
-    );
+    super::html::append_shadow_specimens(ui);
 }
 
 fn render_shadow_tuner(
@@ -1282,90 +1233,6 @@ fn shadow_tune_output(base: ShadowTuneState, hover: ShadowTuneState) -> String {
         layer(hover, 0),
         layer(hover, 1)
     )
-}
-
-fn shadow_item(
-    ui: &mut des_document::DocumentBuilder,
-    id: &'static str,
-    label: &'static str,
-    body: &'static str,
-) {
-    ui.element(
-        id,
-        ElementSpec::new(Element::Div)
-            .class("shadow-card")
-            .class(id),
-        |ui| {
-            ui.text_element(
-                format!("{id}-label"),
-                ElementSpec::new(Element::Text).class("card-title"),
-                label,
-            );
-            ui.text_element(
-                format!("{id}-body"),
-                ElementSpec::new(Element::Text).class("muted"),
-                body,
-            );
-        },
-    );
-}
-
-fn light_shadow_card(
-    ui: &mut des_document::DocumentBuilder,
-    id: &'static str,
-    label: &'static str,
-    raised: bool,
-) {
-    let card_spec = if raised {
-        ElementSpec::new(Element::Div)
-            .class("shadow-light-card")
-            .class("shadow-light-card-raised")
-    } else {
-        ElementSpec::new(Element::Div).class("shadow-light-card")
-    };
-    ui.element(id, card_spec, |ui| {
-        ui.text_element(
-            format!("{id}-label"),
-            ElementSpec::new(Element::Text).class("shadow-light-label"),
-            label,
-        );
-        ui.element(
-            format!("{id}-handle"),
-            ElementSpec::new(Element::Icon)
-                .class("shadow-light-handle")
-                .glyph(Glyph::DragHandle),
-            |_| {},
-        );
-    });
-}
-
-fn web_shadow_card(
-    ui: &mut des_document::DocumentBuilder,
-    id: &'static str,
-    label: &'static str,
-    raised: bool,
-) {
-    let card_spec = if raised {
-        ElementSpec::new(Element::Div)
-            .class("shadow-web-card")
-            .class("shadow-web-card-raised")
-    } else {
-        ElementSpec::new(Element::Div).class("shadow-web-card")
-    };
-    ui.element(id, card_spec, |ui| {
-        ui.text_element(
-            format!("{id}-label"),
-            ElementSpec::new(Element::Text).class("shadow-web-label"),
-            label,
-        );
-        ui.element(
-            format!("{id}-handle"),
-            ElementSpec::new(Element::Icon)
-                .class("shadow-web-handle")
-                .glyph(Glyph::DragHandle),
-            |_| {},
-        );
-    });
 }
 
 fn render_structural_selector_specimens(ui: &mut des_document::DocumentBuilder) {

@@ -1,8 +1,8 @@
 use des_document::{
     Color, Document, DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine,
     DocumentInput, DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId,
-    ElementSpec, FontStyle, FontWeight, Length, Point, Size, Style, StyleSheet, TextDecoration,
-    TextVerticalAlign,
+    ElementSpec, FontStyle, FontWeight, Glyph, Length, Point, Size, Style, StyleSheet,
+    TextDecoration, TextVerticalAlign,
 };
 #[cfg(debug_assertions)]
 use des_html::HtmlStylesheetFile;
@@ -532,6 +532,31 @@ fn html_document_maps_browser_boolean_state_attributes() {
     assert_eq!(snapshot.count_disabled(), 1);
     assert_eq!(snapshot.count_selected(), 1);
     assert_eq!(snapshot.count_focused(), 1);
+}
+
+#[test]
+fn html_document_maps_icon_glyph_metadata() {
+    let html = HtmlDocument::parse_fragment(
+        r#"<icon id="handle" class="handle" data-glyph="drag-handle"></icon>"#,
+    )
+    .expect("icon glyph metadata should parse");
+    let mut document = html
+        .to_document(Size::new(120.0, 80.0))
+        .expect("icon glyph metadata should emit a document");
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let icon = output
+        .layout
+        .find("handle")
+        .expect("icon id should be retained");
+    assert_eq!(icon.element, Element::Icon);
+    assert_eq!(icon.glyph, Some(Glyph::DragHandle));
+
+    let error = HtmlDocument::parse_fragment(r#"<icon id="bad" data-glyph="drag"></icon>"#)
+        .expect_err("unknown glyph metadata should be rejected");
+
+    assert!(error.to_string().contains("unknown glyph"));
 }
 
 #[test]

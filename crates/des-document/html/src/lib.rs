@@ -45,7 +45,7 @@ use des_document::{
     Color, Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder,
     DocumentCommandRegistry, DocumentInput, DocumentOutput, DocumentProjection,
     DocumentProjectionReport, DocumentView, Element, ElementBehaviorEvent, ElementBehaviorHook,
-    ElementSpec, FontStretch, FontStyle, FontWeight, InlineTextStyle, Size, StyleSheet,
+    ElementSpec, FontStretch, FontStyle, FontWeight, Glyph, InlineTextStyle, Size, StyleSheet,
     TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextDecoration,
     TextRun, TextTransform, TextVerticalAlign,
 };
@@ -1671,6 +1671,15 @@ impl HtmlNode {
         if let Some(value) = self.attributes.get("value") {
             spec = spec.value(value.clone());
         }
+        if let Some(glyph) = self
+            .attributes
+            .get("data-glyph")
+            .map(|value| parse_glyph(value))
+            .transpose()
+            .expect("HTML glyph metadata should be validated while parsing")
+        {
+            spec = spec.glyph(glyph);
+        }
         if self.attributes.contains_key("disabled") {
             spec = spec.disabled(true);
         }
@@ -2995,6 +3004,15 @@ fn append_rcdom_node(
                     message: format!("invalid table cell metadata on `<{tag}>`: empty data-column"),
                 });
             }
+            if let Some(glyph) = attributes.get("data-glyph") {
+                parse_glyph(glyph).map_err(|message| HtmlError::Parse {
+                    source: None,
+                    offset: 0,
+                    line: 1,
+                    column: 1,
+                    message: format!("invalid glyph metadata on `<{tag}>`: {message}"),
+                })?;
+            }
 
             let children = rcdom_children_to_html(&handle.children.borrow(), diagnostics)?;
             let text = if children.len() == 1
@@ -3037,6 +3055,17 @@ fn html_boolean_attribute(attributes: &BTreeMap<String, String>, name: &str) -> 
     attributes
         .get(name)
         .is_some_and(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "false" | "0"))
+}
+
+fn parse_glyph(input: &str) -> Result<Glyph, String> {
+    match input.trim() {
+        "check" => Ok(Glyph::Check),
+        "chevron-down" => Ok(Glyph::ChevronDown),
+        "chevron-up" => Ok(Glyph::ChevronUp),
+        "drag-handle" => Ok(Glyph::DragHandle),
+        "" => Err("data-glyph cannot be empty".to_owned()),
+        value => Err(format!("unknown glyph `{value}`")),
+    }
 }
 
 fn parse_table_spec_attributes(
@@ -3517,6 +3546,7 @@ fn element_for_tag(tag: &str) -> Element {
         "textarea" => Element::Textarea,
         "label" => Element::Label,
         "canvas" => Element::Canvas,
+        "icon" => Element::Icon,
         "table" => Element::Table,
         "thead" => Element::Thead,
         "tbody" => Element::Tbody,
