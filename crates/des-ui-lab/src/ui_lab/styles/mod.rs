@@ -1,7 +1,11 @@
 mod framework;
 
 use des_document::StyleSheet;
+use std::borrow::Cow;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
+#[cfg(not(debug_assertions))]
 const LAB_CSS: &str = include_str!("lab.css");
 const RESPONSIVE_CSS: &str = r#"
 @media (max-width: 1268px) {
@@ -32,6 +36,31 @@ pub(super) fn stylesheet() -> StyleSheet {
     stylesheet
 }
 
+pub(super) fn asset_revision() -> u64 {
+    let mut hasher = DefaultHasher::new();
+    source().hash(&mut hasher);
+    RESPONSIVE_CSS.hash(&mut hasher);
+    framework::asset_revision().hash(&mut hasher);
+    hasher.finish()
+}
+
 fn lab_stylesheet() -> StyleSheet {
-    StyleSheet::parse_css(LAB_CSS).expect("lab CSS stylesheet is valid")
+    StyleSheet::parse_css(&source()).expect("lab CSS stylesheet is valid")
+}
+
+fn source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/styles/lab.css"
+            ))
+            .expect("lab CSS file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(LAB_CSS)
+    }
 }

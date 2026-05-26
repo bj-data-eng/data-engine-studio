@@ -1,7 +1,12 @@
 use des_document::DocumentBuilder;
 use des_html::HtmlDocument;
+use std::borrow::Cow;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
+#[cfg(not(debug_assertions))]
 const TOPBAR_HTML: &str = include_str!("html/topbar.html");
+#[cfg(not(debug_assertions))]
 const NAV_HTML: &str = include_str!("html/nav.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
@@ -12,10 +17,51 @@ pub(super) fn append_nav(ui: &mut DocumentBuilder) {
     nav_fragment().append_to_builder(ui);
 }
 
+pub(super) fn asset_revision() -> u64 {
+    let mut hasher = DefaultHasher::new();
+    topbar_source().hash(&mut hasher);
+    nav_source().hash(&mut hasher);
+    hasher.finish()
+}
+
 fn topbar_fragment() -> HtmlDocument {
-    HtmlDocument::parse_fragment(TOPBAR_HTML).expect("lab topbar HTML is valid")
+    HtmlDocument::parse_fragment(&topbar_source()).expect("lab topbar HTML is valid")
 }
 
 fn nav_fragment() -> HtmlDocument {
-    HtmlDocument::parse_fragment(NAV_HTML).expect("lab nav HTML is valid")
+    HtmlDocument::parse_fragment(&nav_source()).expect("lab nav HTML is valid")
+}
+
+fn topbar_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/topbar.html"
+            ))
+            .expect("lab topbar HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(TOPBAR_HTML)
+    }
+}
+
+fn nav_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/nav.html"
+            ))
+            .expect("lab nav HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(NAV_HTML)
+    }
 }

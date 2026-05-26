@@ -111,9 +111,14 @@ fn lab_subtitle(debug_overlay: bool) -> &'static str {
     }
 }
 
+fn lab_asset_revision() -> u64 {
+    styles::asset_revision().wrapping_mul(31) ^ html::asset_revision()
+}
+
 pub(crate) struct UiLabState {
     document_engine: DocumentEngine,
     stylesheet: StyleSheet,
+    asset_revision: u64,
     command_registry: DocumentCommandRegistry<LabAction>,
     view: LabView,
     show_optional_card: bool,
@@ -180,6 +185,7 @@ struct LabDocumentKey {
     drag_overlay_active: bool,
     drag_visual_clone: Option<VisualElementClone>,
     text_context_menu: Option<TextContextMenu>,
+    asset_revision: u64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -194,6 +200,7 @@ impl Default for UiLabState {
         Self {
             document_engine: DocumentEngine::default(),
             stylesheet: stylesheet(),
+            asset_revision: lab_asset_revision(),
             command_registry: lab_action_registry(),
             view: LabView::Layout,
             show_optional_card: true,
@@ -243,6 +250,7 @@ impl UiLabState {
     }
 
     pub(crate) fn render(&mut self, ui: &mut egui::Ui, debug_overlay: bool) {
+        self.reload_lab_assets_if_changed();
         configure_text_selection_input(ui.ctx());
         let origin = ui.max_rect().min;
         let viewport = ui.max_rect().size();
@@ -394,6 +402,18 @@ impl UiLabState {
         });
     }
 
+    fn reload_lab_assets_if_changed(&mut self) {
+        let revision = lab_asset_revision();
+        if revision == self.asset_revision {
+            return;
+        }
+
+        self.stylesheet = stylesheet();
+        self.asset_revision = revision;
+        self.lab_document = None;
+        self.last_output = None;
+    }
+
     fn can_reuse_last_output(
         &self,
         viewport: Size,
@@ -487,6 +507,7 @@ impl UiLabState {
             drag_overlay_active: self.active_drag.is_some(),
             drag_visual_clone: self.drag_visual_clone.clone(),
             text_context_menu: self.text_context_menu.clone(),
+            asset_revision: self.asset_revision,
         }
     }
 
@@ -1078,6 +1099,7 @@ impl UiLabState {
 
     #[cfg(test)]
     fn lab_document_output_for_test(&mut self, viewport: Size) -> DocumentOutput {
+        self.reload_lab_assets_if_changed();
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
         let output = self.document_engine.update_with_input_and_text_measurer(
@@ -1096,6 +1118,7 @@ impl UiLabState {
         viewport: Size,
         scroll_y: f32,
     ) -> DocumentOutput {
+        self.reload_lab_assets_if_changed();
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
         self.document_engine.update_with_input_and_text_measurer(
@@ -1122,6 +1145,7 @@ impl UiLabState {
         viewport: Size,
         text_measurer: &mut dyn des_document::TextMeasurer,
     ) -> DocumentOutput {
+        self.reload_lab_assets_if_changed();
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
         let output = self.document_engine.update_with_input_and_text_measurer(
@@ -1140,6 +1164,7 @@ impl UiLabState {
         viewport: Size,
         input: DocumentInput,
     ) -> DocumentOutput {
+        self.reload_lab_assets_if_changed();
         let stylesheet = self.active_stylesheet();
         let mut retained = self.take_lab_document(viewport, false);
         let output = self.document_engine.update_with_input_and_text_measurer(
