@@ -19,8 +19,7 @@ use des_document::{
     Color, Document, DocumentCommandRegistry, DocumentDrag, DocumentEngine, DocumentEventKind,
     DocumentInput, DocumentMetrics, DocumentOutput, DocumentProjection, Element, ElementId,
     ElementSpec, ElementStateSelector, Length, Point, PointerInput, Rect, Shadow, Size, Style,
-    StyleSelector, StyleSheet, TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize,
-    VisualCloneOptions, VisualElementClone,
+    StyleSelector, StyleSheet, VisualCloneOptions, VisualElementClone,
 };
 use des_widgets::{
     AutoScrollOptions, AutoScroller, ContextMenu, DropZoneId, SortableDocumentConfig,

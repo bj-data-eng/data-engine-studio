@@ -1356,10 +1356,9 @@ impl Document {
                 continue;
             }
 
-            let Some(parent_id) = self.parent(id.clone())? else {
-                continue;
-            };
-            let Some(table) = self.element(&parent_id)?.spec.table.clone() else {
+            let Some((table, is_header_row)) =
+                self.table_for_grid_row(&id, element.spec.element)?
+            else {
                 continue;
             };
 
@@ -1368,7 +1367,7 @@ impl Document {
             style.display = Display::Grid;
             style.grid_template_columns = table_grid_columns(&table);
             style.size.width = length(table_grid_width(&table));
-            style.size.height = length(if element.spec.element == Element::Thead {
+            style.size.height = length(if is_header_row {
                 table.header_height
             } else {
                 table.row_height
@@ -1395,6 +1394,30 @@ impl Document {
         }
 
         Ok(layout_changed)
+    }
+
+    fn table_for_grid_row(
+        &self,
+        id: &ElementId,
+        element: Element,
+    ) -> DocumentResult<Option<(TableSpec, bool)>> {
+        let Some(parent_id) = self.parent(id.clone())? else {
+            return Ok(None);
+        };
+        let parent = self.element(&parent_id)?;
+        if let Some(table) = parent.spec.table.clone() {
+            return Ok(Some((table, element == Element::Thead)));
+        }
+        if !matches!(parent.spec.element, Element::Thead | Element::Tbody) {
+            return Ok(None);
+        }
+        let Some(table_id) = self.parent(parent_id)? else {
+            return Ok(None);
+        };
+        let Some(table) = self.element(&table_id)?.spec.table.clone() else {
+            return Ok(None);
+        };
+        Ok(Some((table, parent.spec.element == Element::Thead)))
     }
 }
 

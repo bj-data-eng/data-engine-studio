@@ -2280,14 +2280,26 @@ fn every_lab_view_reuses_retained_document_on_warm_update() {
 #[test]
 fn table_view_renders_document_table_elements_and_shared_tracks() {
     let output = lab_output("table");
+    let heading = frame(&output, "table-heading");
+    let copy = frame(&output, "table-copy");
+    let card = frame(&output, "table-specimen-card");
+    let title = frame(&output, "table-specimen-title");
     let table = frame(&output, "customer-preview-table");
+    let header = frame(&output, "customer-preview-header");
+    let first_row = frame(&output, "customer-preview-row-0");
     let header_customer = frame(&output, "customer-preview-header-customer");
     let row_customer = frame(&output, "customer-preview-row-0-customer");
     let header_revenue = frame(&output, "customer-preview-header-revenue");
     let row_revenue = frame(&output, "customer-preview-row-0-revenue");
 
+    assert_eq!(heading.element, Element::H2);
+    assert_eq!(copy.element, Element::P);
+    assert_eq!(card.element, Element::Section);
+    assert_eq!(title.element, Element::H3);
     assert_eq!(table.element, Element::Table);
-    assert_eq!(header_customer.element, Element::Td);
+    assert_eq!(header.element, Element::Tr);
+    assert_eq!(first_row.element, Element::Tr);
+    assert_eq!(header_customer.element, Element::Th);
     assert_close(
         header_customer.rect.size.width,
         row_customer.rect.size.width,

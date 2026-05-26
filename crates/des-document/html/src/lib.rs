@@ -46,14 +46,15 @@ use des_document::{
     DocumentCommandRegistry, DocumentInput, DocumentOutput, DocumentProjection,
     DocumentProjectionReport, DocumentView, Element, ElementBehaviorEvent, ElementBehaviorHook,
     ElementSpec, FontStretch, FontStyle, FontWeight, InlineTextStyle, Size, StyleSheet,
-    TextContent, TextDecoration, TextRun, TextTransform, TextVerticalAlign,
+    TableCellSpec, TableColumnSpec, TableSpec, TableTrackSize, TextContent, TextDecoration,
+    TextRun, TextTransform, TextVerticalAlign,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{ParseOpts, QualName, local_name, ns, parse_document, parse_fragment};
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
-use std::collections::BTreeMap;
 #[cfg(debug_assertions)]
 use std::collections::hash_map::DefaultHasher;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 #[cfg(debug_assertions)]
@@ -1697,6 +1698,14 @@ impl HtmlNode {
         {
             spec = spec.interactive();
         }
+        if let Some(table) = parse_table_spec_attributes(&self.attributes)
+            .expect("HTML table metadata should be validated while parsing")
+        {
+            spec = spec.table(table);
+        }
+        if let Some(column) = self.attributes.get("data-column") {
+            spec = spec.table_cell(TableCellSpec::new(column.trim().to_owned()));
+        }
 
         if html_boolean_attribute(&self.attributes, "data-rich-text") {
             builder.text_element(id, spec, self.rich_text_content());
@@ -2967,6 +2976,25 @@ fn append_rcdom_node(
                     attributes.insert(name, value);
                 }
             }
+            parse_table_spec_attributes(&attributes).map_err(|message| HtmlError::Parse {
+                source: None,
+                offset: 0,
+                line: 1,
+                column: 1,
+                message: format!("invalid table metadata on `<{tag}>`: {message}"),
+            })?;
+            if attributes
+                .get("data-column")
+                .is_some_and(|value| value.trim().is_empty())
+            {
+                return Err(HtmlError::Parse {
+                    source: None,
+                    offset: 0,
+                    line: 1,
+                    column: 1,
+                    message: format!("invalid table cell metadata on `<{tag}>`: empty data-column"),
+                });
+            }
 
             let children = rcdom_children_to_html(&handle.children.borrow(), diagnostics)?;
             let text = if children.len() == 1
@@ -3009,6 +3037,104 @@ fn html_boolean_attribute(attributes: &BTreeMap<String, String>, name: &str) -> 
     attributes
         .get(name)
         .is_some_and(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "false" | "0"))
+}
+
+fn parse_table_spec_attributes(
+    attributes: &BTreeMap<String, String>,
+) -> Result<Option<TableSpec>, String> {
+    let Some(columns) = attributes.get("data-table-columns") else {
+        if attributes.contains_key("data-table-header-height")
+            || attributes.contains_key("data-table-row-height")
+        {
+            return Err("table height metadata requires data-table-columns".to_owned());
+        }
+        return Ok(None);
+    };
+    let mut table = TableSpec::new(parse_table_columns(columns)?);
+    if let Some(height) = attributes.get("data-table-header-height") {
+        table = table.header_height(parse_table_px(height, "data-table-header-height")?);
+    }
+    if let Some(height) = attributes.get("data-table-row-height") {
+        table = table.row_height(parse_table_px(height, "data-table-row-height")?);
+    }
+    Ok(Some(table))
+}
+
+fn parse_table_columns(input: &str) -> Result<Vec<TableColumnSpec>, String> {
+    let columns = input
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(parse_table_column)
+        .collect::<Result<Vec<_>, _>>()?;
+    if columns.is_empty() {
+        return Err("data-table-columns must declare at least one column".to_owned());
+    }
+    let mut ids = BTreeSet::new();
+    for column in &columns {
+        if !ids.insert(column.id.as_str()) {
+            return Err(format!(
+                "data-table-columns declares duplicate column `{}`",
+                column.id.as_str()
+            ));
+        }
+    }
+    Ok(columns)
+}
+
+fn parse_table_column(input: &str) -> Result<TableColumnSpec, String> {
+    let parts = input.split(':').map(str::trim).collect::<Vec<_>>();
+    if parts.len() != 4 {
+        return Err(format!(
+            "table column `{input}` must use id:title:width:min-width"
+        ));
+    }
+    let id = parts[0];
+    let title = parts[1];
+    let width = parts[2];
+    let min_width = parts[3];
+    if id.is_empty() {
+        return Err(format!("table column `{input}` has an empty id"));
+    }
+    if title.is_empty() {
+        return Err(format!("table column `{input}` has an empty title"));
+    }
+    Ok(TableColumnSpec::new(id, title)
+        .width(parse_table_track_size(width)?)
+        .min_width(parse_table_px(min_width, "table column min-width")?))
+}
+
+fn parse_table_track_size(input: &str) -> Result<TableTrackSize, String> {
+    if let Some(value) = input.strip_suffix("px") {
+        return Ok(TableTrackSize::px(parse_table_f32(
+            value,
+            "table column width",
+        )?));
+    }
+    if let Some(value) = input.strip_suffix("fr") {
+        return Ok(TableTrackSize::flex(parse_table_f32(
+            value,
+            "table column width",
+        )?));
+    }
+    Err(format!("table column width `{input}` must use px or fr"))
+}
+
+fn parse_table_px(input: &str, context: &str) -> Result<f32, String> {
+    let Some(value) = input.strip_suffix("px") else {
+        return Err(format!("{context} `{input}` must use px"));
+    };
+    parse_table_f32(value, context)
+}
+
+fn parse_table_f32(input: &str, context: &str) -> Result<f32, String> {
+    let value = input
+        .parse::<f32>()
+        .map_err(|_| format!("{context} expects a number, got `{input}`"))?;
+    if !value.is_finite() || value < 0.0 {
+        return Err(format!("{context} expects a non-negative finite number"));
+    }
+    Ok(value)
 }
 
 fn push_text_run(runs: &mut Vec<TextRun>, text: &str, style: InlineTextStyle) {

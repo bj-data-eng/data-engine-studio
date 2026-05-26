@@ -535,6 +535,90 @@ fn html_document_maps_browser_boolean_state_attributes() {
 }
 
 #[test]
+fn html_document_maps_table_metadata_to_typed_table_contracts() {
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <table
+          id="customers"
+          data-table-columns="customer:Customer:120px:80px,revenue:Revenue:1fr:90px"
+          data-table-header-height="34px"
+          data-table-row-height="32px"
+        >
+          <thead id="customers-head">
+            <tr id="customers-header">
+              <th id="customers-header-customer" data-column="customer">Customer</th>
+              <th id="customers-header-revenue" data-column="revenue">Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="customers-body">
+            <tr id="customers-row-0">
+              <td id="customers-row-0-customer" data-column="customer">Acme</td>
+              <td id="customers-row-0-revenue" data-column="revenue">$42</td>
+            </tr>
+          </tbody>
+        </table>
+        "#,
+    )
+    .expect("HTML table metadata should parse");
+    let mut document = html
+        .to_document(Size::new(360.0, 180.0))
+        .expect("HTML table metadata should emit a document");
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let snapshot = output.snapshot();
+    let table = snapshot
+        .find("customers")
+        .expect("table id should be retained");
+    let header_customer = snapshot
+        .find("customers-header-customer")
+        .expect("header cell should be retained");
+    let row_customer = snapshot
+        .find("customers-row-0-customer")
+        .expect("row cell should be retained");
+    let header_revenue = snapshot
+        .find("customers-header-revenue")
+        .expect("header revenue cell should be retained");
+    let row_revenue = snapshot
+        .find("customers-row-0-revenue")
+        .expect("row revenue cell should be retained");
+
+    assert_eq!(table.element(), Element::Table);
+    assert_eq!(header_customer.element(), Element::Th);
+    assert_eq!(row_customer.element(), Element::Td);
+    assert_eq!(header_customer.rect().size.width, 120.0);
+    assert_eq!(
+        header_customer.rect().size.width,
+        row_customer.rect().size.width
+    );
+    assert_eq!(header_revenue.rect().origin.x, row_revenue.rect().origin.x);
+}
+
+#[test]
+fn html_document_rejects_malformed_table_metadata() {
+    let error = HtmlDocument::parse_fragment(
+        r#"<table id="bad" data-table-columns="customer:Customer:auto"></table>"#,
+    )
+    .expect_err("malformed table metadata should be rejected");
+
+    assert!(error.to_string().contains("invalid table metadata"));
+
+    let error = HtmlDocument::parse_fragment(
+        r#"<table id="bad" data-table-columns="customer:Customer:120px:80"></table>"#,
+    )
+    .expect_err("unitless table metadata should be rejected");
+
+    assert!(error.to_string().contains("table column min-width"));
+
+    let error = HtmlDocument::parse_fragment(
+        r#"<table id="bad" data-table-columns="customer:Customer:120px:80px,customer:Customer:1fr:80px"></table>"#,
+    )
+    .expect_err("duplicate table columns should be rejected");
+
+    assert!(error.to_string().contains("duplicate column"));
+}
+
+#[test]
 fn html_document_maps_commandless_interaction_intent() {
     let html = HtmlDocument::parse_fragment(
         r#"

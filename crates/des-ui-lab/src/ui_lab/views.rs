@@ -2107,40 +2107,7 @@ fn render_scrolling_view(ui: &mut des_document::DocumentBuilder) {
 }
 
 fn render_table_view(ui: &mut des_document::DocumentBuilder) {
-    ui.text_element(
-        "table-heading",
-        ElementSpec::new(Element::Text).class("heading"),
-        "Document Table",
-    );
-    ui.text_element(
-        "table-copy",
-        ElementSpec::new(Element::Text).class("muted"),
-        "Table layout resolves column tracks once and applies them to headers and body cells.",
-    );
-    ui.element(
-        "table-specimen-card",
-        ElementSpec::new(Element::Div).class("specimen-card"),
-        |ui| {
-            ui.text_element(
-                "table-specimen-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Data-driven columns",
-            );
-            ui.element(
-                "customer-preview-table",
-                ElementSpec::new(Element::Table)
-                    .class("data-table")
-                    .class("styled-scrollbar")
-                    .table(sample_table_spec()),
-                |ui| {
-                    table_header(ui);
-                    for (index, row) in sample_table_rows().iter().enumerate() {
-                        table_row(ui, index, row);
-                    }
-                },
-            );
-        },
-    );
+    super::html::append_table(ui);
 }
 
 fn render_floating_view(ui: &mut des_document::DocumentBuilder) {
@@ -2721,75 +2688,6 @@ fn floating_edge_flip_specimen(ui: &mut des_document::DocumentBuilder) {
 
 fn render_text_view(ui: &mut des_document::DocumentBuilder) {
     super::html::append_text_specimens(ui);
-}
-
-fn sample_table_spec() -> TableSpec {
-    TableSpec::new(vec![
-        TableColumnSpec::new("customer", "Customer")
-            .width(TableTrackSize::px(170.0))
-            .min_width(120.0),
-        TableColumnSpec::new("country", "Country")
-            .width(TableTrackSize::px(110.0))
-            .min_width(80.0),
-        TableColumnSpec::new("orders", "Orders")
-            .width(TableTrackSize::px(82.0))
-            .min_width(64.0),
-        TableColumnSpec::new("revenue", "Revenue")
-            .width(TableTrackSize::px(112.0))
-            .min_width(90.0),
-        TableColumnSpec::new("status", "Status")
-            .width(TableTrackSize::flex(1.0))
-            .min_width(120.0),
-    ])
-    .header_height(34.0)
-    .row_height(32.0)
-}
-
-fn table_header(ui: &mut des_document::DocumentBuilder) {
-    ui.element(
-        "customer-preview-header",
-        ElementSpec::new(Element::Thead).class("table-header-row"),
-        |ui| {
-            for column in sample_table_spec().columns {
-                ui.text_element(
-                    format!("customer-preview-header-{}", column.id.as_str()),
-                    ElementSpec::new(Element::Td)
-                        .class("table-header-cell")
-                        .table_cell(TableCellSpec::new(column.id)),
-                    column.title,
-                );
-            }
-        },
-    );
-}
-
-fn table_row(ui: &mut des_document::DocumentBuilder, index: usize, row: &[&str; 5]) {
-    ui.element(
-        format!("customer-preview-row-{index}"),
-        ElementSpec::new(Element::Tr).class("table-row"),
-        |ui| {
-            for (column, value) in sample_table_spec().columns.iter().zip(row.iter()) {
-                ui.text_element(
-                    format!("customer-preview-row-{index}-{}", column.id.as_str()),
-                    ElementSpec::new(Element::Td)
-                        .class("table-cell")
-                        .table_cell(TableCellSpec::new(column.id.clone())),
-                    *value,
-                );
-            }
-        },
-    );
-}
-
-fn sample_table_rows() -> [[&'static str; 5]; 6] {
-    [
-        ["Acme Logistics", "US", "182", "$42,880", "Active"],
-        ["Northwind", "CA", "94", "$18,250", "Review"],
-        ["Globex Retail", "UK", "211", "$51,040", "Active"],
-        ["Initech", "US", "33", "$7,920", "Draft"],
-        ["Umbrella", "DE", "76", "$14,600", "Paused"],
-        ["Stark Data", "FR", "128", "$29,440", "Active"],
-    ]
 }
 
 fn render_nesting_view(ui: &mut des_document::DocumentBuilder) {

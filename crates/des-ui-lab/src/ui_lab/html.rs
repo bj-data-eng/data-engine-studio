@@ -20,6 +20,8 @@ const GRAPH_HTML: &str = include_str!("html/graph.html");
 const STRUCTURAL_SELECTORS_HTML: &str = include_str!("html/structural-selectors.html");
 #[cfg(not(debug_assertions))]
 const TEXT_SPECIMENS_HTML: &str = include_str!("html/text-specimens.html");
+#[cfg(not(debug_assertions))]
+const TABLE_HTML: &str = include_str!("html/table.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -53,6 +55,10 @@ pub(super) fn append_text_specimens(ui: &mut DocumentBuilder) {
     text_specimens_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_table(ui: &mut DocumentBuilder) {
+    table_fragment().append_to_builder(ui);
+}
+
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
@@ -63,6 +69,7 @@ pub(super) fn asset_revision() -> u64 {
     graph_source().hash(&mut hasher);
     structural_selectors_source().hash(&mut hasher);
     text_specimens_source().hash(&mut hasher);
+    table_source().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -100,6 +107,10 @@ fn structural_selectors_fragment() -> HtmlDocument {
 fn text_specimens_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&text_specimens_source())
         .expect("lab text specimens HTML is valid")
+}
+
+fn table_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&table_source()).expect("lab table HTML is valid")
 }
 
 fn topbar_source() -> Cow<'static, str> {
@@ -235,5 +246,22 @@ fn text_specimens_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(TEXT_SPECIMENS_HTML)
+    }
+}
+
+fn table_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/table.html"
+            ))
+            .expect("lab table HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(TABLE_HTML)
     }
 }
