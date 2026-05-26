@@ -784,6 +784,58 @@ fn html_css_entry_points_can_recover_like_browser_stylesheets() {
 }
 
 #[test]
+fn html_authored_views_use_document_update_request_as_canonical_complex_path() {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum HtmlAction {
+        Run,
+    }
+
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section id="panel" class="card">
+          <button id="run" data-command="project.run" disabled>Run</button>
+        </section>
+        "#,
+    )
+    .expect("HTML should parse");
+    let mut view = html
+        .to_view_with_css_forgiving(
+            Size::new(240.0, 160.0),
+            ".broken { width: ; } .card { width: 180px; height: 72px; } button { width: 80px; height: 28px; }",
+        )
+        .expect("HTML and forgiving CSS should create a document view");
+    let registry = DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
+    let mut dispatched = Vec::new();
+
+    let (frame, report) = view
+        .update_request()
+        .projection(DocumentProjection::new().enable("run"))
+        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .dispatch_action_values(&registry, |action| dispatched.push(*action))
+        .expect("HTML-authored views should use document update requests for rich frames");
+
+    assert_eq!(frame.projection_report().unwrap().changed, 1);
+    assert_eq!(
+        frame
+            .output()
+            .snapshot()
+            .find("panel")
+            .unwrap()
+            .rect()
+            .size
+            .width,
+        180.0
+    );
+    assert!(frame.frame().contains_action_for_target_intent(
+        "run",
+        ElementBehaviorEvent::Click,
+        &HtmlAction::Run
+    ));
+    assert_eq!(report, DocumentCommandDispatchReport::new(1, 1, 0));
+    assert_eq!(dispatched, vec![HtmlAction::Run]);
+}
+
+#[test]
 fn html_document_updates_with_css_and_collects_actions_directly() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {

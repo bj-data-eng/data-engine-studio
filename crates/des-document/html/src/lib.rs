@@ -28,15 +28,17 @@
 //! )
 //! .expect("CSS should parse");
 //!
-//! let actions = ui
-//!     .update_with_input_action_values_with_actions(
-//!         Size::new(320.0, 180.0),
-//!         DocumentInput::primary_click(Point::new(8.0, 8.0)),
-//!         [("query.run", AppAction::RunQuery)],
-//!     )
+//! let mut view = ui
+//!     .to_view(Size::new(320.0, 180.0))
+//!     .expect("HTML should create a document view");
+//! let registry = DocumentCommandRegistry::new().bind_click("query.run", AppAction::RunQuery);
+//! let frame = view
+//!     .update_request()
+//!     .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+//!     .update_actions(&registry)
 //!     .expect("HTML-authored commands should map to typed Rust actions");
 //!
-//! assert_eq!(actions, vec![AppAction::RunQuery]);
+//! assert_eq!(frame.actions()[0].action(), &AppAction::RunQuery);
 //! ```
 
 use des_document::{
