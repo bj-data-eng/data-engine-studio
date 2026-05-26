@@ -935,6 +935,30 @@ fn lab_chrome_is_authored_from_html_fragments() {
 }
 
 #[test]
+fn interaction_update_loop_is_authored_from_html_fragment() {
+    let output = lab_output("interaction");
+    let grid = frame(&output, "loop-grid");
+    let action_card = frame(&output, "loop-action-card");
+    let button = frame(&output, "loop-action-button");
+    let result = frame(&output, "loop-button-result-box");
+
+    assert_eq!(grid.element, Element::Section);
+    assert_eq!(action_card.element, Element::Article);
+    assert_eq!(button.element, Element::Button);
+    assert!(
+        button
+            .behavior_hooks
+            .iter()
+            .any(|hook| { hook.event == "click" && hook.command == "loop-action-button" })
+    );
+    assert_eq!(result.element, Element::Article);
+    assert_eq!(
+        frame_text(&output, "loop-checkbox-result"),
+        Some("Profiling: enabled by checkbox")
+    );
+}
+
+#[test]
 fn lab_shell_tracks_document_viewport_size() {
     for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
         let output = lab_output_with_size("layout", viewport);
