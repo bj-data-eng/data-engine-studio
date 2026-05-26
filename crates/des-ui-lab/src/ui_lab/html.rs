@@ -31,6 +31,16 @@ const INTERACTION_LOOP_HTML: &str = include_str!("html/interaction-loop.html");
 #[cfg(not(debug_assertions))]
 const DRAGGABLE_SHELL_HTML: &str = include_str!("html/draggable-shell.html");
 #[cfg(not(debug_assertions))]
+const DRAG_WORKBENCH_HTML: &str = include_str!("html/drag-workbench.html");
+#[cfg(not(debug_assertions))]
+const DRAG_SCROLL_LIST_CARD_HTML: &str = include_str!("html/drag-scroll-list-card.html");
+#[cfg(not(debug_assertions))]
+const DRAG_SCROLL_LIST_TITLE_HTML: &str = include_str!("html/drag-scroll-list-title.html");
+#[cfg(not(debug_assertions))]
+const DRAG_SCROLL_LIST_HTML: &str = include_str!("html/drag-scroll-list.html");
+#[cfg(not(debug_assertions))]
+const DRAG_GRID_HTML: &str = include_str!("html/drag-grid.html");
+#[cfg(not(debug_assertions))]
 const NESTING_HTML: &str = include_str!("html/nesting.html");
 #[cfg(not(debug_assertions))]
 const GRAPH_HTML: &str = include_str!("html/graph.html");
@@ -125,6 +135,51 @@ pub(super) fn append_draggable_shell(ui: &mut DocumentBuilder) {
     draggable_shell_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_drag_workbench(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(ui, drag_workbench_fragment(), "drag-workbench", children);
+}
+
+pub(super) fn append_drag_scroll_list_card(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(
+        ui,
+        drag_scroll_list_card_fragment(),
+        "drag-scroll-list-card",
+        |ui| {
+            append_drag_scroll_list_title(ui);
+            children(ui);
+        },
+    );
+}
+
+fn append_drag_scroll_list_title(ui: &mut DocumentBuilder) {
+    drag_scroll_list_title_fragment().append_to_builder(ui);
+}
+
+pub(super) fn append_drag_scroll_list(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(
+        ui,
+        drag_scroll_list_fragment(),
+        "drag-scroll-list-0",
+        children,
+    );
+}
+
+pub(super) fn append_drag_grid(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(ui, drag_grid_fragment(), "drag-grid", children);
+}
+
 pub(super) fn append_nesting(ui: &mut DocumentBuilder) {
     nesting_fragment().append_to_builder(ui);
 }
@@ -184,6 +239,11 @@ pub(super) fn asset_revision() -> u64 {
     interaction_controls_source().hash(&mut hasher);
     interaction_loop_source().hash(&mut hasher);
     draggable_shell_source().hash(&mut hasher);
+    drag_workbench_source().hash(&mut hasher);
+    drag_scroll_list_card_source().hash(&mut hasher);
+    drag_scroll_list_title_source().hash(&mut hasher);
+    drag_scroll_list_source().hash(&mut hasher);
+    drag_grid_source().hash(&mut hasher);
     nesting_source().hash(&mut hasher);
     graph_source().hash(&mut hasher);
     structural_selectors_source().hash(&mut hasher);
@@ -255,6 +315,30 @@ fn interaction_loop_fragment() -> HtmlDocument {
 fn draggable_shell_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&draggable_shell_source())
         .expect("lab draggable shell HTML is valid")
+}
+
+fn drag_workbench_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&drag_workbench_source())
+        .expect("lab drag workbench HTML is valid")
+}
+
+fn drag_scroll_list_card_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&drag_scroll_list_card_source())
+        .expect("lab drag scroll list card HTML is valid")
+}
+
+fn drag_scroll_list_title_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&drag_scroll_list_title_source())
+        .expect("lab drag scroll list title HTML is valid")
+}
+
+fn drag_scroll_list_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&drag_scroll_list_source())
+        .expect("lab drag scroll list HTML is valid")
+}
+
+fn drag_grid_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&drag_grid_source()).expect("lab drag grid HTML is valid")
 }
 
 fn nesting_fragment() -> HtmlDocument {
@@ -369,6 +453,7 @@ fn shell_element(tag: &str, expected_id: &str) -> Element {
         "div" => Element::Div,
         "main" => Element::Main,
         "section" => Element::Section,
+        "h3" => Element::H3,
         other => panic!("unsupported `{expected_id}` lab shell element `<{other}>`"),
     }
 }
@@ -595,6 +680,91 @@ fn draggable_shell_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(DRAGGABLE_SHELL_HTML)
+    }
+}
+
+fn drag_workbench_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/drag-workbench.html"
+            ))
+            .expect("lab drag workbench HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DRAG_WORKBENCH_HTML)
+    }
+}
+
+fn drag_scroll_list_card_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/drag-scroll-list-card.html"
+            ))
+            .expect("lab drag scroll list card HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DRAG_SCROLL_LIST_CARD_HTML)
+    }
+}
+
+fn drag_scroll_list_title_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/drag-scroll-list-title.html"
+            ))
+            .expect("lab drag scroll list title HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DRAG_SCROLL_LIST_TITLE_HTML)
+    }
+}
+
+fn drag_scroll_list_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/drag-scroll-list.html"
+            ))
+            .expect("lab drag scroll list HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DRAG_SCROLL_LIST_HTML)
+    }
+}
+
+fn drag_grid_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/drag-grid.html"
+            ))
+            .expect("lab drag grid HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DRAG_GRID_HTML)
     }
 }
 

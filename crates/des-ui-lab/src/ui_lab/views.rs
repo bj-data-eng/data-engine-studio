@@ -177,90 +177,65 @@ fn render_drag_drop_lab(ui: &mut des_document::DocumentBuilder, drag: DragLabSta
         drag_drop_preview,
         scroll_list_drop_preview,
     } = drag;
-    ui.div("drag-workbench")
-        .class("drag-workbench")
-        .children(|ui| {
-            render_elevated_scrollable_drag_list(
-                ui,
-                "Scrollable list target",
-                scroll_list_item_order,
-                active_scroll_list_drag_item,
-                scroll_list_drop_preview,
-                pressed_drag_source,
-            );
-            ui.div("drag-grid").class("drag-grid").children(|ui| {
-                for cell in 0..6 {
-                    let column = if cell % 2 == 0 { "Left" } else { "Right" };
-                    let row = cell / 2 + 1;
-                    ui.div(format!("drag-cell-{cell}"))
-                        .class("drag-cell")
-                        .children(|ui| {
-                            ui.child(format!("drag-cell-{cell}-label"), Element::Text)
-                                .class("muted")
-                                .text(format!("{column} row {row}"));
-                            let mut cell_items: Vec<_> = drag_item_cells
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(item, item_cell)| {
-                                    (*item_cell == cell).then_some(item)
-                                })
-                                .collect();
-                            cell_items.sort_by_key(|item| drag_item_order[*item]);
-                            for item in cell_items {
-                                if active_drag_item == Some(des_widgets::SortableItemId(item)) {
-                                    drag_item(
-                                        ui,
-                                        item,
-                                        drag_drop_preview,
-                                        true,
-                                        pressed_drag_source,
-                                    );
-                                } else {
-                                    drag_item(
-                                        ui,
-                                        item,
-                                        drag_drop_preview,
-                                        false,
-                                        pressed_drag_source,
-                                    );
-                                }
+    super::html::append_drag_workbench(ui, |ui| {
+        render_elevated_scrollable_drag_list(
+            ui,
+            scroll_list_item_order,
+            active_scroll_list_drag_item,
+            scroll_list_drop_preview,
+            pressed_drag_source,
+        );
+        super::html::append_drag_grid(ui, |ui| {
+            for cell in 0..6 {
+                let column = if cell % 2 == 0 { "Left" } else { "Right" };
+                let row = cell / 2 + 1;
+                ui.div(format!("drag-cell-{cell}"))
+                    .class("drag-cell")
+                    .children(|ui| {
+                        ui.child(format!("drag-cell-{cell}-label"), Element::Text)
+                            .class("muted")
+                            .text(format!("{column} row {row}"));
+                        let mut cell_items: Vec<_> = drag_item_cells
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(item, item_cell)| (*item_cell == cell).then_some(item))
+                            .collect();
+                        cell_items.sort_by_key(|item| drag_item_order[*item]);
+                        for item in cell_items {
+                            if active_drag_item == Some(des_widgets::SortableItemId(item)) {
+                                drag_item(ui, item, drag_drop_preview, true, pressed_drag_source);
+                            } else {
+                                drag_item(ui, item, drag_drop_preview, false, pressed_drag_source);
                             }
-                        });
-                }
-            });
+                        }
+                    });
+            }
         });
+    });
 }
 
 fn render_elevated_scrollable_drag_list(
     ui: &mut des_document::DocumentBuilder,
-    title: &'static str,
     scroll_list_item_order: [usize; 14],
     active_scroll_list_drag_item: Option<des_widgets::SortableItemId>,
     scroll_list_drop_preview: Option<des_widgets::SortableDropPreview>,
     pressed_drag_source: Option<&str>,
 ) {
-    ui.div("drag-scroll-list-card")
-        .class("drag-scroll-list-card")
-        .children(|ui| {
-            ui.child("drag-scroll-list-title", Element::Text)
-                .class("section-subtitle")
-                .text(title);
-            ui.div("drag-scroll-list-0")
-                .class("drag-scroll-list")
-                .children(|ui| {
-                    let mut list_items: Vec<_> = (0..scroll_list_item_order.len()).collect();
-                    list_items.sort_by_key(|item| scroll_list_item_order[*item]);
-                    for item in list_items {
-                        drag_scroll_item(
-                            ui,
-                            item,
-                            scroll_list_drop_preview,
-                            active_scroll_list_drag_item == Some(des_widgets::SortableItemId(item)),
-                            pressed_drag_source,
-                        );
-                    }
-                });
+    super::html::append_drag_scroll_list_card(ui, |ui| {
+        super::html::append_drag_scroll_list(ui, |ui| {
+            let mut list_items: Vec<_> = (0..scroll_list_item_order.len()).collect();
+            list_items.sort_by_key(|item| scroll_list_item_order[*item]);
+            for item in list_items {
+                drag_scroll_item(
+                    ui,
+                    item,
+                    scroll_list_drop_preview,
+                    active_scroll_list_drag_item == Some(des_widgets::SortableItemId(item)),
+                    pressed_drag_source,
+                );
+            }
         });
+    });
 }
 
 pub(super) fn render_drag_overlay_layer(

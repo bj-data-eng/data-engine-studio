@@ -1140,10 +1140,24 @@ fn draggable_shell_is_authored_from_html_fragment() {
     let copy = frame(&output, "draggable-copy");
     let title = frame(&output, "drag-title");
     let workbench = frame(&output, "drag-workbench");
+    let list_card = frame(&output, "drag-scroll-list-card");
+    let list_title = frame(&output, "drag-scroll-list-title");
+    let list = frame(&output, "drag-scroll-list-0");
+    let grid = frame(&output, "drag-grid");
 
     assert_eq!(heading.element, Element::H2);
     assert_eq!(copy.element, Element::P);
     assert_eq!(title.element, Element::H2);
+    assert_eq!(workbench.element, Element::Div);
+    assert!(has_class(workbench, "drag-workbench"));
+    assert_eq!(list_card.element, Element::Section);
+    assert!(has_class(list_card, "drag-scroll-list-card"));
+    assert_eq!(list_title.element, Element::H3);
+    assert!(has_class(list_title, "section-subtitle"));
+    assert_eq!(list.element, Element::Div);
+    assert!(has_class(list, "drag-scroll-list"));
+    assert_eq!(grid.element, Element::Section);
+    assert!(has_class(grid, "drag-grid"));
     assert_eq!(
         frame_text(&output, "draggable-heading"),
         Some("Document Draggables")
@@ -1156,7 +1170,6 @@ fn draggable_shell_is_authored_from_html_fragment() {
         frame_text(&output, "drag-scroll-list-title"),
         Some("Scrollable list target")
     );
-    assert_eq!(workbench.element, Element::Div);
 }
 
 #[test]
