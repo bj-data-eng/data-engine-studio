@@ -1228,10 +1228,17 @@ mod tests {
         assert_eq!(mapped_registry.bindings().len(), 2);
         assert_eq!(pushed_mapped.bindings().len(), 2);
         assert!(frame.contains_action(&MenuAction::Copy));
-        assert!(mapped_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(mapped_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert!(!frame.contains_action(&MenuAction::Rename));
         assert_eq!(
-            frame.first_clicked_action().unwrap().target().as_str(),
+            frame
+                .first_action_for_intent(des_document::ElementBehaviorEvent::Click)
+                .unwrap()
+                .target()
+                .as_str(),
             "copy"
         );
     }
@@ -1492,9 +1499,18 @@ mod tests {
         assert_eq!(forgiving_css_mapped_surface.commands().bindings().len(), 2);
         assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
         assert!(!paste.interactive());
-        assert!(frame.contains_clicked_action(&MenuAction::Copy));
-        assert!(mapped_frame.contains_clicked_action(&MenuAction::Copy));
-        assert!(css_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
+        assert!(mapped_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
+        assert!(css_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             css_frame
                 .output()
@@ -1506,7 +1522,10 @@ mod tests {
                 .height,
             34.0
         );
-        assert!(css_mapped_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(css_mapped_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             css_mapped_frame
                 .output()
@@ -1518,7 +1537,10 @@ mod tests {
                 .height,
             35.0
         );
-        assert!(forgiving_css_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(forgiving_css_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             forgiving_css_frame
                 .output()
@@ -1530,7 +1552,10 @@ mod tests {
                 .height,
             37.0
         );
-        assert!(forgiving_css_mapped_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(forgiving_css_mapped_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             forgiving_css_mapped_frame
                 .output()
@@ -1542,7 +1567,10 @@ mod tests {
                 .height,
             38.0
         );
-        assert!(direct_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(direct_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert!(direct_mapped_frame.contains_action_for_target_intent(
             "copy",
             des_document::ElementBehaviorEvent::Click,
@@ -1551,31 +1579,46 @@ mod tests {
         assert_eq!(direct_values, vec![MenuAction::Copy]);
         assert_eq!(direct_mapped_values, vec![MenuAction::Copy]);
         assert_eq!(styled_direct_mapped_values, vec![MenuAction::Copy]);
-        assert!(dispatch_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(dispatch_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             dispatch_report,
             des_document::DocumentCommandDispatchReport::new(1, 1, 0)
         );
         assert_eq!(dispatched, vec![MenuAction::Copy]);
-        assert!(value_dispatch_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(value_dispatch_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             value_dispatch_report,
             des_document::DocumentCommandDispatchReport::new(1, 1, 0)
         );
         assert_eq!(dispatched_values, vec![MenuAction::Copy]);
-        assert!(mapped_dispatch_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(mapped_dispatch_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             mapped_dispatch_report,
             des_document::DocumentCommandDispatchReport::new(1, 1, 0)
         );
         assert_eq!(mapped_dispatched, vec![MenuAction::Copy]);
-        assert!(mapped_value_dispatch_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(mapped_value_dispatch_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             mapped_value_dispatch_report,
             des_document::DocumentCommandDispatchReport::new(1, 1, 0)
         );
         assert_eq!(mapped_dispatched_values, vec![MenuAction::Copy]);
-        assert!(styled_dispatch_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(styled_dispatch_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             styled_dispatch_frame
                 .output()
@@ -1592,7 +1635,10 @@ mod tests {
             des_document::DocumentCommandDispatchReport::new(1, 1, 0)
         );
         assert_eq!(styled_dispatched, vec![MenuAction::Copy]);
-        assert!(styled_value_dispatch_frame.contains_clicked_action(&MenuAction::Copy));
+        assert!(styled_value_dispatch_frame.contains_action_for_intent(
+            des_document::ElementBehaviorEvent::Click,
+            &MenuAction::Copy
+        ));
         assert_eq!(
             styled_value_dispatch_frame
                 .output()

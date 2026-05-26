@@ -676,14 +676,21 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
 
     assert!(focus_frame.output().focus_event_for("search"));
     assert!(focus_frame.contains_action_for_intent(ElementBehaviorEvent::Focus, &AppAction::Focus));
-    assert!(focus_frame.contains_focus_action(&AppAction::Focus));
-    assert_eq!(focus_frame.focus_actions().count(), 1);
+    assert!(focus_frame.contains_action_for_intent(ElementBehaviorEvent::Focus, &AppAction::Focus));
     assert_eq!(
-        focus_frame.first_focus_action_value(),
+        focus_frame
+            .actions_for_intent(ElementBehaviorEvent::Focus)
+            .count(),
+        1
+    );
+    assert_eq!(
+        focus_frame.first_action_value_for_intent(ElementBehaviorEvent::Focus),
         Some(&AppAction::Focus)
     );
     assert_eq!(
-        focus_frame.focus_action_values().collect::<Vec<_>>(),
+        focus_frame
+            .action_values_for_intent(ElementBehaviorEvent::Focus)
+            .collect::<Vec<_>>(),
         vec![&AppAction::Focus]
     );
     assert_eq!(
@@ -708,9 +715,17 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
     );
     assert!(blur_frame.output().blur_event_for("search"));
     assert!(blur_frame.contains_action_for_intent(ElementBehaviorEvent::Blur, &AppAction::Blur));
-    assert!(blur_frame.contains_blur_action(&AppAction::Blur));
-    assert_eq!(blur_frame.blur_actions().count(), 1);
-    assert_eq!(blur_frame.first_blur_action_value(), Some(&AppAction::Blur));
+    assert!(blur_frame.contains_action_for_intent(ElementBehaviorEvent::Blur, &AppAction::Blur));
+    assert_eq!(
+        blur_frame
+            .actions_for_intent(ElementBehaviorEvent::Blur)
+            .count(),
+        1
+    );
+    assert_eq!(
+        blur_frame.first_action_value_for_intent(ElementBehaviorEvent::Blur),
+        Some(&AppAction::Blur)
+    );
     assert_eq!(
         registry.collect_blur_action_values(blur_frame.output()),
         vec![AppAction::Blur]
@@ -734,14 +749,23 @@ fn focus_and_selection_intents_emit_commands_without_a_host_adapter() {
     assert!(
         select_frame.contains_action_for_intent(ElementBehaviorEvent::Select, &AppAction::Select)
     );
-    assert!(select_frame.contains_select_action(&AppAction::Select));
-    assert_eq!(select_frame.select_actions().count(), 1);
+    assert!(
+        select_frame.contains_action_for_intent(ElementBehaviorEvent::Select, &AppAction::Select)
+    );
     assert_eq!(
-        select_frame.select_action_values().collect::<Vec<_>>(),
+        select_frame
+            .actions_for_intent(ElementBehaviorEvent::Select)
+            .count(),
+        1
+    );
+    assert_eq!(
+        select_frame
+            .action_values_for_intent(ElementBehaviorEvent::Select)
+            .collect::<Vec<_>>(),
         vec![&AppAction::Select]
     );
     assert_eq!(
-        select_frame.first_select_action_value(),
+        select_frame.first_action_value_for_intent(ElementBehaviorEvent::Select),
         Some(&AppAction::Select)
     );
     assert_eq!(
@@ -1738,9 +1762,11 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert!(click_frame.contains_action(&AppAction::Run));
     assert!(idle_values.is_empty());
     assert_eq!(click_values, vec![AppAction::Run]);
-    let context_actions = context_frame.context_menu_actions().collect::<Vec<_>>();
+    let context_actions = context_frame
+        .actions_for_intent(ElementBehaviorEvent::ContextMenu)
+        .collect::<Vec<_>>();
     let context_values = context_frame
-        .context_menu_action_values()
+        .action_values_for_intent(ElementBehaviorEvent::ContextMenu)
         .cloned()
         .collect::<Vec<_>>();
     let mut context_dispatched = Vec::new();
@@ -1753,23 +1779,34 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     assert_eq!(context_actions[0].target.as_str(), "menu");
     assert_eq!(context_values, vec![AppAction::Menu]);
     assert_eq!(
-        context_frame.first_context_menu_action().unwrap().command,
+        context_frame
+            .first_action_for_intent(ElementBehaviorEvent::ContextMenu)
+            .unwrap()
+            .command,
         "menu.open"
     );
     assert_eq!(
-        context_frame.first_context_menu_action_value(),
+        context_frame.first_action_value_for_intent(ElementBehaviorEvent::ContextMenu),
         Some(&AppAction::Menu)
     );
-    assert!(context_frame.contains_context_menu_action(&AppAction::Menu));
+    assert!(
+        context_frame
+            .contains_action_for_intent(ElementBehaviorEvent::ContextMenu, &AppAction::Menu)
+    );
     assert_eq!(
         context_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(context_dispatched, vec![AppAction::Menu]);
-    assert!(dispatch_frame.contains_clicked_action(&AppAction::Run));
+    assert!(
+        dispatch_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Run)
+    );
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![AppAction::Run]);
-    assert!(value_dispatch_frame.contains_clicked_action(&AppAction::Run));
+    assert!(
+        value_dispatch_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Run)
+    );
     assert_eq!(
         value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
@@ -2140,22 +2177,29 @@ fn document_action_frame_supports_app_update_loop_queries() {
     );
     assert!(click_frame.contains_action_for("run", &AppAction::Run));
     assert!(!click_frame.contains_action_for("cancel", &AppAction::Run));
-    assert_eq!(click_frame.clicked_actions().count(), 1);
     assert_eq!(
         click_frame
-            .first_clicked_action()
+            .actions_for_intent(ElementBehaviorEvent::Click)
+            .count(),
+        1
+    );
+    assert_eq!(
+        click_frame
+            .first_action_for_intent(ElementBehaviorEvent::Click)
             .map(|action| &action.action),
         Some(&AppAction::Run)
     );
     assert_eq!(
-        click_frame.clicked_action_values().collect::<Vec<_>>(),
+        click_frame
+            .action_values_for_intent(ElementBehaviorEvent::Click)
+            .collect::<Vec<_>>(),
         vec![&AppAction::Run]
     );
     assert_eq!(
-        click_frame.first_clicked_action_value(),
+        click_frame.first_action_value_for_intent(ElementBehaviorEvent::Click),
         Some(&AppAction::Run)
     );
-    assert!(click_frame.contains_clicked_action(&AppAction::Run));
+    assert!(click_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Run));
     assert_eq!(
         click_frame
             .actions_of_kind(DocumentEventKind::Clicked)
@@ -2240,31 +2284,51 @@ fn document_action_frame_supports_app_update_loop_queries() {
     ));
     assert_eq!(
         key_frame
-            .key_down_actions()
+            .actions_for_intent(ElementBehaviorEvent::KeyDown)
             .map(|action| action.command.as_str())
             .collect::<Vec<_>>(),
         vec!["cancel"]
     );
     assert_eq!(
         key_frame
-            .first_key_down_action()
+            .first_action_for_intent(ElementBehaviorEvent::KeyDown)
             .map(|action| &action.action),
         Some(&AppAction::Cancel)
     );
     assert_eq!(
-        key_frame.key_down_action_values().collect::<Vec<_>>(),
+        key_frame
+            .action_values_for_intent(ElementBehaviorEvent::KeyDown)
+            .collect::<Vec<_>>(),
         vec![&AppAction::Cancel]
     );
     assert_eq!(
-        key_frame.first_key_down_action_value(),
+        key_frame.first_action_value_for_intent(ElementBehaviorEvent::KeyDown),
         Some(&AppAction::Cancel)
     );
-    assert!(key_frame.contains_key_down_action(&AppAction::Cancel));
-    assert_eq!(key_frame.key_up_actions().count(), 0);
-    assert_eq!(key_frame.first_key_up_action(), None);
-    assert!(!key_frame.contains_key_up_action(&AppAction::Cancel));
-    assert_eq!(key_frame.clicked_actions().count(), 0);
-    assert_eq!(key_frame.first_clicked_action(), None);
+    assert!(
+        key_frame.contains_action_for_intent(ElementBehaviorEvent::KeyDown, &AppAction::Cancel)
+    );
+    assert_eq!(
+        key_frame
+            .actions_for_intent(ElementBehaviorEvent::KeyUp)
+            .count(),
+        0
+    );
+    assert_eq!(
+        key_frame.first_action_for_intent(ElementBehaviorEvent::KeyUp),
+        None
+    );
+    assert!(!key_frame.contains_action_for_intent(ElementBehaviorEvent::KeyUp, &AppAction::Cancel));
+    assert_eq!(
+        key_frame
+            .actions_for_intent(ElementBehaviorEvent::Click)
+            .count(),
+        0
+    );
+    assert_eq!(
+        key_frame.first_action_for_intent(ElementBehaviorEvent::Click),
+        None
+    );
     let (output, actions) = key_frame.into_parts();
     assert_eq!(
         output
@@ -2286,58 +2350,74 @@ fn document_action_frame_supports_app_update_loop_queries() {
 
     let hover_frame =
         view.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 72.0)), &registry);
-    assert_eq!(hover_frame.pointer_enter_actions().count(), 1);
     assert_eq!(
         hover_frame
-            .first_pointer_enter_action()
+            .actions_for_intent(ElementBehaviorEvent::PointerEnter)
+            .count(),
+        1
+    );
+    assert_eq!(
+        hover_frame
+            .first_action_for_intent(ElementBehaviorEvent::PointerEnter)
             .map(|action| &action.action),
         Some(&AppAction::Inspect)
     );
     assert_eq!(
         hover_frame
-            .pointer_enter_action_values()
+            .action_values_for_intent(ElementBehaviorEvent::PointerEnter)
             .collect::<Vec<_>>(),
         vec![&AppAction::Inspect]
     );
     assert_eq!(
-        hover_frame.first_pointer_enter_action_value(),
+        hover_frame.first_action_value_for_intent(ElementBehaviorEvent::PointerEnter),
         Some(&AppAction::Inspect)
     );
     assert!(
         hover_frame
-            .first_pointer_enter_action()
+            .first_action_for_intent(ElementBehaviorEvent::PointerEnter)
             .unwrap()
             .is_pointer_enter()
     );
-    assert!(hover_frame.contains_pointer_enter_action(&AppAction::Inspect));
+    assert!(
+        hover_frame
+            .contains_action_for_intent(ElementBehaviorEvent::PointerEnter, &AppAction::Inspect)
+    );
     let leave_frame = view.update_with_input_actions(
         DocumentInput::pointer_at(Point::new(180.0, 120.0)),
         &registry,
     );
-    assert_eq!(leave_frame.pointer_leave_actions().count(), 1);
     assert_eq!(
         leave_frame
-            .first_pointer_leave_action()
+            .actions_for_intent(ElementBehaviorEvent::PointerLeave)
+            .count(),
+        1
+    );
+    assert_eq!(
+        leave_frame
+            .first_action_for_intent(ElementBehaviorEvent::PointerLeave)
             .map(|action| &action.action),
         Some(&AppAction::Uninspect)
     );
     assert_eq!(
         leave_frame
-            .pointer_leave_action_values()
+            .action_values_for_intent(ElementBehaviorEvent::PointerLeave)
             .collect::<Vec<_>>(),
         vec![&AppAction::Uninspect]
     );
     assert_eq!(
-        leave_frame.first_pointer_leave_action_value(),
+        leave_frame.first_action_value_for_intent(ElementBehaviorEvent::PointerLeave),
         Some(&AppAction::Uninspect)
     );
     assert!(
         leave_frame
-            .first_pointer_leave_action()
+            .first_action_for_intent(ElementBehaviorEvent::PointerLeave)
             .unwrap()
             .is_pointer_leave()
     );
-    assert!(leave_frame.contains_pointer_leave_action(&AppAction::Uninspect));
+    assert!(
+        leave_frame
+            .contains_action_for_intent(ElementBehaviorEvent::PointerLeave, &AppAction::Uninspect)
+    );
 
     let pointer_down_frame = view.update_with_input_actions(
         DocumentInput::primary_press(Point::new(8.0, 104.0)),
@@ -2345,28 +2425,31 @@ fn document_action_frame_supports_app_update_loop_queries() {
     );
     assert_eq!(
         pointer_down_frame
-            .pointer_down_actions()
+            .actions_for_intent(ElementBehaviorEvent::PointerDown)
             .map(|action| action.command.as_str())
             .collect::<Vec<_>>(),
         vec!["grab"]
     );
     assert_eq!(
         pointer_down_frame
-            .first_pointer_down_action()
+            .first_action_for_intent(ElementBehaviorEvent::PointerDown)
             .map(|action| &action.action),
         Some(&AppAction::Grab)
     );
     assert_eq!(
         pointer_down_frame
-            .pointer_down_action_values()
+            .action_values_for_intent(ElementBehaviorEvent::PointerDown)
             .collect::<Vec<_>>(),
         vec![&AppAction::Grab]
     );
     assert_eq!(
-        pointer_down_frame.first_pointer_down_action_value(),
+        pointer_down_frame.first_action_value_for_intent(ElementBehaviorEvent::PointerDown),
         Some(&AppAction::Grab)
     );
-    assert!(pointer_down_frame.contains_pointer_down_action(&AppAction::Grab));
+    assert!(
+        pointer_down_frame
+            .contains_action_for_intent(ElementBehaviorEvent::PointerDown, &AppAction::Grab)
+    );
 
     let drag_start_frame = view.update_with_input_actions(
         DocumentInput::primary_drag(Point::new(32.0, 104.0), Point::new(24.0, 0.0)),
@@ -2374,34 +2457,63 @@ fn document_action_frame_supports_app_update_loop_queries() {
     );
     assert_eq!(
         drag_start_frame
-            .drag_start_actions()
+            .actions_for_intent(ElementBehaviorEvent::DragStart)
             .map(|action| action.command.as_str())
             .collect::<Vec<_>>(),
         vec!["drag"]
     );
     assert_eq!(
         drag_start_frame
-            .first_drag_start_action()
+            .first_action_for_intent(ElementBehaviorEvent::DragStart)
             .map(|action| &action.action),
         Some(&AppAction::Drag)
     );
     assert_eq!(
         drag_start_frame
-            .drag_start_action_values()
+            .action_values_for_intent(ElementBehaviorEvent::DragStart)
             .collect::<Vec<_>>(),
         vec![&AppAction::Drag]
     );
     assert_eq!(
-        drag_start_frame.first_drag_start_action_value(),
+        drag_start_frame.first_action_value_for_intent(ElementBehaviorEvent::DragStart),
         Some(&AppAction::Drag)
     );
-    assert!(drag_start_frame.contains_drag_start_action(&AppAction::Drag));
-    assert_eq!(drag_start_frame.drag_actions().count(), 0);
-    assert_eq!(drag_start_frame.drag_action_values().count(), 0);
-    assert_eq!(drag_start_frame.first_drag_action_value(), None);
-    assert_eq!(drag_start_frame.drag_end_actions().count(), 0);
-    assert_eq!(drag_start_frame.drag_end_action_values().count(), 0);
-    assert_eq!(drag_start_frame.first_drag_end_action_value(), None);
+    assert!(
+        drag_start_frame
+            .contains_action_for_intent(ElementBehaviorEvent::DragStart, &AppAction::Drag)
+    );
+    assert_eq!(
+        drag_start_frame
+            .actions_for_intent(ElementBehaviorEvent::Drag)
+            .count(),
+        0
+    );
+    assert_eq!(
+        drag_start_frame
+            .action_values_for_intent(ElementBehaviorEvent::Drag)
+            .count(),
+        0
+    );
+    assert_eq!(
+        drag_start_frame.first_action_value_for_intent(ElementBehaviorEvent::Drag),
+        None
+    );
+    assert_eq!(
+        drag_start_frame
+            .actions_for_intent(ElementBehaviorEvent::DragEnd)
+            .count(),
+        0
+    );
+    assert_eq!(
+        drag_start_frame
+            .action_values_for_intent(ElementBehaviorEvent::DragEnd)
+            .count(),
+        0
+    );
+    assert_eq!(
+        drag_start_frame.first_action_value_for_intent(ElementBehaviorEvent::DragEnd),
+        None
+    );
 
     let pointer_up_frame = view.update_with_input_actions(
         DocumentInput::pointer_at(Point::new(32.0, 104.0)),
@@ -2409,28 +2521,31 @@ fn document_action_frame_supports_app_update_loop_queries() {
     );
     assert_eq!(
         pointer_up_frame
-            .pointer_up_actions()
+            .actions_for_intent(ElementBehaviorEvent::PointerUp)
             .map(|action| action.command.as_str())
             .collect::<Vec<_>>(),
         vec!["drop"]
     );
     assert_eq!(
         pointer_up_frame
-            .first_pointer_up_action()
+            .first_action_for_intent(ElementBehaviorEvent::PointerUp)
             .map(|action| &action.action),
         Some(&AppAction::Drop)
     );
     assert_eq!(
         pointer_up_frame
-            .pointer_up_action_values()
+            .action_values_for_intent(ElementBehaviorEvent::PointerUp)
             .collect::<Vec<_>>(),
         vec![&AppAction::Drop]
     );
     assert_eq!(
-        pointer_up_frame.first_pointer_up_action_value(),
+        pointer_up_frame.first_action_value_for_intent(ElementBehaviorEvent::PointerUp),
         Some(&AppAction::Drop)
     );
-    assert!(pointer_up_frame.contains_pointer_up_action(&AppAction::Drop));
+    assert!(
+        pointer_up_frame
+            .contains_action_for_intent(ElementBehaviorEvent::PointerUp, &AppAction::Drop)
+    );
 }
 
 #[test]
@@ -3811,7 +3926,7 @@ fn document_view_builder_can_build_action_surfaces_directly() {
     let run = direct_frame.output().snapshot().find("run").unwrap();
     let menu = configured_frame.output().snapshot().find("menu").unwrap();
 
-    assert!(direct_frame.contains_clicked_action(&AppAction::Run));
+    assert!(direct_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Run));
     assert_eq!(direct_surface.commands().bindings().len(), 1);
     assert_eq!(run.rect().size, Size::new(96.0, 32.0));
     assert_eq!(run.style().background, Some(Color::rgb(220, 238, 255)));
@@ -4541,7 +4656,10 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
 
     assert_eq!(intent_widget_report.operations, 2);
     assert_eq!(intent_widget_report.changed, 2);
-    assert!(intent_widget_frame.contains_clicked_action(&AppAction::Toggle));
+    assert!(
+        intent_widget_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Toggle)
+    );
 
     let waiting_status = StatusWidget { ready: false };
     let ready_status = StatusWidget { ready: true };
@@ -4557,7 +4675,10 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
 
     assert_eq!(mapped_widgets_report.operations, 2);
     assert_eq!(mapped_widgets_report.changed, 2);
-    assert!(mapped_widgets_frame.contains_clicked_action(&AppAction::Toggle));
+    assert!(
+        mapped_widgets_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Toggle)
+    );
 
     let mut intent_widgets_view =
         DocumentView::compose(Size::new(320.0, 180.0)).widget(&waiting_status);
@@ -4575,7 +4696,10 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
 
     assert_eq!(intent_widgets_report.operations, 2);
     assert_eq!(intent_widgets_report.changed, 2);
-    assert!(intent_widgets_frame.contains_clicked_action(&AppAction::Toggle));
+    assert!(
+        intent_widgets_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &AppAction::Toggle)
+    );
 
     let mut no_input_widget_view =
         DocumentView::compose(Size::new(320.0, 180.0)).widget(&StatusWidget { ready: false });

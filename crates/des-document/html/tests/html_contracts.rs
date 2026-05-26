@@ -1253,7 +1253,10 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             .width,
         182.0
     );
-    assert!(intent_surface_key.contains_key_down_action(&HtmlAction::Filter));
+    assert!(
+        intent_surface_key
+            .contains_action_for_intent(ElementBehaviorEvent::KeyDown, &HtmlAction::Filter)
+    );
     assert_eq!(
         intent_surface_key
             .output()
@@ -1278,7 +1281,10 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             .width,
         184.0
     );
-    assert!(forgiving_intent_surface_key.contains_key_down_action(&HtmlAction::Filter));
+    assert!(
+        forgiving_intent_surface_key
+            .contains_action_for_intent(ElementBehaviorEvent::KeyDown, &HtmlAction::Filter)
+    );
     assert_eq!(
         forgiving_intent_surface_key
             .output()
@@ -1301,10 +1307,15 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             .element(),
         Element::Section
     );
-    assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        dispatch_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(dispatch_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
-    assert!(value_dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        value_dispatch_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(
         value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
@@ -1657,7 +1668,7 @@ fn html_document_projects_state_without_css_plumbing() {
     assert_eq!(mapped_report.operations, 2);
     assert_eq!(mapped_report.changed, 2);
     assert_eq!(mapped_run.text(), Some("Running".to_owned()));
-    assert!(mapped_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(mapped_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run));
 
     let mut dispatched = Vec::new();
     let (dispatch_report, dispatch_frame, action_report) = html
@@ -1729,7 +1740,9 @@ fn html_document_projects_state_without_css_plumbing() {
     assert_eq!(dispatch_run.text(), Some("Ready".to_owned()));
     assert_eq!(action_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(dispatched, vec![HtmlAction::Run]);
-    assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        dispatch_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(value_dispatch_report.operations, 3);
     assert_eq!(value_dispatch_report.changed, 3);
     assert_eq!(value_dispatch_run.text(), Some("Ready".to_owned()));
@@ -1738,7 +1751,10 @@ fn html_document_projects_state_without_css_plumbing() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(value_dispatched, vec![HtmlAction::Run]);
-    assert!(value_dispatch_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        value_dispatch_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(configured_report.operations, 1);
     assert_eq!(configured_report.changed, 1);
     assert_eq!(configured_run.text(), Some("Configured".to_owned()));
@@ -1747,7 +1763,9 @@ fn html_document_projects_state_without_css_plumbing() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(configured_dispatched, vec![HtmlAction::Run]);
-    assert!(configured_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        configured_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(configured_value_report.operations, 1);
     assert_eq!(configured_value_report.changed, 1);
     assert_eq!(
@@ -1759,7 +1777,10 @@ fn html_document_projects_state_without_css_plumbing() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(configured_value_dispatched, vec![HtmlAction::Run]);
-    assert!(configured_value_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        configured_value_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
 
     let (surface_report, mut surface) = html
         .to_action_surface_projected_with_actions(
@@ -1775,7 +1796,9 @@ fn html_document_projects_state_without_css_plumbing() {
 
     assert_eq!(surface_report.operations, 1);
     assert_eq!(surface_report.changed, 1);
-    assert!(surface_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        surface_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(
         surface_frame
             .output()
@@ -1896,7 +1919,10 @@ fn html_document_can_create_action_surfaces_without_css_plumbing() {
     assert!(configured_frame.contains_action(&HtmlAction::Run));
     assert!(mapped_context_frame.contains_action(&HtmlAction::Menu));
     assert_eq!(mapped_surface.commands().bindings().len(), 2);
-    assert!(intent_click_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        intent_click_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert!(intent_context_frame.contains_action_for_target_intent(
         "shared",
         ElementBehaviorEvent::ContextMenu,
@@ -2049,8 +2075,16 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
         pushed_mapped_registry.bindings(),
         mapped_registry.bindings()
     );
-    assert!(mapped_click_frame.contains_clicked_action(&HtmlAction::Run));
-    assert!(mapped_key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
+    assert!(
+        mapped_click_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
+    assert!(
+        mapped_key_frame.contains_action_for_intent(
+            ElementBehaviorEvent::KeyDown,
+            &HtmlAction::CommitByKeyboard
+        )
+    );
 
     let intent_registry = bundle.command_intent_action_registry([
         (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
@@ -2101,9 +2135,20 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
         pushed_intent_registry.bindings(),
         intent_registry.bindings()
     );
-    assert!(intent_click_frame.contains_clicked_action(&HtmlAction::CommitByClick));
-    assert!(intent_key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
-    assert!(!intent_click_frame.contains_clicked_action(&HtmlAction::CommitByKeyboard));
+    assert!(
+        intent_click_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::CommitByClick)
+    );
+    assert!(
+        intent_key_frame.contains_action_for_intent(
+            ElementBehaviorEvent::KeyDown,
+            &HtmlAction::CommitByKeyboard
+        )
+    );
+    assert!(
+        !intent_click_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::CommitByKeyboard)
+    );
 
     let registry = bundle.command_registry(|hook| match (hook.command(), hook.intent()) {
         ("project.run", Some(ElementBehaviorEvent::Click)) => Some(HtmlAction::Run),
@@ -2128,10 +2173,18 @@ fn html_authored_commands_dispatch_to_typed_rust_actions() {
         )
         .expect("HTML-authored command registry should route keyboard actions");
 
-    assert!(click_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(click_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run));
     assert!(!click_frame.contains_action(&HtmlAction::CommitByKeyboard));
-    assert!(key_frame.contains_key_down_action(&HtmlAction::CommitByKeyboard));
-    assert!(!key_frame.contains_clicked_action(&HtmlAction::CommitByClick));
+    assert!(
+        key_frame.contains_action_for_intent(
+            ElementBehaviorEvent::KeyDown,
+            &HtmlAction::CommitByKeyboard
+        )
+    );
+    assert!(
+        !key_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::CommitByClick)
+    );
 }
 
 #[test]
@@ -2511,13 +2564,18 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(mapped_report.operations, 1);
     assert_eq!(mapped_report.changed, 1);
     assert!(mapped_select.has_class("is-selected"));
-    assert!(mapped_update_frame.contains_clicked_action(&HtmlAction::Select));
+    assert!(
+        mapped_update_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
     assert_eq!(dispatch_report.operations, 7);
     assert_eq!(dispatch_report.changed, 7);
     assert_eq!(action_report, DocumentCommandDispatchReport::new(1, 1, 0));
     assert_eq!(projected_dispatched, vec![HtmlAction::Select]);
     assert_eq!(dispatch_select.aria("pressed"), Some("false"));
-    assert!(dispatch_frame.contains_clicked_action(&HtmlAction::Select));
+    assert!(
+        dispatch_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
     assert_eq!(value_dispatch_report.operations, 7);
     assert_eq!(value_dispatch_report.changed, 7);
     assert_eq!(
@@ -2526,7 +2584,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     );
     assert_eq!(projected_value_dispatched, vec![HtmlAction::Select]);
     assert_eq!(value_dispatch_select.aria("pressed"), Some("false"));
-    assert!(value_dispatch_frame.contains_clicked_action(&HtmlAction::Select));
+    assert!(
+        value_dispatch_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
     assert_eq!(dispatch_with_report.operations, 1);
     assert_eq!(dispatch_with_report.changed, 1);
     assert_eq!(
@@ -2538,7 +2599,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         dispatch_with_run.text(),
         Some("Dispatch configured".to_owned())
     );
-    assert!(dispatch_with_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        dispatch_with_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(dispatch_with_value_report.operations, 1);
     assert_eq!(dispatch_with_value_report.changed, 1);
     assert_eq!(
@@ -2550,7 +2614,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         dispatch_with_value_run.text(),
         Some("Dispatch value".to_owned())
     );
-    assert!(dispatch_with_value_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        dispatch_with_value_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
 
     let projected_registry = bundle.command_action_registry([
         ("project.run", HtmlAction::Run),
@@ -2620,16 +2687,26 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(surface_report.changed, 7);
     assert_eq!(surface_run.text(), Some("Ready".to_owned()));
     assert!(surface_run.has_class("is-ready"));
-    assert!(mapped_frame.contains_clicked_action(&HtmlAction::Select));
-    assert!(surface_frame.contains_clicked_action(&HtmlAction::Run));
+    assert!(
+        mapped_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
+    assert!(
+        surface_frame.contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Run)
+    );
     assert_eq!(mapped_surface_report.operations, 1);
     assert_eq!(mapped_surface_report.changed, 1);
     assert!(mapped_projected_select.has_class("is-selected"));
-    assert!(mapped_projected_surface_frame.contains_clicked_action(&HtmlAction::Select));
+    assert!(
+        mapped_projected_surface_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
     assert_eq!(intent_surface_report.operations, 1);
     assert_eq!(intent_surface_report.changed, 1);
     assert!(intent_projected_select.has_class("is-selected"));
-    assert!(intent_projected_surface_frame.contains_clicked_action(&HtmlAction::Select));
+    assert!(
+        intent_projected_surface_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
 
     let (configured_report, mut configured_surface) = bundle
         .to_action_surface_projected_with_and(
@@ -2650,7 +2727,10 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
     assert_eq!(configured_report.operations, 1);
     assert_eq!(configured_report.changed, 1);
     assert!(configured_select.has_class("is-selected"));
-    assert!(configured_frame.contains_clicked_action(&HtmlAction::Select));
+    assert!(
+        configured_frame
+            .contains_action_for_intent(ElementBehaviorEvent::Click, &HtmlAction::Select)
+    );
 }
 
 #[test]
