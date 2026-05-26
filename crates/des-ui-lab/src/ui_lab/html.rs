@@ -9,6 +9,8 @@ const TOPBAR_HTML: &str = include_str!("html/topbar.html");
 #[cfg(not(debug_assertions))]
 const NAV_HTML: &str = include_str!("html/nav.html");
 #[cfg(not(debug_assertions))]
+const INTERACTION_CARDS_HTML: &str = include_str!("html/interaction-cards.html");
+#[cfg(not(debug_assertions))]
 const INTERACTION_LOOP_HTML: &str = include_str!("html/interaction-loop.html");
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
@@ -19,6 +21,10 @@ pub(super) fn append_nav(ui: &mut DocumentBuilder) {
     nav_fragment().append_to_builder(ui);
 }
 
+pub(super) fn append_interaction_cards(ui: &mut DocumentBuilder) {
+    interaction_cards_fragment().append_to_builder(ui);
+}
+
 pub(super) fn append_interaction_loop(ui: &mut DocumentBuilder) {
     interaction_loop_fragment().append_to_builder(ui);
 }
@@ -27,6 +33,7 @@ pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
     topbar_source().hash(&mut hasher);
     nav_source().hash(&mut hasher);
+    interaction_cards_source().hash(&mut hasher);
     interaction_loop_source().hash(&mut hasher);
     hasher.finish()
 }
@@ -37,6 +44,11 @@ fn topbar_fragment() -> HtmlDocument {
 
 fn nav_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&nav_source()).expect("lab nav HTML is valid")
+}
+
+fn interaction_cards_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&interaction_cards_source())
+        .expect("lab interaction cards HTML is valid")
 }
 
 fn interaction_loop_fragment() -> HtmlDocument {
@@ -75,6 +87,23 @@ fn nav_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(NAV_HTML)
+    }
+}
+
+fn interaction_cards_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/interaction-cards.html"
+            ))
+            .expect("lab interaction cards HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(INTERACTION_CARDS_HTML)
     }
 }
 

@@ -959,6 +959,31 @@ fn interaction_update_loop_is_authored_from_html_fragment() {
 }
 
 #[test]
+fn interaction_cards_are_authored_from_html_fragment() {
+    let output = lab_output("interaction");
+    let row = frame(&output, "interaction-row");
+    let hover_card = frame(&output, "interaction-card-one");
+    let click_card = frame(&output, "interaction-card-two");
+    let pressed_card = frame(&output, "interaction-card-three");
+
+    assert_eq!(row.element, Element::Section);
+    assert_eq!(hover_card.element, Element::Article);
+    assert_eq!(click_card.element, Element::Article);
+    assert_eq!(pressed_card.element, Element::Article);
+    assert!(hover_card.interactive);
+    assert!(click_card.interactive);
+    assert!(pressed_card.interactive);
+    assert_eq!(
+        frame_text(&output, "interaction-card-one-title"),
+        Some("Hover Target")
+    );
+    assert_eq!(
+        frame_text(&output, "interaction-card-two-body"),
+        Some("interactive owner is the card")
+    );
+}
+
+#[test]
 fn lab_shell_tracks_document_viewport_size() {
     for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
         let output = lab_output_with_size("layout", viewport);

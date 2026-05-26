@@ -534,6 +534,37 @@ fn html_document_maps_browser_boolean_state_attributes() {
 }
 
 #[test]
+fn html_document_maps_commandless_interaction_intent() {
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section id="cards">
+          <article id="intent-card" data-interactive="true">Intent only</article>
+          <article id="static-card" data-interactive="false">Static</article>
+        </section>
+        "#,
+    )
+    .expect("HTML should parse interaction intent attributes");
+    let mut document = html
+        .to_document(Size::new(320.0, 180.0))
+        .expect("HTML should emit a document");
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &des_document::StyleSheet::new());
+    let snapshot = output.snapshot();
+    let intent_card = snapshot
+        .find("intent-card")
+        .expect("intent card id should be retained");
+    let static_card = snapshot
+        .find("static-card")
+        .expect("static card id should be retained");
+
+    assert_eq!(intent_card.element(), Element::Article);
+    assert!(intent_card.interactive());
+    assert!(intent_card.behavior_hooks().is_empty());
+    assert!(!static_card.interactive());
+}
+
+#[test]
 fn html_stylesheet_parses_html_and_css_together() {
     let bundle = HtmlStylesheet::parse_fragment(
         r#"<section id="panel" class="card">Panel</section>"#,

@@ -1682,6 +1682,9 @@ impl HtmlNode {
                 "data-copyable-text",
             ));
         }
+        if html_boolean_attribute(&self.attributes, "data-interactive") {
+            spec = spec.interactive();
+        }
         if !self.behavior_hooks.is_empty()
             || self.attributes.contains_key("data-command")
             || self.attributes.keys().any(|name| name.starts_with("on:"))

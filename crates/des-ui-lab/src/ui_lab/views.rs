@@ -631,48 +631,7 @@ fn render_interaction_view(
         ElementSpec::new(Element::Text).class("muted"),
         "Hover and click styles are resolved by document state. Inner text does not own clicks.",
     );
-    ui.element(
-        "interaction-row",
-        ElementSpec::new(Element::Div).class("card-row"),
-        |ui| {
-            for (id, title, body) in [
-                (
-                    "interaction-card-one",
-                    "Hover Target",
-                    "background comes from class:hover",
-                ),
-                (
-                    "interaction-card-two",
-                    "Click Target",
-                    "interactive owner is the card",
-                ),
-                (
-                    "interaction-card-three",
-                    "Pressed Target",
-                    "press state resolves before paint",
-                ),
-            ] {
-                ui.element(
-                    id,
-                    ElementSpec::new(Element::Div)
-                        .class("feature-card")
-                        .interactive(),
-                    |ui| {
-                        ui.text_element(
-                            format!("{id}-title"),
-                            ElementSpec::new(Element::Text).class("card-title"),
-                            title,
-                        );
-                        ui.text_element(
-                            format!("{id}-body"),
-                            ElementSpec::new(Element::Text).class("muted"),
-                            body,
-                        );
-                    },
-                );
-            }
-        },
-    );
+    super::html::append_interaction_cards(ui);
     ui.text_element(
         "controls-title",
         ElementSpec::new(Element::Text).class("section-title"),
