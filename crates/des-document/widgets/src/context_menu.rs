@@ -272,17 +272,6 @@ impl ContextMenu {
         Ok(self.action_surface_with_stylesheet(viewport, stylesheet, action_for))
     }
 
-    /// Builds a menu action surface with browser-forgiving CSS rules.
-    pub fn action_surface_with_css_forgiving<Action>(
-        &self,
-        viewport: Size,
-        css: &str,
-        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
-    ) -> Result<DocumentActionSurface<Action>, CssParseError> {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
-        Ok(self.action_surface_with_stylesheet(viewport, stylesheet, action_for))
-    }
-
     /// Tries to build a menu action surface, returning document projection errors.
     pub fn try_action_surface<Action>(
         &self,
@@ -313,17 +302,6 @@ impl ContextMenu {
         action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
     ) -> DocumentAuthoringResult<DocumentActionSurface<Action>> {
         let stylesheet = StyleSheet::from_css(css)?;
-        Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?)
-    }
-
-    /// Tries to build a menu action surface with browser-forgiving CSS rules.
-    pub fn try_action_surface_with_css_forgiving<Action>(
-        &self,
-        viewport: Size,
-        css: &str,
-        action_for: impl FnMut(&ContextMenuItem) -> Option<Action>,
-    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>> {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
         Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?)
     }
 
@@ -761,21 +739,6 @@ mod tests {
                 action_for,
             )
             .expect("strict CSS should create a command/action context menu surface");
-        let mut forgiving_css_surface = menu
-            .try_action_surface_with_css_forgiving(
-                Size::new(240.0, 140.0),
-                ".ignored { unknown-property: yes; } #copy { height: 37px; }",
-                action_for,
-            )
-            .expect("forgiving CSS should create a context menu action surface");
-        let mut forgiving_css_mapped_surface = menu
-            .try_action_surface_with_css_forgiving(
-                Size::new(240.0, 140.0),
-                ".ignored { unknown-property: yes; } #copy { height: 38px; }",
-                action_for,
-            )
-            .expect("forgiving CSS should create a mapped context menu surface");
-
         let frame =
             surface.update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let mapped_frame = mapped_surface
@@ -783,10 +746,6 @@ mod tests {
         let css_frame = css_surface
             .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let css_mapped_frame = css_mapped_surface
-            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
-        let forgiving_css_frame = forgiving_css_surface
-            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
-        let forgiving_css_mapped_frame = forgiving_css_mapped_surface
             .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let action_values: Vec<_> = frame.action_values().copied().collect();
         let mapped_action_values: Vec<_> = mapped_frame.action_values().copied().collect();
@@ -812,8 +771,6 @@ mod tests {
         assert_eq!(mapped_surface.commands().bindings().len(), 2);
         assert_eq!(css_surface.commands().bindings().len(), 2);
         assert_eq!(css_mapped_surface.commands().bindings().len(), 2);
-        assert_eq!(forgiving_css_surface.commands().bindings().len(), 2);
-        assert_eq!(forgiving_css_mapped_surface.commands().bindings().len(), 2);
         assert!(copy.has_class(CONTEXT_MENU_ITEM_CLASS));
         assert!(!paste.interactive());
         assert!(frame.contains_action_for_intent(
@@ -853,36 +810,6 @@ mod tests {
                 .size
                 .height,
             35.0
-        );
-        assert!(forgiving_css_frame.contains_action_for_intent(
-            des_document::ElementBehaviorEvent::Click,
-            &MenuAction::Copy
-        ));
-        assert_eq!(
-            forgiving_css_frame
-                .output()
-                .snapshot()
-                .find("copy")
-                .unwrap()
-                .rect()
-                .size
-                .height,
-            37.0
-        );
-        assert!(forgiving_css_mapped_frame.contains_action_for_intent(
-            des_document::ElementBehaviorEvent::Click,
-            &MenuAction::Copy
-        ));
-        assert_eq!(
-            forgiving_css_mapped_frame
-                .output()
-                .snapshot()
-                .find("copy")
-                .unwrap()
-                .rect()
-                .size
-                .height,
-            38.0
         );
         assert_eq!(action_values, vec![MenuAction::Copy]);
         assert_eq!(mapped_action_values, vec![MenuAction::Copy]);

@@ -2075,10 +2075,6 @@ impl StyleSheet {
         Self::parse_css(input)
     }
 
-    pub fn from_css_forgiving(input: &str) -> Result<Self, crate::CssParseError> {
-        Self::parse_css_forgiving(input)
-    }
-
     pub fn rule(mut self, selector: StyleSelector, style: Style) -> Self {
         self.push_rule(selector, style);
         self
@@ -2454,10 +2450,6 @@ impl StyleSheet {
         crate::css::parse_stylesheet(input)
     }
 
-    pub fn parse_css_forgiving(input: &str) -> Result<Self, crate::CssParseError> {
-        crate::css::parse_stylesheet_forgiving(input)
-    }
-
     pub fn extend_css(&mut self, input: &str) -> Result<&mut Self, crate::CssParseError> {
         self.extend(Self::parse_css(input)?);
         Ok(self)
@@ -2481,36 +2473,6 @@ impl StyleSheet {
 
     pub fn with_css_if(mut self, present: bool, input: &str) -> Result<Self, crate::CssParseError> {
         self.extend_css_if(present, input)?;
-        Ok(self)
-    }
-
-    pub fn extend_css_forgiving(&mut self, input: &str) -> Result<&mut Self, crate::CssParseError> {
-        self.extend(Self::parse_css_forgiving(input)?);
-        Ok(self)
-    }
-
-    pub fn with_css_forgiving(mut self, input: &str) -> Result<Self, crate::CssParseError> {
-        self.extend_css_forgiving(input)?;
-        Ok(self)
-    }
-
-    pub fn extend_css_forgiving_if(
-        &mut self,
-        present: bool,
-        input: &str,
-    ) -> Result<&mut Self, crate::CssParseError> {
-        if present {
-            self.extend_css_forgiving(input)?;
-        }
-        Ok(self)
-    }
-
-    pub fn with_css_forgiving_if(
-        mut self,
-        present: bool,
-        input: &str,
-    ) -> Result<Self, crate::CssParseError> {
-        self.extend_css_forgiving_if(present, input)?;
         Ok(self)
     }
 

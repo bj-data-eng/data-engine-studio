@@ -1178,58 +1178,22 @@ fn css_stylesheet_parser_reports_unclosed_comments_and_blocks() {
 }
 
 #[test]
-fn css_stylesheet_forgiving_parser_recovers_like_browser_stylesheets() {
-    let stylesheet = StyleSheet::parse_css_forgiving(
-        r#"
-        @unknown {
-          .panel { width: 999px; }
-        }
+fn css_stylesheet_parser_rejects_invalid_author_css() {
+    assert!(StyleSheet::parse_css("@unknown { .panel { width: 999px; } }").is_err());
+    assert!(
+        StyleSheet::parse_css("@media (unknown-feature: 1px) { .panel { width: 888px; } }")
+            .is_err()
+    );
+    assert!(StyleSheet::parse_css(".panel, ??? { width: 120px; }").is_err());
+    assert!(StyleSheet::parse_css(".panel { broken declaration; }").is_err());
+    assert!(StyleSheet::parse_css(".panel { height: nope; }").is_err());
 
-        @media (unknown-feature: 1px) {
-          .panel { width: 888px; }
-        }
-
-        .panel, ??? {
-          unknown-property: 1px;
-          width: 120px;
-          broken declaration;
-          height: nope;
-          height: 40px;
-        }
-        "#,
-    )
-    .unwrap();
-    let mut extended = StyleSheet::new();
-    extended
-        .extend_css_forgiving(
-            r#"
-            .accent {
-              background: #cdf0dd;
-              bad-color: ??;
-            }
-            "#,
-        )
-        .unwrap();
-
-    let mut document = Document::new(Size::new(800.0, 600.0));
-    document
-        .append_element(
-            "root",
-            "panel",
-            ElementSpec::new(Element::Div)
-                .class("panel")
-                .class("accent"),
-        )
-        .unwrap();
-    let mut merged = stylesheet;
-    merged.extend(extended);
-    document.apply_stylesheet(&merged, &HashMap::new()).unwrap();
-
-    let layout = document.resolved_layout().unwrap();
-    let panel = layout.find("panel").unwrap();
-    assert_eq!(panel.style.width, Length::Px(120.0));
-    assert_eq!(panel.style.height, Length::Px(40.0));
-    assert_eq!(panel.style.background, Some(Color::rgb(205, 240, 221)));
+    let mut stylesheet = StyleSheet::new();
+    assert!(
+        stylesheet
+            .extend_css(".accent { background: #cdf0dd; bad-color: ??; }")
+            .is_err()
+    );
 }
 
 #[test]

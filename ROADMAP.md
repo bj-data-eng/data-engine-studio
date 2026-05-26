@@ -28,7 +28,7 @@ What is working:
 What is risky:
 
 - Public APIs have grown combinatorially across event intent, projection,
-  update, dispatch, action-value, HTML, CSS, forgiving-CSS, and named-document
+  update, dispatch, action-value, HTML, CSS, and named-document
   variants.
 - `DocumentOutput` and `DocumentInteractionState` now answer many of the same
   questions through separate public surfaces.
@@ -245,7 +245,7 @@ Do not continue mirroring every method both ways.
 `DocumentView`, `DocumentActionSurface`, `HtmlDocument`, `HtmlStylesheet`, and
 `HtmlSet` expose many combinations of:
 
-- no CSS vs CSS vs forgiving CSS
+- no CSS vs CSS
 - input vs no input
 - projection vs no projection
 - registry vs mapped actions

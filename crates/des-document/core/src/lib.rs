@@ -47,7 +47,7 @@
 //!
 //!     fn push_styles(&self, stylesheet: &mut StyleSheet) {
 //!         stylesheet
-//!             .extend_css_forgiving(
+//!             .extend_css(
 //!                 ".toolbar { display: flex; gap: 8px; padding: 12px; }
 //!                  .button { width: 96px; height: 32px; }
 //!                  .icon-button { width: 72px; height: 32px; }",
@@ -79,7 +79,7 @@
 //!     .expect("valid app stylesheet");
 //!
 //! let mut actions = Vec::new();
-//! let frame = surface
+//! let (frame, _) = surface
 //!     .update_request()
 //!     .input(DocumentInput::primary_click(Point::new(20.0, 20.0)))
 //!     .project_with(|projection| {

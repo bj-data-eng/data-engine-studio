@@ -910,38 +910,6 @@ impl<Action> DocumentActionSurface<Action> {
         Ok(self)
     }
 
-    /// Parses browser-forgiving CSS into the paired stylesheet.
-    pub fn extend_css_forgiving(&mut self, css: &str) -> Result<&mut Self, crate::CssParseError> {
-        self.view.extend_css_forgiving(css)?;
-        Ok(self)
-    }
-
-    /// Parses browser-forgiving CSS into the paired stylesheet and returns the surface.
-    pub fn with_css_forgiving(mut self, css: &str) -> Result<Self, crate::CssParseError> {
-        self.extend_css_forgiving(css)?;
-        Ok(self)
-    }
-
-    /// Conditionally parses browser-forgiving CSS into the paired stylesheet.
-    pub fn extend_css_forgiving_if(
-        &mut self,
-        present: bool,
-        css: &str,
-    ) -> Result<&mut Self, crate::CssParseError> {
-        self.view.extend_css_forgiving_if(present, css)?;
-        Ok(self)
-    }
-
-    /// Conditionally parses browser-forgiving CSS and returns the surface.
-    pub fn with_css_forgiving_if(
-        mut self,
-        present: bool,
-        css: &str,
-    ) -> Result<Self, crate::CssParseError> {
-        self.extend_css_forgiving_if(present, css)?;
-        Ok(self)
-    }
-
     /// Returns the typed command registry paired with this view.
     pub fn commands(&self) -> &DocumentCommandRegistry<Action> {
         &self.commands
@@ -2002,40 +1970,6 @@ impl DocumentView {
         Ok(self)
     }
 
-    /// Parses browser-forgiving CSS into the view stylesheet.
-    pub fn extend_css_forgiving(&mut self, css: &str) -> Result<&mut Self, crate::CssParseError> {
-        self.stylesheet.extend_css_forgiving(css)?;
-        Ok(self)
-    }
-
-    /// Parses browser-forgiving CSS into the view stylesheet and returns the view.
-    pub fn with_css_forgiving(mut self, css: &str) -> Result<Self, crate::CssParseError> {
-        self.extend_css_forgiving(css)?;
-        Ok(self)
-    }
-
-    /// Conditionally parses browser-forgiving CSS into the view stylesheet.
-    pub fn extend_css_forgiving_if(
-        &mut self,
-        present: bool,
-        css: &str,
-    ) -> Result<&mut Self, crate::CssParseError> {
-        if present {
-            self.stylesheet.extend_css_forgiving(css)?;
-        }
-        Ok(self)
-    }
-
-    /// Conditionally parses browser-forgiving CSS into the view stylesheet and returns the view.
-    pub fn with_css_forgiving_if(
-        mut self,
-        present: bool,
-        css: &str,
-    ) -> Result<Self, crate::CssParseError> {
-        self.extend_css_forgiving_if(present, css)?;
-        Ok(self)
-    }
-
     /// Adds styles declared by a reusable document widget.
     pub fn push_widget_styles(&mut self, widget: &(impl DocumentWidget + ?Sized)) {
         widget.push_styles(&mut self.stylesheet);
@@ -2212,26 +2146,6 @@ impl DocumentViewBuilder {
     pub fn css_if(mut self, present: bool, css: &str) -> Result<Self, crate::CssParseError> {
         if present {
             self.stylesheet.extend_css(css)?;
-        }
-        Ok(self)
-    }
-
-    pub fn css_forgiving(mut self, css: &str) -> Result<Self, crate::CssParseError> {
-        self.stylesheet.extend_css_forgiving(css)?;
-        Ok(self)
-    }
-
-    pub fn with_css_forgiving(self, css: &str) -> Result<Self, crate::CssParseError> {
-        self.css_forgiving(css)
-    }
-
-    pub fn css_forgiving_if(
-        mut self,
-        present: bool,
-        css: &str,
-    ) -> Result<Self, crate::CssParseError> {
-        if present {
-            self.stylesheet.extend_css_forgiving(css)?;
         }
         Ok(self)
     }

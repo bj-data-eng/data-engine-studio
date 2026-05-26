@@ -17,7 +17,7 @@
 //!     r#"<button id="run" class="primary" on:click="query.run">Run</button>"#,
 //! )
 //! .expect("HTML should parse")
-//! .with_css_forgiving(
+//! .with_css(
 //!     r#"
 //!     .primary {
 //!         width: 96px;
@@ -460,20 +460,6 @@ impl HtmlDocument {
         }
     }
 
-    /// Parses CSS with browser-like error recovery and pairs it with this HTML tree.
-    pub fn with_css_forgiving(self, css: &str) -> HtmlResult<HtmlStylesheet> {
-        Ok(self.with_stylesheet(parse_stylesheet_forgiving(css)?))
-    }
-
-    /// Conditionally parses forgiving CSS and pairs it with this HTML tree.
-    pub fn with_css_forgiving_if(self, present: bool, css: &str) -> HtmlResult<HtmlStylesheet> {
-        if present {
-            self.with_css_forgiving(css)
-        } else {
-            Ok(self.with_stylesheet(StyleSheet::new()))
-        }
-    }
-
     /// Creates a ready-to-update document view from this HTML tree and stylesheet.
     pub fn to_view_with_stylesheet(
         &self,
@@ -511,29 +497,6 @@ impl HtmlDocument {
     ) -> HtmlResult<DocumentView> {
         if present {
             self.to_view_with_css(viewport, css)
-        } else {
-            self.to_view(viewport)
-        }
-    }
-
-    /// Parses CSS with browser-like error recovery and creates a document view.
-    pub fn to_view_with_css_forgiving(
-        &self,
-        viewport: Size,
-        css: &str,
-    ) -> HtmlResult<DocumentView> {
-        self.to_view_with_stylesheet(viewport, parse_stylesheet_forgiving(css)?)
-    }
-
-    /// Conditionally parses forgiving CSS and creates a ready-to-update document view.
-    pub fn to_view_with_css_forgiving_if(
-        &self,
-        viewport: Size,
-        present: bool,
-        css: &str,
-    ) -> HtmlResult<DocumentView> {
-        if present {
-            self.to_view_with_css_forgiving(viewport, css)
         } else {
             self.to_view(viewport)
         }
@@ -785,44 +748,9 @@ impl HtmlDocument {
             .action_surface_with(configure))
     }
 
-    /// Parses forgiving CSS and creates an action surface with typed Rust commands.
-    pub fn to_action_surface_with_css_forgiving<Action>(
-        &self,
-        viewport: Size,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionSurface<Action>> {
-        Ok(self
-            .to_view_with_css_forgiving(viewport, css)?
-            .action_surface_with(configure))
-    }
-
-    /// Conditionally parses forgiving CSS and creates an action surface.
-    pub fn to_action_surface_with_css_forgiving_if<Action>(
-        &self,
-        viewport: Size,
-        present: bool,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionSurface<Action>> {
-        Ok(self
-            .to_view_with_css_forgiving_if(viewport, present, css)?
-            .action_surface_with(configure))
-    }
-
     /// Parses CSS, resolves this HTML tree, and returns the first output frame.
     pub fn update_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentOutput> {
         self.to_view_with_css(viewport, css)
-            .map(|mut view| view.update())
-    }
-
-    /// Parses forgiving CSS, resolves this HTML tree, and returns the first output frame.
-    pub fn update_with_css_forgiving(
-        &self,
-        viewport: Size,
-        css: &str,
-    ) -> HtmlResult<DocumentOutput> {
-        self.to_view_with_css_forgiving(viewport, css)
             .map(|mut view| view.update())
     }
 
@@ -853,35 +781,6 @@ impl HtmlDocument {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_actions_with_css(viewport, css, &registry)
-    }
-
-    /// Parses forgiving CSS, resolves this HTML tree, and collects typed Rust actions.
-    pub fn update_actions_with_css_forgiving<Action>(
-        &self,
-        viewport: Size,
-        css: &str,
-        registry: &DocumentCommandRegistry<Action>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-    {
-        self.to_view_with_css_forgiving(viewport, css)
-            .map(|mut view| view.update_actions(registry))
-    }
-
-    /// Parses forgiving CSS, resolves this HTML tree, and configures typed actions in one hook.
-    pub fn update_actions_with_css_forgiving_and<Action>(
-        &self,
-        viewport: Size,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-    {
-        let mut registry = DocumentCommandRegistry::new();
-        configure(&mut registry);
-        self.update_actions_with_css_forgiving(viewport, css, &registry)
     }
 
     /// Parses CSS, routes input through this HTML tree, and returns output.
@@ -924,48 +823,6 @@ impl HtmlDocument {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_actions_and_css(viewport, input, css, &registry)
-    }
-
-    /// Parses forgiving CSS, routes input through this HTML tree, and returns output.
-    pub fn update_with_input_and_css_forgiving(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-    ) -> HtmlResult<DocumentOutput> {
-        self.to_view_with_css_forgiving(viewport, css)
-            .map(|mut view| view.update_with_input(input))
-    }
-
-    /// Parses forgiving CSS, routes input through this HTML tree, and collects typed actions.
-    pub fn update_with_input_actions_and_css_forgiving<Action>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        registry: &DocumentCommandRegistry<Action>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-    {
-        self.to_view_with_css_forgiving(viewport, css)
-            .map(|mut view| view.update_with_input_actions(input, registry))
-    }
-
-    /// Parses forgiving CSS, routes input, and configures typed actions in one hook.
-    pub fn update_with_input_actions_and_css_forgiving_with<Action>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-    {
-        let mut registry = DocumentCommandRegistry::new();
-        configure(&mut registry);
-        self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
     }
 
     /// Emits this parsed HTML tree into a caller-owned document builder.
@@ -1099,32 +956,6 @@ impl HtmlStylesheet {
         Ok(self)
     }
 
-    /// Parses forgiving CSS into the parsed stylesheet.
-    pub fn extend_css_forgiving(&mut self, css: &str) -> HtmlResult<&mut Self> {
-        self.stylesheet.extend(parse_stylesheet_forgiving(css)?);
-        Ok(self)
-    }
-
-    /// Parses forgiving CSS into the parsed stylesheet and returns the bundle.
-    pub fn with_css_forgiving(mut self, css: &str) -> HtmlResult<Self> {
-        self.extend_css_forgiving(css)?;
-        Ok(self)
-    }
-
-    /// Conditionally parses forgiving CSS into the parsed stylesheet.
-    pub fn extend_css_forgiving_if(&mut self, present: bool, css: &str) -> HtmlResult<&mut Self> {
-        if present {
-            self.extend_css_forgiving(css)?;
-        }
-        Ok(self)
-    }
-
-    /// Conditionally parses forgiving CSS into the parsed stylesheet and returns the bundle.
-    pub fn with_css_forgiving_if(mut self, present: bool, css: &str) -> HtmlResult<Self> {
-        self.extend_css_forgiving_if(present, css)?;
-        Ok(self)
-    }
-
     /// Finds the first parsed HTML node with the supplied id.
     pub fn find_by_id(&self, id: &str) -> Option<&HtmlNode> {
         self.html.find_by_id(id)
@@ -1249,21 +1080,9 @@ impl HtmlStylesheet {
         Ok(Self::new(HtmlDocument::parse(html)?, stylesheet))
     }
 
-    /// Parses an HTML document and forgiving CSS stylesheet into typed inputs.
-    pub fn parse_forgiving(html: &str, css: &str) -> HtmlResult<Self> {
-        let stylesheet = parse_stylesheet_forgiving(css)?;
-        Ok(Self::new(HtmlDocument::parse(html)?, stylesheet))
-    }
-
     /// Parses an HTML fragment and CSS stylesheet into typed document inputs.
     pub fn parse_fragment(html: &str, css: &str) -> HtmlResult<Self> {
         let stylesheet = parse_stylesheet(css)?;
-        Ok(Self::new(HtmlDocument::parse_fragment(html)?, stylesheet))
-    }
-
-    /// Parses an HTML fragment and forgiving CSS stylesheet into typed inputs.
-    pub fn parse_fragment_forgiving(html: &str, css: &str) -> HtmlResult<Self> {
-        let stylesheet = parse_stylesheet_forgiving(css)?;
         Ok(Self::new(HtmlDocument::parse_fragment(html)?, stylesheet))
     }
 
@@ -1272,17 +1091,6 @@ impl HtmlStylesheet {
         Ok(Self::new(
             HtmlDocument::load(html_path)?,
             parse_stylesheet(&fs::read_to_string(css_path)?)?,
-        ))
-    }
-
-    /// Reads HTML and CSS files, recovering from invalid CSS rules like browsers do.
-    pub fn load_files_forgiving(
-        html_path: impl AsRef<Path>,
-        css_path: impl AsRef<Path>,
-    ) -> HtmlResult<Self> {
-        Ok(Self::new(
-            HtmlDocument::load(html_path)?,
-            parse_stylesheet_forgiving(&fs::read_to_string(css_path)?)?,
         ))
     }
 
@@ -2177,16 +1985,6 @@ impl HtmlSet {
         self.get(name)?.to_view_with_css(viewport, css)
     }
 
-    /// Parses forgiving CSS and creates a document view from a named document.
-    pub fn to_view_with_css_forgiving(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-    ) -> HtmlResult<DocumentView> {
-        self.get(name)?.to_view_with_css_forgiving(viewport, css)
-    }
-
     /// Creates a named document view, applies retained state projection, and returns both.
     pub fn to_view_with_projection(
         &self,
@@ -2327,31 +2125,6 @@ impl HtmlSet {
             .to_action_surface_with_css_if(viewport, present, css, configure)
     }
 
-    /// Parses forgiving CSS and creates an action surface for a named document.
-    pub fn to_action_surface_with_css_forgiving<Action>(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionSurface<Action>> {
-        self.get(name)?
-            .to_action_surface_with_css_forgiving(viewport, css, configure)
-    }
-
-    /// Conditionally parses forgiving CSS and creates an action surface for a named document.
-    pub fn to_action_surface_with_css_forgiving_if<Action>(
-        &self,
-        name: &str,
-        viewport: Size,
-        present: bool,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionSurface<Action>> {
-        self.get(name)?
-            .to_action_surface_with_css_forgiving_if(viewport, present, css, configure)
-    }
-
     /// Resolves a named HTML document with an empty stylesheet.
     pub fn update(&self, name: &str, viewport: Size) -> HtmlResult<DocumentOutput> {
         self.to_view(name, viewport).map(|mut view| view.update())
@@ -2436,16 +2209,6 @@ impl HtmlSet {
         self.get(name)?.update_with_css(viewport, css)
     }
 
-    /// Parses forgiving CSS and resolves a named HTML document.
-    pub fn update_with_css_forgiving(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-    ) -> HtmlResult<DocumentOutput> {
-        self.get(name)?.update_with_css_forgiving(viewport, css)
-    }
-
     /// Parses CSS and routes input through a named HTML document.
     pub fn update_with_input_and_css(
         &self,
@@ -2456,18 +2219,6 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentOutput> {
         self.get(name)?
             .update_with_input_and_css(viewport, input, css)
-    }
-
-    /// Parses forgiving CSS and routes input through a named HTML document.
-    pub fn update_with_input_and_css_forgiving(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-    ) -> HtmlResult<DocumentOutput> {
-        self.get(name)?
-            .update_with_input_and_css_forgiving(viewport, input, css)
     }
 
     /// Parses CSS, routes input, and collects typed Rust actions.
@@ -2500,38 +2251,6 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_actions_and_css_with(viewport, input, css, configure)
-    }
-
-    /// Parses forgiving CSS, routes input, and collects typed Rust actions.
-    pub fn update_with_input_actions_and_css_forgiving<Action>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        registry: &DocumentCommandRegistry<Action>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-    {
-        self.get(name)?
-            .update_with_input_actions_and_css_forgiving(viewport, input, css, registry)
-    }
-
-    /// Parses forgiving CSS, routes input, and configures typed actions in one hook.
-    pub fn update_with_input_actions_and_css_forgiving_with<Action>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        configure: impl FnOnce(&mut DocumentCommandRegistry<Action>),
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-    {
-        self.get(name)?
-            .update_with_input_actions_and_css_forgiving_with(viewport, input, css, configure)
     }
 
     /// Re-reads file-backed HTML documents and returns names that changed.
@@ -2584,10 +2303,6 @@ impl HtmlFingerprint {
 
 fn parse_stylesheet(css: &str) -> HtmlResult<StyleSheet> {
     StyleSheet::parse_css(css).map_err(|error| HtmlError::Css(error.to_string()))
-}
-
-fn parse_stylesheet_forgiving(css: &str) -> HtmlResult<StyleSheet> {
-    StyleSheet::parse_css_forgiving(css).map_err(|error| HtmlError::Css(error.to_string()))
 }
 
 fn rcdom_children_to_html(

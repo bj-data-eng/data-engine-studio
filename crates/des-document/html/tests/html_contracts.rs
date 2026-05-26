@@ -698,17 +698,14 @@ fn html_document_can_pair_with_css_without_manual_bundle_plumbing() {
         .clone()
         .with_css_if(false, r#".card { width: ; }"#)
         .expect("skipped conditional CSS should not parse");
-    let forgiving_bundle = html
+    let strict_bundle = html
         .clone()
-        .with_css_forgiving_if(
-            true,
-            r#".card { unknown-property: 1px; } .card { margin: 1px; }"#,
-        )
-        .expect("conditional forgiving CSS should parse onto HTML");
-    let skipped_forgiving_bundle = html
+        .with_css_if(true, r#".card { } .card { margin: 1px; }"#)
+        .expect("conditional strict CSS should parse onto HTML");
+    let skipped_strict_bundle = html
         .clone()
-        .with_css_forgiving_if(false, "/* unclosed")
-        .expect("skipped forgiving CSS should not parse");
+        .with_css_if(false, "/* unclosed")
+        .expect("skipped CSS should not parse");
     let mut view = html
         .to_view_with_css(
             Size::new(240.0, 160.0),
@@ -725,62 +722,54 @@ fn html_document_can_pair_with_css_without_manual_bundle_plumbing() {
     let mut skipped_view = html
         .to_view_with_css_if(Size::new(240.0, 160.0), false, r#".card { width: ; }"#)
         .expect("skipped view CSS should not parse");
-    let mut forgiving_view = html
-        .to_view_with_css_forgiving_if(
+    let mut strict_view = html
+        .to_view_with_css_if(
             Size::new(240.0, 160.0),
             true,
-            r#".card { unknown-property: 1px; } .card { width: 132px; }"#,
+            r#".card { } .card { width: 132px; }"#,
         )
-        .expect("conditional forgiving view CSS should compose");
+        .expect("conditional strict view CSS should compose");
 
     let output = view.update();
     let typed_output = typed_view.update();
     let skipped_output = skipped_view.update();
-    let forgiving_output = forgiving_view.update();
+    let strict_output = strict_view.update();
     let panel = output.snapshot().find("panel").unwrap();
     let typed_panel = typed_output.snapshot().find("panel").unwrap();
     let skipped_panel = skipped_output.snapshot().find("panel").unwrap();
-    let forgiving_panel = forgiving_output.snapshot().find("panel").unwrap();
+    let strict_panel = strict_output.snapshot().find("panel").unwrap();
 
     assert_eq!(bundle.stylesheet.rule_count(), 1);
     assert_eq!(typed_bundle.stylesheet().rule_count(), 1);
     assert_eq!(skipped_typed_bundle.stylesheet().rule_count(), 0);
     assert_eq!(conditional_bundle.stylesheet().rule_count(), 1);
     assert_eq!(skipped_conditional_bundle.stylesheet().rule_count(), 0);
-    assert!(forgiving_bundle.stylesheet().rule_count() >= 1);
-    assert!(forgiving_bundle.stylesheet().has_rule_for_class("card"));
-    assert_eq!(skipped_forgiving_bundle.stylesheet().rule_count(), 0);
+    assert!(strict_bundle.stylesheet().rule_count() >= 1);
+    assert!(strict_bundle.stylesheet().has_rule_for_class("card"));
+    assert_eq!(skipped_strict_bundle.stylesheet().rule_count(), 0);
     assert_eq!(panel.rect().size.width, 120.0);
     assert_eq!(panel.rect().size.height, 40.0);
     assert_eq!(typed_panel.rect().size.height, 36.0);
     assert_eq!(skipped_panel.element(), Element::Section);
-    assert_eq!(forgiving_panel.rect().size.width, 132.0);
+    assert_eq!(strict_panel.rect().size.width, 132.0);
 }
 
 #[test]
-fn html_css_entry_points_can_recover_like_browser_stylesheets() {
+fn html_css_entry_points_reject_invalid_author_stylesheets() {
     let html = HtmlDocument::parse_fragment(r#"<section id="panel" class="card">Panel</section>"#)
         .expect("HTML should parse");
-    let css = r#"
+    let invalid_css = r#"
         .broken {
           color: rgb(10, 20, );
         }
         .card { width: 144px; height: 48px; }
     "#;
-    let bundle = html
-        .clone()
-        .with_css_forgiving(css)
-        .expect("forgiving CSS should recover valid rules");
-    let mut view = html
-        .to_view_with_css_forgiving(Size::new(240.0, 160.0), css)
-        .expect("forgiving CSS should compose directly into a view");
 
-    let output = view.update();
-    let panel = output.snapshot().find("panel").unwrap();
-
-    assert!(bundle.stylesheet().rule_count() >= 1);
-    assert_eq!(panel.rect().size.width, 144.0);
-    assert_eq!(panel.rect().size.height, 48.0);
+    assert!(html.clone().with_css(invalid_css).is_err());
+    assert!(
+        html.to_view_with_css(Size::new(240.0, 160.0), invalid_css)
+            .is_err()
+    );
 }
 
 #[test]
@@ -799,11 +788,11 @@ fn html_authored_views_use_document_update_request_as_canonical_complex_path() {
     )
     .expect("HTML should parse");
     let mut view = html
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 180px; height: 72px; } button { width: 80px; height: 28px; }",
+            ".card { width: 180px; height: 72px; } button { width: 80px; height: 28px; }",
         )
-        .expect("HTML and forgiving CSS should create a document view");
+        .expect("HTML and strict CSS should create a document view");
     let registry = DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
     let mut dispatched = Vec::new();
 
@@ -875,14 +864,14 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             &registry,
         )
         .expect("HTML and CSS should collect click actions directly");
-    let forgiving_frame = html
-        .update_with_input_actions_and_css_forgiving(
+    let strict_frame = html
+        .update_with_input_actions_and_css(
             Size::new(240.0, 160.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            ".card { width: 180px; height: 72px; }",
             &registry,
         )
-        .expect("forgiving CSS should collect keyboard actions directly");
+        .expect("strict CSS should collect keyboard actions directly");
     let configured_click_frame = html
         .update_with_input_actions_and_css_with(
             Size::new(240.0, 160.0),
@@ -924,52 +913,52 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             &intent_mapped_key_registry,
         )
         .expect("HTML and CSS should map intent-scoped actions for one update");
-    let configured_forgiving_frame = html
-        .update_with_input_actions_and_css_forgiving_with(
+    let configured_strict_frame = html
+        .update_with_input_actions_and_css_with(
             Size::new(240.0, 160.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            ".card { width: 180px; height: 72px; }",
             |commands| {
                 commands.push("project.run", HtmlAction::Run);
                 commands.push_key_down("project.filter", HtmlAction::Filter);
             },
         )
-        .expect("forgiving CSS should configure typed actions for one update");
-    let forgiving_mapped_click_registry =
+        .expect("strict CSS should configure typed actions for one update");
+    let strict_mapped_click_registry =
         html.command_action_registry([("project.run", HtmlAction::Run)]);
-    let forgiving_mapped_click_frame = html
-        .update_with_input_actions_and_css_forgiving(
+    let strict_mapped_click_frame = html
+        .update_with_input_actions_and_css(
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            ".broken { width: ; } .card { width: 188px; height: 72px; }",
-            &forgiving_mapped_click_registry,
+            ".card { width: 188px; height: 72px; }",
+            &strict_mapped_click_registry,
         )
-        .expect("forgiving CSS should map command actions for one update");
-    let forgiving_mapped_empty_registry = html.command_intent_action_registry([(
+        .expect("strict CSS should map command actions for one update");
+    let strict_mapped_empty_registry = html.command_intent_action_registry([(
         ElementBehaviorEvent::KeyDown,
         "project.filter",
         HtmlAction::Filter,
     )]);
-    let forgiving_mapped_empty_frame = html
-        .update_actions_with_css_forgiving(
+    let strict_mapped_empty_frame = html
+        .update_actions_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 191px; height: 72px; }",
-            &forgiving_mapped_empty_registry,
+            ".card { width: 191px; height: 72px; }",
+            &strict_mapped_empty_registry,
         )
-        .expect("forgiving CSS should map intent actions for no-input updates");
-    let forgiving_intent_mapped_key_registry = html.command_intent_action_registry([(
+        .expect("strict CSS should map intent actions for no-input updates");
+    let strict_intent_mapped_key_registry = html.command_intent_action_registry([(
         ElementBehaviorEvent::KeyDown,
         "project.filter",
         HtmlAction::Filter,
     )]);
-    let forgiving_intent_mapped_key_frame = html
-        .update_with_input_actions_and_css_forgiving(
+    let strict_intent_mapped_key_frame = html
+        .update_with_input_actions_and_css(
             Size::new(240.0, 160.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            ".broken { width: ; } .card { width: 189px; height: 72px; }",
-            &forgiving_intent_mapped_key_registry,
+            ".card { width: 189px; height: 72px; }",
+            &strict_intent_mapped_key_registry,
         )
-        .expect("forgiving CSS should map intent-scoped actions for one update");
+        .expect("strict CSS should map intent-scoped actions for one update");
     let mut surface = html
         .to_action_surface_with_css(Size::new(240.0, 160.0), css, |commands| {
             commands.push("project.run", HtmlAction::Run);
@@ -1020,32 +1009,32 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("skipped action-surface CSS should not parse");
     let skipped_surface_click = skipped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let mut forgiving_surface = html
-        .to_action_surface_with_css_forgiving(
+    let mut strict_surface = html
+        .to_action_surface_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            ".card { width: 180px; height: 72px; }",
             |commands| {
                 commands.push("project.run", HtmlAction::Run);
                 commands.push_key_down("project.filter", HtmlAction::Filter);
             },
         )
-        .expect("forgiving CSS should create a typed action surface directly");
+        .expect("strict CSS should create a typed action surface directly");
     let surface_key =
-        forgiving_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
-    let forgiving_mapped_surface_registry = html.command_action_registry([
+        strict_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
+    let strict_mapped_surface_registry = html.command_action_registry([
         ("project.run", HtmlAction::Run),
         ("project.filter", HtmlAction::Filter),
     ]);
-    let mut forgiving_mapped_surface = html
-        .to_view_with_css_forgiving(
+    let mut strict_mapped_surface = html
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 184px; height: 72px; }",
+            ".card { width: 184px; height: 72px; }",
         )
-        .expect("forgiving CSS should create a mapped action view directly")
-        .action_surface(forgiving_mapped_surface_registry);
-    let forgiving_mapped_surface_click = forgiving_mapped_surface
+        .expect("strict CSS should create a mapped action view directly")
+        .action_surface(strict_mapped_surface_registry);
+    let strict_mapped_surface_click = strict_mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let forgiving_intent_surface_registry = html.command_intent_action_registry([
+    let strict_intent_surface_registry = html.command_intent_action_registry([
         (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
         (
             ElementBehaviorEvent::KeyDown,
@@ -1053,26 +1042,21 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             HtmlAction::Filter,
         ),
     ]);
-    let mut forgiving_intent_surface = html
-        .to_view_with_css_forgiving(
+    let mut strict_intent_surface = html
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 185px; height: 72px; }",
+            ".card { width: 185px; height: 72px; }",
         )
-        .expect("forgiving CSS should create an intent-mapped action view directly")
-        .action_surface(forgiving_intent_surface_registry);
-    let forgiving_intent_surface_key = forgiving_intent_surface
+        .expect("strict CSS should create an intent-mapped action view directly")
+        .action_surface(strict_intent_surface_registry);
+    let strict_intent_surface_key = strict_intent_surface
         .update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
-    let mut skipped_forgiving_surface = html
-        .to_action_surface_with_css_forgiving_if(
-            Size::new(240.0, 160.0),
-            false,
-            "/* unclosed",
-            |commands| {
-                commands.push("project.run", HtmlAction::Run);
-            },
-        )
-        .expect("skipped forgiving action-surface CSS should not parse");
-    let skipped_forgiving_surface_click = skipped_forgiving_surface
+    let mut skipped_strict_surface = html
+        .to_action_surface_with_css_if(Size::new(240.0, 160.0), false, "/* unclosed", |commands| {
+            commands.push("project.run", HtmlAction::Run);
+        })
+        .expect("skipped strict action-surface CSS should not parse");
+    let skipped_strict_surface_click = skipped_strict_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut dispatched = Vec::new();
     let mut dispatch_view = html
@@ -1123,53 +1107,52 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
                 configured_dispatched_values.push(*action);
             })
             .expect("HTML and CSS should configure and dispatch typed action values directly");
-    let mut forgiving_dispatched = Vec::new();
-    let mut forgiving_dispatch_view = html
-        .to_view_with_css_forgiving(
+    let mut strict_dispatched = Vec::new();
+    let mut strict_dispatch_view = html
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            ".card { width: 180px; height: 72px; }",
         )
-        .expect("forgiving CSS should create a view for dispatch");
-    let (forgiving_dispatch_frame, forgiving_dispatch_report) = forgiving_dispatch_view
+        .expect("strict CSS should create a view for dispatch");
+    let (strict_dispatch_frame, strict_dispatch_report) = strict_dispatch_view
         .update_request()
         .input(DocumentInput::key_down(DocumentKey::Enter))
         .dispatch(&registry, |action| {
-            forgiving_dispatched.push(*action.action());
+            strict_dispatched.push(*action.action());
         })
-        .expect("forgiving CSS should dispatch typed actions directly");
-    let mut forgiving_dispatched_values = Vec::new();
-    let mut forgiving_value_dispatch_view = html
-        .to_view_with_css_forgiving(
+        .expect("strict CSS should dispatch typed actions directly");
+    let mut strict_dispatched_values = Vec::new();
+    let mut strict_value_dispatch_view = html
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 180px; height: 72px; }",
+            ".card { width: 180px; height: 72px; }",
         )
-        .expect("forgiving CSS should create a view for value dispatch");
-    let (forgiving_value_dispatch_frame, forgiving_value_dispatch_report) =
-        forgiving_value_dispatch_view
+        .expect("strict CSS should create a view for value dispatch");
+    let (strict_value_dispatch_frame, strict_value_dispatch_report) = strict_value_dispatch_view
+        .update_request()
+        .input(DocumentInput::key_down(DocumentKey::Enter))
+        .dispatch_action_values(&registry, |action| {
+            strict_dispatched_values.push(*action);
+        })
+        .expect("strict CSS should dispatch typed action values directly");
+    let mut strict_configured_dispatched_values = Vec::new();
+    let mut strict_configured_registry = DocumentCommandRegistry::new();
+    strict_configured_registry.push("project.run", HtmlAction::Run);
+    strict_configured_registry.push_key_down("project.filter", HtmlAction::Filter);
+    let mut strict_configured_value_dispatch_view = html
+        .to_view_with_css(
+            Size::new(240.0, 160.0),
+            ".card { width: 180px; height: 72px; }",
+        )
+        .expect("strict CSS should create a view for configured value dispatch");
+    let (strict_configured_value_dispatch_frame, strict_configured_value_dispatch_report) =
+        strict_configured_value_dispatch_view
             .update_request()
             .input(DocumentInput::key_down(DocumentKey::Enter))
-            .dispatch_action_values(&registry, |action| {
-                forgiving_dispatched_values.push(*action);
+            .dispatch_action_values(&strict_configured_registry, |action| {
+                strict_configured_dispatched_values.push(*action);
             })
-            .expect("forgiving CSS should dispatch typed action values directly");
-    let mut forgiving_configured_dispatched_values = Vec::new();
-    let mut forgiving_configured_registry = DocumentCommandRegistry::new();
-    forgiving_configured_registry.push("project.run", HtmlAction::Run);
-    forgiving_configured_registry.push_key_down("project.filter", HtmlAction::Filter);
-    let mut forgiving_configured_value_dispatch_view = html
-        .to_view_with_css_forgiving(
-            Size::new(240.0, 160.0),
-            ".broken { width: ; } .card { width: 180px; height: 72px; }",
-        )
-        .expect("forgiving CSS should create a view for configured value dispatch");
-    let (forgiving_configured_value_dispatch_frame, forgiving_configured_value_dispatch_report) =
-        forgiving_configured_value_dispatch_view
-            .update_request()
-            .input(DocumentInput::key_down(DocumentKey::Enter))
-            .dispatch_action_values(&forgiving_configured_registry, |action| {
-                forgiving_configured_dispatched_values.push(*action);
-            })
-            .expect("forgiving CSS should configure and dispatch typed action values directly");
+            .expect("strict CSS should configure and dispatch typed action values directly");
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,
@@ -1187,9 +1170,9 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         80.0
     );
     assert!(click_frame.contains_action(&HtmlAction::Run));
-    assert!(forgiving_frame.contains_action(&HtmlAction::Filter));
+    assert!(strict_frame.contains_action(&HtmlAction::Filter));
     assert!(configured_click_frame.contains_action(&HtmlAction::Run));
-    assert!(configured_forgiving_frame.contains_action(&HtmlAction::Filter));
+    assert!(configured_strict_frame.contains_action(&HtmlAction::Filter));
     assert!(mapped_empty_frame.is_empty());
     assert_eq!(
         mapped_empty_frame
@@ -1202,9 +1185,9 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             .width,
         190.0
     );
-    assert!(forgiving_mapped_empty_frame.is_empty());
+    assert!(strict_mapped_empty_frame.is_empty());
     assert_eq!(
-        forgiving_mapped_empty_frame
+        strict_mapped_empty_frame
             .output()
             .snapshot()
             .find("panel")
@@ -1238,9 +1221,9 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             .width,
         187.0
     );
-    assert!(forgiving_mapped_click_frame.contains_action(&HtmlAction::Run));
+    assert!(strict_mapped_click_frame.contains_action(&HtmlAction::Run));
     assert_eq!(
-        forgiving_mapped_click_frame
+        strict_mapped_click_frame
             .output()
             .snapshot()
             .find("panel")
@@ -1250,9 +1233,9 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             .width,
         188.0
     );
-    assert!(forgiving_intent_mapped_key_frame.contains_action(&HtmlAction::Filter));
+    assert!(strict_intent_mapped_key_frame.contains_action(&HtmlAction::Filter));
     assert_eq!(
-        forgiving_intent_mapped_key_frame
+        strict_intent_mapped_key_frame
             .output()
             .snapshot()
             .find("panel")
@@ -1291,9 +1274,9 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         183.0
     );
     assert!(surface_key.contains_action(&HtmlAction::Filter));
-    assert!(forgiving_mapped_surface_click.contains_action(&HtmlAction::Run));
+    assert!(strict_mapped_surface_click.contains_action(&HtmlAction::Run));
     assert_eq!(
-        forgiving_mapped_surface_click
+        strict_mapped_surface_click
             .output()
             .snapshot()
             .find("panel")
@@ -1304,11 +1287,11 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         184.0
     );
     assert!(
-        forgiving_intent_surface_key
+        strict_intent_surface_key
             .contains_action_for_intent(ElementBehaviorEvent::KeyDown, &HtmlAction::Filter)
     );
     assert_eq!(
-        forgiving_intent_surface_key
+        strict_intent_surface_key
             .output()
             .snapshot()
             .find("panel")
@@ -1319,7 +1302,7 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         185.0
     );
     assert!(skipped_surface_click.contains_action(&HtmlAction::Run));
-    assert!(skipped_forgiving_surface_click.contains_action(&HtmlAction::Run));
+    assert!(skipped_strict_surface_click.contains_action(&HtmlAction::Run));
     assert_eq!(
         skipped_surface_click
             .output()
@@ -1355,44 +1338,43 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(configured_dispatched_values, vec![HtmlAction::Run]);
-    assert!(forgiving_dispatch_frame.contains_action(&HtmlAction::Filter));
+    assert!(strict_dispatch_frame.contains_action(&HtmlAction::Filter));
     assert_eq!(
-        forgiving_dispatch_report,
+        strict_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
-    assert_eq!(forgiving_dispatched, vec![HtmlAction::Filter]);
-    assert!(forgiving_value_dispatch_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(strict_dispatched, vec![HtmlAction::Filter]);
+    assert!(strict_value_dispatch_frame.contains_action(&HtmlAction::Filter));
     assert_eq!(
-        forgiving_value_dispatch_report,
+        strict_value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
-    assert_eq!(forgiving_dispatched_values, vec![HtmlAction::Filter]);
-    assert!(forgiving_configured_value_dispatch_frame.contains_action(&HtmlAction::Filter));
+    assert_eq!(strict_dispatched_values, vec![HtmlAction::Filter]);
+    assert!(strict_configured_value_dispatch_frame.contains_action(&HtmlAction::Filter));
     assert_eq!(
-        forgiving_configured_value_dispatch_report,
+        strict_configured_value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(
-        forgiving_configured_dispatched_values,
+        strict_configured_dispatched_values,
         vec![HtmlAction::Filter]
     );
 }
 
 #[test]
-fn html_stylesheet_forgiving_constructors_compile_author_assets() {
-    let bundle = HtmlStylesheet::parse_fragment_forgiving(
+fn html_stylesheet_strict_constructors_compile_author_assets() {
+    let bundle = HtmlStylesheet::parse_fragment(
         r#"<button id="run" class="primary" on:click="run">Run</button>"#,
         r#"
-        .discard-me { width: ; }
         .primary { width: 96px; height: 32px; }
         "#,
     )
-    .expect("fragment and forgiving CSS should compile together");
-    let document_bundle = HtmlStylesheet::parse_forgiving(
+    .expect("fragment and strict CSS should compile together");
+    let document_bundle = HtmlStylesheet::parse(
         r#"<html><body><main id="app" class="shell">App</main></body></html>"#,
-        r#".bad { width: ; } .shell { width: 200px; height: 80px; }"#,
+        r#".shell { width: 200px; height: 80px; }"#,
     )
-    .expect("document and forgiving CSS should compile together");
+    .expect("document and strict CSS should compile together");
 
     let mut view = bundle
         .to_view(Size::new(320.0, 180.0))
@@ -2822,10 +2804,7 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         .with_css(r#".primary { width: 96px; height: 32px; }"#)
         .and_then(|bundle| bundle.with_css(".primary { padding: 2px; }"))
         .and_then(|bundle| bundle.with_css_if(false, ".primary { width: ; }"))
-        .and_then(|bundle| {
-            bundle
-                .with_css_forgiving(".primary { unknown-property: 1px; } .primary { margin: 1px; }")
-        })
+        .and_then(|bundle| bundle.with_css(".primary { } .primary { margin: 1px; }"))
         .map(|bundle| {
             bundle
                 .with(|bundle| {
@@ -2839,7 +2818,7 @@ fn html_prelude_exposes_browser_document_authoring_surface() {
         })
         .and_then(|bundle| {
             bundle.try_with(|bundle| {
-                bundle.extend_css_forgiving(".primary { unknown-property: 2px; }")?;
+                bundle.extend_css(".primary { }")?;
                 Ok::<_, HtmlError>(())
             })
         })
@@ -2903,25 +2882,19 @@ fn html_document_and_stylesheet_load_from_files() {
 }
 
 #[test]
-fn html_document_and_forgiving_stylesheet_load_from_files() {
-    let html_fixture = TempHtmlPath::new("des-html-forgiving-document-load", "html");
-    let css_fixture = TempHtmlPath::new("des-html-forgiving-stylesheet-load", "css");
+fn html_document_and_strict_stylesheet_load_from_files() {
+    let html_fixture = TempHtmlPath::new("des-html-strict-document-load", "html");
+    let css_fixture = TempHtmlPath::new("des-html-strict-stylesheet-load", "css");
     fs::write(
         html_fixture.path(),
         r#"<section id="loaded" class="card">Loaded</section>"#,
     )
     .expect("HTML fixture should be writable");
-    fs::write(
-        css_fixture.path(),
-        r#"
-        .bad { height: ; }
-        .card { width: 88px; height: 24px; }
-        "#,
-    )
-    .expect("CSS fixture should be writable");
+    fs::write(css_fixture.path(), ".card { width: 88px; height: 24px; }")
+        .expect("CSS fixture should be writable");
 
-    let bundle = HtmlStylesheet::load_files_forgiving(html_fixture.path(), css_fixture.path())
-        .expect("HTML+forgiving CSS files should load");
+    let bundle = HtmlStylesheet::load_files(html_fixture.path(), css_fixture.path())
+        .expect("HTML+strict CSS files should load");
     let mut view = bundle
         .to_view(Size::new(240.0, 160.0))
         .expect("file-backed bundle should create a view");
@@ -3074,13 +3047,13 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             "#inline { width: 128px; height: 32px; }",
         )
         .expect("named document should resolve strict CSS through the set front door");
-    let css_forgiving_output = set
-        .update_with_css_forgiving(
+    let css_extra_output = set
+        .update_with_css(
             "inline",
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 136px; height: 32px; }",
+            "#inline { width: 136px; height: 32px; }",
         )
-        .expect("named document should resolve forgiving CSS through the set front door");
+        .expect("named document should resolve strict CSS through the set front door");
     let mut css_view = set
         .to_view_with_css(
             "inline",
@@ -3089,14 +3062,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         )
         .expect("named document should create strict CSS views through the set front door");
     let css_view_output = css_view.update();
-    let mut css_forgiving_view = set
-        .to_view_with_css_forgiving(
+    let mut css_extra_view = set
+        .to_view_with_css(
             "inline",
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 144px; height: 32px; }",
+            "#inline { width: 144px; height: 32px; }",
         )
-        .expect("named document should create forgiving CSS views through the set front door");
-    let css_forgiving_view_output = css_forgiving_view.update();
+        .expect("named document should create strict CSS views through the set front door");
+    let css_extra_view_output = css_extra_view.update();
     let inline = output.snapshot().find("inline").unwrap();
 
     assert_eq!(inline.text(), Some("Inline".to_owned()));
@@ -3112,7 +3085,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         128.0
     );
     assert_eq!(
-        css_forgiving_output
+        css_extra_output
             .snapshot()
             .find("inline")
             .unwrap()
@@ -3132,7 +3105,7 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         140.0
     );
     assert_eq!(
-        css_forgiving_view_output
+        css_extra_view_output
             .snapshot()
             .find("inline")
             .unwrap()
@@ -3156,14 +3129,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             "#inline { width: 146px; height: 32px; }",
         )
         .expect("named document should route input through strict CSS");
-    let input_css_forgiving_output = set
-        .update_with_input_and_css_forgiving(
+    let input_css_extra_output = set
+        .update_with_input_and_css(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            ".ignored { unknown-property: yes; } #inline { width: 147px; height: 32px; }",
+            "#inline { width: 147px; height: 32px; }",
         )
-        .expect("named document should route input through forgiving CSS");
+        .expect("named document should route input through strict CSS");
     let action_frame = set
         .update_with_input_actions(
             "inline",
@@ -3365,28 +3338,28 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &css_intent_mapped_registry,
         )
         .expect("named document should map intent actions through strict CSS helpers");
-    let css_forgiving_action_frame = set
-        .update_with_input_actions_and_css_forgiving(
+    let css_extra_action_frame = set
+        .update_with_input_actions_and_css(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            ".ignored { unknown-property: yes; } #inline { width: 156px; height: 32px; }",
+            "#inline { width: 156px; height: 32px; }",
             &registry,
         )
-        .expect("named document should route input through forgiving CSS action helpers");
-    let css_forgiving_mapped_registry = set
+        .expect("named document should route input through strict CSS action helpers");
+    let css_extra_mapped_registry = set
         .command_action_registry("inline", [("inline.run", SetAction::Run)])
-        .expect("named document should create forgiving CSS registries");
-    let css_forgiving_mapped_frame = set
-        .update_with_input_actions_and_css_forgiving(
+        .expect("named document should create strict CSS registries");
+    let css_extra_mapped_frame = set
+        .update_with_input_actions_and_css(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            ".ignored { unknown-property: yes; } #inline { width: 158px; height: 32px; }",
-            &css_forgiving_mapped_registry,
+            "#inline { width: 158px; height: 32px; }",
+            &css_extra_mapped_registry,
         )
-        .expect("named document should map actions through forgiving CSS helpers");
-    let css_forgiving_intent_mapped_registry = set
+        .expect("named document should map actions through strict CSS helpers");
+    let css_extra_intent_mapped_registry = set
         .command_intent_action_registry(
             "shared",
             [(
@@ -3395,16 +3368,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 SetAction::Menu,
             )],
         )
-        .expect("named document should create forgiving intent CSS registries");
-    let css_forgiving_intent_mapped_frame = set
-        .update_with_input_actions_and_css_forgiving(
+        .expect("named document should create strict intent CSS registries");
+    let css_extra_intent_mapped_frame = set
+        .update_with_input_actions_and_css(
             "shared",
             Size::new(240.0, 160.0),
             DocumentInput::secondary_click(Point::new(8.0, 8.0)),
-            ".ignored { unknown-property: yes; } #shared { width: 159px; height: 32px; }",
-            &css_forgiving_intent_mapped_registry,
+            "#shared { width: 159px; height: 32px; }",
+            &css_extra_intent_mapped_registry,
         )
-        .expect("named document should map intent actions through forgiving CSS helpers");
+        .expect("named document should map intent actions through strict CSS helpers");
     let mut css_dispatched = Vec::new();
     let mut css_dispatch_view = set
         .get("inline")
@@ -3473,79 +3446,77 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 css_configured_dispatched_values.push(*action);
             })
             .expect("named document should configure and dispatch strict CSS action values");
-    let mut css_forgiving_dispatched = Vec::new();
-    let mut css_forgiving_dispatch_view = set
+    let mut css_extra_dispatched = Vec::new();
+    let mut css_extra_dispatch_view = set
         .get("inline")
         .expect("named document should be present")
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 176px; height: 32px; }",
+            "#inline { width: 176px; height: 32px; }",
         )
-        .expect("named document should create a forgiving CSS view for dispatch");
-    let (css_forgiving_dispatch_frame, css_forgiving_dispatch_report) = css_forgiving_dispatch_view
+        .expect("named document should create a strict CSS view for dispatch");
+    let (css_extra_dispatch_frame, css_extra_dispatch_report) = css_extra_dispatch_view
         .update_request()
         .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
         .dispatch(&registry, |action| {
-            css_forgiving_dispatched.push(*action.action());
+            css_extra_dispatched.push(*action.action());
         })
-        .expect("named document should dispatch forgiving CSS action frames");
-    let mut css_forgiving_dispatched_values = Vec::new();
-    let mut css_forgiving_value_dispatch_view = set
+        .expect("named document should dispatch strict CSS action frames");
+    let mut css_extra_dispatched_values = Vec::new();
+    let mut css_extra_value_dispatch_view = set
         .get("inline")
         .expect("named document should be present")
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 177px; height: 32px; }",
+            "#inline { width: 177px; height: 32px; }",
         )
-        .expect("named document should create a forgiving CSS view for value dispatch");
-    let (css_forgiving_value_dispatch_frame, css_forgiving_value_dispatch_report) =
-        css_forgiving_value_dispatch_view
+        .expect("named document should create a strict CSS view for value dispatch");
+    let (css_extra_value_dispatch_frame, css_extra_value_dispatch_report) =
+        css_extra_value_dispatch_view
             .update_request()
             .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
             .dispatch_action_values(&registry, |action| {
-                css_forgiving_dispatched_values.push(*action);
+                css_extra_dispatched_values.push(*action);
             })
-            .expect("named document should dispatch forgiving CSS action values");
-    let mut css_forgiving_configured_dispatched = Vec::new();
-    let mut css_forgiving_configured_registry = DocumentCommandRegistry::new();
-    css_forgiving_configured_registry.push_click("inline.run", SetAction::Run);
-    let mut css_forgiving_configured_dispatch_view = set
+            .expect("named document should dispatch strict CSS action values");
+    let mut css_extra_configured_dispatched = Vec::new();
+    let mut css_extra_configured_registry = DocumentCommandRegistry::new();
+    css_extra_configured_registry.push_click("inline.run", SetAction::Run);
+    let mut css_extra_configured_dispatch_view = set
         .get("inline")
         .expect("named document should be present")
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 180px; height: 32px; }",
+            "#inline { width: 180px; height: 32px; }",
         )
-        .expect("named document should create a forgiving CSS view for configured dispatch");
-    let (css_forgiving_configured_dispatch_frame, css_forgiving_configured_dispatch_report) =
-        css_forgiving_configured_dispatch_view
+        .expect("named document should create a strict CSS view for configured dispatch");
+    let (css_extra_configured_dispatch_frame, css_extra_configured_dispatch_report) =
+        css_extra_configured_dispatch_view
             .update_request()
             .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
-            .dispatch(&css_forgiving_configured_registry, |action| {
-                css_forgiving_configured_dispatched.push(*action.action());
+            .dispatch(&css_extra_configured_registry, |action| {
+                css_extra_configured_dispatched.push(*action.action());
             })
-            .expect("named document should configure and dispatch forgiving CSS action frames");
-    let mut css_forgiving_configured_dispatched_values = Vec::new();
-    let mut css_forgiving_configured_value_registry = DocumentCommandRegistry::new();
-    css_forgiving_configured_value_registry.push_click("inline.run", SetAction::Run);
-    let mut css_forgiving_configured_value_dispatch_view = set
+            .expect("named document should configure and dispatch strict CSS action frames");
+    let mut css_extra_configured_dispatched_values = Vec::new();
+    let mut css_extra_configured_value_registry = DocumentCommandRegistry::new();
+    css_extra_configured_value_registry.push_click("inline.run", SetAction::Run);
+    let mut css_extra_configured_value_dispatch_view = set
         .get("inline")
         .expect("named document should be present")
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 181px; height: 32px; }",
+            "#inline { width: 181px; height: 32px; }",
         )
-        .expect("named document should create a forgiving CSS view for configured value dispatch");
-    let (
-        css_forgiving_configured_value_dispatch_frame,
-        css_forgiving_configured_value_dispatch_report,
-    ) = css_forgiving_configured_value_dispatch_view
-        .update_request()
-        .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
-        .dispatch_action_values(&css_forgiving_configured_value_registry, |action| {
-            css_forgiving_configured_dispatched_values.push(*action);
-        })
-        .expect("named document should configure and dispatch forgiving CSS action values");
+        .expect("named document should create a strict CSS view for configured value dispatch");
+    let (css_extra_configured_value_dispatch_frame, css_extra_configured_value_dispatch_report) =
+        css_extra_configured_value_dispatch_view
+            .update_request()
+            .input(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+            .dispatch_action_values(&css_extra_configured_value_registry, |action| {
+                css_extra_configured_dispatched_values.push(*action);
+            })
+            .expect("named document should configure and dispatch strict CSS action values");
     let styled_surface = set
         .to_action_surface_with_stylesheet(
             "inline",
@@ -3618,33 +3589,33 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named skipped strict CSS action surface should not parse");
     let skipped_css_surface_frame = skipped_css_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let mut css_forgiving_surface = set
-        .to_action_surface_with_css_forgiving(
+    let mut css_extra_surface = set
+        .to_action_surface_with_css(
             "inline",
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 164px; height: 32px; }",
+            "#inline { width: 164px; height: 32px; }",
             |commands| {
                 commands.push_click("inline.run", SetAction::Run);
             },
         )
-        .expect("named document should build forgiving CSS action surfaces");
-    let css_forgiving_surface_frame = css_forgiving_surface
+        .expect("named document should build strict CSS action surfaces");
+    let css_extra_surface_frame = css_extra_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let css_forgiving_mapped_surface_registry = set
+    let css_extra_mapped_surface_registry = set
         .command_action_registry("inline", [("inline.run", SetAction::Run)])
-        .expect("named document should create mapped forgiving CSS surface registries");
-    let mut css_forgiving_mapped_surface = set
+        .expect("named document should create mapped strict CSS surface registries");
+    let mut css_extra_mapped_surface = set
         .get("inline")
         .expect("named document should be present")
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #inline { width: 165px; height: 32px; }",
+            "#inline { width: 165px; height: 32px; }",
         )
-        .expect("named document should build mapped forgiving CSS views")
-        .action_surface(css_forgiving_mapped_surface_registry);
-    let css_forgiving_mapped_surface_frame = css_forgiving_mapped_surface
+        .expect("named document should build mapped strict CSS views")
+        .action_surface(css_extra_mapped_surface_registry);
+    let css_extra_mapped_surface_frame = css_extra_mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let css_forgiving_intent_surface_registry = set
+    let css_extra_intent_surface_registry = set
         .command_intent_action_registry(
             "shared",
             [
@@ -3656,20 +3627,20 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 ),
             ],
         )
-        .expect("named document should create intent forgiving CSS surface registries");
-    let mut css_forgiving_intent_surface = set
+        .expect("named document should create intent strict CSS surface registries");
+    let mut css_extra_intent_surface = set
         .get("shared")
         .expect("named document should be present")
-        .to_view_with_css_forgiving(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #shared { width: 166px; height: 32px; }",
+            "#shared { width: 166px; height: 32px; }",
         )
-        .expect("named document should build intent-mapped forgiving CSS views")
-        .action_surface(css_forgiving_intent_surface_registry);
-    let css_forgiving_intent_surface_frame = css_forgiving_intent_surface
+        .expect("named document should build intent-mapped strict CSS views")
+        .action_surface(css_extra_intent_surface_registry);
+    let css_extra_intent_surface_frame = css_extra_intent_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
-    let mut skipped_css_forgiving_surface = set
-        .to_action_surface_with_css_forgiving_if(
+    let mut skipped_css_extra_surface = set
+        .to_action_surface_with_css_if(
             "inline",
             Size::new(240.0, 160.0),
             false,
@@ -3678,8 +3649,8 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 commands.push_click("inline.run", SetAction::Run);
             },
         )
-        .expect("named skipped forgiving CSS action surface should not parse");
-    let skipped_css_forgiving_surface_frame = skipped_css_forgiving_surface
+        .expect("named skipped strict CSS action surface should not parse");
+    let skipped_css_extra_surface_frame = skipped_css_extra_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let (project_report, projected_output) = set
         .update_projected_with("inline", Size::new(240.0, 160.0), |projection| {
@@ -3865,9 +3836,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         146.0
     );
-    assert!(input_css_forgiving_output.was_clicked("inline"));
+    assert!(input_css_extra_output.was_clicked("inline"));
     assert_eq!(
-        input_css_forgiving_output
+        input_css_extra_output
             .snapshot()
             .find("inline")
             .unwrap()
@@ -3976,9 +3947,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         155.0
     );
-    assert!(css_forgiving_action_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_action_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_action_frame
+        css_extra_action_frame
             .output()
             .snapshot()
             .find("inline")
@@ -3988,9 +3959,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         156.0
     );
-    assert!(css_forgiving_mapped_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_mapped_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_mapped_frame
+        css_extra_mapped_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4001,14 +3972,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         158.0
     );
     assert!(
-        css_forgiving_intent_mapped_frame.contains_action_for_target_intent(
+        css_extra_intent_mapped_frame.contains_action_for_target_intent(
             "shared",
             ElementBehaviorEvent::ContextMenu,
             &SetAction::Menu
         )
     );
     assert_eq!(
-        css_forgiving_intent_mapped_frame
+        css_extra_intent_mapped_frame
             .output()
             .snapshot()
             .find("shared")
@@ -4086,14 +4057,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         173.0
     );
-    assert!(css_forgiving_dispatch_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_dispatch_report,
+        css_extra_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
-    assert_eq!(css_forgiving_dispatched, vec![SetAction::Run]);
+    assert_eq!(css_extra_dispatched, vec![SetAction::Run]);
     assert_eq!(
-        css_forgiving_dispatch_frame
+        css_extra_dispatch_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4103,14 +4074,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         176.0
     );
-    assert!(css_forgiving_value_dispatch_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_value_dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_value_dispatch_report,
+        css_extra_value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
-    assert_eq!(css_forgiving_dispatched_values, vec![SetAction::Run]);
+    assert_eq!(css_extra_dispatched_values, vec![SetAction::Run]);
     assert_eq!(
-        css_forgiving_value_dispatch_frame
+        css_extra_value_dispatch_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4120,14 +4091,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         177.0
     );
-    assert!(css_forgiving_configured_dispatch_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_configured_dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_configured_dispatch_report,
+        css_extra_configured_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
-    assert_eq!(css_forgiving_configured_dispatched, vec![SetAction::Run]);
+    assert_eq!(css_extra_configured_dispatched, vec![SetAction::Run]);
     assert_eq!(
-        css_forgiving_configured_dispatch_frame
+        css_extra_configured_dispatch_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4137,17 +4108,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         180.0
     );
-    assert!(css_forgiving_configured_value_dispatch_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_configured_value_dispatch_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_configured_value_dispatch_report,
+        css_extra_configured_value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
+    assert_eq!(css_extra_configured_dispatched_values, vec![SetAction::Run]);
     assert_eq!(
-        css_forgiving_configured_dispatched_values,
-        vec![SetAction::Run]
-    );
-    assert_eq!(
-        css_forgiving_configured_value_dispatch_frame
+        css_extra_configured_value_dispatch_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4208,9 +4176,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .element(),
         Element::Button
     );
-    assert!(css_forgiving_surface_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_surface_frame
+        css_extra_surface_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4220,9 +4188,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         164.0
     );
-    assert!(css_forgiving_mapped_surface_frame.contains_action(&SetAction::Run));
+    assert!(css_extra_mapped_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        css_forgiving_mapped_surface_frame
+        css_extra_mapped_surface_frame
             .output()
             .snapshot()
             .find("inline")
@@ -4233,14 +4201,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         165.0
     );
     assert!(
-        css_forgiving_intent_surface_frame.contains_action_for_target_intent(
+        css_extra_intent_surface_frame.contains_action_for_target_intent(
             "shared",
             ElementBehaviorEvent::ContextMenu,
             &SetAction::Menu
         )
     );
     assert_eq!(
-        css_forgiving_intent_surface_frame
+        css_extra_intent_surface_frame
             .output()
             .snapshot()
             .find("shared")
@@ -4250,9 +4218,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             .width,
         166.0
     );
-    assert!(skipped_css_forgiving_surface_frame.contains_action(&SetAction::Run));
+    assert!(skipped_css_extra_surface_frame.contains_action(&SetAction::Run));
     assert_eq!(
-        skipped_css_forgiving_surface_frame
+        skipped_css_extra_surface_frame
             .output()
             .snapshot()
             .find("inline")

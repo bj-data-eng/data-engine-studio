@@ -53,8 +53,8 @@ fn document_view_groups_document_stylesheet_and_engine_update() {
         .expect("strict CSS should extend an existing view")
         .extend_css_if(false, ".panel { width: ; }")
         .expect("skipped CSS should not parse")
-        .extend_css_forgiving(".panel { unknown-property: 1px; } .panel { margin: 2px; }")
-        .expect("forgiving CSS should extend an existing view")
+        .extend_css(".panel { margin: 2px; }")
+        .expect("CSS should extend an existing view")
         .extend_stylesheet(
             StyleSheet::new().class("panel", Style::default().border(Color::rgb(90, 120, 180))),
         );
@@ -1606,10 +1606,8 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         .with_css_if(false, ".run-action { width: ; }")
         .expect("skipped action-surface CSS should not parse");
     surface
-        .extend_css_forgiving(
-            ".inspect-action { unknown-property: 1px; } .inspect-action { height: 40px; }",
-        )
-        .expect("forgiving CSS should extend a configured action surface")
+        .extend_css(".inspect-action { height: 40px; }")
+        .expect("CSS should extend a configured action surface")
         .extend_stylesheet_if(
             StyleSheet::new().class("run-action", Style::default().radius(4.0)),
             true,
@@ -3711,10 +3709,7 @@ fn document_view_compose_collects_css_and_widget_styles() {
         .unwrap()
         .css_if(destructive, ".panel { width: ; }")
         .unwrap()
-        .css_forgiving_if(
-            compact,
-            ".panel { unknown-property: 1px; } .tone { height: 28px; }",
-        )
+        .css_if(compact, ".tone { height: 28px; }")
         .unwrap()
         .extend_stylesheet_if(
             StyleSheet::new().class("accent", Style::default().border(Color::rgb(90, 120, 180))),
@@ -3775,7 +3770,7 @@ fn document_view_builder_can_build_action_surfaces_directly() {
                 Style::default().background(Color::rgb(220, 238, 255)),
             ))
         })
-        .try_with(|builder| builder.with_css_forgiving(".ignored { unknown-property: yes; }"))
+        .try_with(|builder| builder.with_css(".ignored { margin: 1px; }"))
         .expect("builder configuration should compose")
         .with_css("#run { width: 96px; height: 32px; }")
         .expect("CSS should compose")
@@ -4945,18 +4940,18 @@ fn document_widgets_can_declare_typed_command_bindings() {
             "#toggle { border-color: rgb(28, 78, 120); }",
         )
         .expect("widget CSS and projection should be valid");
-    let mut forgiving_css_view = toggle
-        .view_with_css_forgiving(
+    let mut extra_css_view = toggle
+        .view_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { border-color: rgb(40, 80, 120); }",
+            ".toggle { border-color: rgb(40, 80, 120); }",
         )
-        .expect("forgiving widget CSS should keep supported rules");
-    let mut try_forgiving_css_view = toggle
-        .try_view_with_css_forgiving(
+        .expect("widget CSS should keep supported rules");
+    let mut try_extra_css_view = toggle
+        .try_view_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { border-color: rgb(48, 88, 128); }",
+            ".toggle { border-color: rgb(48, 88, 128); }",
         )
-        .expect("forgiving widget CSS and projection should be valid");
+        .expect("widget CSS and projection should be valid");
     let mut css_surface = toggle
         .action_surface_with_css(
             Size::new(320.0, 180.0),
@@ -4969,18 +4964,18 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(218, 242, 232); }",
         )
         .expect("widget action CSS and projection should be valid");
-    let mut forgiving_css_surface = toggle
-        .action_surface_with_css_forgiving(
+    let mut extra_css_surface = toggle
+        .action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 232, 255); }",
+            ".toggle { background: rgb(240, 232, 255); }",
         )
-        .expect("forgiving widget action CSS should keep supported rules");
-    let mut try_forgiving_css_surface = toggle
-        .try_action_surface_with_css_forgiving(
+        .expect("widget action CSS should keep supported rules");
+    let mut try_extra_css_surface = toggle
+        .try_action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 230, 250); }",
+            ".toggle { background: rgb(236, 230, 250); }",
         )
-        .expect("forgiving widget action CSS and projection should be valid");
+        .expect("widget action CSS and projection should be valid");
 
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
@@ -4990,15 +4985,15 @@ fn document_widgets_can_declare_typed_command_bindings() {
     );
     let css_output = css_view.update();
     let try_css_output = try_css_view.update();
-    let forgiving_css_output = forgiving_css_view.update();
-    let try_forgiving_css_output = try_forgiving_css_view.update();
+    let extra_css_output = extra_css_view.update();
+    let try_extra_css_output = try_extra_css_view.update();
     let css_surface_frame =
         css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let try_css_surface_frame = try_css_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let forgiving_css_surface_frame = forgiving_css_surface
+    let extra_css_surface_frame = extra_css_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let try_forgiving_css_surface_frame = try_forgiving_css_surface
+    let try_extra_css_surface_frame = try_extra_css_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let toggle_commands = toggle.commands();
     let boxed_toggle_commands = boxed_toggle.commands();
@@ -5103,71 +5098,70 @@ fn document_widgets_can_declare_typed_command_bindings() {
     let try_css_idle_value_dispatch_frame = try_css_idle_value_dispatch_surface.update_actions();
     let try_css_idle_value_dispatch_report = try_css_idle_value_dispatch_frame
         .dispatch_action_values(|action| try_css_idle_dispatched_values.push(*action));
-    let mut forgiving_dispatch_actions = Vec::new();
-    let mut forgiving_dispatch_surface = toggle
-        .action_surface_with_css_forgiving(
+    let mut strict_dispatch_actions = Vec::new();
+    let mut strict_dispatch_surface = toggle
+        .action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 238, 255); }",
+            ".toggle { background: rgb(240, 238, 255); }",
         )
-        .expect("forgiving widget CSS should keep supported rules");
-    let forgiving_dispatch_frame = forgiving_dispatch_surface.update_actions();
-    let forgiving_dispatch_report = forgiving_dispatch_frame
-        .dispatch(|command| forgiving_dispatch_actions.push(*command.action()));
-    let mut forgiving_idle_dispatched_values = Vec::new();
-    let mut forgiving_idle_value_dispatch_surface = toggle
-        .action_surface_with_css_forgiving(
+        .expect("widget CSS should keep supported rules");
+    let strict_dispatch_frame = strict_dispatch_surface.update_actions();
+    let strict_dispatch_report =
+        strict_dispatch_frame.dispatch(|command| strict_dispatch_actions.push(*command.action()));
+    let mut strict_idle_dispatched_values = Vec::new();
+    let mut strict_idle_value_dispatch_surface = toggle
+        .action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(242, 240, 255); }",
+            ".toggle { background: rgb(242, 240, 255); }",
         )
-        .expect("forgiving widget CSS should keep supported rules");
-    let forgiving_idle_value_dispatch_frame =
-        forgiving_idle_value_dispatch_surface.update_actions();
-    let forgiving_idle_value_dispatch_report = forgiving_idle_value_dispatch_frame
-        .dispatch_action_values(|action| forgiving_idle_dispatched_values.push(*action));
-    let mut try_forgiving_idle_dispatched_values = Vec::new();
-    let mut try_forgiving_idle_value_dispatch_surface = toggle
-        .try_action_surface_with_css_forgiving(
+        .expect("widget CSS should keep supported rules");
+    let strict_idle_value_dispatch_frame = strict_idle_value_dispatch_surface.update_actions();
+    let strict_idle_value_dispatch_report = strict_idle_value_dispatch_frame
+        .dispatch_action_values(|action| strict_idle_dispatched_values.push(*action));
+    let mut try_strict_idle_dispatched_values = Vec::new();
+    let mut try_strict_idle_value_dispatch_surface = toggle
+        .try_action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(244, 242, 255); }",
+            ".toggle { background: rgb(244, 242, 255); }",
         )
-        .expect("forgiving widget CSS and projection should be valid");
-    let try_forgiving_idle_value_dispatch_frame =
-        try_forgiving_idle_value_dispatch_surface.update_actions();
-    let try_forgiving_idle_value_dispatch_report = try_forgiving_idle_value_dispatch_frame
-        .dispatch_action_values(|action| try_forgiving_idle_dispatched_values.push(*action));
-    let mut forgiving_input_dispatch_actions = Vec::new();
-    let mut forgiving_input_dispatch_surface = toggle
-        .try_action_surface_with_css_forgiving(
+        .expect("widget CSS and projection should be valid");
+    let try_strict_idle_value_dispatch_frame =
+        try_strict_idle_value_dispatch_surface.update_actions();
+    let try_strict_idle_value_dispatch_report = try_strict_idle_value_dispatch_frame
+        .dispatch_action_values(|action| try_strict_idle_dispatched_values.push(*action));
+    let mut strict_input_dispatch_actions = Vec::new();
+    let mut strict_input_dispatch_surface = toggle
+        .try_action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 252); }",
+            ".toggle { background: rgb(238, 236, 252); }",
         )
-        .expect("forgiving widget CSS and projection should be valid");
-    let forgiving_input_dispatch_frame = forgiving_input_dispatch_surface
+        .expect("widget CSS and projection should be valid");
+    let strict_input_dispatch_frame = strict_input_dispatch_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let forgiving_input_dispatch_report = forgiving_input_dispatch_frame
-        .dispatch(|command| forgiving_input_dispatch_actions.push(*command.action()));
-    let mut forgiving_input_dispatched_values = Vec::new();
-    let mut forgiving_input_value_dispatch_surface = toggle
-        .action_surface_with_css_forgiving(
+    let strict_input_dispatch_report = strict_input_dispatch_frame
+        .dispatch(|command| strict_input_dispatch_actions.push(*command.action()));
+    let mut strict_input_dispatched_values = Vec::new();
+    let mut strict_input_value_dispatch_surface = toggle
+        .action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 254); }",
+            ".toggle { background: rgb(238, 236, 254); }",
         )
-        .expect("forgiving widget CSS should keep supported rules");
-    let forgiving_input_value_dispatch_frame = forgiving_input_value_dispatch_surface
+        .expect("widget CSS should keep supported rules");
+    let strict_input_value_dispatch_frame = strict_input_value_dispatch_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let forgiving_input_value_dispatch_report = forgiving_input_value_dispatch_frame
-        .dispatch_action_values(|action| forgiving_input_dispatched_values.push(*action));
-    let mut try_forgiving_input_dispatched_values = Vec::new();
-    let mut try_forgiving_input_value_dispatch_surface = toggle
-        .try_action_surface_with_css_forgiving(
+    let strict_input_value_dispatch_report = strict_input_value_dispatch_frame
+        .dispatch_action_values(|action| strict_input_dispatched_values.push(*action));
+    let mut try_strict_input_dispatched_values = Vec::new();
+    let mut try_strict_input_value_dispatch_surface = toggle
+        .try_action_surface_with_css(
             Size::new(320.0, 180.0),
-            ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 234, 252); }",
+            ".toggle { background: rgb(236, 234, 252); }",
         )
-        .expect("forgiving widget CSS and projection should be valid");
-    let try_forgiving_input_value_dispatch_frame = try_forgiving_input_value_dispatch_surface
+        .expect("widget CSS and projection should be valid");
+    let try_strict_input_value_dispatch_frame = try_strict_input_value_dispatch_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let try_forgiving_input_value_dispatch_report = try_forgiving_input_value_dispatch_frame
-        .dispatch_action_values(|action| try_forgiving_input_dispatched_values.push(*action));
+    let try_strict_input_value_dispatch_report = try_strict_input_value_dispatch_frame
+        .dispatch_action_values(|action| try_strict_input_dispatched_values.push(*action));
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
@@ -5207,7 +5201,7 @@ fn document_widgets_can_declare_typed_command_bindings() {
         Some(Color::rgb(28, 78, 120))
     );
     assert_eq!(
-        forgiving_css_output
+        extra_css_output
             .snapshot()
             .find("toggle")
             .unwrap()
@@ -5216,7 +5210,7 @@ fn document_widgets_can_declare_typed_command_bindings() {
         Some(Color::rgb(40, 80, 120))
     );
     assert_eq!(
-        try_forgiving_css_output
+        try_extra_css_output
             .snapshot()
             .find("toggle")
             .unwrap()
@@ -5246,9 +5240,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(218, 242, 232))
     );
-    assert!(forgiving_css_surface_frame.contains_action(&WidgetAction::Toggle));
+    assert!(extra_css_surface_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
-        forgiving_css_surface_frame
+        extra_css_surface_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5257,9 +5251,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(240, 232, 255))
     );
-    assert!(try_forgiving_css_surface_frame.contains_action(&WidgetAction::Toggle));
+    assert!(try_extra_css_surface_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
-        try_forgiving_css_surface_frame
+        try_extra_css_surface_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5388,14 +5382,14 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(224, 238, 250))
     );
-    assert!(forgiving_dispatch_frame.is_empty());
+    assert!(strict_dispatch_frame.is_empty());
     assert_eq!(
-        forgiving_dispatch_report,
+        strict_dispatch_report,
         DocumentCommandDispatchReport::new(0, 0, 0)
     );
-    assert!(forgiving_dispatch_actions.is_empty());
+    assert!(strict_dispatch_actions.is_empty());
     assert_eq!(
-        forgiving_dispatch_frame
+        strict_dispatch_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5404,14 +5398,14 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(240, 238, 255))
     );
-    assert!(forgiving_idle_value_dispatch_frame.is_empty());
+    assert!(strict_idle_value_dispatch_frame.is_empty());
     assert_eq!(
-        forgiving_idle_value_dispatch_report,
+        strict_idle_value_dispatch_report,
         DocumentCommandDispatchReport::new(0, 0, 0)
     );
-    assert!(forgiving_idle_dispatched_values.is_empty());
+    assert!(strict_idle_dispatched_values.is_empty());
     assert_eq!(
-        forgiving_idle_value_dispatch_frame
+        strict_idle_value_dispatch_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5420,14 +5414,14 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(242, 240, 255))
     );
-    assert!(try_forgiving_idle_value_dispatch_frame.is_empty());
+    assert!(try_strict_idle_value_dispatch_frame.is_empty());
     assert_eq!(
-        try_forgiving_idle_value_dispatch_report,
+        try_strict_idle_value_dispatch_report,
         DocumentCommandDispatchReport::new(0, 0, 0)
     );
-    assert!(try_forgiving_idle_dispatched_values.is_empty());
+    assert!(try_strict_idle_dispatched_values.is_empty());
     assert_eq!(
-        try_forgiving_idle_value_dispatch_frame
+        try_strict_idle_value_dispatch_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5436,14 +5430,14 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(244, 242, 255))
     );
-    assert!(forgiving_input_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert!(strict_input_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
-        forgiving_input_dispatch_report,
+        strict_input_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
-    assert_eq!(forgiving_input_dispatch_actions, vec![WidgetAction::Toggle]);
+    assert_eq!(strict_input_dispatch_actions, vec![WidgetAction::Toggle]);
     assert_eq!(
-        forgiving_input_dispatch_frame
+        strict_input_dispatch_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5452,17 +5446,14 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(238, 236, 252))
     );
-    assert!(forgiving_input_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert!(strict_input_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
-        forgiving_input_value_dispatch_report,
+        strict_input_value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
+    assert_eq!(strict_input_dispatched_values, vec![WidgetAction::Toggle]);
     assert_eq!(
-        forgiving_input_dispatched_values,
-        vec![WidgetAction::Toggle]
-    );
-    assert_eq!(
-        forgiving_input_value_dispatch_frame
+        strict_input_value_dispatch_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5471,17 +5462,17 @@ fn document_widgets_can_declare_typed_command_bindings() {
             .background,
         Some(Color::rgb(238, 236, 254))
     );
-    assert!(try_forgiving_input_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
+    assert!(try_strict_input_value_dispatch_frame.contains_action(&WidgetAction::Toggle));
     assert_eq!(
-        try_forgiving_input_value_dispatch_report,
+        try_strict_input_value_dispatch_report,
         DocumentCommandDispatchReport::new(1, 1, 0)
     );
     assert_eq!(
-        try_forgiving_input_dispatched_values,
+        try_strict_input_dispatched_values,
         vec![WidgetAction::Toggle]
     );
     assert_eq!(
-        try_forgiving_input_value_dispatch_frame
+        try_strict_input_value_dispatch_frame
             .output()
             .snapshot()
             .find("toggle")
@@ -5658,11 +5649,10 @@ fn document_widget_css_helpers_return_authoring_errors_without_panics() {
         Ok(_) => panic!("action widget projection errors should be returned after CSS parses"),
         Err(error) => error,
     };
-    let forgiving_projection_error = match widget.try_action_surface_with_css_forgiving(
-        Size::new(320.0, 180.0),
-        ".ignored { unknown-property: yes; } #rendered { width: 120px; }",
-    ) {
-        Ok(_) => panic!("forgiving CSS should still report widget projection errors"),
+    let strict_projection_error = match widget
+        .try_action_surface_with_css(Size::new(320.0, 180.0), "#rendered { width: 120px; }")
+    {
+        Ok(_) => panic!("strict CSS should still report widget projection errors"),
         Err(error) => error,
     };
 
@@ -5676,7 +5666,7 @@ fn document_widget_css_helpers_return_authoring_errors_without_panics() {
         DocumentAuthoringError::Document(_)
     ));
     assert!(matches!(
-        forgiving_projection_error,
+        strict_projection_error,
         DocumentAuthoringError::Document(_)
     ));
     assert!(projection_error.to_string().contains("missing"));
@@ -5829,14 +5819,14 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
         .with_css_if(compact, ".css-extra { height: 12px; }")
         .expect("conditional strict CSS should compose")
         .with_css_if(destructive, ".skipped-css { width: ; }")
-        .expect("skipped strict CSS should not parse")
-        .with_css_forgiving_if(
+        .expect("skipped CSS should not parse")
+        .with_css_if(
             compact,
-            ".css-extra { unknown-property: 1px; } .css-forgiving { width: 64px; }",
+            ".css-extra { margin: 1px; } .css-strict { width: 64px; }",
         )
-        .expect("conditional forgiving CSS should compose")
-        .with_css_forgiving_if(destructive, "/* unclosed")
-        .expect("skipped forgiving CSS should not parse")
+        .expect("conditional CSS should compose")
+        .with_css_if(destructive, "/* unclosed")
+        .expect("skipped CSS should not parse")
         .when(compact, |stylesheet| {
             stylesheet.push_class("compact", Style::default().padding(Insets::all(2.0)));
         })
@@ -5846,12 +5836,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
                 Style::default().background(Color::rgb(255, 180, 180)),
             );
         })
-        .extended(
-            StyleSheet::from_css_forgiving(
-                ".panel { unknown-property: 1px; } .title { width: 80px; }",
-            )
-            .expect("forgiving CSS should keep valid rules"),
-        )
+        .extended(StyleSheet::from_css(".title { width: 80px; }").expect("CSS should parse"))
         .extended_if(
             StyleSheet::new().class("frame", Style::default().border(Color::rgb(90, 120, 180))),
             compact,
@@ -5875,7 +5860,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert!(stylesheet.has_rule_for_element(Element::Div));
     assert!(stylesheet.has_rule_for_class("panel"));
     assert!(stylesheet.has_rule_for_class("css-extra"));
-    assert!(stylesheet.has_rule_for_class("css-forgiving"));
+    assert!(stylesheet.has_rule_for_class("css-strict"));
     assert!(!stylesheet.has_rule_for_class("skipped-css"));
     assert!(stylesheet.has_rule_for_class("typed-if"));
     assert!(stylesheet.has_rule_for_class("typed-a"));
@@ -5948,19 +5933,16 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
         .expect("conditional mutable CSS should compose")
         .extend_css_if(false, ".mutable-skipped { width: ; }")
         .expect("skipped mutable CSS should not parse")
-        .extend_css_forgiving_if(
-            true,
-            ".mutable-forgiving { unknown-property: 1px; } .mutable-forgiving { height: 24px; }",
-        )
-        .expect("conditional mutable forgiving CSS should compose")
-        .extend_css_forgiving_if(false, "/* unclosed")
-        .expect("skipped mutable forgiving CSS should not parse")
+        .extend_css_if(true, ".mutable-strict { height: 24px; }")
+        .expect("conditional mutable CSS should compose")
+        .extend_css_if(false, "/* unclosed")
+        .expect("skipped mutable CSS should not parse")
         .extend_if(
             StyleSheet::new().class("ignored", Style::default().width(Length::Px(999.0))),
             false,
         );
     assert!(mutable_stylesheet.has_rule_for_class("mutable-css"));
-    assert!(mutable_stylesheet.has_rule_for_class("mutable-forgiving"));
+    assert!(mutable_stylesheet.has_rule_for_class("mutable-strict"));
     assert!(mutable_stylesheet.has_rule_for_class("mutable-typed"));
     assert!(!mutable_stylesheet.has_rule_for_class("mutable-skipped"));
     assert!(!mutable_stylesheet.has_rule_for_id("mutable-skipped-id"));
@@ -5987,7 +5969,7 @@ fn stylesheet_composes_typed_rules_and_css_fluently() {
     assert_eq!(panel.style().radius, CornerRadii::all(4.0));
     assert_eq!(title.rect().size, Size::new(80.0, 20.0));
     assert_eq!(title.style().padding.left, 4.0);
-    assert_eq!(mutable_stylesheet.rule_count(), 8);
+    assert_eq!(mutable_stylesheet.rule_count(), 7);
     assert!(view.stylesheet().rule_count() >= 6);
 }
 

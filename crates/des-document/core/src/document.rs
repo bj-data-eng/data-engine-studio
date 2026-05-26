@@ -1511,32 +1511,6 @@ pub trait DocumentWidget {
         Ok(self.try_view_with_stylesheet(viewport, stylesheet)?)
     }
 
-    /// Creates a document view containing this widget and browser-forgiving CSS rules.
-    fn view_with_css_forgiving(
-        &self,
-        viewport: Size,
-        css: &str,
-    ) -> Result<crate::DocumentView, crate::CssParseError>
-    where
-        Self: Sized,
-    {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
-        Ok(self.view_with_stylesheet(viewport, stylesheet))
-    }
-
-    /// Creates a forgiving CSS-backed view, returning all authoring errors explicitly.
-    fn try_view_with_css_forgiving(
-        &self,
-        viewport: Size,
-        css: &str,
-    ) -> DocumentAuthoringResult<crate::DocumentView>
-    where
-        Self: Sized,
-    {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
-        Ok(self.try_view_with_stylesheet(viewport, stylesheet)?)
-    }
-
     /// Creates a styled view containing this widget, returning projection errors explicitly.
     fn try_view_with_stylesheet(
         &self,
@@ -1659,32 +1633,6 @@ pub trait DocumentActionWidget<Action>: DocumentWidget {
         Self: Sized,
     {
         let stylesheet = StyleSheet::from_css(css)?;
-        Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet)?)
-    }
-
-    /// Creates an action surface containing this widget and browser-forgiving CSS rules.
-    fn action_surface_with_css_forgiving(
-        &self,
-        viewport: Size,
-        css: &str,
-    ) -> Result<crate::DocumentActionSurface<Action>, crate::CssParseError>
-    where
-        Self: Sized,
-    {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
-        Ok(self.action_surface_with_stylesheet(viewport, stylesheet))
-    }
-
-    /// Creates a forgiving CSS-backed action surface, returning all authoring errors explicitly.
-    fn try_action_surface_with_css_forgiving(
-        &self,
-        viewport: Size,
-        css: &str,
-    ) -> DocumentAuthoringResult<crate::DocumentActionSurface<Action>>
-    where
-        Self: Sized,
-    {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
         Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet)?)
     }
 

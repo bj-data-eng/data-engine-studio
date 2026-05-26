@@ -30,7 +30,7 @@ Use these rules before adding or preserving any public helper:
 - Keep direct shortcuts only for the most common two-step app loops.
 - Do not add both frame-returning and value-only variants unless the value-only
   path removes substantial ceremony.
-- Do not add both strict-CSS and forgiving-CSS variants at every layer.
+- Keep CSS parsing strict; do not add app-authoring recovery variants at every layer.
 - Do not mirror helper families from `DocumentView` into `DocumentActionSurface`,
   widgets, HTML documents, HTML bundles, and named HTML sets.
 - A test should prove behavior or a canonical workflow, not the existence of
@@ -47,7 +47,7 @@ File: `crates/des-document/widgets/src/context_menu.rs`
 `ContextMenu` still exposes a broad matrix across:
 
 - `action_for` closures vs `(command, action)` pairs
-- default stylesheet vs explicit stylesheet vs strict CSS vs forgiving CSS
+- default stylesheet vs explicit stylesheet vs CSS
 - update vs input update
 - action frame vs action values
 - dispatch action objects vs dispatch action values
@@ -82,7 +82,7 @@ File: `crates/des-document/core/src/document.rs`
 
 - update vs update with input
 - dispatch vs dispatch action values
-- strict CSS vs forgiving CSS
+- CSS vs no CSS
 - fallible vs infallible
 
 These defaults are convenient but make every widget inherit a very wide public
@@ -154,7 +154,7 @@ Recent consolidation removed the worst direct dispatch permutations from
 - `update_action_values_with_actions`
 - `update_actions_with_intent_actions`
 - `update_action_values_with_intent_actions`
-- CSS and forgiving-CSS variants
+- CSS variants
 - named-document variants
 
 Recommended direction:
@@ -183,7 +183,7 @@ Files:
 
 The tests are valuable, but some still prove helper breadth more than product
 behavior. Examples include blocks that exercise every combination of direct
-dispatch, action values, mapped actions, CSS, forgiving CSS, and named set
+dispatch, action values, mapped actions, CSS, and named set
 variants.
 
 Recommended direction:
@@ -237,8 +237,8 @@ Useful commands:
 ```sh
 git log --oneline --since='24 hours ago' --stat -- crates/des-document crates/des-app crates/des-ui-lab crates/des-core
 find crates/des-document crates/des-app crates/des-ui-lab crates/des-core -name '*.rs' -print0 | xargs -0 wc -l | sort -n | tail -40
-rg "pub fn .*(_if|_with|_and_|action_values|dispatch|forgiving|projection|projected)" crates/des-document/core/src crates/des-document/html/src crates/des-document/widgets/src -n
-rg "helpers|directly|one_front_door|with_css|forgiving|bundle|set_manages" crates/des-document/core/tests crates/des-document/html/tests crates/des-document/widgets/src -n
+rg "pub fn .*(_if|_with|_and_|action_values|dispatch|projection|projected)" crates/des-document/core/src crates/des-document/html/src crates/des-document/widgets/src -n
+rg "helpers|directly|one_front_door|with_css|bundle|set_manages" crates/des-document/core/tests crates/des-document/html/tests crates/des-document/widgets/src -n
 ```
 
 Use these as smoke detectors, not as automatic deletion instructions.
