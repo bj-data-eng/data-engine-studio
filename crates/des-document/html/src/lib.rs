@@ -689,72 +689,6 @@ impl HtmlDocument {
         Ok(view.project_and_update_with_input_actions(projection, input, registry)?)
     }
 
-    /// Creates a projected view, routes input, and maps HTML commands to typed actions.
-    pub fn update_with_input_projection_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_with_input_projection_actions(viewport, input, projection, &registry)
-    }
-
-    /// Creates a projected view, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_projection_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
-        self.update_with_input_projection_actions(viewport, input, projection, &registry)
-    }
-
-    /// Builds projection in place, routes input, and maps HTML commands to typed actions.
-    pub fn update_with_input_projected_with_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let mut projection = DocumentProjection::new();
-        project(&mut projection);
-        self.update_with_input_projection_and_actions(viewport, input, &projection, actions)
-    }
-
-    /// Builds projection in place, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_projected_with_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let mut projection = DocumentProjection::new();
-        project(&mut projection);
-        self.update_with_input_projection_and_intent_actions(viewport, input, &projection, actions)
-    }
-
     /// Resolves this HTML tree with an empty stylesheet.
     pub fn update(&self, viewport: Size) -> HtmlResult<DocumentOutput> {
         self.to_view(viewport).map(|mut view| view.update())
@@ -838,38 +772,6 @@ impl HtmlDocument {
             .action_surface_with(configure))
     }
 
-    /// Parses CSS and creates an action surface from `(command, action)` pairs.
-    pub fn to_action_surface_with_css_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        Ok(self
-            .to_view_with_css(viewport, css)?
-            .action_surface(self.command_action_registry(actions)))
-    }
-
-    /// Parses CSS and creates an action surface from intent-scoped action tuples.
-    pub fn to_action_surface_with_css_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        Ok(self
-            .to_view_with_css(viewport, css)?
-            .action_surface(self.command_intent_action_registry(actions)))
-    }
-
     /// Conditionally parses CSS and creates an action surface with typed Rust commands.
     pub fn to_action_surface_with_css_if<Action>(
         &self,
@@ -893,38 +795,6 @@ impl HtmlDocument {
         Ok(self
             .to_view_with_css_forgiving(viewport, css)?
             .action_surface_with(configure))
-    }
-
-    /// Parses forgiving CSS and creates an action surface from `(command, action)` pairs.
-    pub fn to_action_surface_with_css_forgiving_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        Ok(self
-            .to_view_with_css_forgiving(viewport, css)?
-            .action_surface(self.command_action_registry(actions)))
-    }
-
-    /// Parses forgiving CSS and creates an action surface from intent-scoped action tuples.
-    pub fn to_action_surface_with_css_forgiving_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        Ok(self
-            .to_view_with_css_forgiving(viewport, css)?
-            .action_surface(self.command_intent_action_registry(actions)))
     }
 
     /// Conditionally parses forgiving CSS and creates an action surface.
@@ -985,36 +855,6 @@ impl HtmlDocument {
         self.update_actions_with_css(viewport, css, &registry)
     }
 
-    /// Parses CSS, resolves this HTML tree, and maps command names to actions.
-    pub fn update_actions_with_css_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_actions_with_css(viewport, css, &registry)
-    }
-
-    /// Parses CSS, resolves this HTML tree, and maps intent-scoped commands.
-    pub fn update_actions_with_css_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
-        self.update_actions_with_css(viewport, css, &registry)
-    }
-
     /// Parses forgiving CSS, resolves this HTML tree, and collects typed Rust actions.
     pub fn update_actions_with_css_forgiving<Action>(
         &self,
@@ -1041,36 +881,6 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
-        self.update_actions_with_css_forgiving(viewport, css, &registry)
-    }
-
-    /// Parses forgiving CSS, resolves this HTML tree, and maps command names.
-    pub fn update_actions_with_css_forgiving_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_actions_with_css_forgiving(viewport, css, &registry)
-    }
-
-    /// Parses forgiving CSS, resolves this HTML tree, and maps intent-scoped commands.
-    pub fn update_actions_with_css_forgiving_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
         self.update_actions_with_css_forgiving(viewport, css, &registry)
     }
 
@@ -1116,38 +926,6 @@ impl HtmlDocument {
         self.update_with_input_actions_and_css(viewport, input, css, &registry)
     }
 
-    /// Parses CSS, routes input, and maps command names to typed Rust actions.
-    pub fn update_with_input_actions_and_css_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_with_input_actions_and_css(viewport, input, css, &registry)
-    }
-
-    /// Parses CSS, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_actions_and_css_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
-        self.update_with_input_actions_and_css(viewport, input, css, &registry)
-    }
-
     /// Parses forgiving CSS, routes input through this HTML tree, and returns output.
     pub fn update_with_input_and_css_forgiving(
         &self,
@@ -1187,38 +965,6 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
-        self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
-    }
-
-    /// Parses forgiving CSS, routes input, and maps command names to actions.
-    pub fn update_with_input_actions_and_css_forgiving_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
-    }
-
-    /// Parses forgiving CSS, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_actions_and_css_forgiving_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions_and_css_forgiving(viewport, input, css, &registry)
     }
 
@@ -1697,42 +1443,6 @@ impl HtmlStylesheet {
         Ok(view.project_and_update_actions(projection, registry)?)
     }
 
-    /// Creates a projected view, resolves it, and maps HTML commands to typed actions.
-    pub fn update_with_projection_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.update_with_projection_actions(
-            viewport,
-            projection,
-            &self.command_action_registry(actions),
-        )
-    }
-
-    /// Creates a projected view, resolves it, and maps intent-scoped commands.
-    pub fn update_with_projection_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.update_with_projection_actions(
-            viewport,
-            projection,
-            &self.command_intent_action_registry(actions),
-        )
-    }
-
     /// Builds retained state projection in place, resolves it, and collects typed actions.
     pub fn update_projected_with_actions<Action>(
         &self,
@@ -1746,38 +1456,6 @@ impl HtmlStylesheet {
         let mut projection = DocumentProjection::new();
         project(&mut projection);
         self.update_with_projection_actions(viewport, &projection, registry)
-    }
-
-    /// Builds projection in place, resolves it, and maps HTML commands to typed actions.
-    pub fn update_projected_with_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let mut projection = DocumentProjection::new();
-        project(&mut projection);
-        self.update_with_projection_and_actions(viewport, &projection, actions)
-    }
-
-    /// Builds projection in place, resolves it, and maps intent-scoped commands.
-    pub fn update_projected_with_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let mut projection = DocumentProjection::new();
-        project(&mut projection);
-        self.update_with_projection_and_intent_actions(viewport, &projection, actions)
     }
 
     /// Creates a projected view, routes input, and returns the resolved output.
@@ -1818,46 +1496,6 @@ impl HtmlStylesheet {
         Ok(view.project_and_update_with_input_actions(projection, input, registry)?)
     }
 
-    /// Creates a projected view, routes input, and maps HTML commands to typed actions.
-    pub fn update_with_input_projection_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.update_with_input_projection_actions(
-            viewport,
-            input,
-            projection,
-            &self.command_action_registry(actions),
-        )
-    }
-
-    /// Creates a projected view, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_projection_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.update_with_input_projection_actions(
-            viewport,
-            input,
-            projection,
-            &self.command_intent_action_registry(actions),
-        )
-    }
-
     /// Builds retained state projection in place, routes input, and collects typed actions.
     pub fn update_with_input_projected_with_actions<Action>(
         &self,
@@ -1873,41 +1511,6 @@ impl HtmlStylesheet {
         project(&mut projection);
         self.update_with_input_projection_actions(viewport, input, &projection, registry)
     }
-
-    /// Builds projection in place, routes input, and maps HTML commands to typed actions.
-    pub fn update_with_input_projected_with_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let mut projection = DocumentProjection::new();
-        project(&mut projection);
-        self.update_with_input_projection_and_actions(viewport, input, &projection, actions)
-    }
-
-    /// Builds projection in place, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_projected_with_and_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let mut projection = DocumentProjection::new();
-        project(&mut projection);
-        self.update_with_input_projection_and_intent_actions(viewport, input, &projection, actions)
-    }
-
     /// Creates a view, resolves the document, and returns the first output frame.
     pub fn update(&self, viewport: Size) -> HtmlResult<DocumentOutput> {
         Ok(self.to_view(viewport)?.update())
@@ -2711,38 +2314,6 @@ impl HtmlSet {
             .to_action_surface_with_css(viewport, css, configure)
     }
 
-    /// Parses CSS and creates a named action surface from `(command, action)` pairs.
-    pub fn to_action_surface_with_css_and_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .to_action_surface_with_css_and_actions(viewport, css, actions)
-    }
-
-    /// Parses CSS and creates a named action surface from intent-scoped action tuples.
-    pub fn to_action_surface_with_css_and_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .to_action_surface_with_css_and_intent_actions(viewport, css, actions)
-    }
-
     /// Conditionally parses CSS and creates an action surface for a named document.
     pub fn to_action_surface_with_css_if<Action>(
         &self,
@@ -2766,38 +2337,6 @@ impl HtmlSet {
     ) -> HtmlResult<DocumentActionSurface<Action>> {
         self.get(name)?
             .to_action_surface_with_css_forgiving(viewport, css, configure)
-    }
-
-    /// Parses forgiving CSS and creates a named action surface from `(command, action)` pairs.
-    pub fn to_action_surface_with_css_forgiving_and_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .to_action_surface_with_css_forgiving_and_actions(viewport, css, actions)
-    }
-
-    /// Parses forgiving CSS and creates a named action surface from intent-scoped action tuples.
-    pub fn to_action_surface_with_css_forgiving_and_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .to_action_surface_with_css_forgiving_and_intent_actions(viewport, css, actions)
     }
 
     /// Conditionally parses forgiving CSS and creates an action surface for a named document.
@@ -2874,74 +2413,6 @@ impl HtmlSet {
         project: impl FnOnce(&mut DocumentProjection),
     ) -> HtmlResult<(DocumentProjectionReport, DocumentOutput)> {
         self.get(name)?.update_projected_with(viewport, project)
-    }
-
-    /// Applies projection, routes input, and maps named HTML commands to typed actions.
-    pub fn update_with_input_projection_and_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_projection_and_actions(viewport, input, projection, actions)
-    }
-
-    /// Applies projection, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_projection_and_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        projection: &DocumentProjection,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_projection_and_intent_actions(viewport, input, projection, actions)
-    }
-
-    /// Builds projection in place, routes input, and maps named HTML commands to typed actions.
-    pub fn update_with_input_projected_with_and_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_projected_with_and_actions(viewport, input, project, actions)
-    }
-
-    /// Builds projection in place, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_projected_with_and_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        project: impl FnOnce(&mut DocumentProjection),
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<(DocumentProjectionReport, DocumentActionFrame<Action>)>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_projected_with_and_intent_actions(viewport, input, project, actions)
     }
 
     /// Resolves a named HTML document with the supplied stylesheet.
@@ -3031,40 +2502,6 @@ impl HtmlSet {
             .update_with_input_actions_and_css_with(viewport, input, css, configure)
     }
 
-    /// Parses CSS, routes input through a named document, and maps command names.
-    pub fn update_with_input_actions_and_css_and_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_actions_and_css_and_actions(viewport, input, css, actions)
-    }
-
-    /// Parses CSS, routes input through a named document, and maps intent-scoped commands.
-    pub fn update_with_input_actions_and_css_and_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_actions_and_css_and_intent_actions(viewport, input, css, actions)
-    }
-
     /// Parses forgiving CSS, routes input, and collects typed Rust actions.
     pub fn update_with_input_actions_and_css_forgiving<Action>(
         &self,
@@ -3095,42 +2532,6 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_actions_and_css_forgiving_with(viewport, input, css, configure)
-    }
-
-    /// Parses forgiving CSS, routes input through a named document, and maps command names.
-    pub fn update_with_input_actions_and_css_forgiving_and_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_actions_and_css_forgiving_and_actions(viewport, input, css, actions)
-    }
-
-    /// Parses forgiving CSS, routes input through a named document, and maps intent-scoped commands.
-    pub fn update_with_input_actions_and_css_forgiving_and_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        css: &str,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_actions_and_css_forgiving_and_intent_actions(
-                viewport, input, css, actions,
-            )
     }
 
     /// Re-reads file-backed HTML documents and returns names that changed.

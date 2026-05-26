@@ -894,31 +894,34 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             },
         )
         .expect("HTML and CSS should configure typed actions for one update");
+    let mapped_empty_registry = html.command_action_registry([("project.run", HtmlAction::Run)]);
     let mapped_empty_frame = html
-        .update_actions_with_css_and_actions(
+        .update_actions_with_css(
             Size::new(240.0, 160.0),
             ".card { width: 190px; height: 72px; }",
-            [("project.run", HtmlAction::Run)],
+            &mapped_empty_registry,
         )
         .expect("HTML and CSS should map command actions for no-input updates");
+    let mapped_click_registry = html.command_action_registry([("project.run", HtmlAction::Run)]);
     let mapped_click_frame = html
-        .update_with_input_actions_and_css_and_actions(
+        .update_with_input_actions_and_css(
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".card { width: 186px; height: 72px; }",
-            [("project.run", HtmlAction::Run)],
+            &mapped_click_registry,
         )
         .expect("HTML and CSS should map command actions for one update");
+    let intent_mapped_key_registry = html.command_intent_action_registry([(
+        ElementBehaviorEvent::KeyDown,
+        "project.filter",
+        HtmlAction::Filter,
+    )]);
     let intent_mapped_key_frame = html
-        .update_with_input_actions_and_css_and_intent_actions(
+        .update_with_input_actions_and_css(
             Size::new(240.0, 160.0),
             DocumentInput::key_down(DocumentKey::Enter),
             ".card { width: 187px; height: 72px; }",
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.filter",
-                HtmlAction::Filter,
-            )],
+            &intent_mapped_key_registry,
         )
         .expect("HTML and CSS should map intent-scoped actions for one update");
     let configured_forgiving_frame = html
@@ -932,35 +935,39 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
             },
         )
         .expect("forgiving CSS should configure typed actions for one update");
+    let forgiving_mapped_click_registry =
+        html.command_action_registry([("project.run", HtmlAction::Run)]);
     let forgiving_mapped_click_frame = html
-        .update_with_input_actions_and_css_forgiving_and_actions(
+        .update_with_input_actions_and_css_forgiving(
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".broken { width: ; } .card { width: 188px; height: 72px; }",
-            [("project.run", HtmlAction::Run)],
+            &forgiving_mapped_click_registry,
         )
         .expect("forgiving CSS should map command actions for one update");
+    let forgiving_mapped_empty_registry = html.command_intent_action_registry([(
+        ElementBehaviorEvent::KeyDown,
+        "project.filter",
+        HtmlAction::Filter,
+    )]);
     let forgiving_mapped_empty_frame = html
-        .update_actions_with_css_forgiving_and_intent_actions(
+        .update_actions_with_css_forgiving(
             Size::new(240.0, 160.0),
             ".broken { width: ; } .card { width: 191px; height: 72px; }",
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.filter",
-                HtmlAction::Filter,
-            )],
+            &forgiving_mapped_empty_registry,
         )
         .expect("forgiving CSS should map intent actions for no-input updates");
+    let forgiving_intent_mapped_key_registry = html.command_intent_action_registry([(
+        ElementBehaviorEvent::KeyDown,
+        "project.filter",
+        HtmlAction::Filter,
+    )]);
     let forgiving_intent_mapped_key_frame = html
-        .update_with_input_actions_and_css_forgiving_and_intent_actions(
+        .update_with_input_actions_and_css_forgiving(
             Size::new(240.0, 160.0),
             DocumentInput::key_down(DocumentKey::Enter),
             ".broken { width: ; } .card { width: 189px; height: 72px; }",
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.filter",
-                HtmlAction::Filter,
-            )],
+            &forgiving_intent_mapped_key_registry,
         )
         .expect("forgiving CSS should map intent-scoped actions for one update");
     let mut surface = html
@@ -971,32 +978,34 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("HTML and CSS should create a typed action surface directly");
     let surface_click =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let mapped_surface_registry = html.command_action_registry([
+        ("project.run", HtmlAction::Run),
+        ("project.filter", HtmlAction::Filter),
+    ]);
     let mut mapped_surface = html
-        .to_action_surface_with_css_and_actions(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
             ".card { width: 182px; height: 72px; } button { width: 82px; height: 28px; }",
-            [
-                ("project.run", HtmlAction::Run),
-                ("project.filter", HtmlAction::Filter),
-            ],
         )
-        .expect("HTML and CSS should create a mapped action surface directly");
+        .expect("HTML and CSS should create a mapped action view directly")
+        .action_surface(mapped_surface_registry);
     let mapped_surface_click = mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let intent_surface_registry = html.command_intent_action_registry([
+        (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+        (
+            ElementBehaviorEvent::KeyDown,
+            "project.filter",
+            HtmlAction::Filter,
+        ),
+    ]);
     let mut intent_surface = html
-        .to_action_surface_with_css_and_intent_actions(
+        .to_view_with_css(
             Size::new(240.0, 160.0),
             ".card { width: 183px; height: 72px; }",
-            [
-                (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
-                (
-                    ElementBehaviorEvent::KeyDown,
-                    "project.filter",
-                    HtmlAction::Filter,
-                ),
-            ],
         )
-        .expect("HTML and CSS should create an intent-mapped action surface directly");
+        .expect("HTML and CSS should create an intent-mapped action view directly")
+        .action_surface(intent_surface_registry);
     let intent_surface_key =
         intent_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
     let mut skipped_surface = html
@@ -1023,32 +1032,34 @@ fn html_document_updates_with_css_and_collects_actions_directly() {
         .expect("forgiving CSS should create a typed action surface directly");
     let surface_key =
         forgiving_surface.update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
+    let forgiving_mapped_surface_registry = html.command_action_registry([
+        ("project.run", HtmlAction::Run),
+        ("project.filter", HtmlAction::Filter),
+    ]);
     let mut forgiving_mapped_surface = html
-        .to_action_surface_with_css_forgiving_and_actions(
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
             ".broken { width: ; } .card { width: 184px; height: 72px; }",
-            [
-                ("project.run", HtmlAction::Run),
-                ("project.filter", HtmlAction::Filter),
-            ],
         )
-        .expect("forgiving CSS should create a mapped action surface directly");
+        .expect("forgiving CSS should create a mapped action view directly")
+        .action_surface(forgiving_mapped_surface_registry);
     let forgiving_mapped_surface_click = forgiving_mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let forgiving_intent_surface_registry = html.command_intent_action_registry([
+        (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
+        (
+            ElementBehaviorEvent::KeyDown,
+            "project.filter",
+            HtmlAction::Filter,
+        ),
+    ]);
     let mut forgiving_intent_surface = html
-        .to_action_surface_with_css_forgiving_and_intent_actions(
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
             ".broken { width: ; } .card { width: 185px; height: 72px; }",
-            [
-                (ElementBehaviorEvent::Click, "project.run", HtmlAction::Run),
-                (
-                    ElementBehaviorEvent::KeyDown,
-                    "project.filter",
-                    HtmlAction::Filter,
-                ),
-            ],
         )
-        .expect("forgiving CSS should create an intent-mapped action surface directly");
+        .expect("forgiving CSS should create an intent-mapped action view directly")
+        .action_surface(forgiving_intent_surface_registry);
     let forgiving_intent_surface_key = forgiving_intent_surface
         .update_with_input_actions(DocumentInput::key_down(DocumentKey::Enter));
     let mut skipped_forgiving_surface = html
@@ -1657,17 +1668,18 @@ fn html_document_projects_state_without_css_plumbing() {
     assert_eq!(run.text(), Some("Ready".to_owned()));
     assert!(run.has_class("is-ready"));
 
+    let mapped_registry = html.command_action_registry([("project.run", HtmlAction::Run)]);
+    let mut mapped_projection = DocumentProjection::new();
+    mapped_projection
+        .element("run")
+        .text("Running")
+        .add_class("is-ready");
     let (mapped_report, mapped_frame) = html
-        .update_with_input_projected_with_and_actions(
+        .update_with_input_projection_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection
-                    .element("run")
-                    .text("Running")
-                    .add_class("is-ready");
-            },
-            [("project.run", HtmlAction::Run)],
+            &mapped_projection,
+            &mapped_registry,
         )
         .expect("HTML document should project state and map actions without CSS");
     let mapped_run = mapped_frame.output().snapshot().find("run").unwrap();
@@ -2482,17 +2494,18 @@ fn html_stylesheet_projects_app_state_through_one_front_door() {
         )
         .expect("HTML bundle should project app state and collect actions");
     let run = frame.output().snapshot().find("run").unwrap();
+    let mapped_update_registry = bundle.command_action_registry([
+        ("project.run", HtmlAction::Run),
+        ("project.select", HtmlAction::Select),
+    ]);
     let (mapped_report, mapped_update_frame) = bundle
-        .update_with_input_projected_with_and_actions(
+        .update_with_input_projected_with_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 32.0)),
             |projection| {
                 projection.element("select").add_class("is-selected");
             },
-            [
-                ("project.run", HtmlAction::Run),
-                ("project.select", HtmlAction::Select),
-            ],
+            &mapped_update_registry,
         )
         .expect("HTML bundle should project state and map command actions in one call");
     let mapped_select = mapped_update_frame
@@ -3321,26 +3334,35 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             },
         )
         .expect("named document should configure actions through strict CSS helpers");
+    let css_mapped_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create mapped CSS registries");
     let css_mapped_frame = set
-        .update_with_input_actions_and_css_and_actions(
+        .update_with_input_actions_and_css(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             "#inline { width: 154px; height: 32px; }",
-            [("inline.run", SetAction::Run)],
+            &css_mapped_registry,
         )
         .expect("named document should map actions through strict CSS helpers");
-    let css_intent_mapped_frame = set
-        .update_with_input_actions_and_css_and_intent_actions(
+    let css_intent_mapped_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
-            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
-            "#shared { width: 155px; height: 32px; }",
             [(
                 ElementBehaviorEvent::ContextMenu,
                 "shared.open",
                 SetAction::Menu,
             )],
+        )
+        .expect("named document should create intent CSS registries");
+    let css_intent_mapped_frame = set
+        .update_with_input_actions_and_css(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            "#shared { width: 155px; height: 32px; }",
+            &css_intent_mapped_registry,
         )
         .expect("named document should map intent actions through strict CSS helpers");
     let css_forgiving_action_frame = set
@@ -3352,26 +3374,35 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &registry,
         )
         .expect("named document should route input through forgiving CSS action helpers");
+    let css_forgiving_mapped_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create forgiving CSS registries");
     let css_forgiving_mapped_frame = set
-        .update_with_input_actions_and_css_forgiving_and_actions(
+        .update_with_input_actions_and_css_forgiving(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             ".ignored { unknown-property: yes; } #inline { width: 158px; height: 32px; }",
-            [("inline.run", SetAction::Run)],
+            &css_forgiving_mapped_registry,
         )
         .expect("named document should map actions through forgiving CSS helpers");
-    let css_forgiving_intent_mapped_frame = set
-        .update_with_input_actions_and_css_forgiving_and_intent_actions(
+    let css_forgiving_intent_mapped_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
-            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
-            ".ignored { unknown-property: yes; } #shared { width: 159px; height: 32px; }",
             [(
                 ElementBehaviorEvent::ContextMenu,
                 "shared.open",
                 SetAction::Menu,
             )],
+        )
+        .expect("named document should create forgiving intent CSS registries");
+    let css_forgiving_intent_mapped_frame = set
+        .update_with_input_actions_and_css_forgiving(
+            "shared",
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            ".ignored { unknown-property: yes; } #shared { width: 159px; height: 32px; }",
+            &css_forgiving_intent_mapped_registry,
         )
         .expect("named document should map intent actions through forgiving CSS helpers");
     let mut css_dispatched = Vec::new();
@@ -3536,21 +3567,23 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build strict CSS action surfaces");
     let css_surface_frame =
         css_surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let css_mapped_surface_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create mapped strict CSS surface registries");
     let mut css_mapped_surface = set
-        .to_action_surface_with_css_and_actions(
-            "inline",
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css(
             Size::new(240.0, 160.0),
             "#inline { width: 161px; height: 32px; }",
-            [("inline.run", SetAction::Run)],
         )
-        .expect("named document should build mapped strict CSS action surfaces");
+        .expect("named document should build mapped strict CSS views")
+        .action_surface(css_mapped_surface_registry);
     let css_mapped_surface_frame = css_mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let mut css_intent_surface = set
-        .to_action_surface_with_css_and_intent_actions(
+    let css_intent_surface_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
-            "#shared { width: 162px; height: 32px; }",
             [
                 (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
                 (
@@ -3560,7 +3593,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 ),
             ],
         )
-        .expect("named document should build intent-mapped strict CSS action surfaces");
+        .expect("named document should create intent strict CSS surface registries");
+    let mut css_intent_surface = set
+        .get("shared")
+        .expect("named document should be present")
+        .to_view_with_css(
+            Size::new(240.0, 160.0),
+            "#shared { width: 162px; height: 32px; }",
+        )
+        .expect("named document should build intent-mapped strict CSS views")
+        .action_surface(css_intent_surface_registry);
     let css_intent_surface_frame = css_intent_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let mut skipped_css_surface = set
@@ -3588,21 +3630,23 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .expect("named document should build forgiving CSS action surfaces");
     let css_forgiving_surface_frame = css_forgiving_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let css_forgiving_mapped_surface_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create mapped forgiving CSS surface registries");
     let mut css_forgiving_mapped_surface = set
-        .to_action_surface_with_css_forgiving_and_actions(
-            "inline",
+        .get("inline")
+        .expect("named document should be present")
+        .to_view_with_css_forgiving(
             Size::new(240.0, 160.0),
             ".ignored { unknown-property: yes; } #inline { width: 165px; height: 32px; }",
-            [("inline.run", SetAction::Run)],
         )
-        .expect("named document should build mapped forgiving CSS action surfaces");
+        .expect("named document should build mapped forgiving CSS views")
+        .action_surface(css_forgiving_mapped_surface_registry);
     let css_forgiving_mapped_surface_frame = css_forgiving_mapped_surface
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let mut css_forgiving_intent_surface = set
-        .to_action_surface_with_css_forgiving_and_intent_actions(
+    let css_forgiving_intent_surface_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
-            ".ignored { unknown-property: yes; } #shared { width: 166px; height: 32px; }",
             [
                 (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
                 (
@@ -3612,7 +3656,16 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                 ),
             ],
         )
-        .expect("named document should build intent-mapped forgiving CSS action surfaces");
+        .expect("named document should create intent forgiving CSS surface registries");
+    let mut css_forgiving_intent_surface = set
+        .get("shared")
+        .expect("named document should be present")
+        .to_view_with_css_forgiving(
+            Size::new(240.0, 160.0),
+            ".ignored { unknown-property: yes; } #shared { width: 166px; height: 32px; }",
+        )
+        .expect("named document should build intent-mapped forgiving CSS views")
+        .action_surface(css_forgiving_intent_surface_registry);
     let css_forgiving_intent_surface_frame = css_forgiving_intent_surface
         .update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 8.0)));
     let mut skipped_css_forgiving_surface = set
@@ -3637,15 +3690,19 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         })
         .expect("named document should project state through the set front door");
     let projected_inline = projected_output.snapshot().find("inline").unwrap();
+    let mapped_project_registry = set
+        .command_action_registry("inline", [("inline.run", SetAction::Run)])
+        .expect("named document should create projected action registries");
+    let mut mapped_project_projection = DocumentProjection::new();
+    mapped_project_projection.element("inline").text("Mapped");
     let (mapped_project_report, mapped_project_frame) = set
-        .update_with_input_projected_with_and_actions(
-            "inline",
+        .get("inline")
+        .expect("named document should be present")
+        .update_with_input_projection_actions(
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("inline").text("Mapped");
-            },
-            [("inline.run", SetAction::Run)],
+            &mapped_project_projection,
+            &mapped_project_registry,
         )
         .expect("named document should project state and map actions through the set front door");
     let mut projected_dispatched = Vec::new();
@@ -3730,14 +3787,9 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
     let configured_value_project_report = configured_value_project_frame
         .projection_report()
         .expect("projection report should be available");
-    let (intent_project_report, intent_project_frame) = set
-        .update_with_input_projected_with_and_intent_actions(
+    let intent_project_registry = set
+        .command_intent_action_registry(
             "shared",
-            Size::new(240.0, 160.0),
-            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
-            |projection| {
-                projection.element("shared").text("Menu");
-            },
             [
                 (ElementBehaviorEvent::Click, "shared.open", SetAction::Open),
                 (
@@ -3746,6 +3798,18 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
                     SetAction::Menu,
                 ),
             ],
+        )
+        .expect("named document should create projected intent action registries");
+    let mut intent_project_projection = DocumentProjection::new();
+    intent_project_projection.element("shared").text("Menu");
+    let (intent_project_report, intent_project_frame) = set
+        .get("shared")
+        .expect("named document should be present")
+        .update_with_input_projection_actions(
+            Size::new(240.0, 160.0),
+            DocumentInput::secondary_click(Point::new(8.0, 8.0)),
+            &intent_project_projection,
+            &intent_project_registry,
         )
         .expect("named document should project state and map intent-scoped actions");
     let projected_surface_registry = set
