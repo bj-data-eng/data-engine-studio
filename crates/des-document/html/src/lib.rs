@@ -42,10 +42,9 @@
 //! ```
 
 use des_document::{
-    Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandAction,
-    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentInput, DocumentOutput,
-    DocumentProjection, DocumentProjectionReport, DocumentView, Element, ElementBehaviorEvent,
-    ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
+    Document, DocumentActionFrame, DocumentActionSurface, DocumentBuilder, DocumentCommandRegistry,
+    DocumentInput, DocumentOutput, DocumentProjection, DocumentProjectionReport, DocumentView,
+    Element, ElementBehaviorEvent, ElementBehaviorHook, ElementSpec, Size, StyleSheet, TextContent,
 };
 use html5ever::tendril::TendrilSink;
 use html5ever::{QualName, local_name, ns, parse_document, parse_fragment};
@@ -1977,38 +1976,6 @@ impl HtmlStylesheet {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
         self.update_with_input_actions(viewport, input, &registry)
-    }
-
-    /// Creates a view, routes input, collects typed actions, and dispatches them.
-    pub fn update_with_input_and_dispatch<Action>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        registry: &DocumentCommandRegistry<Action>,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
-    where
-        Action: Clone,
-    {
-        let frame = self.update_with_input_actions(viewport, input, registry)?;
-        let report = frame.dispatch(handler);
-        Ok((frame, report))
-    }
-
-    /// Creates a styled view, routes input, and dispatches only typed action values.
-    pub fn update_with_input_and_dispatch_action_values<Action>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        registry: &DocumentCommandRegistry<Action>,
-        handler: impl for<'frame> FnMut(&'frame Action),
-    ) -> HtmlResult<(DocumentActionFrame<Action>, DocumentCommandDispatchReport)>
-    where
-        Action: Clone,
-    {
-        let frame = self.update_with_input_actions(viewport, input, registry)?;
-        let report = frame.dispatch_action_values(handler);
-        Ok((frame, report))
     }
 }
 

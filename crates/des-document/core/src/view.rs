@@ -1402,66 +1402,12 @@ impl<Action> DocumentActionSurface<Action> {
         self.view.update_actions(&self.commands)
     }
 
-    /// Resolves the view, collects typed app actions, and dispatches them.
-    pub fn update_and_dispatch(
-        &mut self,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_actions();
-        let report = frame.dispatch(handler);
-        (frame, report)
-    }
-
-    /// Resolves the view, collects actions, and dispatches only typed app action values.
-    pub fn update_and_dispatch_action_values(
-        &mut self,
-        handler: impl for<'frame> FnMut(&'frame Action),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_actions();
-        let report = frame.dispatch_action_values(handler);
-        (frame, report)
-    }
-
     /// Routes input, resolves the view, and collects typed app actions.
     pub fn update_with_input_actions(&mut self, input: DocumentInput) -> DocumentActionFrame<Action>
     where
         Action: Clone,
     {
         self.view.update_with_input_actions(input, &self.commands)
-    }
-
-    /// Routes input, collects typed app actions, and dispatches them.
-    pub fn update_with_input_and_dispatch(
-        &mut self,
-        input: DocumentInput,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_with_input_actions(input);
-        let report = frame.dispatch(handler);
-        (frame, report)
-    }
-
-    /// Routes input, collects actions, and dispatches only typed app action values.
-    pub fn update_with_input_and_dispatch_action_values(
-        &mut self,
-        input: DocumentInput,
-        handler: impl for<'frame> FnMut(&'frame Action),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_with_input_actions(input);
-        let report = frame.dispatch_action_values(handler);
-        (frame, report)
     }
 
     /// Routes input with a host text measurer and collects typed app actions.
@@ -1475,21 +1421,6 @@ impl<Action> DocumentActionSurface<Action> {
     {
         self.view
             .update_with_input_and_text_measurer_actions(input, text_measurer, &self.commands)
-    }
-
-    /// Routes input with a host text measurer, collects actions, and dispatches them.
-    pub fn update_with_input_and_text_measurer_and_dispatch(
-        &mut self,
-        input: DocumentInput,
-        text_measurer: &mut dyn TextMeasurer,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_with_input_and_text_measurer_actions(input, text_measurer);
-        let report = frame.dispatch(handler);
-        (frame, report)
     }
 
     /// Splits the surface into its owned view and typed command registry.
@@ -2152,20 +2083,6 @@ impl DocumentView {
         Self::collect_action_frame(registry, output)
     }
 
-    /// Resolves the document, collects typed app actions, and dispatches them.
-    pub fn update_and_dispatch<Action>(
-        &mut self,
-        registry: &DocumentCommandRegistry<Action>,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_actions(registry);
-        let report = frame.dispatch(handler);
-        (frame, report)
-    }
-
     /// Routes input, resolves style/layout, and returns the current document output.
     pub fn update_with_input(&mut self, input: DocumentInput) -> DocumentOutput {
         self.engine
@@ -2183,21 +2100,6 @@ impl DocumentView {
     {
         let output = self.update_with_input(input);
         Self::collect_action_frame(registry, output)
-    }
-
-    /// Routes input, collects typed app actions, and dispatches them.
-    pub fn update_with_input_and_dispatch<Action>(
-        &mut self,
-        input: DocumentInput,
-        registry: &DocumentCommandRegistry<Action>,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame = self.update_with_input_actions(input, registry);
-        let report = frame.dispatch(handler);
-        (frame, report)
     }
 
     /// Routes input and resolves the document with a host-provided text measurer.
@@ -2226,23 +2128,6 @@ impl DocumentView {
     {
         let output = self.update_with_input_and_text_measurer(input, text_measurer);
         Self::collect_action_frame(registry, output)
-    }
-
-    /// Routes input with a host text measurer, collects actions, and dispatches them.
-    pub fn update_with_input_and_text_measurer_and_dispatch<Action>(
-        &mut self,
-        input: DocumentInput,
-        text_measurer: &mut dyn TextMeasurer,
-        registry: &DocumentCommandRegistry<Action>,
-        handler: impl for<'frame> FnMut(&'frame DocumentCommandAction<Action>),
-    ) -> (DocumentActionFrame<Action>, DocumentCommandDispatchReport)
-    where
-        Action: Clone,
-    {
-        let frame =
-            self.update_with_input_and_text_measurer_actions(input, text_measurer, registry);
-        let report = frame.dispatch(handler);
-        (frame, report)
     }
 
     /// Splits the view into its owned document, stylesheet, and engine.

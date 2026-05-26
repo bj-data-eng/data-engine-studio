@@ -792,19 +792,17 @@ mod tests {
         let mapped_action_values: Vec<_> = mapped_frame.action_values().copied().collect();
         let mut dispatch_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let mut dispatched = Vec::new();
-        let (dispatch_frame, dispatch_report) = dispatch_surface.update_with_input_and_dispatch(
-            DocumentInput::primary_click(Point::new(2.0, 2.0)),
-            |action| {
-                dispatched.push(*action.action());
-            },
-        );
+        let dispatch_frame = dispatch_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let dispatch_report = dispatch_frame.dispatch(|action| {
+            dispatched.push(*action.action());
+        });
         let mut value_dispatch_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let mut dispatched_values = Vec::new();
-        let (value_dispatch_frame, value_dispatch_report) = value_dispatch_surface
-            .update_with_input_and_dispatch_action_values(
-                DocumentInput::primary_click(Point::new(2.0, 2.0)),
-                |action| dispatched_values.push(*action),
-            );
+        let value_dispatch_frame = value_dispatch_surface
+            .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
+        let value_dispatch_report =
+            value_dispatch_frame.dispatch_action_values(|action| dispatched_values.push(*action));
         let mut empty_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let empty_frame = empty_surface.update_actions();
         let copy = frame.output().snapshot().find("copy").unwrap();

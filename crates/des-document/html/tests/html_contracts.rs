@@ -2314,48 +2314,50 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         .expect("HTML bundle should map no-input intent commands directly to action values")
         .into_action_values();
     let mut dispatched = Vec::new();
-    let (dispatch_frame, dispatch_report) = bundle
-        .update_with_input_and_dispatch(
+    let dispatch_frame = bundle
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &registry,
-            |action| {
-                dispatched.push(*action.action());
-            },
         )
-        .expect("HTML bundle should dispatch typed actions directly");
+        .expect("HTML bundle should collect typed actions for dispatch");
+    let dispatch_report = dispatch_frame.dispatch(|action| {
+        dispatched.push(*action.action());
+    });
     let mut dispatched_values = Vec::new();
-    let (value_dispatch_frame, value_dispatch_report) = bundle
-        .update_with_input_and_dispatch_action_values(
+    let value_dispatch_frame = bundle
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
             &registry,
-            |action| dispatched_values.push(*action),
         )
-        .expect("HTML bundle should dispatch typed action values directly");
+        .expect("HTML bundle should collect typed action values for dispatch");
+    let value_dispatch_report =
+        value_dispatch_frame.dispatch_action_values(|action| dispatched_values.push(*action));
     let mut configured_dispatched = Vec::new();
     let configured_registry = DocumentCommandRegistry::new()
         .bind("project.run", HtmlAction::Run)
         .bind_key_down("project.filter", HtmlAction::Filter);
-    let (configured_dispatch_frame, configured_dispatch_report) = bundle
-        .update_with_input_and_dispatch(
+    let configured_dispatch_frame = bundle
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
             &configured_registry,
-            |action| {
-                configured_dispatched.push(*action.action());
-            },
         )
-        .expect("HTML bundle should dispatch configured typed actions directly");
+        .expect("HTML bundle should collect configured typed actions for dispatch");
+    let configured_dispatch_report = configured_dispatch_frame.dispatch(|action| {
+        configured_dispatched.push(*action.action());
+    });
     let mut configured_dispatched_values = Vec::new();
-    let (configured_value_dispatch_frame, configured_value_dispatch_report) = bundle
-        .update_with_input_and_dispatch_action_values(
+    let configured_value_dispatch_frame = bundle
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
             &configured_registry,
-            |action| configured_dispatched_values.push(*action),
         )
-        .expect("HTML bundle should dispatch configured typed action values directly");
+        .expect("HTML bundle should collect configured typed action values for dispatch");
+    let configured_value_dispatch_report = configured_value_dispatch_frame
+        .dispatch_action_values(|action| configured_dispatched_values.push(*action));
 
     assert_eq!(
         output.snapshot().find("panel").unwrap().rect().size.width,

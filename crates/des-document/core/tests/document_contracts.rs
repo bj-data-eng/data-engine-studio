@@ -1626,18 +1626,16 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     let context_frame =
         surface.update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 72.0)));
     let mut dispatched = Vec::new();
-    let (dispatch_frame, dispatch_report) = surface.update_with_input_and_dispatch(
-        DocumentInput::primary_click(Point::new(8.0, 8.0)),
-        |action| {
-            dispatched.push(action.action().clone());
-        },
-    );
+    let dispatch_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let dispatch_report = dispatch_frame.dispatch(|action| {
+        dispatched.push(action.action().clone());
+    });
     let mut dispatched_values = Vec::new();
-    let (value_dispatch_frame, value_dispatch_report) = surface
-        .update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| dispatched_values.push(action.clone()),
-        );
+    let value_dispatch_frame =
+        surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let value_dispatch_report = value_dispatch_frame
+        .dispatch_action_values(|action| dispatched_values.push(action.clone()));
 
     assert_eq!(surface.commands().bindings().len(), 4);
     assert!(surface.stylesheet().has_rule_for_class("run-action"));
@@ -1739,14 +1737,13 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         )
         .unwrap();
     let measured_run = measured_frame.output().snapshot().find("run").unwrap();
-    let (measured_dispatch_frame, measured_dispatch_report) = surface
-        .update_with_input_and_text_measurer_and_dispatch(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            &mut text_measurer,
-            |action| {
-                measured_dispatched.push(action.action().clone());
-            },
-        );
+    let measured_dispatch_frame = surface.update_with_input_and_text_measurer_actions(
+        DocumentInput::primary_click(Point::new(8.0, 8.0)),
+        &mut text_measurer,
+    );
+    let measured_dispatch_report = measured_dispatch_frame.dispatch(|action| {
+        measured_dispatched.push(action.action().clone());
+    });
     let measured_value_projection =
         DocumentProjection::new().set_text("run", "Measured values explicit");
     let mut measured_value_dispatched = Vec::new();
@@ -1847,10 +1844,10 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
     );
     let direct_registry = DocumentCommandRegistry::new().bind_click("run", AppAction::Run);
     let mut direct_update_dispatched = Vec::new();
-    let (direct_update_frame, direct_update_report) =
-        direct_view.update_and_dispatch(&direct_registry, |action| {
-            direct_update_dispatched.push(action.action().clone());
-        });
+    let direct_update_frame = direct_view.update_actions(&direct_registry);
+    let direct_update_report = direct_update_frame.dispatch(|action| {
+        direct_update_dispatched.push(action.action().clone());
+    });
     let mut direct_measurer = FixedTextMeasurer;
     let mut direct_measured_dispatched = Vec::new();
     let (direct_measured_report, direct_measured_frame) = direct_view
@@ -4408,13 +4405,13 @@ fn document_view_projects_state_and_collects_actions_through_one_front_door() {
     assert!(frame.contains_action(&AppAction::Refresh));
 
     let mut direct_dispatched = Vec::new();
-    let (direct_frame, direct_report) = view.update_with_input_and_dispatch(
+    let direct_frame = view.update_with_input_actions(
         DocumentInput::primary_click(Point::new(8.0, 8.0)),
         &registry,
-        |action| {
-            direct_dispatched.push(*action.action());
-        },
     );
+    let direct_report = direct_frame.dispatch(|action| {
+        direct_dispatched.push(*action.action());
+    });
 
     assert!(direct_frame.contains_action(&AppAction::Refresh));
     assert_eq!(direct_report, DocumentCommandDispatchReport::new(1, 1, 0));
@@ -5016,35 +5013,32 @@ fn document_widgets_can_declare_typed_command_bindings() {
         .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
     let mut dispatched_actions = Vec::new();
     let mut direct_dispatch_surface = toggle.action_surface(Size::new(320.0, 180.0));
-    let (direct_dispatch_frame, direct_dispatch_report) = direct_dispatch_surface
-        .update_with_input_and_dispatch(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |command| dispatched_actions.push(*command.action()),
-        );
+    let direct_dispatch_frame = direct_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let direct_dispatch_report =
+        direct_dispatch_frame.dispatch(|command| dispatched_actions.push(*command.action()));
     let mut directly_dispatched_values = Vec::new();
     let mut direct_value_dispatch_surface = toggle.action_surface(Size::new(320.0, 180.0));
-    let (direct_value_dispatch_frame, direct_value_dispatch_report) = direct_value_dispatch_surface
-        .update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| directly_dispatched_values.push(*action),
-        );
+    let direct_value_dispatch_frame = direct_value_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let direct_value_dispatch_report = direct_value_dispatch_frame
+        .dispatch_action_values(|action| directly_dispatched_values.push(*action));
     let mut try_directly_dispatched_values = Vec::new();
     let mut try_direct_value_dispatch_surface = toggle
         .try_action_surface(Size::new(320.0, 180.0))
         .expect("widget projection should be valid for action dispatch");
-    let (try_direct_value_dispatch_frame, try_direct_value_dispatch_report) =
-        try_direct_value_dispatch_surface.update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| try_directly_dispatched_values.push(*action),
-        );
+    let try_direct_value_dispatch_frame = try_direct_value_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let try_direct_value_dispatch_report = try_direct_value_dispatch_frame
+        .dispatch_action_values(|action| try_directly_dispatched_values.push(*action));
     let mut idle_dispatched_values = Vec::new();
     let mut idle_value_dispatch_surface = toggle
         .try_action_surface(Size::new(320.0, 180.0))
         .expect("widget projection should be valid for idle dispatch");
-    let (idle_value_dispatch_frame, idle_value_dispatch_report) = idle_value_dispatch_surface
-        .update_and_dispatch_action_values(|action| {
-            idle_dispatched_values.push(*action);
-        });
+    let idle_value_dispatch_frame = idle_value_dispatch_surface.update_actions();
+    let idle_value_dispatch_report = idle_value_dispatch_frame.dispatch_action_values(|action| {
+        idle_dispatched_values.push(*action);
+    });
     let mut css_dispatched_actions = Vec::new();
     let mut css_dispatch_surface = toggle
         .action_surface_with_css(
@@ -5052,11 +5046,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(232, 242, 255); }",
         )
         .expect("widget CSS should parse");
-    let (css_dispatch_frame, css_dispatch_report) = css_dispatch_surface
-        .update_with_input_and_dispatch(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |command| css_dispatched_actions.push(*command.action()),
-        );
+    let css_dispatch_frame = css_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let css_dispatch_report =
+        css_dispatch_frame.dispatch(|command| css_dispatched_actions.push(*command.action()));
     let mut css_dispatched_values = Vec::new();
     let mut css_value_dispatch_surface = toggle
         .action_surface_with_css(
@@ -5064,11 +5057,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(234, 244, 255); }",
         )
         .expect("widget CSS should parse");
-    let (css_value_dispatch_frame, css_value_dispatch_report) = css_value_dispatch_surface
-        .update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| css_dispatched_values.push(*action),
-        );
+    let css_value_dispatch_frame = css_value_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let css_value_dispatch_report = css_value_dispatch_frame
+        .dispatch_action_values(|action| css_dispatched_values.push(*action));
     let mut css_idle_dispatched_values = Vec::new();
     let mut css_idle_value_dispatch_surface = toggle
         .action_surface_with_css(
@@ -5076,9 +5068,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(236, 246, 255); }",
         )
         .expect("widget CSS should parse");
-    let (css_idle_value_dispatch_frame, css_idle_value_dispatch_report) =
-        css_idle_value_dispatch_surface
-            .update_and_dispatch_action_values(|action| css_idle_dispatched_values.push(*action));
+    let css_idle_value_dispatch_frame = css_idle_value_dispatch_surface.update_actions();
+    let css_idle_value_dispatch_report = css_idle_value_dispatch_frame
+        .dispatch_action_values(|action| css_idle_dispatched_values.push(*action));
     let mut try_css_dispatched_actions = Vec::new();
     let mut try_css_dispatch_surface = toggle
         .try_action_surface_with_css(
@@ -5086,11 +5078,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(226, 240, 252); }",
         )
         .expect("widget CSS and projection should be valid");
-    let (try_css_dispatch_frame, try_css_dispatch_report) = try_css_dispatch_surface
-        .update_with_input_and_dispatch(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |command| try_css_dispatched_actions.push(*command.action()),
-        );
+    let try_css_dispatch_frame = try_css_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let try_css_dispatch_report = try_css_dispatch_frame
+        .dispatch(|command| try_css_dispatched_actions.push(*command.action()));
     let mut try_css_dispatched_values = Vec::new();
     let mut try_css_value_dispatch_surface = toggle
         .try_action_surface_with_css(
@@ -5098,11 +5089,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(228, 242, 253); }",
         )
         .expect("widget CSS and projection should be valid");
-    let (try_css_value_dispatch_frame, try_css_value_dispatch_report) =
-        try_css_value_dispatch_surface.update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| try_css_dispatched_values.push(*action),
-        );
+    let try_css_value_dispatch_frame = try_css_value_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let try_css_value_dispatch_report = try_css_value_dispatch_frame
+        .dispatch_action_values(|action| try_css_dispatched_values.push(*action));
     let mut try_css_idle_dispatched_values = Vec::new();
     let mut try_css_idle_value_dispatch_surface = toggle
         .try_action_surface_with_css(
@@ -5110,10 +5100,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".toggle { background: rgb(224, 238, 250); }",
         )
         .expect("widget CSS and projection should be valid");
-    let (try_css_idle_value_dispatch_frame, try_css_idle_value_dispatch_report) =
-        try_css_idle_value_dispatch_surface.update_and_dispatch_action_values(|action| {
-            try_css_idle_dispatched_values.push(*action)
-        });
+    let try_css_idle_value_dispatch_frame = try_css_idle_value_dispatch_surface.update_actions();
+    let try_css_idle_value_dispatch_report = try_css_idle_value_dispatch_frame
+        .dispatch_action_values(|action| try_css_idle_dispatched_values.push(*action));
     let mut forgiving_dispatch_actions = Vec::new();
     let mut forgiving_dispatch_surface = toggle
         .action_surface_with_css_forgiving(
@@ -5121,8 +5110,9 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".ignored { unknown-property: yes; } .toggle { background: rgb(240, 238, 255); }",
         )
         .expect("forgiving widget CSS should keep supported rules");
-    let (forgiving_dispatch_frame, forgiving_dispatch_report) = forgiving_dispatch_surface
-        .update_and_dispatch(|command| forgiving_dispatch_actions.push(*command.action()));
+    let forgiving_dispatch_frame = forgiving_dispatch_surface.update_actions();
+    let forgiving_dispatch_report = forgiving_dispatch_frame
+        .dispatch(|command| forgiving_dispatch_actions.push(*command.action()));
     let mut forgiving_idle_dispatched_values = Vec::new();
     let mut forgiving_idle_value_dispatch_surface = toggle
         .action_surface_with_css_forgiving(
@@ -5130,10 +5120,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".ignored { unknown-property: yes; } .toggle { background: rgb(242, 240, 255); }",
         )
         .expect("forgiving widget CSS should keep supported rules");
-    let (forgiving_idle_value_dispatch_frame, forgiving_idle_value_dispatch_report) =
-        forgiving_idle_value_dispatch_surface.update_and_dispatch_action_values(|action| {
-            forgiving_idle_dispatched_values.push(*action)
-        });
+    let forgiving_idle_value_dispatch_frame =
+        forgiving_idle_value_dispatch_surface.update_actions();
+    let forgiving_idle_value_dispatch_report = forgiving_idle_value_dispatch_frame
+        .dispatch_action_values(|action| forgiving_idle_dispatched_values.push(*action));
     let mut try_forgiving_idle_dispatched_values = Vec::new();
     let mut try_forgiving_idle_value_dispatch_surface = toggle
         .try_action_surface_with_css_forgiving(
@@ -5141,10 +5131,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".ignored { unknown-property: yes; } .toggle { background: rgb(244, 242, 255); }",
         )
         .expect("forgiving widget CSS and projection should be valid");
-    let (try_forgiving_idle_value_dispatch_frame, try_forgiving_idle_value_dispatch_report) =
-        try_forgiving_idle_value_dispatch_surface.update_and_dispatch_action_values(|action| {
-            try_forgiving_idle_dispatched_values.push(*action);
-        });
+    let try_forgiving_idle_value_dispatch_frame =
+        try_forgiving_idle_value_dispatch_surface.update_actions();
+    let try_forgiving_idle_value_dispatch_report = try_forgiving_idle_value_dispatch_frame
+        .dispatch_action_values(|action| try_forgiving_idle_dispatched_values.push(*action));
     let mut forgiving_input_dispatch_actions = Vec::new();
     let mut forgiving_input_dispatch_surface = toggle
         .try_action_surface_with_css_forgiving(
@@ -5152,11 +5142,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 252); }",
         )
         .expect("forgiving widget CSS and projection should be valid");
-    let (forgiving_input_dispatch_frame, forgiving_input_dispatch_report) =
-        forgiving_input_dispatch_surface.update_with_input_and_dispatch(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |command| forgiving_input_dispatch_actions.push(*command.action()),
-        );
+    let forgiving_input_dispatch_frame = forgiving_input_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let forgiving_input_dispatch_report = forgiving_input_dispatch_frame
+        .dispatch(|command| forgiving_input_dispatch_actions.push(*command.action()));
     let mut forgiving_input_dispatched_values = Vec::new();
     let mut forgiving_input_value_dispatch_surface = toggle
         .action_surface_with_css_forgiving(
@@ -5164,11 +5153,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".ignored { unknown-property: yes; } .toggle { background: rgb(238, 236, 254); }",
         )
         .expect("forgiving widget CSS should keep supported rules");
-    let (forgiving_input_value_dispatch_frame, forgiving_input_value_dispatch_report) =
-        forgiving_input_value_dispatch_surface.update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| forgiving_input_dispatched_values.push(*action),
-        );
+    let forgiving_input_value_dispatch_frame = forgiving_input_value_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let forgiving_input_value_dispatch_report = forgiving_input_value_dispatch_frame
+        .dispatch_action_values(|action| forgiving_input_dispatched_values.push(*action));
     let mut try_forgiving_input_dispatched_values = Vec::new();
     let mut try_forgiving_input_value_dispatch_surface = toggle
         .try_action_surface_with_css_forgiving(
@@ -5176,11 +5164,10 @@ fn document_widgets_can_declare_typed_command_bindings() {
             ".ignored { unknown-property: yes; } .toggle { background: rgb(236, 234, 252); }",
         )
         .expect("forgiving widget CSS and projection should be valid");
-    let (try_forgiving_input_value_dispatch_frame, try_forgiving_input_value_dispatch_report) =
-        try_forgiving_input_value_dispatch_surface.update_with_input_and_dispatch_action_values(
-            DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            |action| try_forgiving_input_dispatched_values.push(*action),
-        );
+    let try_forgiving_input_value_dispatch_frame = try_forgiving_input_value_dispatch_surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let try_forgiving_input_value_dispatch_report = try_forgiving_input_value_dispatch_frame
+        .dispatch_action_values(|action| try_forgiving_input_dispatched_values.push(*action));
 
     assert_eq!(registry.bindings().len(), 3);
     assert_eq!(pushed.bindings(), registry.bindings());
