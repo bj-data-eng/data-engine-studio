@@ -923,12 +923,22 @@ fn nav_uses_explicit_card_spacing_and_styled_scrollbar() {
 #[test]
 fn lab_chrome_is_authored_from_html_fragments() {
     let output = lab_output("text");
+    let lab_root = frame(&output, "lab-root");
+    let lab_body = frame(&output, "lab-body");
+    let stage = frame(&output, "stage");
     let topbar = frame(&output, "topbar");
     let title = frame(&output, "title");
     let nav = frame(&output, "nav");
     let selected_view = frame(&output, "view-text");
     let layout_view = frame(&output, "view-layout");
 
+    assert_eq!(lab_root.element, Element::Div);
+    assert!(has_class(lab_root, "lab-root"));
+    assert_eq!(lab_body.element, Element::Div);
+    assert!(has_class(lab_body, "lab-body"));
+    assert_eq!(stage.element, Element::Div);
+    assert!(has_class(stage, "stage"));
+    assert!(has_class(stage, "styled-scrollbar"));
     assert_eq!(topbar.element, Element::Header);
     assert_eq!(title.element, Element::H1);
     assert_eq!(nav.element, Element::Nav);

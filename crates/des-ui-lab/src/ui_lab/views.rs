@@ -10,25 +10,19 @@ pub(super) fn render_stage(ui: &mut des_document::DocumentBuilder, state: StageR
         shadow_tune,
         shadow_hover_tune,
     } = state;
-    ui.element(
-        "stage",
-        ElementSpec::new(Element::Div)
-            .class("stage")
-            .class("styled-scrollbar"),
-        |ui| match view {
-            LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
-            LabView::Interaction => render_interaction_view(ui),
-            LabView::Draggable => render_draggable_view(ui, drag),
-            LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
-            LabView::Animation => render_animation_view(ui),
-            LabView::Scrolling => render_scrolling_view(ui),
-            LabView::Floating => render_floating_view(ui),
-            LabView::Table => render_table_view(ui),
-            LabView::Text => render_text_view(ui),
-            LabView::Nesting => render_nesting_view(ui),
-            LabView::Graph => render_graph_view(ui),
-        },
-    );
+    super::html::append_stage(ui, |ui| match view {
+        LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
+        LabView::Interaction => render_interaction_view(ui),
+        LabView::Draggable => render_draggable_view(ui, drag),
+        LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
+        LabView::Animation => render_animation_view(ui),
+        LabView::Scrolling => render_scrolling_view(ui),
+        LabView::Floating => render_floating_view(ui),
+        LabView::Table => render_table_view(ui),
+        LabView::Text => render_text_view(ui),
+        LabView::Nesting => render_nesting_view(ui),
+        LabView::Graph => render_graph_view(ui),
+    });
 }
 
 #[derive(Clone, Copy, Debug)]

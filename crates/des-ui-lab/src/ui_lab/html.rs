@@ -1,9 +1,15 @@
-use des_document::DocumentBuilder;
-use des_html::HtmlDocument;
+use des_document::{DocumentBuilder, Element, ElementSpec};
+use des_html::{HtmlDocument, HtmlNode};
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+#[cfg(not(debug_assertions))]
+const LAB_ROOT_HTML: &str = include_str!("html/lab-root.html");
+#[cfg(not(debug_assertions))]
+const LAB_BODY_HTML: &str = include_str!("html/lab-body.html");
+#[cfg(not(debug_assertions))]
+const STAGE_HTML: &str = include_str!("html/stage.html");
 #[cfg(not(debug_assertions))]
 const TOPBAR_HTML: &str = include_str!("html/topbar.html");
 #[cfg(not(debug_assertions))]
@@ -40,6 +46,24 @@ const STYLING_OVERVIEW_HTML: &str = include_str!("html/styling-overview.html");
 const ANIMATION_HTML: &str = include_str!("html/animation.html");
 #[cfg(not(debug_assertions))]
 const FLOATING_HTML: &str = include_str!("html/floating.html");
+
+pub(super) fn append_lab_root(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(ui, lab_root_fragment(), "lab-root", children);
+}
+
+pub(super) fn append_lab_body(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(ui, lab_body_fragment(), "lab-body", children);
+}
+
+pub(super) fn append_stage(ui: &mut DocumentBuilder, children: impl FnOnce(&mut DocumentBuilder)) {
+    append_shell_slot(ui, stage_fragment(), "stage", children);
+}
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
     topbar_fragment().append_to_builder(ui);
@@ -115,6 +139,9 @@ pub(super) fn append_floating(ui: &mut DocumentBuilder) {
 
 pub(super) fn asset_revision() -> u64 {
     let mut hasher = DefaultHasher::new();
+    lab_root_source().hash(&mut hasher);
+    lab_body_source().hash(&mut hasher);
+    stage_source().hash(&mut hasher);
     topbar_source().hash(&mut hasher);
     nav_source().hash(&mut hasher);
     interaction_shell_source().hash(&mut hasher);
@@ -134,6 +161,18 @@ pub(super) fn asset_revision() -> u64 {
     animation_source().hash(&mut hasher);
     floating_source().hash(&mut hasher);
     hasher.finish()
+}
+
+fn lab_root_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&lab_root_source()).expect("lab root HTML is valid")
+}
+
+fn lab_body_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&lab_body_source()).expect("lab body HTML is valid")
+}
+
+fn stage_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&stage_source()).expect("lab stage HTML is valid")
 }
 
 fn topbar_fragment() -> HtmlDocument {
@@ -217,16 +256,139 @@ fn floating_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&floating_source()).expect("lab floating HTML is valid")
 }
 
+fn append_shell_slot(
+    ui: &mut DocumentBuilder,
+    fragment: HtmlDocument,
+    expected_id: &str,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    let node = shell_node(&fragment, expected_id);
+    ui.element(
+        node.id()
+            .expect("lab shell HTML fragment should declare an id")
+            .to_owned(),
+        shell_spec(node, expected_id),
+        children,
+    );
+}
+
+fn shell_node<'a>(fragment: &'a HtmlDocument, expected_id: &str) -> &'a HtmlNode {
+    let nodes = fragment
+        .children()
+        .iter()
+        .filter(|node| !html_whitespace_node(node))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        nodes.len(),
+        1,
+        "lab shell HTML fragment `{expected_id}` should contain exactly one root element"
+    );
+    let node = nodes[0];
+    assert!(
+        !node.is_text(),
+        "lab shell HTML fragment `{expected_id}` should use an element root"
+    );
+    assert_eq!(
+        node.id(),
+        Some(expected_id),
+        "lab shell HTML fragment id should match its slot"
+    );
+    assert!(
+        node.text().is_none_or(str::is_empty) && node.children().iter().all(html_whitespace_node),
+        "lab shell HTML fragment `{expected_id}` should leave children to Rust projection"
+    );
+    node
+}
+
+fn shell_spec(node: &HtmlNode, expected_id: &str) -> ElementSpec {
+    let mut spec = ElementSpec::new(shell_element(node.tag(), expected_id))
+        .classes(node.classes().iter().cloned())
+        .attributes(node.attributes().clone())
+        .behavior_hooks(
+            node.behavior_hooks()
+                .into_iter()
+                .map(|hook| hook.to_element_hook()),
+        );
+    if let Some(role) = node.role() {
+        spec = spec.role(role.to_owned());
+    }
+    spec
+}
+
+fn shell_element(tag: &str, expected_id: &str) -> Element {
+    match tag {
+        "div" => Element::Div,
+        "main" => Element::Main,
+        "section" => Element::Section,
+        other => panic!("unsupported `{expected_id}` lab shell element `<{other}>`"),
+    }
+}
+
+fn html_whitespace_node(node: &HtmlNode) -> bool {
+    node.is_text() && node.text().is_none_or(|text| text.trim().is_empty())
+}
+
+fn lab_root_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/lab-root.html"
+            ))
+            .expect("lab root HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(LAB_ROOT_HTML)
+    }
+}
+
+fn lab_body_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/lab-body.html"
+            ))
+            .expect("lab body HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(LAB_BODY_HTML)
+    }
+}
+
+fn stage_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/stage.html"
+            ))
+            .expect("lab stage HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(STAGE_HTML)
+    }
+}
+
 fn topbar_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/topbar.html"
             ))
             .expect("lab topbar HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -237,13 +399,13 @@ fn topbar_source() -> Cow<'static, str> {
 fn nav_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/nav.html"
             ))
             .expect("lab nav HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -254,13 +416,13 @@ fn nav_source() -> Cow<'static, str> {
 fn interaction_shell_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/interaction-shell.html"
             ))
             .expect("lab interaction shell HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -271,13 +433,13 @@ fn interaction_shell_source() -> Cow<'static, str> {
 fn interaction_cards_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/interaction-cards.html"
             ))
             .expect("lab interaction cards HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -288,13 +450,13 @@ fn interaction_cards_source() -> Cow<'static, str> {
 fn interaction_controls_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/interaction-controls.html"
             ))
             .expect("lab interaction controls HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -305,13 +467,13 @@ fn interaction_controls_source() -> Cow<'static, str> {
 fn interaction_loop_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/interaction-loop.html"
             ))
             .expect("lab interaction loop HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -322,13 +484,13 @@ fn interaction_loop_source() -> Cow<'static, str> {
 fn draggable_shell_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/draggable-shell.html"
             ))
             .expect("lab draggable shell HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -339,13 +501,13 @@ fn draggable_shell_source() -> Cow<'static, str> {
 fn nesting_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/nesting.html"
             ))
             .expect("lab nesting HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -356,13 +518,13 @@ fn nesting_source() -> Cow<'static, str> {
 fn graph_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/graph.html"
             ))
             .expect("lab graph HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -373,13 +535,13 @@ fn graph_source() -> Cow<'static, str> {
 fn structural_selectors_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/structural-selectors.html"
             ))
             .expect("lab structural selectors HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -390,13 +552,13 @@ fn structural_selectors_source() -> Cow<'static, str> {
 fn text_specimens_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/text-specimens.html"
             ))
             .expect("lab text specimens HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -407,13 +569,13 @@ fn text_specimens_source() -> Cow<'static, str> {
 fn table_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/table.html"
             ))
             .expect("lab table HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -424,13 +586,13 @@ fn table_source() -> Cow<'static, str> {
 fn layout_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/layout.html"
             ))
             .expect("lab layout HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -441,13 +603,13 @@ fn layout_source() -> Cow<'static, str> {
 fn scrolling_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/scrolling.html"
             ))
             .expect("lab scrolling HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -458,13 +620,13 @@ fn scrolling_source() -> Cow<'static, str> {
 fn shadow_specimens_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/shadow-specimens.html"
             ))
             .expect("lab shadow specimens HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -475,13 +637,13 @@ fn shadow_specimens_source() -> Cow<'static, str> {
 fn styling_overview_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/styling-overview.html"
             ))
             .expect("lab styling overview HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -492,13 +654,13 @@ fn styling_overview_source() -> Cow<'static, str> {
 fn animation_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/animation.html"
             ))
             .expect("lab animation HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {
@@ -509,13 +671,13 @@ fn animation_source() -> Cow<'static, str> {
 fn floating_source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/html/floating.html"
             ))
             .expect("lab floating HTML file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {

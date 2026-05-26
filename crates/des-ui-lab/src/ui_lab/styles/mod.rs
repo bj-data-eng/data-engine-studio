@@ -51,13 +51,13 @@ fn lab_stylesheet() -> StyleSheet {
 fn source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/styles/lab.css"
             ))
             .expect("lab CSS file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {

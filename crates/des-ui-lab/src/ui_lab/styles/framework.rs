@@ -17,13 +17,13 @@ pub(super) fn asset_revision() -> u64 {
 fn source() -> Cow<'static, str> {
     #[cfg(debug_assertions)]
     {
-        return Cow::Owned(
+        Cow::Owned(
             std::fs::read_to_string(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/src/ui_lab/styles/framework.css"
             ))
             .expect("lab framework CSS file should be readable"),
-        );
+        )
     }
     #[cfg(not(debug_assertions))]
     {

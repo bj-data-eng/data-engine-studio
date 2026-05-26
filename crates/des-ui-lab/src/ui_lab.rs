@@ -853,50 +853,39 @@ impl UiLabState {
 
     fn document(&self, viewport: Size, debug_overlay: bool) -> Document {
         let mut document = Document::build(viewport, |ui| {
-            ui.element(
-                "lab-root",
-                ElementSpec::new(Element::Div).class("lab-root"),
-                |ui| {
-                    html::append_topbar(ui);
-                    ui.element(
-                        "lab-body",
-                        ElementSpec::new(Element::Div).class("lab-body"),
-                        |ui| {
-                            html::append_nav(ui);
-                            render_stage(
-                                ui,
-                                StageRenderState::new(self.view)
-                                    .optional_card(self.show_optional_card)
-                                    .dense_mode(self.dense_mode)
-                                    .drag(
-                                        DragLabState::new(
-                                            self.drag_item_cells,
-                                            self.drag_item_order,
-                                            self.scroll_list_item_order,
-                                        )
-                                        .active(
-                                            self.pressed_drag_source.as_deref(),
-                                            self.active_drag_item(),
-                                            self.active_scroll_list_drag_item(),
-                                            self.active_drag.as_ref().map(|drag| drag.current),
-                                        )
-                                        .previews(
-                                            self.drag_drop_preview,
-                                            self.scroll_list_drop_preview,
-                                        ),
-                                    )
-                                    .shadows(self.shadow_tune, self.shadow_hover_tune),
-                            );
-                        },
-                    );
-                    render_drag_overlay_layer(
+            html::append_lab_root(ui, |ui| {
+                html::append_topbar(ui);
+                html::append_lab_body(ui, |ui| {
+                    html::append_nav(ui);
+                    render_stage(
                         ui,
-                        self.active_drag.as_ref().map(|drag| drag.current),
-                        self.drag_visual_clone.as_ref(),
+                        StageRenderState::new(self.view)
+                            .optional_card(self.show_optional_card)
+                            .dense_mode(self.dense_mode)
+                            .drag(
+                                DragLabState::new(
+                                    self.drag_item_cells,
+                                    self.drag_item_order,
+                                    self.scroll_list_item_order,
+                                )
+                                .active(
+                                    self.pressed_drag_source.as_deref(),
+                                    self.active_drag_item(),
+                                    self.active_scroll_list_drag_item(),
+                                    self.active_drag.as_ref().map(|drag| drag.current),
+                                )
+                                .previews(self.drag_drop_preview, self.scroll_list_drop_preview),
+                            )
+                            .shadows(self.shadow_tune, self.shadow_hover_tune),
                     );
-                    render_text_context_menu(ui, self.text_context_menu.as_ref());
-                },
-            );
+                });
+                render_drag_overlay_layer(
+                    ui,
+                    self.active_drag.as_ref().map(|drag| drag.current),
+                    self.drag_visual_clone.as_ref(),
+                );
+                render_text_context_menu(ui, self.text_context_menu.as_ref());
+            });
         });
         document
             .set_text("subtitle", lab_subtitle(debug_overlay))
