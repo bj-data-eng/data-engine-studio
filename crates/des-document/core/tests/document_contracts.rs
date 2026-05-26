@@ -1619,9 +1619,10 @@ fn document_view_can_be_lifted_into_a_configured_action_surface() {
         surface.update_with_input_actions(DocumentInput::pointer_at(Point::new(8.0, 40.0)));
     let click_frame =
         surface.update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)));
-    let idle_values = surface.update_action_values();
-    let click_values =
-        surface.update_with_input_action_values(DocumentInput::primary_click(Point::new(8.0, 8.0)));
+    let idle_values = surface.update_actions().into_action_values();
+    let click_values = surface
+        .update_with_input_actions(DocumentInput::primary_click(Point::new(8.0, 8.0)))
+        .into_action_values();
     let context_frame =
         surface.update_with_input_actions(DocumentInput::secondary_click(Point::new(8.0, 72.0)));
     let mut dispatched = Vec::new();

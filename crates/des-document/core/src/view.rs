@@ -1402,14 +1402,6 @@ impl<Action> DocumentActionSurface<Action> {
         self.view.update_actions(&self.commands)
     }
 
-    /// Resolves the view and returns only collected typed app action values.
-    pub fn update_action_values(&mut self) -> Vec<Action>
-    where
-        Action: Clone,
-    {
-        self.update_actions().into_action_values()
-    }
-
     /// Resolves the view, collects typed app actions, and dispatches them.
     pub fn update_and_dispatch(
         &mut self,
@@ -1442,14 +1434,6 @@ impl<Action> DocumentActionSurface<Action> {
         Action: Clone,
     {
         self.view.update_with_input_actions(input, &self.commands)
-    }
-
-    /// Routes input, resolves the view, and returns only typed app action values.
-    pub fn update_with_input_action_values(&mut self, input: DocumentInput) -> Vec<Action>
-    where
-        Action: Clone,
-    {
-        self.update_with_input_actions(input).into_action_values()
     }
 
     /// Routes input, collects typed app actions, and dispatches them.
