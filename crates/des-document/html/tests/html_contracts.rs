@@ -773,6 +773,26 @@ fn html_css_entry_points_reject_invalid_author_stylesheets() {
 }
 
 #[test]
+fn html_css_errors_include_source_location_and_label() {
+    let html = HtmlDocument::parse_fragment(r#"<section id="panel" class="card">Panel</section>"#)
+        .expect("HTML should parse");
+    let error = html
+        .with_css(
+            r#"
+.card {
+  height: nope;
+}
+"#,
+        )
+        .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "html css error: CSS parse error in inline CSS at 3:11: expected number, got `nope`"
+    );
+}
+
+#[test]
 fn html_authored_views_use_document_update_request_as_canonical_complex_path() {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum HtmlAction {

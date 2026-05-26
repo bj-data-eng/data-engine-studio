@@ -1197,6 +1197,30 @@ fn css_stylesheet_parser_rejects_invalid_author_css() {
 }
 
 #[test]
+fn css_stylesheet_parse_errors_report_author_location() {
+    let error = StyleSheet::parse_css(
+        r#"
+.panel {
+  width: 120px;
+  height: nope;
+}
+"#,
+    )
+    .unwrap_err();
+    let location = error
+        .location()
+        .expect("CSS errors should report a location");
+
+    assert_eq!(error.message(), "expected number, got `nope`");
+    assert_eq!(location.line(), 4);
+    assert_eq!(location.column(), 11);
+    assert_eq!(
+        error.to_string(),
+        "CSS parse error at 4:11: expected number, got `nope`"
+    );
+}
+
+#[test]
 fn document_engine_invalidates_cached_layout_when_stylesheet_key_changes() {
     let mut document = Document::new(Size::new(800.0, 600.0));
     document

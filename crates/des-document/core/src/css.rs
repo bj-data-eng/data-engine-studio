@@ -12,87 +12,213 @@ use std::fmt;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CssParseError {
     message: String,
+    source: Option<String>,
+    location: Option<CssSourceLocation>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CssSourceLocation {
+    line: usize,
+    column: usize,
+    offset: usize,
 }
 
 impl CssParseError {
     fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            source: None,
+            location: None,
         }
+    }
+
+    fn at(mut self, location: CssSourceLocation) -> Self {
+        self.location = Some(location);
+        self
+    }
+
+    pub fn with_source_label(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn source_label(&self) -> Option<&str> {
+        self.source.as_deref()
+    }
+
+    pub fn location(&self) -> Option<CssSourceLocation> {
+        self.location
+    }
+}
+
+impl CssSourceLocation {
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    pub fn column(&self) -> usize {
+        self.column
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 }
 
 impl fmt::Display for CssParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
+        f.write_str("CSS parse error")?;
+        if let Some(source) = &self.source {
+            write!(f, " in {source}")?;
+        }
+        if let Some(location) = self.location {
+            write!(f, " at {}:{}", location.line, location.column)?;
+        }
+        write!(f, ": {}", self.message)
     }
 }
 
 impl Error for CssParseError {}
 
 pub(crate) fn parse_stylesheet(input: &str) -> Result<StyleSheet, CssParseError> {
-    let input = strip_comments(input)?;
+    let input = CssSource::new(input)?;
     let mut sheet = StyleSheet::new();
-    parse_rules_into(&mut sheet, input.as_str(), None)?;
+    parse_rules_into(&mut sheet, &input, None, 0, input.css.len())?;
     Ok(sheet)
 }
 
-fn strip_comments(input: &str) -> Result<String, CssParseError> {
+struct CssSource {
+    original: String,
+    css: String,
+    offsets: Vec<usize>,
+}
+
+impl CssSource {
+    fn new(input: &str) -> Result<Self, CssParseError> {
+        let (css, offsets) = strip_comments(input)?;
+        Ok(Self {
+            original: input.to_owned(),
+            css,
+            offsets,
+        })
+    }
+
+    fn location(&self, stripped_offset: usize) -> CssSourceLocation {
+        let original_offset = self
+            .offsets
+            .get(stripped_offset)
+            .copied()
+            .or_else(|| self.offsets.last().copied())
+            .unwrap_or(0);
+        source_location(&self.original, original_offset)
+    }
+
+    fn error_at(&self, stripped_offset: usize, message: impl Into<String>) -> CssParseError {
+        CssParseError::new(message).at(self.location(stripped_offset))
+    }
+}
+
+fn strip_comments(input: &str) -> Result<(String, Vec<usize>), CssParseError> {
     let mut output = String::with_capacity(input.len());
+    let mut offsets = Vec::with_capacity(input.len());
     let mut rest = input;
+    let mut base = 0;
     while let Some(start) = rest.find("/*") {
-        output.push_str(&rest[..start]);
+        push_mapped(&mut output, &mut offsets, &rest[..start], base);
         let after_start = &rest[start + 2..];
         let Some(end) = after_start.find("*/") else {
-            return Err(CssParseError::new("CSS comment is missing closing `*/`"));
+            return Err(CssParseError::new("CSS comment is missing closing `*/`")
+                .at(source_location(input, base + start)));
         };
+        base += start + 2 + end + 2;
         rest = &after_start[end + 2..];
     }
-    output.push_str(rest);
-    Ok(output)
+    push_mapped(&mut output, &mut offsets, rest, base);
+    Ok((output, offsets))
+}
+
+fn push_mapped(output: &mut String, offsets: &mut Vec<usize>, chunk: &str, base: usize) {
+    for (offset, ch) in chunk.char_indices() {
+        output.push(ch);
+        offsets.push(base + offset);
+        for _ in 1..ch.len_utf8() {
+            offsets.push(base + offset);
+        }
+    }
+}
+
+fn source_location(input: &str, target: usize) -> CssSourceLocation {
+    let mut line = 1;
+    let mut column = 1;
+    for (offset, ch) in input.char_indices() {
+        if offset >= target {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    CssSourceLocation {
+        line,
+        column,
+        offset: target,
+    }
 }
 
 fn parse_rules_into(
     sheet: &mut StyleSheet,
-    input: &str,
+    source: &CssSource,
     condition: Option<StyleCondition>,
+    start: usize,
+    end: usize,
 ) -> Result<(), CssParseError> {
-    let mut rest = input.trim_start();
-    while !rest.is_empty() {
-        let Some(start) = rest.find('{') else {
-            return Err(CssParseError::new(
-                "CSS contains trailing text outside a rule",
-            ));
+    let input = source.css.as_str();
+    let mut cursor = skip_css_whitespace(input, start, end);
+    while cursor < end {
+        let Some(open) = input[cursor..end].find('{').map(|offset| cursor + offset) else {
+            return Err(source.error_at(cursor, "CSS contains trailing text outside a rule"));
         };
-        let prelude = rest[..start].trim();
+        let prelude_start = skip_css_whitespace(input, cursor, open);
+        let prelude_end = trim_css_end(input, prelude_start, open);
+        let prelude = &input[prelude_start..prelude_end];
         if prelude.is_empty() {
-            return Err(CssParseError::new("CSS rule is missing a selector"));
+            return Err(source.error_at(cursor, "CSS rule is missing a selector"));
         }
-        let end = matching_block_end(rest, start)?;
-        let block = &rest[start + 1..end];
-        rest = rest[end + 1..].trim_start();
+        let close = matching_block_end(source, open, end)?;
+        cursor = skip_css_whitespace(input, close + 1, end);
 
         if let Some(query) = prelude.strip_prefix("@media") {
-            let condition = parse_conditional_rule(condition, parse_media_query(query.trim()))?;
-            parse_rules_into(sheet, block, Some(condition))?;
+            let condition = parse_conditional_rule(condition, parse_media_query(query.trim()))
+                .map_err(|error| error.at(source.location(prelude_start)))?;
+            parse_rules_into(sheet, source, Some(condition), open + 1, close)?;
             continue;
         }
 
         if let Some(query) = prelude.strip_prefix("@container") {
-            let condition = parse_conditional_rule(condition, parse_container_query(query.trim()))?;
-            parse_rules_into(sheet, block, Some(condition))?;
+            let condition = parse_conditional_rule(condition, parse_container_query(query.trim()))
+                .map_err(|error| error.at(source.location(prelude_start)))?;
+            parse_rules_into(sheet, source, Some(condition), open + 1, close)?;
             continue;
         }
 
         if prelude.starts_with('@') {
-            return Err(CssParseError::new(format!(
-                "unsupported CSS at-rule `{prelude}`"
-            )));
+            return Err(source.error_at(prelude_start, "unsupported CSS at-rule `{prelude}`"));
         }
 
-        let style = parse_declarations(block)?;
-        for selector in prelude.split(',') {
-            let selector = parse_selector(selector.trim())?;
+        let style = parse_declarations(source, open + 1, close)?;
+        for selector_range in split_selector_ranges(input, prelude_start, prelude_end) {
+            let selector_text = input[selector_range.clone()].trim();
+            let selector_offset =
+                skip_css_whitespace(input, selector_range.start, selector_range.end);
+            let selector = parse_selector(selector_text)
+                .map_err(|error| error.at(source.location(selector_offset)))?;
             if let Some(condition) = condition {
                 sheet.push_conditional_rule(condition, selector, style.clone());
             } else {
@@ -110,9 +236,10 @@ fn parse_conditional_rule(
     next.and_then(|next| merge_conditions(existing, next))
 }
 
-fn matching_block_end(input: &str, open: usize) -> Result<usize, CssParseError> {
+fn matching_block_end(source: &CssSource, open: usize, end: usize) -> Result<usize, CssParseError> {
+    let input = source.css.as_str();
     let mut depth = 0usize;
-    for (index, ch) in input[open..].char_indices() {
+    for (index, ch) in input[open..end].char_indices() {
         match ch {
             '{' => depth += 1,
             '}' => {
@@ -124,7 +251,52 @@ fn matching_block_end(input: &str, open: usize) -> Result<usize, CssParseError> 
             _ => {}
         }
     }
-    Err(CssParseError::new("CSS block is missing closing `}`"))
+    Err(source.error_at(open, "CSS block is missing closing `}`"))
+}
+
+fn skip_css_whitespace(input: &str, mut cursor: usize, end: usize) -> usize {
+    while cursor < end {
+        let ch = input[cursor..]
+            .chars()
+            .next()
+            .expect("cursor is inside CSS input");
+        if !ch.is_whitespace() {
+            break;
+        }
+        cursor += ch.len_utf8();
+    }
+    cursor
+}
+
+fn trim_css_end(input: &str, start: usize, mut end: usize) -> usize {
+    while end > start {
+        let Some((offset, ch)) = input[..end].char_indices().next_back() else {
+            break;
+        };
+        if !ch.is_whitespace() {
+            break;
+        }
+        end = offset;
+    }
+    end
+}
+
+fn split_selector_ranges(
+    input: &str,
+    start: usize,
+    end: usize,
+) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+    let mut cursor = start;
+    std::iter::from_fn(move || {
+        if cursor > end {
+            return None;
+        }
+        let range_start = cursor;
+        let next = input[cursor..end].find(',').map(|offset| cursor + offset);
+        let range_end = next.unwrap_or(end);
+        cursor = next.map_or(end + 1, |comma| comma + 1);
+        Some(range_start..range_end)
+    })
 }
 
 fn parse_media_query(input: &str) -> Result<StyleCondition, CssParseError> {
@@ -530,19 +702,42 @@ fn parse_nth_child(
     }
 }
 
-fn parse_declarations(input: &str) -> Result<Style, CssParseError> {
+fn parse_declarations(
+    source: &CssSource,
+    start: usize,
+    end: usize,
+) -> Result<Style, CssParseError> {
+    let input = source.css.as_str();
     let mut style = Style::default();
-    for declaration in input.split(';') {
-        let declaration = declaration.trim();
+    let mut cursor = start;
+    while cursor <= end {
+        let next = input[cursor..end]
+            .find(';')
+            .map_or(end, |offset| cursor + offset);
+        let declaration_start = skip_css_whitespace(input, cursor, next);
+        let declaration_end = trim_css_end(input, declaration_start, next);
+        let declaration = &input[declaration_start..declaration_end];
         if declaration.is_empty() {
+            if next == end {
+                break;
+            }
+            cursor = next + 1;
             continue;
         }
         let Some((name, value)) = declaration.split_once(':') else {
-            return Err(CssParseError::new(format!(
-                "CSS declaration `{declaration}` is missing `:`"
-            )));
+            return Err(source.error_at(
+                declaration_start,
+                "CSS declaration `{declaration}` is missing `:`",
+            ));
         };
-        apply_declaration(&mut style, name.trim(), value.trim())?;
+        let value_offset =
+            skip_css_whitespace(input, declaration_start + name.len() + 1, declaration_end);
+        apply_declaration(&mut style, name.trim(), value.trim())
+            .map_err(|error| error.at(source.location(value_offset)))?;
+        if next == end {
+            break;
+        }
+        cursor = next + 1;
     }
     Ok(style)
 }

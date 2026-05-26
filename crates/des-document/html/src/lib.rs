@@ -448,7 +448,7 @@ impl HtmlDocument {
 
     /// Parses CSS and pairs it with this parsed HTML tree.
     pub fn with_css(self, css: &str) -> HtmlResult<HtmlStylesheet> {
-        Ok(self.with_stylesheet(parse_stylesheet(css)?))
+        Ok(self.with_stylesheet(parse_stylesheet(css, "inline CSS")?))
     }
 
     /// Conditionally parses CSS and pairs it with this parsed HTML tree.
@@ -485,7 +485,7 @@ impl HtmlDocument {
 
     /// Parses CSS and creates a ready-to-update document view from this HTML tree.
     pub fn to_view_with_css(&self, viewport: Size, css: &str) -> HtmlResult<DocumentView> {
-        self.to_view_with_stylesheet(viewport, parse_stylesheet(css)?)
+        self.to_view_with_stylesheet(viewport, parse_stylesheet(css, "inline CSS")?)
     }
 
     /// Conditionally parses CSS and creates a ready-to-update document view.
@@ -932,7 +932,7 @@ impl HtmlStylesheet {
 
     /// Parses strict CSS into the parsed stylesheet.
     pub fn extend_css(&mut self, css: &str) -> HtmlResult<&mut Self> {
-        self.stylesheet.extend(parse_stylesheet(css)?);
+        self.stylesheet.extend(parse_stylesheet(css, "inline CSS")?);
         Ok(self)
     }
 
@@ -1076,21 +1076,23 @@ impl HtmlStylesheet {
 
     /// Parses an HTML document and CSS stylesheet into typed document inputs.
     pub fn parse(html: &str, css: &str) -> HtmlResult<Self> {
-        let stylesheet = parse_stylesheet(css)?;
+        let stylesheet = parse_stylesheet(css, "inline CSS")?;
         Ok(Self::new(HtmlDocument::parse(html)?, stylesheet))
     }
 
     /// Parses an HTML fragment and CSS stylesheet into typed document inputs.
     pub fn parse_fragment(html: &str, css: &str) -> HtmlResult<Self> {
-        let stylesheet = parse_stylesheet(css)?;
+        let stylesheet = parse_stylesheet(css, "inline CSS")?;
         Ok(Self::new(HtmlDocument::parse_fragment(html)?, stylesheet))
     }
 
     /// Reads HTML and CSS files and parses them into typed document inputs.
     pub fn load_files(html_path: impl AsRef<Path>, css_path: impl AsRef<Path>) -> HtmlResult<Self> {
+        let css_path = css_path.as_ref();
+        let css = fs::read_to_string(css_path)?;
         Ok(Self::new(
             HtmlDocument::load(html_path)?,
-            parse_stylesheet(&fs::read_to_string(css_path)?)?,
+            parse_stylesheet(&css, css_path.display().to_string())?,
         ))
     }
 
@@ -2301,8 +2303,9 @@ impl HtmlFingerprint {
     }
 }
 
-fn parse_stylesheet(css: &str) -> HtmlResult<StyleSheet> {
-    StyleSheet::parse_css(css).map_err(|error| HtmlError::Css(error.to_string()))
+fn parse_stylesheet(css: &str, source: impl Into<String>) -> HtmlResult<StyleSheet> {
+    StyleSheet::parse_css(css)
+        .map_err(|error| HtmlError::Css(error.with_source_label(source).to_string()))
 }
 
 fn rcdom_children_to_html(
