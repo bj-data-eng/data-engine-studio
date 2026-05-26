@@ -3178,45 +3178,41 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
             &registry,
         )
         .expect("named document should collect typed actions through the set front door");
+    let input_mapped_registry =
+        DocumentCommandRegistry::new().bind_click("inline.run", SetAction::Run);
+    let intent_mapped_registry =
+        DocumentCommandRegistry::new().bind_context_menu("shared.open", SetAction::Menu);
     let mapped_action_frame = set
-        .update_with_input_actions_with_actions(
+        .update_with_input_actions(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            [("inline.run", SetAction::Run)],
+            &input_mapped_registry,
         )
         .expect("named document should map commands through the set front door");
     let mapped_action_values = set
-        .update_with_input_actions_with_actions(
+        .update_with_input_actions(
             "inline",
             Size::new(240.0, 160.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            [("inline.run", SetAction::Run)],
+            &input_mapped_registry,
         )
         .expect("named document should map commands directly to action values")
         .into_action_values();
     let intent_mapped_action_frame = set
-        .update_with_input_actions_with_intent_actions(
+        .update_with_input_actions(
             "shared",
             Size::new(240.0, 160.0),
             DocumentInput::secondary_click(Point::new(8.0, 8.0)),
-            [(
-                ElementBehaviorEvent::ContextMenu,
-                "shared.open",
-                SetAction::Menu,
-            )],
+            &intent_mapped_registry,
         )
         .expect("named document should map intent-scoped commands through the set front door");
     let intent_mapped_action_values = set
-        .update_with_input_actions_with_intent_actions(
+        .update_with_input_actions(
             "shared",
             Size::new(240.0, 160.0),
             DocumentInput::secondary_click(Point::new(8.0, 8.0)),
-            [(
-                ElementBehaviorEvent::ContextMenu,
-                "shared.open",
-                SetAction::Menu,
-            )],
+            &intent_mapped_registry,
         )
         .expect("named document should map intent-scoped commands directly to action values")
         .into_action_values();
@@ -3281,26 +3277,14 @@ fn html_set_manages_named_inline_and_file_backed_documents() {
         .update_actions("inline", Size::new(240.0, 160.0), &registry)
         .expect("named document should update and collect actions through the set front door");
     let mapped_empty_frame = set
-        .update_actions_with_actions(
-            "inline",
-            Size::new(240.0, 160.0),
-            [("inline.run", SetAction::Run)],
-        )
+        .update_actions("inline", Size::new(240.0, 160.0), &input_mapped_registry)
         .expect("named document should map commands during update");
     let mapped_empty_values = set
-        .update_actions_with_actions(
-            "inline",
-            Size::new(240.0, 160.0),
-            [("inline.run", SetAction::Run)],
-        )
+        .update_actions("inline", Size::new(240.0, 160.0), &input_mapped_registry)
         .expect("named document should map no-input commands directly to action values")
         .into_action_values();
     let intent_mapped_empty_values = set
-        .update_actions_with_intent_actions(
-            "inline",
-            Size::new(240.0, 160.0),
-            [(ElementBehaviorEvent::Click, "inline.run", SetAction::Run)],
-        )
+        .update_actions("inline", Size::new(240.0, 160.0), &input_mapped_registry)
         .expect("named document should map no-input intent commands directly to action values")
         .into_action_values();
     let mut surface = set

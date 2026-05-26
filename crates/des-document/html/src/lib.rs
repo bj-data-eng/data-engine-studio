@@ -3272,36 +3272,6 @@ impl HtmlSet {
         self.get(name)?.update_actions(viewport, registry)
     }
 
-    /// Resolves a named document and maps command names to typed actions.
-    pub fn update_actions_with_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_actions_with_actions(viewport, actions)
-    }
-
-    /// Resolves a named document and maps intent-scoped commands to actions.
-    pub fn update_actions_with_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_actions_with_intent_actions(viewport, actions)
-    }
-
     /// Routes input through a named HTML document.
     pub fn update_with_input(
         &self,
@@ -3325,38 +3295,6 @@ impl HtmlSet {
     {
         self.get(name)?
             .update_with_input_actions(viewport, input, registry)
-    }
-
-    /// Routes input through a named document and maps command names to actions.
-    pub fn update_with_input_actions_with_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_actions_with_actions(viewport, input, actions)
-    }
-
-    /// Routes input through a named document and maps intent-scoped commands.
-    pub fn update_with_input_actions_with_intent_actions<Action, Command>(
-        &self,
-        name: &str,
-        viewport: Size,
-        input: DocumentInput,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.get(name)?
-            .update_with_input_actions_with_intent_actions(viewport, input, actions)
     }
 
     /// Applies projection and resolves a named HTML document.
