@@ -1,0 +1,66 @@
+<h2 id="controls-title" class="section-title">Control elements</h2>
+<section id="controls-grid" class="controls-grid">
+  <article id="control-checkbox-card" class="control-card">
+    <h3 id="control-checkbox-title" class="card-title">Checkbox</h3>
+    <div id="control-checkbox" role="checkbox" class="control-row" selected on:click="control-checkbox">
+      <span id="control-checkbox-mark" class="checkbox-mark" selected>
+        <icon id="control-checkbox-glyph" class="check-glyph" selected data-glyph="check"></icon>
+      </span>
+      <span id="control-checkbox-label" class="control-label">Profile this transform</span>
+    </div>
+  </article>
+
+  <article id="control-radio-card" class="control-card">
+    <h3 id="control-radio-title" class="card-title">Radio group</h3>
+    <div id="control-radio-local" role="radio" class="control-row" selected on:click="control-radio-local">
+      <span id="control-radio-local-dot" class="radio-dot" selected>
+        <span id="control-radio-local-dot-fill" class="radio-dot-fill" selected></span>
+      </span>
+      <span id="control-radio-local-label" class="control-label">Local runtime</span>
+    </div>
+    <div id="control-radio-remote" role="radio" class="control-row" on:click="control-radio-remote">
+      <span id="control-radio-remote-dot" class="radio-dot">
+        <span id="control-radio-remote-dot-fill" class="radio-dot-fill"></span>
+      </span>
+      <span id="control-radio-remote-label" class="control-label">Remote worker</span>
+    </div>
+    <div id="control-radio-hybrid" role="radio" class="control-row" on:click="control-radio-hybrid">
+      <span id="control-radio-hybrid-dot" class="radio-dot">
+        <span id="control-radio-hybrid-dot-fill" class="radio-dot-fill"></span>
+      </span>
+      <span id="control-radio-hybrid-label" class="control-label">Hybrid</span>
+    </div>
+  </article>
+
+  <article id="control-dropdown-card" class="control-card">
+    <h3 id="control-dropdown-title" class="card-title">Dropdown</h3>
+    <div id="control-dropdown" class="dropdown-field" on:click="control-dropdown">
+      <div id="control-dropdown-trigger" role="combobox" class="dropdown-control">
+        <span id="control-dropdown-label" class="control-label">DuckDB table</span>
+        <icon id="control-dropdown-chevron-down" class="dropdown-chevron dropdown-chevron-visible" data-glyph="chevron-down"></icon>
+        <icon id="control-dropdown-chevron-up" class="dropdown-chevron" data-glyph="chevron-up"></icon>
+      </div>
+      <div id="control-dropdown-menu" class="dropdown-menu">
+        <button id="control-dropdown-option-csv" class="dropdown-option" on:click="control-dropdown-option-csv">
+          <span id="control-dropdown-option-csv-label" class="control-label">CSV source</span>
+        </button>
+        <button id="control-dropdown-option-duckdb" class="dropdown-option" selected on:click="control-dropdown-option-duckdb">
+          <span id="control-dropdown-option-duckdb-label" class="control-label" selected>DuckDB table</span>
+        </button>
+        <button id="control-dropdown-option-python" class="dropdown-option" on:click="control-dropdown-option-python">
+          <span id="control-dropdown-option-python-label" class="control-label">Python node</span>
+        </button>
+      </div>
+    </div>
+  </article>
+
+  <article id="control-input-card" class="control-card">
+    <h3 id="control-input-title" class="card-title">Input fields</h3>
+    <div id="control-input-name" role="textbox" class="input-field" data-interactive="true" autofocus>
+      <span id="control-input-name-label" class="control-label" autofocus>pipeline_name</span>
+    </div>
+    <div id="control-input-disabled" role="textbox" class="input-field" disabled>
+      <span id="control-input-disabled-label" class="control-label" disabled>read_only_id</span>
+    </div>
+  </article>
+</section>

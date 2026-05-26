@@ -868,12 +868,6 @@ impl UiLabState {
                                 StageRenderState::new(self.view)
                                     .optional_card(self.show_optional_card)
                                     .dense_mode(self.dense_mode)
-                                    .controls(
-                                        self.checkbox_enabled,
-                                        self.radio_choice,
-                                        self.dropdown_open,
-                                        self.dropdown_choice,
-                                    )
                                     .drag(
                                         DragLabState::new(
                                             self.drag_item_cells,
@@ -1029,6 +1023,63 @@ impl UiLabState {
 
     fn interaction_projection(&self) -> DocumentProjection {
         let mut projection = DocumentProjection::new();
+        projection
+            .element("control-checkbox")
+            .selected(self.checkbox_enabled);
+        projection
+            .element("control-checkbox-mark")
+            .selected(self.checkbox_enabled);
+        projection
+            .element("control-checkbox-glyph")
+            .selected(self.checkbox_enabled);
+        for (index, id) in [
+            "control-radio-local",
+            "control-radio-remote",
+            "control-radio-hybrid",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let selected = self.radio_choice == index;
+            projection.element(*id).selected(selected);
+            projection.element(format!("{id}-dot")).selected(selected);
+            projection
+                .element(format!("{id}-dot-fill"))
+                .selected(selected);
+        }
+        projection
+            .element("control-dropdown-trigger")
+            .selected(self.dropdown_open);
+        projection
+            .element("control-dropdown-label")
+            .text(["CSV source", "DuckDB table", "Python node"][self.dropdown_choice]);
+        projection
+            .element("control-dropdown-menu")
+            .class("dropdown-menu-open", self.dropdown_open);
+        projection
+            .element("control-dropdown-chevron-down")
+            .class("dropdown-chevron-visible", !self.dropdown_open);
+        projection
+            .element("control-dropdown-chevron-up")
+            .class("dropdown-chevron-visible", self.dropdown_open);
+        for (index, id) in [
+            "control-dropdown-option-csv",
+            "control-dropdown-option-duckdb",
+            "control-dropdown-option-python",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let selected = self.dropdown_choice == index;
+            projection.element(*id).selected(selected);
+            projection.element(format!("{id}-label")).selected(selected);
+        }
+        projection.element("control-input-name").focused(true);
+        projection.element("control-input-name-label").focused(true);
+        projection.element("control-input-disabled").disabled(true);
+        projection
+            .element("control-input-disabled-label")
+            .disabled(true);
         projection.element("loop-button-result").text(format!(
             "Button events received: {}",
             self.loop_action_count
@@ -1301,7 +1352,7 @@ fn is_dropdown_hit(hit_id: &Option<ElementId>) -> bool {
         id.as_str() == "control-dropdown"
             || id.as_str() == "control-dropdown-trigger"
             || id.as_str() == "control-dropdown-label"
-            || id.as_str() == "control-dropdown-chevron"
+            || id.as_str().starts_with("control-dropdown-chevron")
             || id.as_str() == "control-dropdown-menu"
             || id.as_str().starts_with("control-dropdown-option-")
     })

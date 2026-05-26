@@ -4,9 +4,9 @@ use crate::graphics_testing::{
     test_harness,
 };
 use des_document::{
-    DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle, FontWeight,
-    Insets, Length, OverflowWrap, Point, PointerInput, Position, ResolvedElement, ScrollAxis, Size,
-    Style, StyleSelector, StyleSheet, TextDecoration, TextOverflow, TextWrapMode,
+    Display, DocumentEngine, DocumentInput, DocumentOutput, Element, ElementSpec, FontStyle,
+    FontWeight, Insets, Length, OverflowWrap, Point, PointerInput, Position, ResolvedElement,
+    ScrollAxis, Size, Style, StyleSelector, StyleSheet, TextDecoration, TextOverflow, TextWrapMode,
 };
 use des_egui::adapter::EguiTextMeasurer;
 use egui_kittest::Harness;
@@ -992,6 +992,55 @@ fn interaction_cards_are_authored_from_html_fragment() {
 }
 
 #[test]
+fn interaction_controls_are_authored_from_html_fragment_and_projected_from_state() {
+    let mut state = UiLabState::new(Some("interaction"));
+    state.checkbox_enabled = false;
+    state.radio_choice = 2;
+    state.dropdown_open = true;
+    state.dropdown_choice = 0;
+
+    let output = state.lab_document_output_for_test(Size::new(TEST_WIDTH, TEST_HEIGHT));
+
+    assert_eq!(frame(&output, "controls-grid").element, Element::Section);
+    assert_eq!(
+        frame(&output, "control-checkbox-card").element,
+        Element::Article
+    );
+    assert_eq!(
+        frame(&output, "control-checkbox").element,
+        Element::Checkbox
+    );
+    assert_eq!(
+        frame(&output, "control-radio-hybrid").element,
+        Element::Radio
+    );
+    assert_eq!(
+        frame(&output, "control-dropdown-trigger").element,
+        Element::Select
+    );
+    assert_eq!(frame(&output, "control-input-name").element, Element::Input);
+    assert!(!frame(&output, "control-checkbox").selected);
+    assert_eq!(
+        frame(&output, "control-checkbox-glyph").style.display,
+        Display::None
+    );
+    assert!(frame(&output, "control-radio-hybrid").selected);
+    assert!(has_class(
+        frame(&output, "control-dropdown-menu"),
+        "dropdown-menu-open"
+    ));
+    assert_eq!(
+        frame_text(&output, "control-dropdown-label"),
+        Some("CSV source")
+    );
+    assert!(has_class(
+        frame(&output, "control-dropdown-chevron-up"),
+        "dropdown-chevron-visible"
+    ));
+    assert!(frame(&output, "control-dropdown-option-csv").selected);
+}
+
+#[test]
 fn nesting_view_is_authored_from_html_fragment() {
     let output = lab_output("nesting");
     let heading = frame(&output, "nesting-heading");
@@ -1224,8 +1273,16 @@ fn interaction_view_renders_common_control_elements() {
         output
             .snapshot()
             .find("control-radio-remote-dot-fill")
-            .is_none(),
-        "unselected radio option should not render an inner dot"
+            .is_some_and(|dot| dot.style().display == Display::None),
+        "unselected radio option should keep its HTML-authored dot hidden by state projection"
+    );
+    assert_eq!(
+        frame(&output, "control-checkbox").role.as_deref(),
+        Some("checkbox")
+    );
+    assert_eq!(
+        frame(&output, "control-dropdown-trigger").role.as_deref(),
+        Some("combobox")
     );
     assert_eq!(
         frame(&output, "control-radio-local-dot").style.background,

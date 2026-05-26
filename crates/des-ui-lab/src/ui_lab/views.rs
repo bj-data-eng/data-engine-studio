@@ -6,10 +6,6 @@ pub(super) fn render_stage(ui: &mut des_document::DocumentBuilder, state: StageR
         view,
         show_optional_card,
         dense_mode,
-        checkbox_enabled,
-        radio_choice,
-        dropdown_open,
-        dropdown_choice,
         drag,
         shadow_tune,
         shadow_hover_tune,
@@ -21,13 +17,7 @@ pub(super) fn render_stage(ui: &mut des_document::DocumentBuilder, state: StageR
             .class("styled-scrollbar"),
         |ui| match view {
             LabView::Layout => render_layout_view(ui, show_optional_card, dense_mode),
-            LabView::Interaction => render_interaction_view(
-                ui,
-                checkbox_enabled,
-                radio_choice,
-                dropdown_open,
-                dropdown_choice,
-            ),
+            LabView::Interaction => render_interaction_view(ui),
             LabView::Draggable => render_draggable_view(ui, drag),
             LabView::Styling => render_styling_view(ui, dense_mode, shadow_tune, shadow_hover_tune),
             LabView::Animation => render_animation_view(ui),
@@ -46,10 +36,6 @@ pub(super) struct StageRenderState<'a> {
     view: LabView,
     show_optional_card: bool,
     dense_mode: bool,
-    checkbox_enabled: bool,
-    radio_choice: usize,
-    dropdown_open: bool,
-    dropdown_choice: usize,
     drag: DragLabState<'a>,
     shadow_tune: ShadowTuneState,
     shadow_hover_tune: ShadowTuneState,
@@ -61,10 +47,6 @@ impl<'a> StageRenderState<'a> {
             view,
             show_optional_card: false,
             dense_mode: false,
-            checkbox_enabled: false,
-            radio_choice: 0,
-            dropdown_open: false,
-            dropdown_choice: 0,
             drag: DragLabState::default(),
             shadow_tune: ShadowTuneState::default(),
             shadow_hover_tune: ShadowTuneState::default(),
@@ -78,20 +60,6 @@ impl<'a> StageRenderState<'a> {
 
     pub(super) fn dense_mode(mut self, dense_mode: bool) -> Self {
         self.dense_mode = dense_mode;
-        self
-    }
-
-    pub(super) fn controls(
-        mut self,
-        checkbox_enabled: bool,
-        radio_choice: usize,
-        dropdown_open: bool,
-        dropdown_choice: usize,
-    ) -> Self {
-        self.checkbox_enabled = checkbox_enabled;
-        self.radio_choice = radio_choice;
-        self.dropdown_open = dropdown_open;
-        self.dropdown_choice = dropdown_choice;
         self
     }
 
@@ -187,13 +155,7 @@ fn render_layout_view(
     super::html::append_layout(ui);
 }
 
-fn render_interaction_view(
-    ui: &mut des_document::DocumentBuilder,
-    checkbox_enabled: bool,
-    radio_choice: usize,
-    dropdown_open: bool,
-    dropdown_choice: usize,
-) {
+fn render_interaction_view(ui: &mut des_document::DocumentBuilder) {
     ui.text_element(
         "interaction-heading",
         ElementSpec::new(Element::Text).class("heading"),
@@ -205,21 +167,7 @@ fn render_interaction_view(
         "Hover and click styles are resolved by document state. Inner text does not own clicks.",
     );
     super::html::append_interaction_cards(ui);
-    ui.text_element(
-        "controls-title",
-        ElementSpec::new(Element::Text).class("section-title"),
-        "Control elements",
-    );
-    ui.element(
-        "controls-grid",
-        ElementSpec::new(Element::Div).class("controls-grid"),
-        |ui| {
-            control_checkbox(ui, checkbox_enabled);
-            control_radio_group(ui, radio_choice);
-            control_dropdown(ui, dropdown_open, dropdown_choice);
-            control_text_inputs(ui);
-        },
-    );
+    super::html::append_interaction_controls(ui);
     render_document_update_loop(ui);
 }
 
@@ -721,214 +669,6 @@ fn drag_overlay_placeholder(ui: &mut des_document::DocumentBuilder) {
         .class("drag-overlay-idle")
         .value("")
         .empty();
-}
-
-fn control_checkbox(ui: &mut des_document::DocumentBuilder, checked: bool) {
-    ui.element(
-        "control-checkbox-card",
-        ElementSpec::new(Element::Div).class("control-card"),
-        |ui| {
-            ui.text_element(
-                "control-checkbox-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Checkbox",
-            );
-            ui.element(
-                "control-checkbox",
-                ElementSpec::new(Element::Checkbox)
-                    .class("control-row")
-                    .on_click("control-checkbox")
-                    .selected(checked),
-                |ui| {
-                    ui.element(
-                        "control-checkbox-mark",
-                        ElementSpec::new(Element::Div)
-                            .class("checkbox-mark")
-                            .selected(checked),
-                        |ui| {
-                            if checked {
-                                ui.element(
-                                    "control-checkbox-glyph",
-                                    ElementSpec::new(Element::Icon)
-                                        .class("check-glyph")
-                                        .glyph(Glyph::Check),
-                                    |_| {},
-                                );
-                            }
-                        },
-                    );
-                    ui.text_element(
-                        "control-checkbox-label",
-                        ElementSpec::new(Element::Text).class("control-label"),
-                        "Profile this transform",
-                    );
-                },
-            );
-        },
-    );
-}
-
-fn control_radio_group(ui: &mut des_document::DocumentBuilder, choice: usize) {
-    ui.element(
-        "control-radio-card",
-        ElementSpec::new(Element::Div).class("control-card"),
-        |ui| {
-            ui.text_element(
-                "control-radio-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Radio group",
-            );
-            for (index, id, label) in [
-                (0, "control-radio-local", "Local runtime"),
-                (1, "control-radio-remote", "Remote worker"),
-                (2, "control-radio-hybrid", "Hybrid"),
-            ] {
-                ui.element(
-                    id,
-                    ElementSpec::new(Element::Radio)
-                        .class("control-row")
-                        .on_click(id)
-                        .selected(choice == index),
-                    |ui| {
-                        ui.element(
-                            format!("{id}-dot"),
-                            ElementSpec::new(Element::Div)
-                                .class("radio-dot")
-                                .selected(choice == index),
-                            |ui| {
-                                if choice == index {
-                                    ui.element(
-                                        format!("{id}-dot-fill"),
-                                        ElementSpec::new(Element::Div).class("radio-dot-fill"),
-                                        |_| {},
-                                    );
-                                }
-                            },
-                        );
-                        ui.text_element(
-                            format!("{id}-label"),
-                            ElementSpec::new(Element::Text).class("control-label"),
-                            label,
-                        );
-                    },
-                );
-            }
-        },
-    );
-}
-
-fn control_dropdown(ui: &mut des_document::DocumentBuilder, open: bool, choice: usize) {
-    let selected = ["CSV source", "DuckDB table", "Python node"][choice];
-    ui.element(
-        "control-dropdown-card",
-        ElementSpec::new(Element::Div).class("control-card"),
-        |ui| {
-            ui.text_element(
-                "control-dropdown-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Dropdown",
-            );
-            ui.element(
-                "control-dropdown",
-                ElementSpec::new(Element::Div)
-                    .class("dropdown-field")
-                    .on_click("control-dropdown"),
-                |ui| {
-                    ui.element(
-                        "control-dropdown-trigger",
-                        ElementSpec::new(Element::Select)
-                            .class("dropdown-control")
-                            .selected(open),
-                        |ui| {
-                            ui.text_element(
-                                "control-dropdown-label",
-                                ElementSpec::new(Element::Text).class("control-label"),
-                                selected,
-                            );
-                            ui.element(
-                                "control-dropdown-chevron",
-                                ElementSpec::new(Element::Icon)
-                                    .class("dropdown-chevron")
-                                    .glyph(if open {
-                                        Glyph::ChevronUp
-                                    } else {
-                                        Glyph::ChevronDown
-                                    }),
-                                |_| {},
-                            );
-                        },
-                    );
-                    if open {
-                        ui.element(
-                            "control-dropdown-menu",
-                            ElementSpec::new(Element::Div).class("dropdown-menu"),
-                            |ui| {
-                                for (index, id, label) in [
-                                    (0, "control-dropdown-option-csv", "CSV source"),
-                                    (1, "control-dropdown-option-duckdb", "DuckDB table"),
-                                    (2, "control-dropdown-option-python", "Python node"),
-                                ] {
-                                    ui.element(
-                                        id,
-                                        ElementSpec::new(Element::Button)
-                                            .class("dropdown-option")
-                                            .on_click(id)
-                                            .selected(choice == index),
-                                        |ui| {
-                                            ui.text_element(
-                                                format!("{id}-label"),
-                                                ElementSpec::new(Element::Text)
-                                                    .class("control-label")
-                                                    .selected(choice == index),
-                                                label,
-                                            );
-                                        },
-                                    );
-                                }
-                            },
-                        );
-                    }
-                },
-            );
-        },
-    );
-}
-
-fn control_text_inputs(ui: &mut des_document::DocumentBuilder) {
-    ui.element(
-        "control-input-card",
-        ElementSpec::new(Element::Div).class("control-card"),
-        |ui| {
-            ui.text_element(
-                "control-input-title",
-                ElementSpec::new(Element::Text).class("card-title"),
-                "Input fields",
-            );
-            for (id, label, focused, disabled) in [
-                ("control-input-name", "pipeline_name", true, false),
-                ("control-input-disabled", "read_only_id", false, true),
-            ] {
-                ui.element(
-                    id,
-                    ElementSpec::new(Element::Input)
-                        .class("input-field")
-                        .interactive()
-                        .focused(focused)
-                        .disabled(disabled),
-                    |ui| {
-                        ui.text_element(
-                            format!("{id}-label"),
-                            ElementSpec::new(Element::Text)
-                                .class("control-label")
-                                .focused(focused)
-                                .disabled(disabled),
-                            label,
-                        );
-                    },
-                );
-            }
-        },
-    );
 }
 
 fn render_styling_view(

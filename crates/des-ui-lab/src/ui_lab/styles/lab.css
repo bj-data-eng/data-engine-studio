@@ -44,6 +44,7 @@ input {
 }
 
 .dropdown-menu {
+  display: none;
   position: absolute-parent;
   anchor-bottom-start: control-dropdown 0px -1px;
   z-index: 20;
@@ -568,10 +569,15 @@ text {
 }
 
 .check-glyph {
+  display: none;
   width: 13px;
   height: 13px;
   font-size: 13px;
   color: #1d1b20;
+}
+
+.check-glyph:selected {
+  display: flex;
 }
 
 .radio-dot {
@@ -589,10 +595,15 @@ text {
 }
 
 .radio-dot-fill {
+  display: none;
   width: 8px;
   height: 8px;
   background: #6750a4;
   border-radius: 4px;
+}
+
+.radio-dot-fill:selected {
+  display: flex;
 }
 
 .control-label {
@@ -627,6 +638,18 @@ text {
   border-color: #6750a4;
   border-bottom-left-radius: 0px;
   border-bottom-right-radius: 0px;
+}
+
+.dropdown-menu-open {
+  display: flex;
+}
+
+.dropdown-chevron {
+  display: none;
+}
+
+.dropdown-chevron-visible {
+  display: flex;
 }
 
 .dropdown-option {

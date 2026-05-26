@@ -11,6 +11,8 @@ const NAV_HTML: &str = include_str!("html/nav.html");
 #[cfg(not(debug_assertions))]
 const INTERACTION_CARDS_HTML: &str = include_str!("html/interaction-cards.html");
 #[cfg(not(debug_assertions))]
+const INTERACTION_CONTROLS_HTML: &str = include_str!("html/interaction-controls.html");
+#[cfg(not(debug_assertions))]
 const INTERACTION_LOOP_HTML: &str = include_str!("html/interaction-loop.html");
 #[cfg(not(debug_assertions))]
 const NESTING_HTML: &str = include_str!("html/nesting.html");
@@ -43,6 +45,10 @@ pub(super) fn append_nav(ui: &mut DocumentBuilder) {
 
 pub(super) fn append_interaction_cards(ui: &mut DocumentBuilder) {
     interaction_cards_fragment().append_to_builder(ui);
+}
+
+pub(super) fn append_interaction_controls(ui: &mut DocumentBuilder) {
+    interaction_controls_fragment().append_to_builder(ui);
 }
 
 pub(super) fn append_interaction_loop(ui: &mut DocumentBuilder) {
@@ -94,6 +100,7 @@ pub(super) fn asset_revision() -> u64 {
     topbar_source().hash(&mut hasher);
     nav_source().hash(&mut hasher);
     interaction_cards_source().hash(&mut hasher);
+    interaction_controls_source().hash(&mut hasher);
     interaction_loop_source().hash(&mut hasher);
     nesting_source().hash(&mut hasher);
     graph_source().hash(&mut hasher);
@@ -119,6 +126,11 @@ fn nav_fragment() -> HtmlDocument {
 fn interaction_cards_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&interaction_cards_source())
         .expect("lab interaction cards HTML is valid")
+}
+
+fn interaction_controls_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&interaction_controls_source())
+        .expect("lab interaction controls HTML is valid")
 }
 
 fn interaction_loop_fragment() -> HtmlDocument {
@@ -217,6 +229,23 @@ fn interaction_cards_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(INTERACTION_CARDS_HTML)
+    }
+}
+
+fn interaction_controls_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        return Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/interaction-controls.html"
+            ))
+            .expect("lab interaction controls HTML file should be readable"),
+        );
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(INTERACTION_CONTROLS_HTML)
     }
 }
 

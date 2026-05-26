@@ -535,6 +535,43 @@ fn html_document_maps_browser_boolean_state_attributes() {
 }
 
 #[test]
+fn html_document_maps_interactive_aria_roles_to_typed_elements() {
+    let html = HtmlDocument::parse_fragment(
+        r#"
+        <section id="controls">
+          <div id="profile" role="checkbox" on:click="profile.toggle"><span>Profile</span></div>
+          <div id="runtime" role="radio" selected on:click="runtime.local"><span>Local</span></div>
+          <div id="source" role="combobox" selected><span>CSV</span></div>
+          <div id="filter" role="textbox" autofocus><span>pipeline_name</span></div>
+        </section>
+        "#,
+    )
+    .expect("interactive ARIA roles should parse");
+    let mut document = html
+        .to_document(Size::new(320.0, 180.0))
+        .expect("interactive ARIA roles should emit a document");
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let snapshot = output.snapshot();
+    let profile = snapshot.find("profile").expect("checkbox role should emit");
+    let runtime = snapshot.find("runtime").expect("radio role should emit");
+    let source = snapshot.find("source").expect("combobox role should emit");
+    let filter = snapshot.find("filter").expect("textbox role should emit");
+
+    assert_eq!(profile.element(), Element::Checkbox);
+    assert_eq!(runtime.element(), Element::Radio);
+    assert_eq!(source.element(), Element::Select);
+    assert_eq!(filter.element(), Element::Input);
+    assert_eq!(profile.role(), Some("checkbox"));
+    assert!(profile.interactive());
+    assert!(runtime.selected());
+    assert!(source.selected());
+    assert!(filter.focused());
+    assert_eq!(profile.behavior_hooks()[0].command, "profile.toggle");
+}
+
+#[test]
 fn html_document_maps_icon_glyph_metadata() {
     let html = HtmlDocument::parse_fragment(
         r#"<icon id="handle" class="handle" data-glyph="drag-handle"></icon>"#,

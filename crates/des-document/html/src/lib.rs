@@ -1658,7 +1658,7 @@ impl HtmlNode {
             .id
             .clone()
             .unwrap_or_else(|| stable_element_id(&self.tag, path));
-        let mut spec = ElementSpec::new(element_for_tag(&self.tag)).classes(self.classes.clone());
+        let mut spec = ElementSpec::new(element_for_node(self)).classes(self.classes.clone());
         if let Some(role) = &self.role {
             spec = spec.role(role.clone());
         }
@@ -3554,6 +3554,16 @@ fn element_for_tag(tag: &str) -> Element {
         "th" => Element::Th,
         "td" => Element::Td,
         _ => Element::Div,
+    }
+}
+
+fn element_for_node(node: &HtmlNode) -> Element {
+    match node.role.as_deref() {
+        Some("checkbox") => Element::Checkbox,
+        Some("radio") => Element::Radio,
+        Some("combobox") => Element::Select,
+        Some("textbox" | "searchbox") => Element::Input,
+        _ => element_for_tag(&node.tag),
     }
 }
 
