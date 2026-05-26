@@ -1449,6 +1449,9 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
     let registry = DocumentCommandRegistry::new()
         .bind_click("project.run", HtmlAction::Run)
         .bind_key_down("project.search", HtmlAction::Search);
+    let mapped_registry = DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
+    let intent_mapped_registry =
+        DocumentCommandRegistry::new().bind_key_down("project.search", HtmlAction::Search);
 
     let output = html
         .update(Size::new(320.0, 180.0))
@@ -1474,40 +1477,32 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
         )
         .expect("HTML should configure typed actions for one update");
     let mapped_click_frame = html
-        .update_with_input_actions_with_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            [("project.run", HtmlAction::Run)],
+            &mapped_registry,
         )
         .expect("HTML should map commands for one update");
     let mapped_click_values = html
-        .update_with_input_actions_with_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            [("project.run", HtmlAction::Run)],
+            &mapped_registry,
         )
         .expect("HTML should map commands directly to action values")
         .into_action_values();
     let intent_mapped_key_frame = html
-        .update_with_input_actions_with_intent_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.search",
-                HtmlAction::Search,
-            )],
+            &intent_mapped_registry,
         )
         .expect("HTML should map intent-scoped commands for one update");
     let intent_mapped_key_values = html
-        .update_with_input_actions_with_intent_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.search",
-                HtmlAction::Search,
-            )],
+            &intent_mapped_registry,
         )
         .expect("HTML should map intent-scoped commands directly to action values")
         .into_action_values();
@@ -1517,17 +1512,14 @@ fn html_document_updates_and_collects_actions_without_css_plumbing() {
         })
         .expect("HTML should configure typed actions for a no-input update");
     let mapped_empty_frame = html
-        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .update_actions(Size::new(320.0, 180.0), &mapped_registry)
         .expect("HTML should map commands for a no-input update");
     let mapped_empty_values = html
-        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .update_actions(Size::new(320.0, 180.0), &mapped_registry)
         .expect("HTML should map no-input commands directly to action values")
         .into_action_values();
     let intent_mapped_empty_values = html
-        .update_actions_with_intent_actions(
-            Size::new(320.0, 180.0),
-            [(ElementBehaviorEvent::Click, "project.run", HtmlAction::Run)],
-        )
+        .update_actions(Size::new(320.0, 180.0), &mapped_registry)
         .expect("HTML should map no-input intent commands directly to action values")
         .into_action_values();
     let key_input_frame = html
@@ -2262,6 +2254,9 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
             &registry,
         )
         .expect("HTML bundle should collect keyboard actions directly");
+    let mapped_registry = DocumentCommandRegistry::new().bind_click("project.run", HtmlAction::Run);
+    let intent_mapped_registry =
+        DocumentCommandRegistry::new().bind_key_down("project.filter", HtmlAction::Filter);
     let configured_click_frame = bundle
         .update_with_input_actions_with(
             Size::new(320.0, 180.0),
@@ -2273,40 +2268,32 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         )
         .expect("HTML bundle should configure typed actions for one update");
     let mapped_click_frame = bundle
-        .update_with_input_actions_with_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            [("project.run", HtmlAction::Run)],
+            &mapped_registry,
         )
         .expect("HTML bundle should map commands for one update");
     let mapped_click_values = bundle
-        .update_with_input_actions_with_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::primary_click(Point::new(8.0, 8.0)),
-            [("project.run", HtmlAction::Run)],
+            &mapped_registry,
         )
         .expect("HTML bundle should map commands directly to action values")
         .into_action_values();
     let intent_mapped_key_frame = bundle
-        .update_with_input_actions_with_intent_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.filter",
-                HtmlAction::Filter,
-            )],
+            &intent_mapped_registry,
         )
         .expect("HTML bundle should map intent-scoped commands for one update");
     let intent_mapped_key_values = bundle
-        .update_with_input_actions_with_intent_actions(
+        .update_with_input_actions(
             Size::new(320.0, 180.0),
             DocumentInput::key_down(DocumentKey::Enter),
-            [(
-                ElementBehaviorEvent::KeyDown,
-                "project.filter",
-                HtmlAction::Filter,
-            )],
+            &intent_mapped_registry,
         )
         .expect("HTML bundle should map intent-scoped commands directly to action values")
         .into_action_values();
@@ -2316,17 +2303,14 @@ fn html_stylesheet_updates_and_collects_typed_actions_through_one_front_door() {
         })
         .expect("HTML bundle should configure typed actions for a no-input update");
     let mapped_empty_frame = bundle
-        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .update_actions(Size::new(320.0, 180.0), &mapped_registry)
         .expect("HTML bundle should map commands for a no-input update");
     let mapped_empty_values = bundle
-        .update_actions_with_actions(Size::new(320.0, 180.0), [("project.run", HtmlAction::Run)])
+        .update_actions(Size::new(320.0, 180.0), &mapped_registry)
         .expect("HTML bundle should map no-input commands directly to action values")
         .into_action_values();
     let intent_mapped_empty_values = bundle
-        .update_actions_with_intent_actions(
-            Size::new(320.0, 180.0),
-            [(ElementBehaviorEvent::Click, "project.run", HtmlAction::Run)],
-        )
+        .update_actions(Size::new(320.0, 180.0), &mapped_registry)
         .expect("HTML bundle should map no-input intent commands directly to action values")
         .into_action_values();
     let mut dispatched = Vec::new();

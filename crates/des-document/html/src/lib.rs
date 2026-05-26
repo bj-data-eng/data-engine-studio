@@ -856,34 +856,6 @@ impl HtmlDocument {
         self.update_actions(viewport, &registry)
     }
 
-    /// Resolves this HTML tree and maps command names to typed Rust actions.
-    pub fn update_actions_with_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_actions(viewport, &registry)
-    }
-
-    /// Resolves this HTML tree and maps intent-scoped commands to actions.
-    pub fn update_actions_with_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
-        self.update_actions(viewport, &registry)
-    }
-
     /// Routes input through this HTML tree with an empty stylesheet.
     pub fn update_with_input(
         &self,
@@ -920,36 +892,6 @@ impl HtmlDocument {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
-        self.update_with_input_actions(viewport, input, &registry)
-    }
-
-    /// Routes input through this HTML tree and maps command names to typed actions.
-    pub fn update_with_input_actions_with_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_with_input_actions(viewport, input, &registry)
-    }
-
-    /// Routes input through this HTML tree and maps intent-scoped commands.
-    pub fn update_with_input_actions_with_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions(viewport, input, &registry)
     }
 
@@ -2188,34 +2130,6 @@ impl HtmlStylesheet {
         self.update_actions(viewport, &registry)
     }
 
-    /// Creates a view, resolves it, and maps command names to typed actions.
-    pub fn update_actions_with_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_actions(viewport, &registry)
-    }
-
-    /// Creates a view, resolves it, and maps intent-scoped commands to actions.
-    pub fn update_actions_with_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
-        self.update_actions(viewport, &registry)
-    }
-
     /// Creates a view, routes input, and returns the resolved output frame.
     pub fn update_with_input(
         &self,
@@ -2252,36 +2166,6 @@ impl HtmlStylesheet {
     {
         let mut registry = DocumentCommandRegistry::new();
         configure(&mut registry);
-        self.update_with_input_actions(viewport, input, &registry)
-    }
-
-    /// Creates a view, routes input, and maps command names to typed actions.
-    pub fn update_with_input_actions_with_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_action_registry(actions);
-        self.update_with_input_actions(viewport, input, &registry)
-    }
-
-    /// Creates a view, routes input, and maps intent-scoped commands.
-    pub fn update_with_input_actions_with_intent_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        input: DocumentInput,
-        actions: impl IntoIterator<Item = (ElementBehaviorEvent, Command, Action)>,
-    ) -> HtmlResult<DocumentActionFrame<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let registry = self.command_intent_action_registry(actions);
         self.update_with_input_actions(viewport, input, &registry)
     }
 
