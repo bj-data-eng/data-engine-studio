@@ -11,6 +11,12 @@ const LAB_BODY_HTML: &str = include_str!("html/lab-body.html");
 #[cfg(not(debug_assertions))]
 const STAGE_HTML: &str = include_str!("html/stage.html");
 #[cfg(not(debug_assertions))]
+const DEBUG_OVERLAY_ROOT_HTML: &str = include_str!("html/debug-overlay-root.html");
+#[cfg(not(debug_assertions))]
+const DEBUG_OVERLAY_HTML: &str = include_str!("html/debug-overlay.html");
+#[cfg(not(debug_assertions))]
+const DEBUG_OVERLAY_TITLE_HTML: &str = include_str!("html/debug-overlay-title.html");
+#[cfg(not(debug_assertions))]
 const TOPBAR_HTML: &str = include_str!("html/topbar.html");
 #[cfg(not(debug_assertions))]
 const NAV_HTML: &str = include_str!("html/nav.html");
@@ -63,6 +69,32 @@ pub(super) fn append_lab_body(
 
 pub(super) fn append_stage(ui: &mut DocumentBuilder, children: impl FnOnce(&mut DocumentBuilder)) {
     append_shell_slot(ui, stage_fragment(), "stage", children);
+}
+
+pub(super) fn append_debug_overlay_root(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(
+        ui,
+        debug_overlay_root_fragment(),
+        "debug-overlay-root",
+        children,
+    );
+}
+
+pub(super) fn append_debug_overlay(
+    ui: &mut DocumentBuilder,
+    children: impl FnOnce(&mut DocumentBuilder),
+) {
+    append_shell_slot(ui, debug_overlay_fragment(), "debug-overlay", |ui| {
+        append_debug_overlay_title(ui);
+        children(ui);
+    });
+}
+
+fn append_debug_overlay_title(ui: &mut DocumentBuilder) {
+    debug_overlay_title_fragment().append_to_builder(ui);
 }
 
 pub(super) fn append_topbar(ui: &mut DocumentBuilder) {
@@ -142,6 +174,9 @@ pub(super) fn asset_revision() -> u64 {
     lab_root_source().hash(&mut hasher);
     lab_body_source().hash(&mut hasher);
     stage_source().hash(&mut hasher);
+    debug_overlay_root_source().hash(&mut hasher);
+    debug_overlay_source().hash(&mut hasher);
+    debug_overlay_title_source().hash(&mut hasher);
     topbar_source().hash(&mut hasher);
     nav_source().hash(&mut hasher);
     interaction_shell_source().hash(&mut hasher);
@@ -173,6 +208,20 @@ fn lab_body_fragment() -> HtmlDocument {
 
 fn stage_fragment() -> HtmlDocument {
     HtmlDocument::parse_fragment(&stage_source()).expect("lab stage HTML is valid")
+}
+
+fn debug_overlay_root_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&debug_overlay_root_source())
+        .expect("lab debug overlay root HTML is valid")
+}
+
+fn debug_overlay_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&debug_overlay_source()).expect("lab debug overlay HTML is valid")
+}
+
+fn debug_overlay_title_fragment() -> HtmlDocument {
+    HtmlDocument::parse_fragment(&debug_overlay_title_source())
+        .expect("lab debug overlay title HTML is valid")
 }
 
 fn topbar_fragment() -> HtmlDocument {
@@ -376,6 +425,57 @@ fn stage_source() -> Cow<'static, str> {
     #[cfg(not(debug_assertions))]
     {
         Cow::Borrowed(STAGE_HTML)
+    }
+}
+
+fn debug_overlay_root_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/debug-overlay-root.html"
+            ))
+            .expect("lab debug overlay root HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DEBUG_OVERLAY_ROOT_HTML)
+    }
+}
+
+fn debug_overlay_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/debug-overlay.html"
+            ))
+            .expect("lab debug overlay HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DEBUG_OVERLAY_HTML)
+    }
+}
+
+fn debug_overlay_title_source() -> Cow<'static, str> {
+    #[cfg(debug_assertions)]
+    {
+        Cow::Owned(
+            std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/ui_lab/html/debug-overlay-title.html"
+            ))
+            .expect("lab debug overlay title HTML file should be readable"),
+        )
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Cow::Borrowed(DEBUG_OVERLAY_TITLE_HTML)
     }
 }
 

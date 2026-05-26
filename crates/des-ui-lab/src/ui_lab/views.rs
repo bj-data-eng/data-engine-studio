@@ -280,201 +280,192 @@ pub(super) fn render_drag_overlay_layer(
 }
 
 pub(super) fn render_debug_overlay_layer(ui: &mut des_document::DocumentBuilder, perf: UiLabPerf) {
-    ui.element(
-        "debug-overlay",
-        ElementSpec::new(Element::Div).class("debug-overlay"),
-        |ui| {
-            ui.text_element(
-                "debug-overlay-title",
-                ElementSpec::new(Element::Text).class("debug-overlay-title"),
-                "UI Lab Runtime",
-            );
-            debug_metric_row(
-                ui,
-                "debug-stylesheet-time",
-                "stylesheet",
-                format_duration(perf.stylesheet_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-document-time",
-                "document",
-                format_duration(perf.document_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-engine-time",
-                "engine",
-                format_duration(perf.engine_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-paint-time",
-                "paint",
-                format_duration(perf.paint_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-elements",
-                "elements",
-                perf.metrics.element_count.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-scrollbars",
-                "scrollbars",
-                perf.metrics.scroll_chrome_count.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-cache",
-                "text cache",
-                format!(
-                    "{} text / {} glyph / {} new / {} cached / {} pages",
-                    perf.text_paint.glyphs_painted,
-                    perf.text_paint.glyph_cache_hits,
-                    perf.text_paint.rasterizations,
-                    perf.text_paint.cached_glyphs,
-                    perf.text_paint.atlas_pages
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-layout-cache",
-                "text layout",
-                format!(
-                    "{} hit / {} miss / {} cached",
-                    perf.text_paint.layout_cache_hits,
-                    perf.text_paint.layout_cache_misses,
-                    perf.text_paint.layout_cache_entries
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-paint-run-cache",
-                "text paint runs",
-                format!(
-                    "{} hit / {} miss / {} cached",
-                    perf.text_paint.paint_run_cache_hits,
-                    perf.text_paint.paint_run_cache_misses,
-                    perf.text_paint.paint_run_cache_entries
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-mesh-cache",
-                "text mesh cache",
-                format!(
-                    "{} hit / {} miss / {} cached",
-                    perf.text_paint.glyph_mesh_cache_hits,
-                    perf.text_paint.glyph_mesh_cache_misses,
-                    perf.text_paint.glyph_mesh_cache_entries
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-measure",
-                "text measure",
-                format!(
-                    "{} / {}",
-                    perf.text_paint.measure_requests,
-                    format_duration(perf.text_paint.measure_time)
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-glyph-run",
-                "text glyph run",
-                format!(
-                    "{} / {}",
-                    perf.text_paint.paint_text_requests,
-                    format_duration(perf.text_paint.glyph_run_time)
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-hit-test",
-                "text hit test",
-                format!(
-                    "{} / {}",
-                    perf.text_paint.hit_test_requests,
-                    format_duration(perf.text_paint.hit_test_time)
-                ),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-atlas-time",
-                "text atlas",
-                format_duration(perf.text_paint.glyph_atlas_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-glyph-image-time",
-                "text glyph image",
-                format_duration(perf.text_paint.glyph_image_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-upload-time",
-                "text upload",
-                format_duration(perf.text_paint.glyph_upload_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-glyph-paint-time",
-                "text glyph paint",
-                format_duration(perf.text_paint.glyph_paint_time),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-glyph-meshes",
-                "text glyph meshes",
-                perf.text_paint.glyph_meshes.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-text-pixels",
-                "text upload px",
-                perf.text_paint.uploaded_pixels.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-input-cache",
-                "input cache hit",
-                perf.metrics.reused_cached_layout.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-final-layout",
-                "final relayout skipped",
-                perf.metrics.reused_input_layout.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-input-changed",
-                "input changed",
-                perf.metrics.input_changed_state.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-style-changed",
-                "style changed",
-                perf.metrics.animation_changed_style.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-layout-changed",
-                "layout changed",
-                perf.metrics.animation_changed_layout.to_string(),
-            );
-            debug_metric_row(
-                ui,
-                "debug-paint-changed",
-                "paint changed",
-                perf.metrics.animation_changed_paint.to_string(),
-            );
-        },
-    );
+    super::html::append_debug_overlay(ui, |ui| {
+        debug_metric_row(
+            ui,
+            "debug-stylesheet-time",
+            "stylesheet",
+            format_duration(perf.stylesheet_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-document-time",
+            "document",
+            format_duration(perf.document_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-engine-time",
+            "engine",
+            format_duration(perf.engine_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-paint-time",
+            "paint",
+            format_duration(perf.paint_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-elements",
+            "elements",
+            perf.metrics.element_count.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-scrollbars",
+            "scrollbars",
+            perf.metrics.scroll_chrome_count.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-cache",
+            "text cache",
+            format!(
+                "{} text / {} glyph / {} new / {} cached / {} pages",
+                perf.text_paint.glyphs_painted,
+                perf.text_paint.glyph_cache_hits,
+                perf.text_paint.rasterizations,
+                perf.text_paint.cached_glyphs,
+                perf.text_paint.atlas_pages
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-layout-cache",
+            "text layout",
+            format!(
+                "{} hit / {} miss / {} cached",
+                perf.text_paint.layout_cache_hits,
+                perf.text_paint.layout_cache_misses,
+                perf.text_paint.layout_cache_entries
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-paint-run-cache",
+            "text paint runs",
+            format!(
+                "{} hit / {} miss / {} cached",
+                perf.text_paint.paint_run_cache_hits,
+                perf.text_paint.paint_run_cache_misses,
+                perf.text_paint.paint_run_cache_entries
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-mesh-cache",
+            "text mesh cache",
+            format!(
+                "{} hit / {} miss / {} cached",
+                perf.text_paint.glyph_mesh_cache_hits,
+                perf.text_paint.glyph_mesh_cache_misses,
+                perf.text_paint.glyph_mesh_cache_entries
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-measure",
+            "text measure",
+            format!(
+                "{} / {}",
+                perf.text_paint.measure_requests,
+                format_duration(perf.text_paint.measure_time)
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-glyph-run",
+            "text glyph run",
+            format!(
+                "{} / {}",
+                perf.text_paint.paint_text_requests,
+                format_duration(perf.text_paint.glyph_run_time)
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-hit-test",
+            "text hit test",
+            format!(
+                "{} / {}",
+                perf.text_paint.hit_test_requests,
+                format_duration(perf.text_paint.hit_test_time)
+            ),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-atlas-time",
+            "text atlas",
+            format_duration(perf.text_paint.glyph_atlas_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-glyph-image-time",
+            "text glyph image",
+            format_duration(perf.text_paint.glyph_image_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-upload-time",
+            "text upload",
+            format_duration(perf.text_paint.glyph_upload_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-glyph-paint-time",
+            "text glyph paint",
+            format_duration(perf.text_paint.glyph_paint_time),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-glyph-meshes",
+            "text glyph meshes",
+            perf.text_paint.glyph_meshes.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-text-pixels",
+            "text upload px",
+            perf.text_paint.uploaded_pixels.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-input-cache",
+            "input cache hit",
+            perf.metrics.reused_cached_layout.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-final-layout",
+            "final relayout skipped",
+            perf.metrics.reused_input_layout.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-input-changed",
+            "input changed",
+            perf.metrics.input_changed_state.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-style-changed",
+            "style changed",
+            perf.metrics.animation_changed_style.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-layout-changed",
+            "layout changed",
+            perf.metrics.animation_changed_layout.to_string(),
+        );
+        debug_metric_row(
+            ui,
+            "debug-paint-changed",
+            "paint changed",
+            perf.metrics.animation_changed_paint.to_string(),
+        );
+    });
 }
 
 fn debug_metric_row(

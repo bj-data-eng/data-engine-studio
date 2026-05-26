@@ -3328,25 +3328,40 @@ fn format_duration_for_test(duration: Duration) -> String {
 #[test]
 fn debug_overlay_reports_split_text_paint_timings() {
     let mut document = Document::build(Size::new(TEST_WIDTH, TEST_HEIGHT), |ui| {
-        render_debug_overlay_layer(
-            ui,
-            UiLabPerf {
-                text_paint: TextPaintStats {
-                    glyph_image_time: std::time::Duration::from_micros(1_250),
-                    glyph_upload_time: std::time::Duration::from_micros(2_500),
-                    glyph_paint_time: std::time::Duration::from_micros(3_750),
-                    glyph_meshes: 9,
-                    glyph_mesh_cache_hits: 7,
-                    glyph_mesh_cache_misses: 2,
-                    glyph_mesh_cache_entries: 5,
-                    ..TextPaintStats::default()
+        html::append_debug_overlay_root(ui, |ui| {
+            render_debug_overlay_layer(
+                ui,
+                UiLabPerf {
+                    text_paint: TextPaintStats {
+                        glyph_image_time: std::time::Duration::from_micros(1_250),
+                        glyph_upload_time: std::time::Duration::from_micros(2_500),
+                        glyph_paint_time: std::time::Duration::from_micros(3_750),
+                        glyph_meshes: 9,
+                        glyph_mesh_cache_hits: 7,
+                        glyph_mesh_cache_misses: 2,
+                        glyph_mesh_cache_entries: 5,
+                        ..TextPaintStats::default()
+                    },
+                    ..UiLabPerf::default()
                 },
-                ..UiLabPerf::default()
-            },
-        );
+            );
+        });
     });
     let output = DocumentEngine::default().update(&mut document, &stylesheet());
 
+    let root = frame(&output, "debug-overlay-root");
+    let overlay = frame(&output, "debug-overlay");
+    let title = frame(&output, "debug-overlay-title");
+    assert_eq!(root.element, Element::Div);
+    assert!(has_class(root, "debug-overlay-root"));
+    assert_eq!(overlay.element, Element::Div);
+    assert!(has_class(overlay, "debug-overlay"));
+    assert_eq!(title.element, Element::Span);
+    assert!(has_class(title, "debug-overlay-title"));
+    assert_eq!(
+        frame_text(&output, "debug-overlay-title"),
+        Some("UI Lab Runtime")
+    );
     assert_eq!(
         frame_text(&output, "debug-text-glyph-image-time-label"),
         Some("text glyph image")

@@ -982,13 +982,9 @@ impl UiLabState {
         viewport: egui::Vec2,
     ) {
         let mut document = Document::build(Size::new(viewport.x, viewport.y), |ui| {
-            ui.element(
-                "debug-overlay-root",
-                ElementSpec::new(Element::Div).class("debug-overlay-root"),
-                |ui| {
-                    render_debug_overlay_layer(ui, self.last_perf);
-                },
-            );
+            html::append_debug_overlay_root(ui, |ui| {
+                render_debug_overlay_layer(ui, self.last_perf);
+            });
         });
         let mut engine = DocumentEngine::default();
         let stylesheet = self.active_stylesheet();
