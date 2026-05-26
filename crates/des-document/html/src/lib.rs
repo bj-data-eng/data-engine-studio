@@ -207,6 +207,16 @@ impl HtmlDocument {
         )
     }
 
+    /// Reads and parses an HTML fragment file using a `body` context element.
+    pub fn load_fragment(path: impl AsRef<Path>) -> HtmlResult<Self> {
+        let path = path.as_ref();
+        Self::parse_with_source(
+            &fs::read_to_string(path)?,
+            path.display().to_string(),
+            HtmlParseKind::Fragment,
+        )
+    }
+
     /// Parses an HTML fragment using a `body` context element.
     pub fn parse_fragment(source: &str) -> HtmlResult<Self> {
         Self::parse_with_source(source, "inline HTML", HtmlParseKind::Fragment)
@@ -250,6 +260,17 @@ impl HtmlDocument {
     /// Returns the top-level parsed HTML nodes in source order.
     pub fn children(&self) -> &[HtmlNode] {
         &self.children
+    }
+
+    /// Appends the parsed HTML nodes into an existing document builder.
+    ///
+    /// This lets applications use browser-authored fragments for stable chrome
+    /// while continuing to project dynamic Rust-owned regions into the same
+    /// retained document.
+    pub fn append_to_builder(&self, builder: &mut DocumentBuilder) {
+        for (index, child) in self.children.iter().enumerate() {
+            child.write_to_document_builder(builder, &[index]);
+        }
     }
 
     /// Returns non-fatal diagnostics collected while mapping HTML semantics.

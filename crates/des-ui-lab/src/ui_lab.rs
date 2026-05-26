@@ -1,3 +1,4 @@
+mod html;
 mod styles;
 #[cfg(test)]
 mod tests;
@@ -11,7 +12,7 @@ use des_egui::adapter::{
 use styles::stylesheet;
 use views::{
     DragLabState, StageRenderState, render_debug_overlay_layer, render_drag_overlay_layer,
-    render_nav, render_stage, render_topbar,
+    render_stage,
 };
 
 use des_document::{
@@ -100,21 +101,13 @@ impl LabView {
             Self::Graph => "view-graph",
         }
     }
+}
 
-    fn label(self) -> &'static str {
-        match self {
-            Self::Layout => "Layout",
-            Self::Interaction => "Interaction",
-            Self::Draggable => "Draggable",
-            Self::Styling => "Styling",
-            Self::Animation => "Animation",
-            Self::Scrolling => "Scrolling",
-            Self::Floating => "Floating",
-            Self::Table => "Table",
-            Self::Text => "Text",
-            Self::Nesting => "Nesting",
-            Self::Graph => "Graph",
-        }
+fn lab_subtitle(debug_overlay: bool) -> &'static str {
+    if debug_overlay {
+        "document layout, style, input, and graph experiments / debug"
+    } else {
+        "document layout, style, input, and graph experiments"
     }
 }
 
@@ -851,12 +844,12 @@ impl UiLabState {
                 "lab-root",
                 ElementSpec::new(Element::Div).class("lab-root"),
                 |ui| {
-                    render_topbar(ui, debug_overlay);
+                    html::append_topbar(ui);
                     ui.element(
                         "lab-body",
                         ElementSpec::new(Element::Div).class("lab-body"),
                         |ui| {
-                            render_nav(ui, self.view);
+                            html::append_nav(ui);
                             render_stage(
                                 ui,
                                 StageRenderState::new(self.view)
@@ -898,6 +891,12 @@ impl UiLabState {
                 },
             );
         });
+        document
+            .set_text("subtitle", lab_subtitle(debug_overlay))
+            .expect("lab HTML subtitle should exist");
+        document
+            .select(self.view.id())
+            .expect("lab HTML nav item should exist");
         if self.view == LabView::Interaction {
             self.apply_interaction_document_state(&mut document);
         }

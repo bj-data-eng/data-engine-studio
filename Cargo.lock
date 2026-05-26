@@ -828,6 +828,7 @@ dependencies = [
  "des-document",
  "des-egui",
  "des-graph-egui",
+ "des-html",
  "des-text",
  "des-widgets",
  "eframe",

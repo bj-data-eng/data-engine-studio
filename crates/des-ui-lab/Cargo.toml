@@ -13,6 +13,7 @@ des-app.workspace = true
 des-core.workspace = true
 des-graph-egui.workspace = true
 des-document.workspace = true
+des-html.workspace = true
 des-egui.workspace = true
 des-text.workspace = true
 des-widgets.workspace = true

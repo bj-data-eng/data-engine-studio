@@ -1,7 +1,7 @@
 use des_document::{
-    DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine, DocumentInput,
-    DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId, Length, Point, Size,
-    Style, StyleSheet,
+    Document, DocumentCommandDispatchReport, DocumentCommandRegistry, DocumentEngine,
+    DocumentInput, DocumentKey, DocumentProjection, Element, ElementBehaviorEvent, ElementId,
+    ElementSpec, Length, Point, Size, Style, StyleSheet,
 };
 #[cfg(debug_assertions)]
 use des_html::HtmlStylesheetFile;
@@ -457,6 +457,36 @@ fn html_document_emits_typed_document_nodes_with_stable_ids() {
     assert_eq!(run.text(), Some("Run".to_owned()));
     assert_eq!(generated_paragraph.text(), Some("Ready".to_owned()));
     assert_eq!(run.rect().size.width, 80.0);
+}
+
+#[test]
+fn html_document_appends_fragment_to_document_builder() {
+    let html = HtmlDocument::parse_fragment(
+        r#"<nav id="nav" class="nav"><button id="view-layout" on:click="view-layout">Layout</button></nav>"#,
+    )
+    .expect("HTML fragment should parse");
+    let mut document = Document::build(Size::new(320.0, 180.0), |ui| {
+        ui.element("app", ElementSpec::new(Element::Div), |ui| {
+            html.append_to_builder(ui);
+            ui.text_element("stage", ElementSpec::new(Element::Text), "Rust stage");
+        });
+    });
+    let mut engine = DocumentEngine::default();
+
+    let output = engine.update(&mut document, &StyleSheet::new());
+    let snapshot = output.snapshot();
+    let nav = snapshot.find("nav").expect("HTML nav should be emitted");
+    let button = snapshot
+        .find("view-layout")
+        .expect("HTML command button should be emitted");
+    let stage = snapshot
+        .find("stage")
+        .expect("Rust-authored sibling should still be emitted");
+
+    assert_eq!(nav.element(), Element::Nav);
+    assert_eq!(button.element(), Element::Button);
+    assert_eq!(button.behavior_hooks()[0].command, "view-layout");
+    assert_eq!(stage.text(), Some("Rust stage".to_owned()));
 }
 
 #[test]

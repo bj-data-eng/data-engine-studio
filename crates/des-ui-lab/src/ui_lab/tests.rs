@@ -913,6 +913,28 @@ fn nav_uses_explicit_card_spacing_and_styled_scrollbar() {
 }
 
 #[test]
+fn lab_chrome_is_authored_from_html_fragments() {
+    let output = lab_output("text");
+    let topbar = frame(&output, "topbar");
+    let title = frame(&output, "title");
+    let nav = frame(&output, "nav");
+    let selected_view = frame(&output, "view-text");
+    let layout_view = frame(&output, "view-layout");
+
+    assert_eq!(topbar.element, Element::Header);
+    assert_eq!(title.element, Element::H1);
+    assert_eq!(nav.element, Element::Nav);
+    assert!(selected_view.selected);
+    assert!(!layout_view.selected);
+    assert!(
+        layout_view
+            .behavior_hooks
+            .iter()
+            .any(|hook| { hook.event == "click" && hook.command == "view-layout" })
+    );
+}
+
+#[test]
 fn lab_shell_tracks_document_viewport_size() {
     for viewport in [Size::new(1180.0, 720.0), Size::new(1480.0, 920.0)] {
         let output = lab_output_with_size("layout", viewport);
