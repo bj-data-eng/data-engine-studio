@@ -283,64 +283,6 @@ impl ContextMenu {
         Ok(self.action_surface_with_stylesheet(viewport, stylesheet, action_for))
     }
 
-    /// Builds a menu action surface from `(command, action)` pairs.
-    pub fn action_surface_with_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> DocumentActionSurface<Action>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.action_surface_with_stylesheet_and_actions(viewport, StyleSheet::new(), actions)
-    }
-
-    /// Builds a styled menu action surface from `(command, action)` pairs.
-    pub fn action_surface_with_stylesheet_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        stylesheet: StyleSheet,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> DocumentActionSurface<Action>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)
-            .expect("context menu projection targets rendered elements")
-    }
-
-    /// Builds a menu action surface with strict CSS and `(command, action)` pairs.
-    pub fn action_surface_with_css_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> Result<DocumentActionSurface<Action>, CssParseError>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let stylesheet = StyleSheet::from_css(css)?;
-        Ok(self.action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions))
-    }
-
-    /// Builds a menu action surface with forgiving CSS and `(command, action)` pairs.
-    pub fn action_surface_with_css_forgiving_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> Result<DocumentActionSurface<Action>, CssParseError>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
-        Ok(self.action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions))
-    }
-
     /// Tries to build a menu action surface, returning document projection errors.
     pub fn try_action_surface<Action>(
         &self,
@@ -383,66 +325,6 @@ impl ContextMenu {
     ) -> DocumentAuthoringResult<DocumentActionSurface<Action>> {
         let stylesheet = StyleSheet::from_css_forgiving(css)?;
         Ok(self.try_action_surface_with_stylesheet(viewport, stylesheet, action_for)?)
-    }
-
-    /// Tries to build a menu action surface from `(command, action)` pairs.
-    pub fn try_action_surface_with_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> DocumentResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        self.try_action_surface_with_stylesheet_and_actions(viewport, StyleSheet::new(), actions)
-    }
-
-    /// Tries to build a styled menu action surface from `(command, action)` pairs.
-    pub fn try_action_surface_with_stylesheet_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        stylesheet: StyleSheet,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> DocumentResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let view = DocumentView::compose(viewport)
-            .stylesheet(stylesheet)
-            .try_widget(self)?;
-        Ok(view.action_surface(self.command_action_registry(actions)))
-    }
-
-    /// Tries to build a menu action surface with strict CSS and `(command, action)` pairs.
-    pub fn try_action_surface_with_css_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let stylesheet = StyleSheet::from_css(css)?;
-        Ok(self.try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?)
-    }
-
-    /// Tries to build a menu action surface with forgiving CSS and `(command, action)` pairs.
-    pub fn try_action_surface_with_css_forgiving_and_actions<Action, Command>(
-        &self,
-        viewport: Size,
-        css: &str,
-        actions: impl IntoIterator<Item = (Command, Action)>,
-    ) -> DocumentAuthoringResult<DocumentActionSurface<Action>>
-    where
-        Action: Clone,
-        Command: AsRef<str>,
-    {
-        let stylesheet = StyleSheet::from_css_forgiving(css)?;
-        Ok(self.try_action_surface_with_stylesheet_and_actions(viewport, stylesheet, actions)?)
     }
 
     /// Pushes typed command bindings for enabled command items into a registry.
@@ -851,62 +733,46 @@ mod tests {
             Copy,
             Rename,
         }
+        fn action_for(item: &ContextMenuItem) -> Option<MenuAction> {
+            match item.command_name() {
+                Some("copy-selection") => Some(MenuAction::Copy),
+                Some("rename-selection") => Some(MenuAction::Rename),
+                _ => None,
+            }
+        }
 
         let menu = ContextMenu::new("row-menu")
             .command_item("copy", "Copy", "copy-selection")
             .command_item("rename", "Rename", "rename-selection")
             .disabled_item("paste", "Paste");
-        let mut surface =
-            menu.action_surface(Size::new(240.0, 140.0), |item| match item.command_name() {
-                Some("copy-selection") => Some(MenuAction::Copy),
-                Some("rename-selection") => Some(MenuAction::Rename),
-                _ => None,
-            });
-        let mut mapped_surface = menu.action_surface_with_actions(
-            Size::new(240.0, 140.0),
-            [
-                ("copy-selection", MenuAction::Copy),
-                ("rename-selection", MenuAction::Rename),
-            ],
-        );
+        let mut surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
+        let mut mapped_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let mut css_surface = menu
-            .action_surface_with_css(Size::new(240.0, 140.0), "#copy { height: 34px; }", |item| {
-                match item.command_name() {
-                    Some("copy-selection") => Some(MenuAction::Copy),
-                    Some("rename-selection") => Some(MenuAction::Rename),
-                    _ => None,
-                }
-            })
+            .action_surface_with_css(
+                Size::new(240.0, 140.0),
+                "#copy { height: 34px; }",
+                action_for,
+            )
             .expect("strict CSS should create a mapped context menu action surface");
         let mut css_mapped_surface = menu
-            .action_surface_with_css_and_actions(
+            .action_surface_with_css(
                 Size::new(240.0, 140.0),
                 "#copy { height: 35px; }",
-                [
-                    ("copy-selection", MenuAction::Copy),
-                    ("rename-selection", MenuAction::Rename),
-                ],
+                action_for,
             )
             .expect("strict CSS should create a command/action context menu surface");
         let mut forgiving_css_surface = menu
             .try_action_surface_with_css_forgiving(
                 Size::new(240.0, 140.0),
                 ".ignored { unknown-property: yes; } #copy { height: 37px; }",
-                |item| match item.command_name() {
-                    Some("copy-selection") => Some(MenuAction::Copy),
-                    Some("rename-selection") => Some(MenuAction::Rename),
-                    _ => None,
-                },
+                action_for,
             )
             .expect("forgiving CSS should create a context menu action surface");
         let mut forgiving_css_mapped_surface = menu
-            .try_action_surface_with_css_forgiving_and_actions(
+            .try_action_surface_with_css_forgiving(
                 Size::new(240.0, 140.0),
                 ".ignored { unknown-property: yes; } #copy { height: 38px; }",
-                [
-                    ("copy-selection", MenuAction::Copy),
-                    ("rename-selection", MenuAction::Rename),
-                ],
+                action_for,
             )
             .expect("forgiving CSS should create a mapped context menu surface");
 
@@ -924,12 +790,7 @@ mod tests {
             .update_with_input_actions(DocumentInput::primary_click(Point::new(2.0, 2.0)));
         let action_values: Vec<_> = frame.action_values().copied().collect();
         let mapped_action_values: Vec<_> = mapped_frame.action_values().copied().collect();
-        let mut dispatch_surface =
-            menu.action_surface(Size::new(240.0, 140.0), |item| match item.command_name() {
-                Some("copy-selection") => Some(MenuAction::Copy),
-                Some("rename-selection") => Some(MenuAction::Rename),
-                _ => None,
-            });
+        let mut dispatch_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let mut dispatched = Vec::new();
         let (dispatch_frame, dispatch_report) = dispatch_surface.update_with_input_and_dispatch(
             DocumentInput::primary_click(Point::new(2.0, 2.0)),
@@ -937,25 +798,14 @@ mod tests {
                 dispatched.push(*action.action());
             },
         );
-        let mut value_dispatch_surface = menu.action_surface_with_actions(
-            Size::new(240.0, 140.0),
-            [
-                ("copy-selection", MenuAction::Copy),
-                ("rename-selection", MenuAction::Rename),
-            ],
-        );
+        let mut value_dispatch_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let mut dispatched_values = Vec::new();
         let (value_dispatch_frame, value_dispatch_report) = value_dispatch_surface
             .update_with_input_and_dispatch_action_values(
                 DocumentInput::primary_click(Point::new(2.0, 2.0)),
                 |action| dispatched_values.push(*action),
             );
-        let mut empty_surface =
-            menu.action_surface(Size::new(240.0, 140.0), |item| match item.command_name() {
-                Some("copy-selection") => Some(MenuAction::Copy),
-                Some("rename-selection") => Some(MenuAction::Rename),
-                _ => None,
-            });
+        let mut empty_surface = menu.action_surface(Size::new(240.0, 140.0), action_for);
         let empty_frame = empty_surface.update_actions();
         let copy = frame.output().snapshot().find("copy").unwrap();
         let paste = frame.output().snapshot().find("paste").unwrap();
