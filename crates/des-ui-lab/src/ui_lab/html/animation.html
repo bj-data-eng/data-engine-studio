@@ -1,0 +1,79 @@
+<h2 id="animation-heading" class="heading">Animation Specimens</h2>
+<p id="animation-copy" class="muted">
+  Each specimen isolates one state selector and the style properties it animates.
+</p>
+<section id="animation-grid" class="animation-grid">
+  <article id="animation-hover-size" class="animation-specimen">
+    <h3 id="animation-hover-size-title" class="box-label">Hovered</h3>
+    <p id="animation-hover-size-note" class="box-note">width and height animate while the pointer is over the specimen</p>
+    <span id="animation-hover-size-rule-0" class="box-rule">base: width Px(150); height Px(58)</span>
+    <span id="animation-hover-size-rule-1" class="box-rule">hovered: width Px(220); height Px(84)</span>
+    <div id="animation-hover-size-surface" class="animation-surface">
+      <div id="animation-hover-size-box" class="animation-box animation-box-hover-size" data-interactive="true">
+        <span id="animation-hover-size-box-label" class="animation-box-label">Hovered</span>
+        <span id="animation-hover-size-box-body" class="animation-box-body">state-driven transition</span>
+      </div>
+    </div>
+  </article>
+  <article id="animation-hover-margin" class="animation-specimen">
+    <h3 id="animation-hover-margin-title" class="box-label">Hovered Margin</h3>
+    <p id="animation-hover-margin-note" class="box-note">margin animates inside the parent and pushes neighboring boxes</p>
+    <span id="animation-hover-margin-rule-0" class="box-rule">base: margin all sides 0</span>
+    <span id="animation-hover-margin-rule-1" class="box-rule">hovered: margin all sides 18</span>
+    <div id="animation-hover-margin-surface" class="animation-surface">
+      <div id="animation-hover-margin-row" class="animation-margin-row">
+        <div id="animation-hover-margin-before" class="animation-margin-chip animation-margin-reference"></div>
+        <div id="animation-hover-margin-target" class="animation-margin-chip animation-box-hover-margin" data-interactive="true"></div>
+        <div id="animation-hover-margin-after" class="animation-margin-chip animation-margin-reference"></div>
+      </div>
+    </div>
+  </article>
+  <article id="animation-pressed-border" class="animation-specimen">
+    <h3 id="animation-pressed-border-title" class="box-label">Pressed</h3>
+    <p id="animation-pressed-border-note" class="box-note">border width and corner radius animate while primary pointer is down</p>
+    <span id="animation-pressed-border-rule-0" class="box-rule">base: border width all sides 2; radius all corners 4</span>
+    <span id="animation-pressed-border-rule-1" class="box-rule">pressed: border width all sides 10; radius all corners 22</span>
+    <div id="animation-pressed-border-surface" class="animation-surface">
+      <div id="animation-pressed-border-box" class="animation-box animation-box-pressed-border" data-interactive="true">
+        <span id="animation-pressed-border-box-label" class="animation-box-label">Pressed</span>
+        <span id="animation-pressed-border-box-body" class="animation-box-body">state-driven transition</span>
+      </div>
+    </div>
+  </article>
+  <article id="animation-selected-spacing" class="animation-specimen">
+    <h3 id="animation-selected-spacing-title" class="box-label">Selected</h3>
+    <p id="animation-selected-spacing-note" class="box-note">size, spacing, color, radius, and font size animate from selected state</p>
+    <span id="animation-selected-spacing-rule-0" class="box-rule">base: width 150; height 58; padding 8; margin 0; radius 4</span>
+    <span id="animation-selected-spacing-rule-1" class="box-rule">selected: width 210; height 92; padding 16; margin 10; radius 12</span>
+    <div id="animation-selected-spacing-surface" class="animation-surface">
+      <div id="animation-selected-spacing-box" class="animation-box animation-box-selected-spacing" data-interactive="true" selected>
+        <span id="animation-selected-spacing-box-label" class="animation-box-label" selected>Selected</span>
+        <span id="animation-selected-spacing-box-body" class="animation-box-body" selected>state-driven transition</span>
+      </div>
+    </div>
+  </article>
+  <article id="animation-disabled-color" class="animation-specimen">
+    <h3 id="animation-disabled-color-title" class="box-label">Disabled</h3>
+    <p id="animation-disabled-color-note" class="box-note">background, border color, and text color animate from disabled state</p>
+    <span id="animation-disabled-color-rule-0" class="box-rule">base: background; border; text color</span>
+    <span id="animation-disabled-color-rule-1" class="box-rule">disabled: muted background; muted border; muted text color</span>
+    <div id="animation-disabled-color-surface" class="animation-surface">
+      <div id="animation-disabled-color-box" class="animation-box animation-box-disabled-color" data-interactive="true" disabled>
+        <span id="animation-disabled-color-box-label" class="animation-box-label" disabled>Disabled</span>
+        <span id="animation-disabled-color-box-body" class="animation-box-body" disabled>state-driven transition</span>
+      </div>
+    </div>
+  </article>
+  <article id="animation-focused-min-size" class="animation-specimen">
+    <h3 id="animation-focused-min-size-title" class="box-label">Focused</h3>
+    <p id="animation-focused-min-size-note" class="box-note">size, border width, color, and radius animate from focused state</p>
+    <span id="animation-focused-min-size-rule-0" class="box-rule">base: width 150; height 58; border width 2; radius 4</span>
+    <span id="animation-focused-min-size-rule-1" class="box-rule">focused: width 226; height 88; border width 6; radius 16</span>
+    <div id="animation-focused-min-size-surface" class="animation-surface">
+      <div id="animation-focused-min-size-box" class="animation-box animation-box-focused-min-size" data-interactive="true" autofocus>
+        <span id="animation-focused-min-size-box-label" class="animation-box-label">Focused</span>
+        <span id="animation-focused-min-size-box-body" class="animation-box-body">state-driven transition</span>
+      </div>
+    </div>
+  </article>
+</section>

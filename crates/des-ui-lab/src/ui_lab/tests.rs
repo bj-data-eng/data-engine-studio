@@ -3429,6 +3429,17 @@ fn text_context_menu_closes_on_click_away() {
 fn animation_view_renders_state_driven_specimens() {
     let output = lab_output("animation");
 
+    assert_eq!(frame(&output, "animation-heading").element, Element::H2);
+    assert_eq!(frame(&output, "animation-copy").element, Element::P);
+    assert_eq!(frame(&output, "animation-grid").element, Element::Section);
+    assert_eq!(
+        frame(&output, "animation-hover-size").element,
+        Element::Article
+    );
+    assert_eq!(
+        frame(&output, "animation-hover-size-title").element,
+        Element::H3
+    );
     assert!(frame(&output, "animation-hover-size-box").interactive);
     assert!(frame(&output, "animation-hover-margin-target").interactive);
     assert!(frame(&output, "animation-pressed-border-box").interactive);
