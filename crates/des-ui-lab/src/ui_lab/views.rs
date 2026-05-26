@@ -2346,8 +2346,7 @@ fn animation_specimen(ui: &mut des_document::DocumentBuilder, specimen: Animatio
                                 ElementSpec::new(Element::Text)
                                     .class("animation-box-label")
                                     .selected(selected)
-                                    .disabled(disabled)
-                                    .focused(focused),
+                                    .disabled(disabled),
                                 title,
                             );
                             ui.text_element(
@@ -2355,8 +2354,7 @@ fn animation_specimen(ui: &mut des_document::DocumentBuilder, specimen: Animatio
                                 ElementSpec::new(Element::Text)
                                     .class("animation-box-body")
                                     .selected(selected)
-                                    .disabled(disabled)
-                                    .focused(focused),
+                                    .disabled(disabled),
                                 "state-driven transition",
                             );
                         },
